@@ -37,6 +37,34 @@ api.interceptors.response.use(
 // Auth Service
 export const authApi = {
   login: async (initData: string) => {
+    // Graceful fallback if API URL is missing (Demo Mode)
+    if (!API_BASE_URL) {
+       console.warn('API URL missing, simulating login success');
+       return {
+         success: true,
+         user: {
+            telegramId: 123456,
+            username: 'demo_user',
+            firstName: 'Demo User',
+            lastName: null,
+            photoUrl: null,
+            subscriptionActive: false,
+            subscriptionExpiresAt: null,
+            subscriptionPlan: null,
+            protectionEnabled: false,
+            defenseMode: 'zero_stock' as const,
+            wbKeyRef: null,
+            ozonKeyRef: null,
+            totalProducts: 5,
+            triggeredToday: 0,
+            savedAmount: 0,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            lastActiveAt: new Date(),
+         }
+       };
+    }
+
     const response = await api.post('/telegramAuth', { initData });
     // Validate response with Zod
     const ResponseSchema = z.object({
