@@ -3,7 +3,7 @@
 // Main application dashboard
 // ============================================
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useAppStore, useProductsStore } from '../stores';
 import { GlobalSwitch } from '../components/controls/GlobalSwitch';
 import { DashboardGrid } from '../components/dashboard/DashboardGrid';
@@ -119,8 +119,13 @@ export function DashboardPage() {
   const setProducts = useProductsStore((state) => state.setProducts);
   const setLoading = useProductsStore((state) => state.setLoading);
   
-  // Load mock data on mount
+  // Load mock data on mount - use ref to prevent double execution
+  const hasLoaded = useRef(false);
+  
   useEffect(() => {
+    if (hasLoaded.current) return;
+    hasLoaded.current = true;
+    
     setLoading(true);
     // Simulate API call
     const timer = setTimeout(() => {
@@ -128,7 +133,7 @@ export function DashboardPage() {
     }, 500);
     
     return () => clearTimeout(timer);
-  }, []);
+  }, [setProducts, setLoading]);
   
   return (
     <div className="min-h-screen bg-gradient-to-b from-stone-900 to-stone-800 px-4 py-6 pb-24">
