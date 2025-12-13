@@ -7,7 +7,8 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DashboardPage } from './pages/DashboardPage';
 import { useAppStore } from './stores';
-import { initTelegramWebApp, getTelegramUser, isTelegramWebApp } from './lib/telegram';
+import { initTelegramWebApp, isTelegramWebApp, getInitData } from './lib/telegram';
+import { authApi } from './lib/api';
 import './index.css';
 
 // Loading screen component
@@ -89,40 +90,52 @@ function App() {
   const [isInitialized, setIsInitialized] = useState(false);
   
   useEffect(() => {
+    let mounted = true;
+
     async function init() {
       try {
         // Initialize Telegram WebApp
         if (isTelegramWebApp()) {
           initTelegramWebApp();
           
-          const tgUser = getTelegramUser();
-          if (tgUser) {
-            // TODO: Fetch full user from backend
-            // For now, use mock with TG data
-            setUser({
-              ...MOCK_USER,
-              telegramId: tgUser.id,
-              username: tgUser.username ?? null,
-              firstName: tgUser.first_name,
-              lastName: tgUser.last_name ?? null,
-              photoUrl: tgUser.photo_url ?? null,
-            });
+          const initData = getInitData();
+          if (initData) {
+              try {
+                  const response = await authApi.login(initData);
+                  if (mounted && response.success && response.user) {
+                      setUser(response.user);
+                  }
+              } catch (err) {
+                  console.error("Auth failed:", err);
+              }
           }
         } else {
           console.log('🔧 Development mode: Using mock user');
-          setUser(MOCK_USER);
+          if (mounted) {
+            setUser(MOCK_USER);
+          }
         }
       } catch (error) {
         console.error('Initialization error:', error);
       } finally {
-        // Simulate minimum loading time for smooth UX
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        setLoading(false);
-        setIsInitialized(true);
+        if (mounted) {
+           // Batch updates if possible, or simple timeout
+           // Delay slightly to avoid React sync state clash during mount
+           setTimeout(() => {
+             if (mounted) {
+               setLoading(false);
+               setIsInitialized(true);
+             }
+           }, 1000);
+        }
       }
     }
     
     init();
+    
+    return () => {
+      mounted = false;
+    };
   }, [setUser, setLoading]);
   
   return (

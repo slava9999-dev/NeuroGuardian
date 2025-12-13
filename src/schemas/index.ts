@@ -5,6 +5,14 @@
 
 import { z } from 'zod';
 
+// Helper to handle Firestore Timestamps and ISO strings
+const zTimestamp = z.preprocess((val: any) => {
+  if (val && typeof val === 'object' && '_seconds' in val) {
+    return new Date(val._seconds * 1000);
+  }
+  return val;
+}, z.coerce.date());
+
 // ============================================
 // Marketplace Enums
 // ============================================
@@ -98,6 +106,7 @@ export const OzonProductInfoSchema = z.object({
   stocks: z.object({
     present: z.number(),
     reserved: z.number(),
+    101: z.number().optional(), // Often separate fields
   }).optional(),
 });
 
@@ -137,7 +146,7 @@ export const UserSchema = z.object({
   lastName: z.string().nullable(),
   photoUrl: z.string().nullable(),
   subscriptionActive: z.boolean(),
-  subscriptionExpiresAt: z.date().nullable(),
+  subscriptionExpiresAt: zTimestamp.nullable(),
   subscriptionPlan: z.enum(['trial', 'basic', 'pro']).nullable(),
   protectionEnabled: z.boolean(),
   defenseMode: DefenseModeSchema,
@@ -146,9 +155,9 @@ export const UserSchema = z.object({
   totalProducts: z.number(),
   triggeredToday: z.number(),
   savedAmount: z.number(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
-  lastActiveAt: z.date(),
+  createdAt: zTimestamp,
+  updatedAt: zTimestamp,
+  lastActiveAt: zTimestamp,
 });
 
 // Product schema for Firestore
@@ -171,10 +180,10 @@ export const ProductSchema = z.object({
   marketplace: MarketplaceSchema,
   status: ProductStatusSchema,
   isMonitored: z.boolean(),
-  lastCheckedAt: z.date(),
-  lastTriggeredAt: z.date().nullable(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
+  lastCheckedAt: zTimestamp,
+  lastTriggeredAt: zTimestamp.nullable(),
+  createdAt: zTimestamp,
+  updatedAt: zTimestamp,
 });
 
 // Log entry schema
@@ -187,7 +196,7 @@ export const LogEntrySchema = z.object({
   message: z.string(),
   metadata: z.record(z.string(), z.unknown()),
   isRead: z.boolean(),
-  createdAt: z.date(),
+  createdAt: zTimestamp,
 });
 
 // API Key input validation
