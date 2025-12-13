@@ -86,7 +86,10 @@ const MOCK_USER = {
 };
 
 function App() {
-  const { setUser, setLoading, isLoading } = useAppStore();
+  const setUser = useAppStore((state) => state.setUser);
+  const setLoading = useAppStore((state) => state.setLoading);
+  const isLoading = useAppStore((state) => state.isLoading);
+  
   const [isInitialized, setIsInitialized] = useState(false);
   
   useEffect(() => {
@@ -119,8 +122,6 @@ function App() {
         console.error('Initialization error:', error);
       } finally {
         if (mounted) {
-           // Batch updates if possible, or simple timeout
-           // Delay slightly to avoid React sync state clash during mount
            setTimeout(() => {
              if (mounted) {
                setLoading(false);

@@ -116,8 +116,9 @@ const MOCK_PRODUCTS: Product[] = [
 ];
 
 export function DashboardPage() {
-  const { subscriptionDaysLeft } = useAppStore();
-  const { setProducts, setLoading } = useProductsStore();
+  const subscriptionDaysLeft = useAppStore((state) => state.subscriptionDaysLeft);
+  const setProducts = useProductsStore((state) => state.setProducts);
+  const setLoading = useProductsStore((state) => state.setLoading);
   
   // Load mock data on mount
   useEffect(() => {
