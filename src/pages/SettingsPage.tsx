@@ -6,11 +6,13 @@
 import { useState } from 'react';
 import { useAppStore } from '../stores';
 import { hapticFeedback } from '../lib/telegram';
+import { PaymentModal } from '../components/ui/PaymentModal';
 import type { DefenseMode } from '../types';
 
 export function SettingsPage({ onBack }: { onBack: () => void }) {
   const { user, defenseMode, setDefenseMode } = useAppStore();
   const [, setIsSaving] = useState(false);
+  const [showPayment, setShowPayment] = useState(false);
   
   const handleDefenseModeChange = async (mode: DefenseMode) => {
     hapticFeedback('light');
@@ -208,12 +210,28 @@ export function SettingsPage({ onBack }: { onBack: () => void }) {
           )}
           
           {!user?.subscriptionActive && (
-            <button className="btn-primary w-full mt-4">
+            <button 
+              onClick={() => {
+                hapticFeedback('light');
+                setShowPayment(true);
+              }}
+              className="btn-primary w-full mt-4"
+            >
               Оформить подписку
             </button>
           )}
         </div>
       </section>
+
+      {/* Payment Modal */}
+      <PaymentModal 
+        isOpen={showPayment} 
+        onClose={() => setShowPayment(false)}
+        onSuccess={() => {
+          // Reload user data after payment
+          window.location.reload();
+        }}
+      />
 
       {/* App info */}
       <section className="text-center text-stone-500 text-sm">
