@@ -3,7 +3,7 @@
 // Main application dashboard
 // ============================================
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAppStore, useProductsStore } from '../stores';
 import { GlobalSwitch } from '../components/controls/GlobalSwitch';
 import { DashboardGrid } from '../components/dashboard/DashboardGrid';
@@ -22,7 +22,7 @@ const MOCK_PRODUCTS: Product[] = [
     nmId: 123456789,
     vendorCode: 'SKU-001',
     title: 'Кроссовки Nike Air Max 270',
-    imageUrl: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=200',
+    imageUrl: '/products/sneakers_nike.webp',
     brand: 'Nike',
     currentPrice: 12500,
     minPrice: 10000,
@@ -42,7 +42,7 @@ const MOCK_PRODUCTS: Product[] = [
     nmId: 987654321,
     vendorCode: 'SKU-002',
     title: 'Худи Adidas Originals',
-    imageUrl: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=200',
+    imageUrl: '/products/hoodie_adidas.webp',
     brand: 'Adidas',
     currentPrice: 6500,
     minPrice: 5000,
@@ -62,7 +62,7 @@ const MOCK_PRODUCTS: Product[] = [
     offerId: 'OZON-SKU-003',
     vendorCode: 'SKU-003',
     title: 'Смартфон Samsung Galaxy S23',
-    imageUrl: 'https://images.unsplash.com/photo-1610945415295-d9bbf067e59c?w=200',
+    imageUrl: '/products/smartphone_samsung.webp',
     brand: 'Samsung',
     currentPrice: 89990,
     minPrice: 80000,
@@ -82,7 +82,7 @@ const MOCK_PRODUCTS: Product[] = [
     offerId: 'OZON-SKU-004',
     vendorCode: 'SKU-004',
     title: 'Наушники Sony WH-1000XM5',
-    imageUrl: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=200',
+    imageUrl: '/products/headphones_sony.webp',
     brand: 'Sony',
     currentPrice: 34990,
     minPrice: 0,
@@ -102,7 +102,7 @@ const MOCK_PRODUCTS: Product[] = [
     nmId: 555666777,
     vendorCode: 'SKU-005',
     title: 'Футболка Puma Essential',
-    imageUrl: 'https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=200',
+    imageUrl: '/products/tshirt_puma.webp',
     brand: 'Puma',
     currentPrice: 2990,
     minPrice: 2500,
@@ -120,23 +120,17 @@ const MOCK_PRODUCTS: Product[] = [
 export function DashboardPage() {
   const subscriptionDaysLeft = useAppStore((state) => state.subscriptionDaysLeft);
   const setProducts = useProductsStore((state) => state.setProducts);
-  const setLoading = useProductsStore((state) => state.setLoading);
+  const products = useProductsStore((state) => state.products);
   
-  // Load mock data on mount - use ref to prevent double execution
-  const hasLoaded = useRef(false);
-  
+  // Load mock data on mount
   useEffect(() => {
-    if (hasLoaded.current) return;
-    hasLoaded.current = true;
-    
-    setLoading(true);
-    // Simulate API call
-    const timer = setTimeout(() => {
+    // Only load if no products (prevents overwriting on HMR)
+    if (products.length === 0) {
+      console.log('📦 Loading mock products...');
       setProducts(MOCK_PRODUCTS);
-    }, 500);
-    
-    return () => clearTimeout(timer);
-  }, [setProducts, setLoading]);
+      console.log('✅ Mock products loaded:', MOCK_PRODUCTS.length);
+    }
+  }, [setProducts, products.length]);
   
   const [showHelp, setShowHelp] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
@@ -166,7 +160,6 @@ export function DashboardPage() {
               </svg>
               <span className="text-sm font-medium text-amber-400">Инструкция</span>
             </button>
-            {subscriptionDaysLeft !== null && (
             <button
               onClick={() => {
                 hapticFeedback('light');
@@ -174,20 +167,19 @@ export function DashboardPage() {
               }}
               className={`
                 px-3 py-1 rounded-full text-sm font-medium transition-all
-                ${subscriptionDaysLeft > 7 
+                ${subscriptionDaysLeft !== null && subscriptionDaysLeft > 7 
                   ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' 
-                  : subscriptionDaysLeft > 0
+                  : subscriptionDaysLeft !== null && subscriptionDaysLeft > 0
                     ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30'
-                    : 'bg-red-500/20 text-red-400 hover:bg-red-500/30 animate-pulse'
+                    : 'bg-gradient-to-r from-amber-500 to-amber-400 text-stone-900 hover:from-amber-400 hover:to-amber-300 animate-pulse shadow-lg shadow-amber-500/25'
                 }
               `}
             >
-              {subscriptionDaysLeft > 0 
+              {subscriptionDaysLeft !== null && subscriptionDaysLeft > 0 
                 ? `${subscriptionDaysLeft} ${getDaysWord(subscriptionDaysLeft)}`
                 : '💳 Оплатить'
               }
             </button>
-            )}
           </div>
         </div>
         <p className="text-stone-400 text-sm">

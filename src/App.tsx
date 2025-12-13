@@ -64,14 +64,15 @@ function LoadingScreen() {
 }
 
 // Mock user for development outside Telegram
+// 💡 To test payment button: set subscriptionActive: false and subscriptionExpiresAt: null
 const MOCK_USER = {
   telegramId: 123456789,
   username: 'dev_user',
   firstName: 'Developer',
   lastName: 'Mode',
   photoUrl: null,
-  subscriptionActive: true,
-  subscriptionExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+  subscriptionActive: false,  // ⬅️ FALSE to show payment button for testing
+  subscriptionExpiresAt: null, // ⬅️ NULL for testing - payment button will show
   subscriptionPlan: 'pro' as const,
   protectionEnabled: false,
   defenseMode: 'zero_stock' as const,
@@ -99,8 +100,6 @@ function App() {
     if (initPerformed.current) return;
     initPerformed.current = true;
 
-    let mounted = true;
-
     async function init() {
       try {
         console.log('🚀 App initialization started...');
@@ -115,7 +114,7 @@ function App() {
               try {
                   console.log('🔐 Authenticating with InitData...');
                   const response = await authApi.login(initData);
-                  if (mounted && response.success && response.user) {
+                  if (response.success && response.user) {
                       console.log('✅ Authentication successful', response.user);
                       setUser(response.user);
                   }
@@ -125,31 +124,22 @@ function App() {
           }
         } else {
           console.log('🔧 Development mode: Using mock user');
-          if (mounted) {
-            setUser(MOCK_USER);
-          }
+          setUser(MOCK_USER);
         }
       } catch (error) {
         console.error('❌ Initialization error:', error);
-      } finally {
-        if (mounted) {
-           // Small delay to ensure smooth transition
-           setTimeout(() => {
-             if (mounted) {
-               console.log('✨ Initialization complete');
-               setLoading(false);
-               setIsInitialized(true);
-             }
-           }, 1000);
-        }
       }
+      
+      // Always complete initialization after delay
+      console.log('⏳ Completing initialization in 1s...');
+      setTimeout(() => {
+        console.log('✨ Initialization complete');
+        setLoading(false);
+        setIsInitialized(true);
+      }, 1000);
     }
     
     init();
-    
-    return () => {
-      mounted = false;
-    };
   }, []); // Empty dependency array to run only once
   
   return (
