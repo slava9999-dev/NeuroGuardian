@@ -204,6 +204,56 @@ export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
               </div>
             </div>
 
+            {/* Collapsible instructions */}
+            <details className="mb-6 group">
+              <summary className="flex items-center gap-2 cursor-pointer text-amber-400 text-sm hover:text-amber-300 transition-colors">
+                <svg 
+                  width="16" 
+                  height="16" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="2"
+                  className="transition-transform group-open:rotate-90"
+                >
+                  <path d="m9 18 6-6-6-6" />
+                </svg>
+                Где получить API ключ?
+              </summary>
+              
+              <div className="mt-4 p-4 bg-stone-800/50 rounded-xl border border-stone-700">
+                {selectedMarketplace === 'WB' ? (
+                  <div className="space-y-3 text-sm text-stone-300">
+                    <p className="font-medium text-white">Инструкция для Wildberries:</p>
+                    <ol className="list-decimal list-inside space-y-2">
+                      <li>Откройте <a href="https://seller.wildberries.ru" target="_blank" rel="noopener" className="text-purple-400 underline">seller.wildberries.ru</a></li>
+                      <li>Перейдите в <span className="text-white">Профиль → Настройки</span></li>
+                      <li>Выберите <span className="text-white">Доступ к API</span></li>
+                      <li>Нажмите <span className="text-white">"Создать новый токен"</span></li>
+                      <li>Выберите права: <span className="text-amber-400">Контент, Цены, Склад</span></li>
+                      <li>Скопируйте полученный ключ</li>
+                    </ol>
+                    <div className="mt-3 p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                      <p className="text-amber-400 text-xs">⚠️ Ключ показывается только 1 раз! Сохраните его.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3 text-sm text-stone-300">
+                    <p className="font-medium text-white">Инструкция для Ozon:</p>
+                    <ol className="list-decimal list-inside space-y-2">
+                      <li>Откройте <a href="https://seller.ozon.ru" target="_blank" rel="noopener" className="text-blue-400 underline">seller.ozon.ru</a></li>
+                      <li>Перейдите в <span className="text-white">Настройки → API ключи</span></li>
+                      <li>Нажмите <span className="text-white">"Создать ключ"</span></li>
+                      <li>Скопируйте <span className="text-blue-400">API-ключ</span> и <span className="text-blue-400">Client ID</span></li>
+                    </ol>
+                    <div className="mt-3 p-2 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                      <p className="text-blue-400 text-xs">📌 Для Ozon нужны ОБА значения: API-ключ и Client ID</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </details>
+
             <div className="space-y-4 mb-8">
               <div>
                 <label className="block text-sm text-stone-400 mb-2">API Key</label>

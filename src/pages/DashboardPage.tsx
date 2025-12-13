@@ -3,11 +3,12 @@
 // Main application dashboard
 // ============================================
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAppStore, useProductsStore } from '../stores';
 import { GlobalSwitch } from '../components/controls/GlobalSwitch';
 import { DashboardGrid } from '../components/dashboard/DashboardGrid';
 import { LogConsole } from '../components/logPanel/LogConsole';
+import { HelpModal } from '../components/ui/HelpModal';
 import type { Product } from '../types';
 
 // Mock data for development
@@ -135,13 +136,31 @@ export function DashboardPage() {
     return () => clearTimeout(timer);
   }, [setProducts, setLoading]);
   
+  const [showHelp, setShowHelp] = useState(false);
+  
   return (
     <div className="min-h-screen bg-gradient-to-b from-stone-900 to-stone-800 px-4 py-6 pb-24">
+      {/* Help Modal */}
+      <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />
+      
       {/* Header */}
       <header className="mb-6">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-2xl font-bold text-gradient-amber">NeuroGUARDIAN</h1>
-          {subscriptionDaysLeft !== null && (
+          <div className="flex items-center gap-2">
+            {/* Help button */}
+            <button
+              onClick={() => setShowHelp(true)}
+              className="p-2 rounded-xl bg-stone-800 hover:bg-stone-700 transition-colors"
+              title="Помощь"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-stone-400">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+            </button>
+            {subscriptionDaysLeft !== null && (
             <div className={`
               px-3 py-1 rounded-full text-sm font-medium
               ${subscriptionDaysLeft > 7 
@@ -156,7 +175,8 @@ export function DashboardPage() {
                 : 'Подписка истекла'
               }
             </div>
-          )}
+            )}
+          </div>
         </div>
         <p className="text-stone-400 text-sm">
           Защита маржи от принудительных акций
