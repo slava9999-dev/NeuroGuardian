@@ -1,9 +1,5 @@
-// ============================================
-// NeuroGUARDIAN — Zustand Products Store
-// Products state management
-// ============================================
-
 import { create } from 'zustand';
+import { devtools, persist } from 'zustand/middleware';
 import type { Product, Marketplace, ProductStatus } from '../types';
 
 interface ProductsState {
@@ -18,8 +14,6 @@ interface ProductsState {
   searchQuery: string;
   sortBy: 'title' | 'price' | 'status' | 'lastChecked';
   sortOrder: 'asc' | 'desc';
-  
-  // Computed (derived in selectors)
   
   // Actions
   setProducts: (products: Product[]) => void;
@@ -40,58 +34,66 @@ interface ProductsState {
   setError: (error: string | null) => void;
 }
 
-export const useProductsStore = create<ProductsState>()((set) => ({
-  // Initial state
-  products: [],
-  isLoading: false,
-  error: null,
-  
-  // Default filters
-  marketplaceFilter: 'all',
-  statusFilter: 'all',
-  searchQuery: '',
-  sortBy: 'title',
-  sortOrder: 'asc',
-  
-  // Data actions
-  setProducts: (products) => set({ products, isLoading: false, error: null }),
-  
-  addProduct: (product) => set((state) => ({
-    products: [...state.products, product],
-  })),
-  
-  updateProduct: (id, updates) => set((state) => ({
-    products: state.products.map((p) =>
-      p.id === id ? { ...p, ...updates, updatedAt: new Date() } : p
+export const useProductsStore = create<ProductsState>()(
+  devtools(
+    persist(
+      (set) => ({
+        // Initial state
+        products: [],
+        isLoading: false,
+        error: null,
+        
+        // Default filters
+        marketplaceFilter: 'all',
+        statusFilter: 'all',
+        searchQuery: '',
+        sortBy: 'title',
+        sortOrder: 'asc',
+        
+        // Data actions
+        setProducts: (products) => set({ products, isLoading: false, error: null }, false, 'setProducts'),
+        
+        addProduct: (product) => set((state) => ({
+          products: [...state.products, product],
+        }), false, 'addProduct'),
+        
+        updateProduct: (id, updates) => set((state) => ({
+          products: state.products.map((p) =>
+            p.id === id ? { ...p, ...updates, updatedAt: new Date() } : p
+          ),
+        }), false, 'updateProduct'),
+        
+        removeProduct: (id) => set((state) => ({
+          products: state.products.filter((p) => p.id !== id),
+        }), false, 'removeProduct'),
+        
+        // Filter actions
+        setMarketplaceFilter: (marketplace) => set({ marketplaceFilter: marketplace }, false, 'setMarketplaceFilter'),
+        setStatusFilter: (status) => set({ statusFilter: status }, false, 'setStatusFilter'),
+        setSearchQuery: (query) => set({ searchQuery: query }, false, 'setSearchQuery'),
+        setSortBy: (sortBy) => set({ sortBy }, false, 'setSortBy'),
+        setSortOrder: (order) => set({ sortOrder: order }, false, 'setSortOrder'),
+        
+        clearFilters: () => set({
+          marketplaceFilter: 'all',
+          statusFilter: 'all',
+          searchQuery: '',
+        }, false, 'clearFilters'),
+        
+        // State actions
+        setLoading: (loading) => set({ isLoading: loading }, false, 'setLoading'),
+        setError: (error) => set({ error, isLoading: false }, false, 'setError'),
+      }),
+      {
+        name: 'arborius-products',
+        partialize: (state) => ({ products: state.products }),
+      }
     ),
-  })),
-  
-  removeProduct: (id) => set((state) => ({
-    products: state.products.filter((p) => p.id !== id),
-  })),
-  
-  // Filter actions
-  setMarketplaceFilter: (marketplace) => set({ marketplaceFilter: marketplace }),
-  setStatusFilter: (status) => set({ statusFilter: status }),
-  setSearchQuery: (query) => set({ searchQuery: query }),
-  setSortBy: (sortBy) => set({ sortBy }),
-  setSortOrder: (order) => set({ sortOrder: order }),
-  
-  clearFilters: () => set({
-    marketplaceFilter: 'all',
-    statusFilter: 'all',
-    searchQuery: '',
-  }),
-  
-  // State actions
-  setLoading: (loading) => set({ isLoading: loading }),
-  setError: (error) => set({ error, isLoading: false }),
-}));
+    { name: 'ProductStore' }
+  )
+);
 
-// ============================================
-// Selectors (for computed values)
-// ============================================
-
+// Selectors
 export const selectFilteredProducts = (state: ProductsState): Product[] => {
   let filtered = [...state.products];
   
@@ -132,7 +134,10 @@ export const selectFilteredProducts = (state: ProductsState): Product[] => {
         comparison = a.status.localeCompare(b.status);
         break;
       case 'lastChecked':
-        comparison = a.lastCheckedAt.getTime() - b.lastCheckedAt.getTime();
+        // Handle Date objects safely (rehydrated state might have strings)
+        const dateA = new Date(a.lastCheckedAt).getTime();
+        const dateB = new Date(b.lastCheckedAt).getTime();
+        comparison = dateA - dateB;
         break;
     }
     
