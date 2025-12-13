@@ -124,10 +124,12 @@ export function DashboardPage() {
   useEffect(() => {
     setLoading(true);
     // Simulate API call
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       setProducts(MOCK_PRODUCTS);
     }, 500);
-  }, [setProducts, setLoading]);
+    
+    return () => clearTimeout(timer);
+  }, []);
   
   return (
     <div className="min-h-screen bg-gradient-to-b from-stone-900 to-stone-800 px-4 py-6 pb-24">

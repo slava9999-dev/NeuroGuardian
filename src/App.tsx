@@ -2,7 +2,7 @@
 // NeuroGUARDIAN — Main App Entry
 // ============================================
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DashboardPage } from './pages/DashboardPage';
@@ -92,24 +92,35 @@ function App() {
   
   const [isInitialized, setIsInitialized] = useState(false);
   
+  const initPerformed = useRef(false);
+  
   useEffect(() => {
+    // Prevent double initialization (especially in React Strict Mode)
+    if (initPerformed.current) return;
+    initPerformed.current = true;
+
     let mounted = true;
 
     async function init() {
       try {
+        console.log('🚀 App initialization started...');
+        
         // Initialize Telegram WebApp
         if (isTelegramWebApp()) {
+          console.log('📱 Detected Telegram WebApp environment');
           initTelegramWebApp();
           
           const initData = getInitData();
           if (initData) {
               try {
+                  console.log('🔐 Authenticating with InitData...');
                   const response = await authApi.login(initData);
                   if (mounted && response.success && response.user) {
+                      console.log('✅ Authentication successful', response.user);
                       setUser(response.user);
                   }
               } catch (err) {
-                  console.error("Auth failed:", err);
+                  console.error("❌ Auth failed:", err);
               }
           }
         } else {
@@ -119,11 +130,13 @@ function App() {
           }
         }
       } catch (error) {
-        console.error('Initialization error:', error);
+        console.error('❌ Initialization error:', error);
       } finally {
         if (mounted) {
+           // Small delay to ensure smooth transition
            setTimeout(() => {
              if (mounted) {
+               console.log('✨ Initialization complete');
                setLoading(false);
                setIsInitialized(true);
              }
@@ -137,7 +150,7 @@ function App() {
     return () => {
       mounted = false;
     };
-  }, [setUser, setLoading]);
+  }, []); // Empty dependency array to run only once
   
   return (
     <AnimatePresence mode="wait">

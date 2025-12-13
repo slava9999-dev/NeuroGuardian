@@ -46,16 +46,24 @@ export function getInitData(): string {
   return tg?.initData ?? '';
 }
 
+let isInitialized = false;
 /**
  * Initialize Telegram WebApp
  * Call this on app startup
  */
 export function initTelegramWebApp(): void {
+  if (isInitialized) {
+    console.log('⚠️ Telegram WebApp already initialized');
+    return;
+  }
+
   const tg = getTelegramWebApp();
   if (!tg) {
     console.warn('⚠️ Not running in Telegram WebApp environment');
     return;
   }
+  
+  isInitialized = true;
   
   // Signal that the app is ready
   tg.ready();
