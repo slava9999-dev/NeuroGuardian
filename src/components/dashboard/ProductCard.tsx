@@ -13,43 +13,43 @@ interface ProductCardProps {
   product: Product;
 }
 
+interface StatusConfig {
+  color: string;
+  label: string;
+  glow: boolean;
+  pulse?: boolean;
+}
+
+const STATUS_CONFIG: Record<string, StatusConfig> = {
+  active: {
+    color: 'bg-stone-500',
+    label: 'Активен',
+    glow: false,
+  },
+  protected: {
+    color: 'bg-emerald-500',
+    label: 'Защищен',
+    glow: true,
+  },
+  triggered: {
+    color: 'bg-red-500',
+    label: 'АТАКА',
+    glow: true,
+    pulse: true,
+  },
+  disabled: {
+    color: 'bg-stone-600',
+    label: 'Отключен',
+    glow: false,
+  },
+};
+
 export function ProductCard({ product }: ProductCardProps) {
   const updateProduct = useProductsStore((s) => s.updateProduct);
   const [isEditing, setIsEditing] = useState(false);
   const [minPriceInput, setMinPriceInput] = useState(product.minPrice.toString());
   
-  interface StatusConfig {
-    color: string;
-    label: string;
-    glow: boolean;
-    pulse?: boolean;
-  }
-
-  const statusConfig: Record<string, StatusConfig> = {
-    active: {
-      color: 'bg-stone-500',
-      label: 'Активен',
-      glow: false,
-    },
-    protected: {
-      color: 'bg-emerald-500',
-      label: 'Защищен',
-      glow: true,
-    },
-    triggered: {
-      color: 'bg-red-500',
-      label: 'АТАКА',
-      glow: true,
-      pulse: true,
-    },
-    disabled: {
-      color: 'bg-stone-600',
-      label: 'Отключен',
-      glow: false,
-    },
-  };
-  
-  const status = statusConfig[product.status];
+  const status = STATUS_CONFIG[product.status];
   
   const handleMinPriceBlur = useCallback(() => {
     setIsEditing(false);
