@@ -76,7 +76,7 @@ export async function createPayment(params: CreatePaymentParams): Promise<Paymen
   }
   
   // Calculate amount with promo code
-  let amount = plan.price;
+  let amount: number = plan.price;
   let discount = 0;
   
   if (promoCode) {
