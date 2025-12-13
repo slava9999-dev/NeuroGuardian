@@ -4,7 +4,6 @@
 // ============================================
 
 import { useEffect } from 'react';
-import { motion } from 'framer-motion';
 import { useAppStore, useProductsStore } from '../stores';
 import { GlobalSwitch } from '../components/controls/GlobalSwitch';
 import { DashboardGrid } from '../components/dashboard/DashboardGrid';
@@ -134,11 +133,7 @@ export function DashboardPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-stone-900 to-stone-800 px-4 py-6 pb-24">
       {/* Header */}
-      <motion.header
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-6"
-      >
+      <header className="mb-6">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-2xl font-bold text-gradient-amber">NeuroGUARDIAN</h1>
           {subscriptionDaysLeft !== null && (
@@ -161,25 +156,15 @@ export function DashboardPage() {
         <p className="text-stone-400 text-sm">
           Защита маржи от принудительных акций
         </p>
-      </motion.header>
+      </header>
       
       {/* Global Switch */}
-      <motion.section
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="mb-6"
-      >
+      <section className="mb-6">
         <GlobalSwitch />
-      </motion.section>
+      </section>
       
       {/* Quick Stats */}
-      <motion.section
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="grid grid-cols-3 gap-3 mb-6"
-      >
+      <section className="grid grid-cols-3 gap-3 mb-6">
         <div className="glass-panel p-4 text-center">
           <div className="text-2xl font-bold text-white">₽42.5k</div>
           <div className="text-xs text-stone-400">Спасено</div>
@@ -192,16 +177,12 @@ export function DashboardPage() {
           <div className="text-2xl font-bold text-red-400">3</div>
           <div className="text-xs text-stone-400">Атак сегодня</div>
         </div>
-      </motion.section>
+      </section>
       
       {/* Products Dashboard */}
-      <motion.section
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-      >
+      <section>
         <DashboardGrid />
-      </motion.section>
+      </section>
       
       {/* Log Console */}
       <LogConsole />

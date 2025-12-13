@@ -4,7 +4,7 @@
 // ============================================
 
 import { useState, useCallback } from 'react';
-import { motion } from 'framer-motion';
+
 import type { Product } from '../../types';
 import { useProductsStore } from '../../stores';
 import { hapticFeedback } from '../../lib/telegram';
@@ -76,18 +76,15 @@ export function ProductCard({ product }: ProductCardProps) {
     ? ((product.currentPrice / product.minPrice) * 100 - 100).toFixed(1)
     : null;
   
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="glass-panel glass-panel-hover p-4 relative overflow-hidden"
+    <div
+      className="glass-panel glass-panel-hover p-4 relative overflow-hidden transition-all duration-300 transform hover:-translate-y-1"
     >
       {/* Triggered animation overlay */}
       {product.status === 'triggered' && (
-        <motion.div
-          className="absolute inset-0 bg-red-500/10 pointer-events-none"
-          animate={{ opacity: [0.1, 0.3, 0.1] }}
-          transition={{ duration: 1.5, repeat: Infinity }}
+        <div
+          className="absolute inset-0 bg-red-500/10 pointer-events-none animate-pulse"
         />
       )}
       
@@ -225,6 +222,6 @@ export function ProductCard({ product }: ProductCardProps) {
           <span>{product.stock} шт</span>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }
