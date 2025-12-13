@@ -153,27 +153,20 @@ function App() {
   }, []); // Empty dependency array to run only once
   
   return (
-    <AnimatePresence mode="wait">
+    <>
       {!isInitialized || isLoading ? (
-        <LoadingScreen key="loading" />
+        <LoadingScreen />
       ) : (
-        <motion.div
-          key="app"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-        >
-          <MemoryRouter>
-            <Routes>
-              <Route path="/" element={<DashboardPage />} />
-              {/* TODO: Add more routes */}
-              {/* <Route path="/onboarding" element={<OnboardingPage />} /> */}
-              {/* <Route path="/settings" element={<SettingsPage />} /> */}
-            </Routes>
-          </MemoryRouter>
-        </motion.div>
+        <MemoryRouter>
+          <Routes>
+            <Route path="/" element={<DashboardPage />} />
+            {/* TODO: Add more routes */}
+            {/* <Route path="/onboarding" element={<OnboardingPage />} /> */}
+            {/* <Route path="/settings" element={<SettingsPage />} /> */}
+          </Routes>
+        </MemoryRouter>
       )}
-    </AnimatePresence>
+    </>
   );
 }
 
