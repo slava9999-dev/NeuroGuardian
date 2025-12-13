@@ -1,73 +1,184 @@
-# React + TypeScript + Vite
+# 🛡️ NeuroGUARDIAN (Arborius Guardian)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Margin Defense System for WB & Ozon Sellers
 
-Currently, two official plugins are available:
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## React Compiler
+## 🚀 Quick Start
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Prerequisites
 
-## Expanding the ESLint configuration
+- Node.js 18+
+- Firebase CLI (`npm install -g firebase-tools`)
+- Google Cloud SDK (optional, for gcloud commands)
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Installation
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+```bash
+# Clone the repository
+git clone https://github.com/slava9999-dev/NeuroGuardian.git
+cd NeuroGuardian
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+# Install frontend dependencies
+npm install
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Install functions dependencies
+cd functions && npm install && cd ..
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Development
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```bash
+# Start frontend dev server
+npm run dev
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Start Firebase emulators (optional)
+firebase emulators:start
 ```
+
+### Build & Deploy
+
+```bash
+# Build frontend
+npm run build
+
+# Deploy to Vercel (automatic via GitHub)
+git push origin main
+
+# Deploy Cloud Functions
+cd functions && npm run build
+firebase deploy --only functions
+```
+
+---
+
+## 📋 Environment Variables
+
+### Frontend (.env)
+
+```env
+VITE_FIREBASE_API_KEY=your_api_key
+VITE_FIREBASE_AUTH_DOMAIN=arbarea-mobile-app.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=arbarea-mobile-app
+VITE_FIREBASE_STORAGE_BUCKET=arbarea-mobile-app.firebasestorage.app
+VITE_FIREBASE_MESSAGING_SENDER_ID=146520926544
+VITE_FIREBASE_APP_ID=1:146520926544:web:66400a01a273ce895702455
+VITE_FIREBASE_MEASUREMENT_ID=G-EDX3X5QY1R
+VITE_USE_EMULATORS=false
+VITE_API_BASE_URL=https://us-central1-arbarea-mobile-app.cloudfunctions.net
+```
+
+### Functions (.env)
+
+```env
+TELEGRAM_BOT_TOKEN=your_bot_token
+CLOUDPAYMENTS_API_SECRET=your_secret
+```
+
+---
+
+## 🏗️ Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    TELEGRAM MINI APP                        │
+│                   (React + Vite + TWA)                      │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                  FIREBASE CLOUD FUNCTIONS                   │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │  Gatekeeper  │  │    Sync      │  │   Sentinel   │      │
+│  │  (Auth/Pay)  │  │  (API Fetch) │  │  (Defense)   │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
+└─────────────────────────────────────────────────────────────┘
+                              │
+         ┌────────────────────┼────────────────────┐
+         ▼                    ▼                    ▼
+┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
+│   Firestore     │  │ Secret Manager  │  │  Cloud Tasks    │
+│   (Database)    │  │  (API Keys)     │  │  (Job Queue)    │
+└─────────────────┘  └─────────────────┘  └─────────────────┘
+```
+
+---
+
+## 📡 API Endpoints
+
+| Endpoint              | Method     | Description                            |
+| --------------------- | ---------- | -------------------------------------- |
+| `/telegramAuth`       | POST       | Authenticate via Telegram initData     |
+| `/paymentWebhook`     | POST       | CloudPayments webhook handler          |
+| `/saveApiKey`         | POST       | Save WB/Ozon API key to Secret Manager |
+| `/getProducts`        | GET        | Get user's products                    |
+| `/updateSettings`     | POST       | Update protection settings             |
+| `/updateMinPrice`     | POST       | Update product minPrice                |
+| `/sentinelDispatcher` | Scheduler  | Dispatch worker tasks                  |
+| `/sentinelWorker`     | Cloud Task | Check prices & execute defense         |
+
+---
+
+## 🛡️ Defense Modes
+
+### 1. Zero Stock Mode
+
+When price drops below minPrice, product stock is set to 0 (removed from sale).
+
+### 2. Price Correction Mode
+
+When price drops below minPrice, price is automatically corrected back to minPrice.
+
+---
+
+## 🔒 Security
+
+- **Telegram Auth**: HMAC-SHA256 validation of initData
+- **API Keys**: Stored in Google Cloud Secret Manager
+- **Firestore Rules**: Users can only access their own data
+- **Payment Webhooks**: Signature validation
+
+---
+
+## 📱 Telegram Bot Setup
+
+1. Create bot via [@BotFather](https://t.me/BotFather)
+2. Enable Mini Apps (Web App)
+3. Set Web App URL to your Vercel deployment
+4. Configure payment provider (optional)
+
+---
+
+## 🚀 Production Checklist
+
+- [ ] Set real Firebase API Key in .env
+- [ ] Configure Vercel Environment Variables
+- [ ] Deploy Cloud Functions
+- [ ] Create Cloud Tasks queue: `sentinel-worker-queue`
+- [ ] Enable Secret Manager API
+- [ ] Enable Artifact Registry API
+- [ ] Set up Telegram Bot
+- [ ] Configure payment webhook URL
+- [ ] Test full flow in Telegram
+
+---
+
+## 📊 Monitoring
+
+- Firebase Console: https://console.firebase.google.com/
+- Vercel Dashboard: https://vercel.com/
+- Cloud Functions Logs: `firebase functions:log`
+
+---
+
+## 📄 License
+
+MIT
+
+---
+
+## 👨‍💻 Author
+
+NeuroExpert Team
