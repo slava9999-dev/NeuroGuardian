@@ -3,26 +3,76 @@
 // Grid of product cards with filters
 // ============================================
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useProductsStore, selectFilteredProducts, selectProductStats } from '../../stores';
+import { useProductsStore } from '../../stores';
 import { ProductCard } from './ProductCard';
 import type { Marketplace, ProductStatus } from '../../types';
 
 export function DashboardGrid() {
-  const {
-    products,
-    isLoading,
-    marketplaceFilter,
-    statusFilter,
-    searchQuery,
-    setMarketplaceFilter,
-    setStatusFilter,
-    setSearchQuery,
-  } = useProductsStore();
-  
-  const filteredProducts = useProductsStore(selectFilteredProducts);
-  const stats = useProductsStore(selectProductStats);
+  const products = useProductsStore((state) => state.products);
+  const isLoading = useProductsStore((state) => state.isLoading);
+  const marketplaceFilter = useProductsStore((state) => state.marketplaceFilter);
+  const statusFilter = useProductsStore((state) => state.statusFilter);
+  const searchQuery = useProductsStore((state) => state.searchQuery);
+  const sortBy = useProductsStore((state) => state.sortBy);
+  const sortOrder = useProductsStore((state) => state.sortOrder);
+  const setMarketplaceFilter = useProductsStore((state) => state.setMarketplaceFilter);
+  const setStatusFilter = useProductsStore((state) => state.setStatusFilter);
+  const setSearchQuery = useProductsStore((state) => state.setSearchQuery);
+
+  // Memoize filtered products to prevent infinite re-renders
+  const filteredProducts = useMemo(() => {
+    let filtered = [...products];
+    
+    if (marketplaceFilter !== 'all') {
+      filtered = filtered.filter((p) => p.marketplace === marketplaceFilter);
+    }
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter((p) => p.status === statusFilter);
+    }
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (p) =>
+          p.title.toLowerCase().includes(query) ||
+          p.vendorCode.toLowerCase().includes(query) ||
+          p.nmId?.toString().includes(query) ||
+          p.offerId?.toLowerCase().includes(query)
+      );
+    }
+    
+    filtered.sort((a, b) => {
+      let comparison = 0;
+      switch (sortBy) {
+        case 'title':
+          comparison = a.title.localeCompare(b.title);
+          break;
+        case 'price':
+          comparison = a.currentPrice - b.currentPrice;
+          break;
+        case 'status':
+          comparison = a.status.localeCompare(b.status);
+          break;
+        case 'lastChecked':
+          comparison = new Date(a.lastCheckedAt).getTime() - new Date(b.lastCheckedAt).getTime();
+          break;
+      }
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+    
+    return filtered;
+  }, [products, marketplaceFilter, statusFilter, searchQuery, sortBy, sortOrder]);
+
+  // Memoize stats
+  const stats = useMemo(() => ({
+    total: products.length,
+    wbCount: products.filter((p) => p.marketplace === 'WB').length,
+    ozonCount: products.filter((p) => p.marketplace === 'Ozon').length,
+    activeCount: products.filter((p) => p.status === 'active').length,
+    triggeredCount: products.filter((p) => p.status === 'triggered').length,
+    protectedCount: products.filter((p) => p.minPrice > 0).length,
+  }), [products]);
   
   const [showFilters, setShowFilters] = useState(false);
   
