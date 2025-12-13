@@ -44,7 +44,7 @@ const SUBSCRIPTION_PLANS = [
   },
 ];
 
-export function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModalProps) {
+export function PaymentModal({ isOpen, onClose, onSuccess: _onSuccess }: PaymentModalProps) {
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,37 +74,62 @@ export function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModalProps) 
       
       if (tg?.openInvoice) {
         // Используем Telegram Payments
-        // Нужен backend для создания invoice
-        const response = await fetch('/api/createInvoice', {
+        // Создаём платёж через YooKassa API
+        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+        const response = await fetch(`${apiBaseUrl}/createPayment`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ planId: selectedPlan }),
+          body: JSON.stringify({ 
+            planId: selectedPlan,
+            returnUrl: window.location.href,
+          }),
         });
         
-        const { invoiceLink } = await response.json();
+        const data = await response.json();
+        if (!data.success) throw new Error(data.error || 'Ошибка создания платежа');
         
-        tg.openInvoice(invoiceLink, (status: string) => {
-          if (status === 'paid') {
-            hapticFeedback('success');
-            onSuccess?.();
-            onClose();
-          } else if (status === 'failed') {
-            setError('Оплата не прошла');
-            hapticFeedback('error');
+        const { confirmationUrl } = data;
+        
+        // Если есть Telegram openLink — используем его, иначе window.open
+        if (confirmationUrl) {
+          if (tg?.openLink) {
+            tg.openLink(confirmationUrl);
+          } else {
+            window.open(confirmationUrl, '_blank');
           }
+          // Закрываем модалку, оплата будет обработана через webhook
           setIsProcessing(false);
-        });
-      } else {
-        // Fallback: показываем информацию об оплате
-        // В продакшене здесь будет редирект на ЮКасса
-        const message = `Оплата тарифа "${plan.name}"\n\nСумма: ${plan.price}₽/месяц\n\nИнтеграция с ЮКасса будет доступна после настройки платёжной системы.`;
-        
-        if (window.Telegram?.WebApp?.showAlert) {
-          window.Telegram.WebApp.showAlert(message);
+          onClose();
         } else {
-          alert(message);
+          throw new Error('Не получена ссылка на оплату');
         }
-        setIsProcessing(false);
+      } else {
+        // Fallback: создаём платёж через API и редиректим
+        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+        if (apiBaseUrl) {
+          const response = await fetch(`${apiBaseUrl}/createPayment`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              planId: selectedPlan,
+              returnUrl: window.location.href,
+            }),
+          });
+          
+          const data = await response.json();
+          if (data.success && data.confirmationUrl) {
+            window.open(data.confirmationUrl, '_blank');
+            setIsProcessing(false);
+            onClose();
+          } else {
+            throw new Error(data.error || 'Ошибка создания платежа');
+          }
+        } else {
+          // Demo mode: показываем информацию
+          const message = `Оплата тарифа "${plan.name}"\n\nСумма: ${plan.price}₽/месяц\n\nДля включения платежей настройте VITE_API_BASE_URL.`;
+          alert(message);
+          setIsProcessing(false);
+        }
       }
     } catch (err: any) {
       setError(err.message || 'Ошибка оплаты');

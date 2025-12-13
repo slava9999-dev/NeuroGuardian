@@ -3,7 +3,7 @@
 // Main application dashboard
 // ============================================
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useAppStore, useProductsStore } from '../stores';
 import { GlobalSwitch } from '../components/controls/GlobalSwitch';
 import { DashboardGrid } from '../components/dashboard/DashboardGrid';
@@ -12,6 +12,14 @@ import { HelpModal } from '../components/ui/HelpModal';
 import { PaymentModal } from '../components/ui/PaymentModal';
 import { hapticFeedback } from '../lib/telegram';
 import type { Product } from '../types';
+
+// Format money with k abbreviation
+function formatMoney(amount: number): string {
+  if (amount >= 1000) {
+    return `₽${(amount / 1000).toFixed(1)}k`;
+  }
+  return `₽${amount}`;
+}
 
 // Mock data for development
 const MOCK_PRODUCTS: Product[] = [
@@ -119,14 +127,25 @@ const MOCK_PRODUCTS: Product[] = [
 
 export function DashboardPage() {
   const subscriptionDaysLeft = useAppStore((state) => state.subscriptionDaysLeft);
+  const user = useAppStore((state) => state.user);
   const setProducts = useProductsStore((state) => state.setProducts);
   const products = useProductsStore((state) => state.products);
   
-  // Load mock data on mount
+  // Calculate stats from real data
+  const stats = useMemo(() => {
+    const protectedCount = products.filter(p => p.minPrice > 0).length;
+    return {
+      savedAmount: user?.savedAmount ?? 0,
+      protectedCount,
+      triggeredToday: user?.triggeredToday ?? 0,
+    };
+  }, [user, products]);
+  
+  // Load mock data ONLY in development mode
   useEffect(() => {
-    // Only load if no products (prevents overwriting on HMR)
-    if (products.length === 0) {
-      console.log('📦 Loading mock products...');
+    // Only load mock data in development if no products exist
+    if (import.meta.env.DEV && products.length === 0) {
+      console.log('🔧 DEV MODE: Loading mock products...');
       setProducts(MOCK_PRODUCTS);
       console.log('✅ Mock products loaded:', MOCK_PRODUCTS.length);
     }
@@ -146,19 +165,19 @@ export function DashboardPage() {
       {/* Header */}
       <header className="mb-6">
         <div className="flex items-center justify-between mb-2">
-          <h1 className="text-2xl font-bold text-gradient-amber">NeuroGUARDIAN</h1>
-          <div className="flex items-center gap-2">
+          <h1 className="text-xl sm:text-2xl font-bold text-gradient-amber truncate mr-2">NeuroGUARDIAN</h1>
+          <div className="flex items-center gap-2 flex-shrink-0">
             {/* Instruction button - prominent */}
             <button
               onClick={() => setShowHelp(true)}
-              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-amber-600/20 border border-amber-500/40 hover:from-amber-500/30 hover:to-amber-600/30 transition-all flex items-center gap-1.5"
+              className="px-2 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-amber-600/20 border border-amber-500/40 hover:from-amber-500/30 hover:to-amber-600/30 transition-all flex items-center gap-1.5"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-amber-400">
                 <circle cx="12" cy="12" r="10" />
                 <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
                 <line x1="12" y1="17" x2="12.01" y2="17" />
               </svg>
-              <span className="text-sm font-medium text-amber-400">Инструкция</span>
+              <span className="text-sm font-medium text-amber-400 hidden sm:inline">Инструкция</span>
             </button>
             <button
               onClick={() => {
@@ -166,7 +185,7 @@ export function DashboardPage() {
                 setShowPayment(true);
               }}
               className={`
-                px-3 py-1 rounded-full text-sm font-medium transition-all
+                px-2 sm:px-3 py-1 rounded-full text-sm font-medium transition-all
                 ${subscriptionDaysLeft !== null && subscriptionDaysLeft > 7 
                   ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' 
                   : subscriptionDaysLeft !== null && subscriptionDaysLeft > 0
@@ -195,15 +214,21 @@ export function DashboardPage() {
       {/* Quick Stats */}
       <section className="grid grid-cols-3 gap-3 mb-6">
         <div className="glass-panel p-4 text-center">
-          <div className="text-2xl font-bold text-white">₽42.5k</div>
+          <div className="text-2xl font-bold text-white">
+            {formatMoney(stats.savedAmount)}
+          </div>
           <div className="text-xs text-stone-400">Спасено</div>
         </div>
         <div className="glass-panel p-4 text-center">
-          <div className="text-2xl font-bold text-emerald-400">24</div>
+          <div className="text-2xl font-bold text-emerald-400">
+            {stats.protectedCount}
+          </div>
           <div className="text-xs text-stone-400">Защищено</div>
         </div>
         <div className="glass-panel p-4 text-center">
-          <div className="text-2xl font-bold text-red-400">3</div>
+          <div className={`text-2xl font-bold ${stats.triggeredToday > 0 ? 'text-red-400' : 'text-stone-500'}`}>
+            {stats.triggeredToday}
+          </div>
           <div className="text-xs text-stone-400">Атак сегодня</div>
         </div>
       </section>

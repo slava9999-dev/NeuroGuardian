@@ -1,7 +1,7 @@
 # 🛡️ NeuroGUARDIAN — ПОЛНЫЙ АУДИТ ПРОЕКТА
 
-**Дата:** 2025-12-13
-**Версия:** 1.0.0
+**Дата:** 2025-12-14
+**Версия:** 1.0.2 (UI/UX фиксы)
 
 ---
 
@@ -213,6 +213,33 @@ allow read, write: if request.auth.token.admin == true;
 2. **Telegram Bot не настроен** — нужен токен от BotFather
 3. **YooKassa не настроена** — нужны shopId и secretKey
 4. **Реальные WB/Ozon API** — не протестированы с реальным магазином
+
+---
+
+## ✅ ИСПРАВЛЕНИЯ v1.0.1 (2025-12-14)
+
+### Критические исправления:
+
+1. **`firebase.json`** — Исправлен путь `hosting.public` с `frontend/dist` на `dist`
+2. **`PaymentModal.tsx`** — Исправлен неверный API endpoint `/api/createInvoice` → `${VITE_API_BASE_URL}/createPayment`
+3. **`PaymentModal.tsx`** — Исправлена логика открытия платёжной страницы YooKassa
+
+### Улучшения:
+
+4. **`DashboardPage.tsx`** — Quick Stats теперь показывают реальные данные из store (savedAmount, protectedCount, triggeredToday)
+5. **`DashboardPage.tsx`** — Mock data загружается только в DEV режиме (`import.meta.env.DEV`)
+6. **`DashboardPage.tsx`** — Добавлена функция `formatMoney()` для красивого отображения сумм
+
+### Улучшения UI/UX (v1.0.2):
+
+7. **`GlobalSwitch.tsx`** — Тексты переведены на русский (ARMED → ЗАЩИТА АКТИВНА)
+8. **`ProductCard.tsx`** — Внедрен `LazyImage` для надежной загрузки картинок с fallback
+9. **`DashboardPage.tsx`** — Адаптивный хедер: скрытие текста кнопок на мобильных, компактные отступы
+
+### TypeScript:
+
+- ✅ Frontend компилируется без ошибок
+- ✅ Backend (functions) компилируется без ошибок
 
 ---
 

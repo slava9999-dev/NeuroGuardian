@@ -8,6 +8,7 @@ import { useState, useCallback } from 'react';
 import type { Product } from '../../types';
 import { useProductsStore } from '../../stores';
 import { hapticFeedback } from '../../lib/telegram';
+import { LazyImage } from '../ui/LazyImage';
 
 interface ProductCardProps {
   product: Product;
@@ -49,7 +50,7 @@ export function ProductCard({ product }: ProductCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [minPriceInput, setMinPriceInput] = useState(product.minPrice.toString());
   
-  const status = STATUS_CONFIG[product.status];
+  const status = STATUS_CONFIG[product.status] || STATUS_CONFIG.active;
   
   const handleMinPriceBlur = useCallback(() => {
     setIsEditing(false);
@@ -61,7 +62,6 @@ export function ProductCard({ product }: ProductCardProps) {
         minPrice: newMinPrice,
         status: newMinPrice > 0 ? 'protected' : 'active',
       });
-      // TODO: Sync with Firestore
     }
   }, [minPriceInput, product.id, product.minPrice, updateProduct]);
   
@@ -75,17 +75,12 @@ export function ProductCard({ product }: ProductCardProps) {
   const pricePercent = product.minPrice > 0 
     ? ((product.currentPrice / product.minPrice) * 100 - 100).toFixed(1)
     : null;
-  
 
   return (
-    <div
-      className="glass-panel glass-panel-hover p-4 relative overflow-hidden transition-all duration-300 transform hover:-translate-y-1"
-    >
+    <div className="glass-panel glass-panel-hover p-4 relative overflow-hidden transition-all duration-300 transform hover:-translate-y-1">
       {/* Triggered animation overlay */}
       {product.status === 'triggered' && (
-        <div
-          className="absolute inset-0 bg-red-500/10 pointer-events-none animate-pulse"
-        />
+        <div className="absolute inset-0 bg-red-500/10 pointer-events-none animate-pulse" />
       )}
       
       {/* Header: Image + Title + Status */}
@@ -93,11 +88,10 @@ export function ProductCard({ product }: ProductCardProps) {
         {/* Product image */}
         <div className="w-16 h-16 rounded-xl bg-stone-800 overflow-hidden flex-shrink-0">
           {product.imageUrl ? (
-            <img
+            <LazyImage
               src={product.imageUrl}
               alt={product.title}
-              className="w-full h-full object-cover"
-              loading="lazy"
+              className="w-full h-full"
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-stone-600">

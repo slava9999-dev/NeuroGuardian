@@ -74,11 +74,11 @@ export function GlobalSwitch() {
         
         {/* Status text */}
         <div className="flex-1 text-right">
-            <div className="text-2xl font-bold text-white tracking-wider">
-              {protectionEnabled ? 'ARMED' : 'DISARMED'}
+            <div className="text-xl font-bold text-white tracking-wider">
+              {protectionEnabled ? 'ЗАЩИТА АКТИВНА' : 'ЗАЩИТА ОТКЛЮЧЕНА'}
             </div>
             <div className="text-sm text-white/70">
-              {protectionEnabled ? 'Нажмите для отключения' : 'Нажмите для активации'}
+              {protectionEnabled ? 'Выключить мониторинг' : 'Включить защиту'}
             </div>
         </div>
         
