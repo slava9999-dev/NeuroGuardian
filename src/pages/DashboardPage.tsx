@@ -6,9 +6,9 @@
 import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useAppStore, useProductsStore } from '../stores';
-import { GlobalSwitch } from '../components/controls/GlobalSwitch';
-import { DashboardGrid } from '../components/dashboard/DashboardGrid';
-import { LogConsole } from '../components/logPanel/LogConsole';
+// import { GlobalSwitch } from '../components/controls/GlobalSwitch';
+// import { DashboardGrid } from '../components/dashboard/DashboardGrid';
+// import { LogConsole } from '../components/logPanel/LogConsole';
 import type { Product } from '../types';
 
 // Mock data for development
@@ -170,7 +170,10 @@ export function DashboardPage() {
         transition={{ delay: 0.1 }}
         className="mb-6"
       >
-        <GlobalSwitch />
+        {/* <GlobalSwitch /> */}
+        <div className="p-4 bg-stone-800 rounded-xl text-center">
+            Global Switch Placeholder
+        </div>
       </motion.section>
       
       {/* Quick Stats */}
@@ -200,11 +203,14 @@ export function DashboardPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
       >
-        <DashboardGrid />
+        {/* <DashboardGrid /> */}
+        <div className="p-4 bg-stone-800 rounded-xl text-center">
+            Dashboard Grid Placeholder
+        </div>
       </motion.section>
       
       {/* Log Console */}
-      <LogConsole />
+      {/* <LogConsole /> */}
     </div>
   );
 }
