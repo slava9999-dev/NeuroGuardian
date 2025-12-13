@@ -43,6 +43,26 @@ import {
 
 import { WorkerTaskPayloadSchema } from './schemas';
 
+// NEW: Payment endpoints
+import {
+  createPaymentEndpoint,
+  paymentWebhookEndpoint,
+  getPlansEndpoint,
+  validatePromoEndpoint,
+  refundEndpoint,
+  paymentSuccessEndpoint,
+} from './modules/payments/endpoints';
+
+// Re-export payment endpoints
+export { 
+  createPaymentEndpoint as createPayment,
+  paymentWebhookEndpoint as yookassaWebhook,
+  getPlansEndpoint as getPlans,
+  validatePromoEndpoint as validatePromo,
+  refundEndpoint as refund,
+  paymentSuccessEndpoint as paymentSuccess,
+};
+
 const db = admin.firestore();
 
 // ============================================

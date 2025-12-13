@@ -37,6 +37,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.db = void 0;
 exports.getUser = getUser;
 exports.upsertUser = upsertUser;
 exports.getActiveProtectedUsers = getActiveProtectedUsers;
@@ -51,7 +52,7 @@ exports.getUserLogs = getUserLogs;
 exports.markLogAsRead = markLogAsRead;
 exports.resetDailyTriggeredCounts = resetDailyTriggeredCounts;
 const admin = __importStar(require("firebase-admin"));
-const db = admin.firestore();
+exports.db = admin.firestore();
 // ============================================
 // User Operations
 // ============================================
@@ -59,14 +60,14 @@ const db = admin.firestore();
  * Get user by Telegram ID
  */
 async function getUser(telegramId) {
-    const doc = await db.collection('users').doc(telegramId.toString()).get();
+    const doc = await exports.db.collection('users').doc(telegramId.toString()).get();
     return doc.exists ? doc.data() : null;
 }
 /**
  * Create or update user
  */
 async function upsertUser(telegramId, data) {
-    const docRef = db.collection('users').doc(telegramId.toString());
+    const docRef = exports.db.collection('users').doc(telegramId.toString());
     const existing = await docRef.get();
     if (existing.exists) {
         await docRef.update({
@@ -102,7 +103,7 @@ async function upsertUser(telegramId, data) {
  * Get users with protection enabled (for Dispatcher)
  */
 async function getActiveProtectedUsers() {
-    const snapshot = await db.collection('users')
+    const snapshot = await exports.db.collection('users')
         .where('protectionEnabled', '==', true)
         .where('subscriptionActive', '==', true)
         .get();
@@ -112,7 +113,7 @@ async function getActiveProtectedUsers() {
  * Update user stats
  */
 async function updateUserStats(telegramId, updates) {
-    await db.collection('users').doc(telegramId.toString()).update({
+    await exports.db.collection('users').doc(telegramId.toString()).update({
         ...updates,
         updatedAt: new Date(),
     });
@@ -124,7 +125,7 @@ async function updateUserStats(telegramId, updates) {
  * Get all products for user
  */
 async function getUserProducts(telegramId, marketplace) {
-    let query = db.collection('users')
+    let query = exports.db.collection('users')
         .doc(telegramId.toString())
         .collection('products');
     if (marketplace) {
@@ -137,7 +138,7 @@ async function getUserProducts(telegramId, marketplace) {
  * Get products with monitoring enabled
  */
 async function getMonitoredProducts(telegramId, marketplace) {
-    let query = db.collection('users')
+    let query = exports.db.collection('users')
         .doc(telegramId.toString())
         .collection('products')
         .where('minPrice', '>', 0);
@@ -151,7 +152,7 @@ async function getMonitoredProducts(telegramId, marketplace) {
  * Upsert product
  */
 async function upsertProduct(telegramId, productId, data) {
-    await db.collection('users')
+    await exports.db.collection('users')
         .doc(telegramId.toString())
         .collection('products')
         .doc(productId)
@@ -161,8 +162,8 @@ async function upsertProduct(telegramId, productId, data) {
  * Batch upsert products
  */
 async function batchUpsertProducts(telegramId, products) {
-    const batch = db.batch();
-    const userProductsRef = db.collection('users')
+    const batch = exports.db.batch();
+    const userProductsRef = exports.db.collection('users')
         .doc(telegramId.toString())
         .collection('products');
     for (const product of products) {
@@ -175,7 +176,7 @@ async function batchUpsertProducts(telegramId, products) {
  * Update product status
  */
 async function updateProductStatus(telegramId, productId, status, additionalData) {
-    await db.collection('users')
+    await exports.db.collection('users')
         .doc(telegramId.toString())
         .collection('products')
         .doc(productId)
@@ -192,7 +193,7 @@ async function updateProductStatus(telegramId, productId, status, additionalData
  * Add log entry
  */
 async function addLogEntry(telegramId, type, title, message, metadata = {}, productId) {
-    const logRef = await db.collection('users')
+    const logRef = await exports.db.collection('users')
         .doc(telegramId.toString())
         .collection('logs')
         .add({
@@ -211,7 +212,7 @@ async function addLogEntry(telegramId, type, title, message, metadata = {}, prod
  * Get recent logs for user
  */
 async function getUserLogs(telegramId, limit = 50) {
-    const snapshot = await db.collection('users')
+    const snapshot = await exports.db.collection('users')
         .doc(telegramId.toString())
         .collection('logs')
         .orderBy('createdAt', 'desc')
@@ -223,7 +224,7 @@ async function getUserLogs(telegramId, limit = 50) {
  * Mark log as read
  */
 async function markLogAsRead(telegramId, logId) {
-    await db.collection('users')
+    await exports.db.collection('users')
         .doc(telegramId.toString())
         .collection('logs')
         .doc(logId)
@@ -233,10 +234,10 @@ async function markLogAsRead(telegramId, logId) {
  * Reset daily triggered count (call at midnight)
  */
 async function resetDailyTriggeredCounts() {
-    const snapshot = await db.collection('users')
+    const snapshot = await exports.db.collection('users')
         .where('triggeredToday', '>', 0)
         .get();
-    const batch = db.batch();
+    const batch = exports.db.batch();
     for (const doc of snapshot.docs) {
         batch.update(doc.ref, { triggeredToday: 0 });
     }

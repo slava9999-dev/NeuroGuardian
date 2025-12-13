@@ -9,6 +9,8 @@ import { GlobalSwitch } from '../components/controls/GlobalSwitch';
 import { DashboardGrid } from '../components/dashboard/DashboardGrid';
 import { LogConsole } from '../components/logPanel/LogConsole';
 import { HelpModal } from '../components/ui/HelpModal';
+import { PaymentModal } from '../components/ui/PaymentModal';
+import { hapticFeedback } from '../lib/telegram';
 import type { Product } from '../types';
 
 // Mock data for development
@@ -137,44 +139,54 @@ export function DashboardPage() {
   }, [setProducts, setLoading]);
   
   const [showHelp, setShowHelp] = useState(false);
+  const [showPayment, setShowPayment] = useState(false);
   
   return (
     <div className="min-h-screen bg-gradient-to-b from-stone-900 to-stone-800 px-4 py-6 pb-24">
       {/* Help Modal */}
       <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />
       
+      {/* Payment Modal */}
+      <PaymentModal isOpen={showPayment} onClose={() => setShowPayment(false)} />
+      
       {/* Header */}
       <header className="mb-6">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-2xl font-bold text-gradient-amber">NeuroGUARDIAN</h1>
           <div className="flex items-center gap-2">
-            {/* Help button */}
+            {/* Instruction button - prominent */}
             <button
               onClick={() => setShowHelp(true)}
-              className="p-2 rounded-xl bg-stone-800 hover:bg-stone-700 transition-colors"
-              title="Помощь"
+              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-amber-600/20 border border-amber-500/40 hover:from-amber-500/30 hover:to-amber-600/30 transition-all flex items-center gap-1.5"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-stone-400">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-amber-400">
                 <circle cx="12" cy="12" r="10" />
                 <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
                 <line x1="12" y1="17" x2="12.01" y2="17" />
               </svg>
+              <span className="text-sm font-medium text-amber-400">Инструкция</span>
             </button>
             {subscriptionDaysLeft !== null && (
-            <div className={`
-              px-3 py-1 rounded-full text-sm font-medium
-              ${subscriptionDaysLeft > 7 
-                ? 'bg-emerald-500/20 text-emerald-400' 
-                : subscriptionDaysLeft > 0
-                  ? 'bg-amber-500/20 text-amber-400'
-                  : 'bg-red-500/20 text-red-400'
-              }
-            `}>
+            <button
+              onClick={() => {
+                hapticFeedback('light');
+                setShowPayment(true);
+              }}
+              className={`
+                px-3 py-1 rounded-full text-sm font-medium transition-all
+                ${subscriptionDaysLeft > 7 
+                  ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' 
+                  : subscriptionDaysLeft > 0
+                    ? 'bg-amber-500/20 text-amber-400 hover:bg-amber-500/30'
+                    : 'bg-red-500/20 text-red-400 hover:bg-red-500/30 animate-pulse'
+                }
+              `}
+            >
               {subscriptionDaysLeft > 0 
                 ? `${subscriptionDaysLeft} ${getDaysWord(subscriptionDaysLeft)}`
-                : 'Подписка истекла'
+                : '💳 Оплатить'
               }
-            </div>
+            </button>
             )}
           </div>
         </div>

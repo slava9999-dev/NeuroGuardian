@@ -1,4 +1,6 @@
 import * as functions from 'firebase-functions';
+import { createPaymentEndpoint, paymentWebhookEndpoint, getPlansEndpoint, validatePromoEndpoint, refundEndpoint, paymentSuccessEndpoint } from './modules/payments/endpoints';
+export { createPaymentEndpoint as createPayment, paymentWebhookEndpoint as yookassaWebhook, getPlansEndpoint as getPlans, validatePromoEndpoint as validatePromo, refundEndpoint as refund, paymentSuccessEndpoint as paymentSuccess, };
 /**
  * Telegram WebApp authentication
  */

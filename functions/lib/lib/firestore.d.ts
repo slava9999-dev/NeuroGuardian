@@ -1,4 +1,6 @@
+import * as admin from 'firebase-admin';
 import { UserDoc, ProductDoc, LogEntryDoc, LogType, Marketplace } from '../schemas';
+export declare const db: admin.firestore.Firestore;
 /**
  * Get user by Telegram ID
  */

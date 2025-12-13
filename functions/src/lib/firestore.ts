@@ -6,7 +6,7 @@
 import * as admin from 'firebase-admin';
 import { UserDoc, ProductDoc, LogEntryDoc, LogType, Marketplace } from '../schemas';
 
-const db = admin.firestore();
+export const db = admin.firestore();
 
 // ============================================
 // User Operations

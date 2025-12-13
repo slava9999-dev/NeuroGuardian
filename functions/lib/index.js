@@ -36,7 +36,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateMinPrice = exports.updateSettings = exports.dailyReset = exports.sentinelWorker = exports.sentinelDispatcher = exports.getProducts = exports.saveApiKey = exports.paymentWebhook = exports.telegramAuth = void 0;
+exports.updateMinPrice = exports.updateSettings = exports.dailyReset = exports.sentinelWorker = exports.sentinelDispatcher = exports.getProducts = exports.saveApiKey = exports.paymentWebhook = exports.telegramAuth = exports.paymentSuccess = exports.refund = exports.validatePromo = exports.getPlans = exports.yookassaWebhook = exports.createPayment = void 0;
 const admin = __importStar(require("firebase-admin"));
 const functions = __importStar(require("firebase-functions"));
 // Initialize Firebase Admin
@@ -47,6 +47,14 @@ const sync_1 = require("./modules/sync");
 const sentinel_1 = require("./modules/sentinel");
 const firestore_1 = require("./lib/firestore");
 const schemas_1 = require("./schemas");
+// NEW: Payment endpoints
+const endpoints_1 = require("./modules/payments/endpoints");
+Object.defineProperty(exports, "createPayment", { enumerable: true, get: function () { return endpoints_1.createPaymentEndpoint; } });
+Object.defineProperty(exports, "yookassaWebhook", { enumerable: true, get: function () { return endpoints_1.paymentWebhookEndpoint; } });
+Object.defineProperty(exports, "getPlans", { enumerable: true, get: function () { return endpoints_1.getPlansEndpoint; } });
+Object.defineProperty(exports, "validatePromo", { enumerable: true, get: function () { return endpoints_1.validatePromoEndpoint; } });
+Object.defineProperty(exports, "refund", { enumerable: true, get: function () { return endpoints_1.refundEndpoint; } });
+Object.defineProperty(exports, "paymentSuccess", { enumerable: true, get: function () { return endpoints_1.paymentSuccessEndpoint; } });
 const db = admin.firestore();
 // ============================================
 // AUTH ENDPOINTS
