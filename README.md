@@ -1,145 +1,73 @@
-# NeuroGUARDIAN
+# React + TypeScript + Vite
 
-> 🛡️ **Margin Defense System** — автоматическая защита селлеров от принудительных акций WB/Ozon
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-## Что это?
+Currently, two official plugins are available:
 
-NeuroGUARDIAN — это "Kill Switch" система, которая мониторит цены ваших товаров на маркетплейсах и мгновенно реагирует при падении ниже заданного Stop-Loss уровня:
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
 
-- **Zero Stock Mode**: Обнуляет остатки, чтобы товар не продавался по убыточной цене
-- **Price Correction Mode**: Автоматически возвращает цену к минимальной
+## React Compiler
 
-## Стек технологий
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
 
-### Frontend (TWA — Telegram Web App)
+## Expanding the ESLint configuration
 
-- **React 18** + **Vite** + **TypeScript**
-- **Tailwind CSS** — стилизация
-- **Framer Motion** — анимации
-- **Zustand** — state management
-- **Zod** — валидация схем
+If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
 
-### Backend (Serverless)
+```js
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
 
-- **Firebase Cloud Functions** (Node.js 18)
-- **Firestore** — база данных
-- **Google Cloud Secret Manager** — хранение API ключей
-- **Google Cloud Tasks** — очередь задач
-- **Cloud Scheduler** — планировщик
+      // Remove tseslint.configs.recommended and replace with this
+      tseslint.configs.recommendedTypeChecked,
+      // Alternatively, use this for stricter rules
+      tseslint.configs.strictTypeChecked,
+      // Optionally, add this for stylistic rules
+      tseslint.configs.stylisticTypeChecked,
 
-## Архитектура
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     Telegram Mini App                            │
-│                    (React + Tailwind)                            │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Firebase Cloud Functions                      │
-├─────────────────┬─────────────────┬─────────────────────────────┤
-│   Gatekeeper    │    API Sync     │         Sentinel            │
-│   (Auth/Pay)    │   (WB/Ozon)     │    (Monitor/Defense)        │
-└─────────────────┴─────────────────┴─────────────────────────────┘
-                           │
-           ┌───────────────┴───────────────┐
-           ▼                               ▼
-    ┌─────────────┐                 ┌─────────────┐
-    │  Firestore  │                 │ Secret Mgr  │
-    │   (Data)    │                 │ (API Keys)  │
-    └─────────────┘                 └─────────────┘
+      // Other configs...
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
 ```
 
-## Быстрый старт
+You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
 
-### 1. Frontend
+```js
+// eslint.config.js
+import reactX from 'eslint-plugin-react-x'
+import reactDom from 'eslint-plugin-react-dom'
 
-```bash
-cd frontend
-npm install
-npm run dev
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
+      // Enable lint rules for React
+      reactX.configs['recommended-typescript'],
+      // Enable lint rules for React DOM
+      reactDom.configs.recommended,
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
 ```
-
-Откройте http://localhost:5173
-
-### 2. Backend (Firebase Functions)
-
-```bash
-cd functions
-npm install
-npm run build
-
-# Запуск эмуляторов
-firebase emulators:start
-```
-
-### 3. Деплой
-
-```bash
-# Frontend
-cd frontend && npm run build
-
-# Всё вместе
-firebase deploy
-```
-
-## Конфигурация
-
-### Frontend (.env.local)
-
-```env
-VITE_FIREBASE_API_KEY=xxx
-VITE_FIREBASE_PROJECT_ID=neuroguardian
-VITE_USE_EMULATORS=true
-```
-
-### Functions (Firebase Config)
-
-```bash
-firebase functions:config:set \
-  telegram.bot_token="xxx" \
-  cloudpayments.public_id="xxx" \
-  cloudpayments.api_secret="xxx"
-```
-
-## API Endpoints
-
-| Endpoint          | Метод | Описание                     |
-| ----------------- | ----- | ---------------------------- |
-| `/telegramAuth`   | POST  | Авторизация через Telegram   |
-| `/paymentWebhook` | POST  | Webhook платежей             |
-| `/saveApiKey`     | POST  | Сохранение API ключа WB/Ozon |
-| `/getProducts`    | GET   | Список товаров               |
-| `/updateSettings` | POST  | Обновление настроек          |
-| `/updateMinPrice` | POST  | Установка Stop-Loss          |
-
-## Модули
-
-### Gatekeeper (Auth & Payment)
-
-- Telegram WebApp HMAC-SHA256 валидация
-- CloudPayments интеграция
-- Subscription management
-
-### API Sync
-
-- WB Content API `/content/v2/get/cards/list`
-- Ozon Seller API `/v2/product/list`
-- Cursor-based pagination
-- Rate limiting с exponential backoff
-
-### Sentinel (Core Logic)
-
-- **Dispatcher**: Cloud Scheduler каждые 2 минуты
-- **Worker**: Cloud Tasks для каждого пользователя
-- **Defense Protocol**: Zero Stock / Price Correction
-- **Alerting**: Telegram уведомления
-
-## Лицензия
-
-MIT License
-
----
-
-**NeuroGUARDIAN** — Защитите свою маржу! 🛡️
