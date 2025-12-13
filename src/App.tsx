@@ -4,7 +4,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { DashboardPage } from './pages/DashboardPage';
 import { useAppStore } from './stores';
 import { initTelegramWebApp, isTelegramWebApp, getInitData } from './lib/telegram';
