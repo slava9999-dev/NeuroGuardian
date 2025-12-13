@@ -65,15 +65,13 @@ export function DashboardGrid() {
         </div>
         
         {stats.triggeredCount > 0 && (
-          <motion.div 
+          <div 
             className="glass-panel px-4 py-2 flex items-center gap-2 whitespace-nowrap bg-red-500/20 border-red-500/30"
-            animate={{ scale: [1, 1.02, 1] }}
-            transition={{ duration: 1.5, repeat: Infinity }}
           >
             <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
             <span className="text-stone-400 text-sm">Атаки:</span>
             <span className="font-bold text-red-400">{stats.triggeredCount}</span>
-          </motion.div>
+          </div>
         )}
       </div>
       
@@ -242,16 +240,11 @@ export function DashboardGrid() {
             </p>
           </div>
         ) : (
-          <motion.div
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-4"
-            layout
-          >
-            <AnimatePresence mode="popLayout">
-              {filteredProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </AnimatePresence>
-          </motion.div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-4">
+            {filteredProducts.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
         )}
       </div>
     </div>
