@@ -5,20 +5,9 @@
   ],
   "functions": {
     "api/**/*.ts": {
-      "memory": 1024,
       "maxDuration": 60
     }
   },
-  "crons": [
-    {
-      "path": "/api?action=check-prices",
-      "schedule": "0 6 * * *"
-    },
-    {
-      "path": "/api?action=send-reminders",
-      "schedule": "0 10 * * *"
-    }
-  ],
   "headers": [
     {
       "source": "/api/(.*)",
