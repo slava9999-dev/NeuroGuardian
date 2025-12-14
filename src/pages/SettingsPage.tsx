@@ -159,21 +159,31 @@ export function SettingsPage({ onBack }: { onBack: () => void }) {
                   </p>
                 </div>
               </div>
-              {user?.wbKeyRef ? (
-                <button
-                  onClick={() => handleDisconnectApi('WB')}
-                  className="text-sm text-red-400 hover:text-red-300"
-                >
-                  Отключить
-                </button>
-              ) : (
-                <button
-                  onClick={() => setShowApiModal('WB')}
-                  className="px-3 py-1.5 rounded-lg bg-purple-500/20 text-purple-400 text-sm font-medium hover:bg-purple-500/30 transition-colors"
-                >
-                  Подключить
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {user?.wbKeyRef ? (
+                  <>
+                    <button
+                      onClick={() => setShowApiModal('WB')}
+                      className="text-sm text-purple-400 hover:text-purple-300"
+                    >
+                      Изменить
+                    </button>
+                    <button
+                      onClick={() => handleDisconnectApi('WB')}
+                      className="text-sm text-red-400 hover:text-red-300"
+                    >
+                      Отключить
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => setShowApiModal('WB')}
+                    className="px-3 py-1.5 rounded-lg bg-purple-500/20 text-purple-400 text-sm font-medium hover:bg-purple-500/30 transition-colors"
+                  >
+                    Подключить
+                  </button>
+                )}
+              </div>
             </div>
             {user?.wbKeyRef && (
               <button
@@ -200,21 +210,31 @@ export function SettingsPage({ onBack }: { onBack: () => void }) {
                   </p>
                 </div>
               </div>
-              {user?.ozonKeyRef ? (
-                <button
-                  onClick={() => handleDisconnectApi('Ozon')}
-                  className="text-sm text-red-400 hover:text-red-300"
-                >
-                  Отключить
-                </button>
-              ) : (
-                <button
-                  onClick={() => setShowApiModal('Ozon')}
-                  className="px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-400 text-sm font-medium hover:bg-blue-500/30 transition-colors"
-                >
-                  Подключить
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {user?.ozonKeyRef ? (
+                  <>
+                    <button
+                      onClick={() => setShowApiModal('Ozon')}
+                      className="text-sm text-blue-400 hover:text-blue-300"
+                    >
+                      Изменить
+                    </button>
+                    <button
+                      onClick={() => handleDisconnectApi('Ozon')}
+                      className="text-sm text-red-400 hover:text-red-300"
+                    >
+                      Отключить
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => setShowApiModal('Ozon')}
+                    className="px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-400 text-sm font-medium hover:bg-blue-500/30 transition-colors"
+                  >
+                    Подключить
+                  </button>
+                )}
+              </div>
             </div>
             {user?.ozonKeyRef && (
               <button
