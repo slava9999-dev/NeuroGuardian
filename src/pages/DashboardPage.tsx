@@ -125,7 +125,11 @@ const MOCK_PRODUCTS: Product[] = [
   },
 ];
 
-export function DashboardPage() {
+interface DashboardPageProps {
+  onGoToSettings?: () => void;
+}
+
+export function DashboardPage({ onGoToSettings }: DashboardPageProps) {
   const subscriptionDaysLeft = useAppStore((state) => state.subscriptionDaysLeft);
   const user = useAppStore((state) => state.user);
   const setProducts = useProductsStore((state) => state.setProducts);
@@ -160,7 +164,11 @@ export function DashboardPage() {
       <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />
       
       {/* Payment Modal */}
-      <PaymentModal isOpen={showPayment} onClose={() => setShowPayment(false)} />
+      <PaymentModal 
+        isOpen={showPayment} 
+        onClose={() => setShowPayment(false)}
+        onGoToSettings={onGoToSettings}
+      />
       
       {/* Header */}
       <header className="mb-6">

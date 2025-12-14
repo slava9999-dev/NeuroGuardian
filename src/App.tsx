@@ -3,9 +3,9 @@
 // ============================================
 
 import { useEffect, useState, useRef } from 'react';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { DashboardPage } from './pages/DashboardPage';
+import { SettingsPage } from './pages/SettingsPage';
 import { useAppStore } from './stores';
 import { initTelegramWebApp, isTelegramWebApp, getInitData } from './lib/telegram';
 import { authApi } from './lib/api';
@@ -64,27 +64,26 @@ function LoadingScreen() {
 }
 
 // Mock user for development outside Telegram
-// 💡 To test payment button: set subscriptionActive: false and subscriptionExpiresAt: null
 const MOCK_USER = {
   telegramId: 123456789,
   username: 'dev_user',
   firstName: 'Developer',
   lastName: 'Mode',
   photoUrl: null,
-  subscriptionActive: false,  // ⬅️ FALSE to show payment button for testing
-  subscriptionExpiresAt: null, // ⬅️ NULL for testing - payment button will show
-  subscriptionPlan: 'pro' as const,
+  subscriptionActive: false,
+  subscriptionExpiresAt: null,
+  subscriptionPlan: null,
   protectionEnabled: false,
   defenseMode: 'zero_stock' as const,
   wbKeyRef: null,
   ozonKeyRef: null,
-  totalProducts: 5,
-  triggeredToday: 3,
-  savedAmount: 42500,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-  lastActiveAt: new Date(),
+  totalProducts: 0,
+  triggeredToday: 0,
+  savedAmount: 0,
 };
+
+// Pages enum
+type Page = 'dashboard' | 'settings';
 
 function App() {
   const setUser = useAppStore((state) => state.setUser);
@@ -92,6 +91,7 @@ function App() {
   const isLoading = useAppStore((state) => state.isLoading);
   
   const [isInitialized, setIsInitialized] = useState(false);
+  const [currentPage, setCurrentPage] = useState<Page>('dashboard');
   
   const initPerformed = useRef(false);
   
@@ -140,22 +140,55 @@ function App() {
     }
     
     init();
-  }, []); // Empty dependency array to run only once
+  }, []);
+  
+  // Navigation functions
+  const goToSettings = () => setCurrentPage('settings');
+  const goToDashboard = () => setCurrentPage('dashboard');
+  
+  if (!isInitialized || isLoading) {
+    return <LoadingScreen />;
+  }
   
   return (
     <>
-      {!isInitialized || isLoading ? (
-        <LoadingScreen />
-      ) : (
-        <MemoryRouter>
-          <Routes>
-            <Route path="/" element={<DashboardPage />} />
-            {/* TODO: Add more routes */}
-            {/* <Route path="/onboarding" element={<OnboardingPage />} /> */}
-            {/* <Route path="/settings" element={<SettingsPage />} /> */}
-          </Routes>
-        </MemoryRouter>
+      {currentPage === 'dashboard' && (
+        <DashboardPage onGoToSettings={goToSettings} />
       )}
+      {currentPage === 'settings' && (
+        <SettingsPage onBack={goToDashboard} />
+      )}
+      
+      {/* Bottom Tab Bar */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-stone-900/95 backdrop-blur-md border-t border-stone-800 safe-area-inset-bottom z-40">
+        <div className="flex justify-around py-2">
+          <button
+            onClick={goToDashboard}
+            className={`flex flex-col items-center gap-1 px-6 py-2 transition-colors ${
+              currentPage === 'dashboard' ? 'text-amber-400' : 'text-stone-500 hover:text-stone-300'
+            }`}
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              <path d="m9 12 2 2 4-4" />
+            </svg>
+            <span className="text-xs font-medium">Защита</span>
+          </button>
+          
+          <button
+            onClick={goToSettings}
+            className={`flex flex-col items-center gap-1 px-6 py-2 transition-colors ${
+              currentPage === 'settings' ? 'text-amber-400' : 'text-stone-500 hover:text-stone-300'
+            }`}
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+            <span className="text-xs font-medium">Настройки</span>
+          </button>
+        </div>
+      </nav>
     </>
   );
 }
