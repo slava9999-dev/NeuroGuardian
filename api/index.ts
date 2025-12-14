@@ -783,6 +783,169 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
+      // ========== SENTINEL: CHECK PRICES (CRON) ==========
+      case 'check-prices': {
+        // Allow Vercel Cron or manual Admin trigger
+        const authHeader = req.headers['authorization'];
+        const isCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+        const isAdmin = req.query.key === process.env.ADMIN_KEY; // Simple admin key param
+        
+        // For MVP manual testing, we allow without strict checks if envs are missing
+        if (!isCron && !isAdmin && process.env.NODE_ENV === 'production' && process.env.CRON_SECRET) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        console.log('🛡️ SENTINEL: Starting price check cycle...');
+        const log = [];
+
+        try {
+          // 1. Get users with protection enabled
+          const usersRes = await sql`
+            SELECT * FROM users 
+            WHERE protection_enabled = true 
+            AND subscription_active = true
+            AND (api_key_ozon IS NOT NULL OR api_key_wb IS NOT NULL)
+          `;
+          const users = usersRes.rows;
+          log.push(`Found ${users.length} protected users`);
+
+          let totalScanned = 0;
+          let totalTriggered = 0;
+
+          // 2. Iterate users
+          for (const user of users) {
+             // --- OZON DEFENSE ---
+             if (user.api_key_ozon) {
+               try {
+                 // Get monitored products
+                 const productsRes = await sql`
+                   SELECT * FROM products 
+                   WHERE user_id = ${user.id} 
+                   AND marketplace = 'Ozon' 
+                   AND min_price > 0 
+                   AND status != 'disabled'
+                 `;
+                 const monitoredProducts = productsRes.rows;
+
+                 if (monitoredProducts.length > 0) {
+                   const [clientId, apiKey] = (user.api_key_ozon || '').split(':');
+                   if (!clientId || !apiKey) continue;
+
+                   // Get current prices from Ozon V3
+                   const productIds = monitoredProducts.map(p => parseInt(p.product_id.replace('ozon-', '')));
+                   const ozonRes = await fetch('https://api-seller.ozon.ru/v3/product/info/list', {
+                     method: 'POST',
+                     headers: { 'Content-Type': 'application/json', 'Client-Id': clientId, 'Api-Key': apiKey },
+                     body: JSON.stringify({ product_id: productIds }),
+                   });
+
+                   if (ozonRes.ok) {
+                     const ozonData = await ozonRes.json();
+                     const currentItems = ozonData.result?.items || ozonData.items || [];
+                     
+                     // Check for violations
+                     for (const item of currentItems) {
+                       const dbProduct = monitoredProducts.find(p => p.product_id === `ozon-${item.id}`);
+                       if (!dbProduct) continue;
+
+                       const currentPrice = parseFloat(item.price || item.marketing_price || '0');
+                       const minPrice = dbProduct.min_price;
+                       
+                       totalScanned++;
+
+                       // VIOLATION DETECTED!
+                       if (currentPrice > 0 && currentPrice < minPrice) {
+                         console.warn(`🚨 ALARM: ${dbProduct.title} Price: ${currentPrice} < StopLoss: ${minPrice}`);
+                         totalTriggered++;
+                         
+                         // EXECUTE DEFENSE
+                         let defenseAction = '';
+                         
+                         if (user.defense_mode === 'zero_stock') {
+                           // Option A: Set Stock to 0
+                           defenseAction = 'Zero Stock';
+                           await fetch('https://api-seller.ozon.ru/v1/product/import/stocks', {
+                             method: 'POST',
+                             headers: { 'Content-Type': 'application/json', 'Client-Id': clientId, 'Api-Key': apiKey },
+                             body: JSON.stringify({
+                               stocks: [{ offer_id: item.offer_id, product_id: item.id, stock: 0 }]
+                             }),
+                           });
+                         } else {
+                           // Option B: Price Correction (Set to min_price)
+                           defenseAction = 'Price Correction';
+                           await fetch('https://api-seller.ozon.ru/v1/product/import/prices', {
+                             method: 'POST',
+                             headers: { 'Content-Type': 'application/json', 'Client-Id': clientId, 'Api-Key': apiKey },
+                             body: JSON.stringify({
+                               prices: [{ 
+                                 offer_id: item.offer_id, 
+                                 product_id: item.id, 
+                                 price: String(minPrice), 
+                                 old_price: String(Math.round(minPrice * 1.2)), // Fake old price
+                                 min_price: String(minPrice),
+                                 currency_code: 'RUB'
+                               }]
+                             }),
+                           });
+                         }
+
+                         // UPDATE DB & NOTIFY
+                         await sql`
+                           UPDATE products SET status = 'triggered', updated_at = CURRENT_TIMESTAMP 
+                           WHERE id = ${dbProduct.id}
+                         `;
+                         
+                         const savedAmount = minPrice - currentPrice;
+                         await sql`
+                           UPDATE users SET 
+                             triggered_today = triggered_today + 1,
+                             saved_amount = saved_amount + ${savedAmount}
+                           WHERE id = ${user.id}
+                         `;
+
+                         // TELEGRAM ALERT
+                         if (process.env.TELEGRAM_BOT_TOKEN) {
+                           const msg = `🛡️ <b>NeuroGUARDIAN SENTRY</b>\n\n` +
+                                     `⚠️ <b>Демпинг обнаружен!</b>\n` +
+                                     `📦 ${dbProduct.title}\n` +
+                                     `📉 Цена упала: ${currentPrice} ₽ < ${minPrice} ₽\n` +
+                                     `⚔️ <b>Защита активирована:</b> ${defenseAction}\n` +
+                                     `💰 Спасено: ${savedAmount} ₽`;
+                           
+                           await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                             method: 'POST',
+                             headers: { 'Content-Type': 'application/json' },
+                             body: JSON.stringify({ chat_id: user.id, text: msg, parse_mode: 'HTML' }),
+                           });
+                         }
+                       }
+                     }
+                   }
+                 }
+               } catch (e) {
+                 console.error(`Error checking Ozon for user ${user.id}:`, e);
+                 log.push(`Error user ${user.id}: ${e}`);
+               }
+             }
+             
+             // --- WB DEFENSE (Future) ---
+             // ... placeholder ...
+          }
+
+          return res.json({ 
+            success: true, 
+            scanned: totalScanned, 
+            triggered: totalTriggered, 
+            log 
+          });
+
+        } catch (error) {
+          console.error('Sentinel Error:', error);
+          return res.status(500).json({ error: 'Sentinel check failed' });
+        }
+      }
+
       // ========== DEFAULT ==========
       default:
         return res.status(400).json({ 
