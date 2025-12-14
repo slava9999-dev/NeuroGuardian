@@ -1,18 +1,24 @@
 // ============================================
 // NeuroGUARDIAN — Settings Page
-// User settings and preferences
+// User settings, API keys, and sync
 // ============================================
 
 import { useState } from 'react';
-import { useAppStore } from '../stores';
+import { useAppStore, useProductsStore } from '../stores';
 import { hapticFeedback } from '../lib/telegram';
 import { PaymentModal } from '../components/ui/PaymentModal';
+import { settingsApi, productsApi } from '../lib/api';
 import type { DefenseMode } from '../types';
 
 export function SettingsPage({ onBack }: { onBack: () => void }) {
-  const { user, defenseMode, setDefenseMode } = useAppStore();
-  const [, setIsSaving] = useState(false);
+  const { user, defenseMode, setDefenseMode, setUser } = useAppStore();
+  const { setProducts } = useProductsStore();
+  const [isSaving, setIsSaving] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
+  const [showApiModal, setShowApiModal] = useState<'WB' | 'Ozon' | null>(null);
+  const [apiKey, setApiKey] = useState('');
+  const [clientId, setClientId] = useState('');
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
   
   const handleDefenseModeChange = async (mode: DefenseMode) => {
     hapticFeedback('light');
@@ -20,21 +26,79 @@ export function SettingsPage({ onBack }: { onBack: () => void }) {
     
     setIsSaving(true);
     try {
-      // TODO: Sync with backend
-      await new Promise((r) => setTimeout(r, 500));
+      await settingsApi.updateSettings({ defenseMode: mode });
     } finally {
       setIsSaving(false);
     }
   };
 
+  const handleSaveApiKey = async () => {
+    if (!showApiModal || !apiKey) return;
+    
+    hapticFeedback('medium');
+    setIsSaving(true);
+    
+    try {
+      // For Ozon, combine clientId:apiKey
+      const fullKey = showApiModal === 'Ozon' && clientId 
+        ? `${clientId}:${apiKey}` 
+        : apiKey;
+      
+      await settingsApi.saveApiKey(showApiModal, fullKey, clientId);
+      
+      // Update local user state
+      if (user) {
+        setUser({
+          ...user,
+          [showApiModal === 'WB' ? 'wbKeyRef' : 'ozonKeyRef']: 'configured',
+        });
+      }
+      
+      setShowApiModal(null);
+      setApiKey('');
+      setClientId('');
+      hapticFeedback('success');
+    } catch (error) {
+      console.error('Error saving API key:', error);
+      hapticFeedback('error');
+      alert('Ошибка сохранения ключа');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSyncProducts = async (marketplace: 'WB' | 'Ozon') => {
+    hapticFeedback('medium');
+    setSyncStatus(`Синхронизация ${marketplace}...`);
+    
+    try {
+      const result = await productsApi.syncProducts(marketplace);
+      setSyncStatus(result.message);
+      
+      // Reload products
+      const productsResult = await productsApi.getProducts();
+      if (productsResult.success) {
+        setProducts(productsResult.products as any);
+      }
+      
+      hapticFeedback('success');
+      
+      // Clear status after 3 seconds
+      setTimeout(() => setSyncStatus(null), 3000);
+    } catch (error: any) {
+      console.error('Sync error:', error);
+      setSyncStatus(`Ошибка: ${error.response?.data?.error || error.message}`);
+      hapticFeedback('error');
+    }
+  };
+
   const handleDisconnectApi = async (marketplace: 'WB' | 'Ozon') => {
     hapticFeedback('warning');
-    // TODO: Implement API disconnect
     alert(`Отключение ${marketplace} API будет реализовано`);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-stone-900 to-stone-800 px-4 py-6">
+    <div className="min-h-screen bg-gradient-to-b from-stone-900 to-stone-800 px-4 py-6 pb-24">
       {/* Header */}
       <header className="flex items-center gap-4 mb-6">
         <button
@@ -47,6 +111,13 @@ export function SettingsPage({ onBack }: { onBack: () => void }) {
         </button>
         <h1 className="text-xl font-bold text-white">Настройки</h1>
       </header>
+
+      {/* Sync Status */}
+      {syncStatus && (
+        <div className="mb-4 p-3 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-400 text-sm">
+          {syncStatus}
+        </div>
+      )}
 
       {/* User info */}
       {user && (
@@ -66,6 +137,97 @@ export function SettingsPage({ onBack }: { onBack: () => void }) {
           </div>
         </section>
       )}
+
+      {/* Connected APIs */}
+      <section className="mb-6">
+        <h3 className="text-sm font-medium text-stone-400 uppercase tracking-wider mb-3">
+          Подключённые API
+        </h3>
+        
+        <div className="space-y-3">
+          {/* WB */}
+          <div className="glass-panel p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                  <span className="text-sm font-bold text-purple-400">WB</span>
+                </div>
+                <div>
+                  <h4 className="font-medium text-white">Wildberries</h4>
+                  <p className="text-sm text-stone-400">
+                    {user?.wbKeyRef ? '✅ Подключён' : '❌ Не подключён'}
+                  </p>
+                </div>
+              </div>
+              {user?.wbKeyRef ? (
+                <button
+                  onClick={() => handleDisconnectApi('WB')}
+                  className="text-sm text-red-400 hover:text-red-300"
+                >
+                  Отключить
+                </button>
+              ) : (
+                <button
+                  onClick={() => setShowApiModal('WB')}
+                  className="px-3 py-1.5 rounded-lg bg-purple-500/20 text-purple-400 text-sm font-medium hover:bg-purple-500/30 transition-colors"
+                >
+                  Подключить
+                </button>
+              )}
+            </div>
+            {user?.wbKeyRef && (
+              <button
+                onClick={() => handleSyncProducts('WB')}
+                disabled={isSaving}
+                className="w-full btn-secondary text-sm"
+              >
+                🔄 Синхронизировать товары WB
+              </button>
+            )}
+          </div>
+
+          {/* Ozon */}
+          <div className="glass-panel p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                  <span className="text-sm font-bold text-blue-400">O₃</span>
+                </div>
+                <div>
+                  <h4 className="font-medium text-white">Ozon</h4>
+                  <p className="text-sm text-stone-400">
+                    {user?.ozonKeyRef ? '✅ Подключён' : '❌ Не подключён'}
+                  </p>
+                </div>
+              </div>
+              {user?.ozonKeyRef ? (
+                <button
+                  onClick={() => handleDisconnectApi('Ozon')}
+                  className="text-sm text-red-400 hover:text-red-300"
+                >
+                  Отключить
+                </button>
+              ) : (
+                <button
+                  onClick={() => setShowApiModal('Ozon')}
+                  className="px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-400 text-sm font-medium hover:bg-blue-500/30 transition-colors"
+                >
+                  Подключить
+                </button>
+              )}
+            </div>
+            {user?.ozonKeyRef && (
+              <button
+                onClick={() => handleSyncProducts('Ozon')}
+                disabled={isSaving}
+                className="w-full btn-secondary text-sm"
+              >
+                🔄 Синхронизировать товары Ozon
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
 
       {/* Defense Mode */}
       <section className="mb-6">
@@ -124,61 +286,6 @@ export function SettingsPage({ onBack }: { onBack: () => void }) {
         </div>
       </section>
 
-      {/* Connected APIs */}
-      <section className="mb-6">
-        <h3 className="text-sm font-medium text-stone-400 uppercase tracking-wider mb-3">
-          Подключённые API
-        </h3>
-        
-        <div className="space-y-3">
-          {/* WB */}
-          <div className="glass-panel p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
-                <span className="text-sm font-bold text-purple-400">WB</span>
-              </div>
-              <div>
-                <h4 className="font-medium text-white">Wildberries</h4>
-                <p className="text-sm text-stone-400">
-                  {user?.wbKeyRef ? '✅ Подключён' : '❌ Не подключён'}
-                </p>
-              </div>
-            </div>
-            {user?.wbKeyRef && (
-              <button
-                onClick={() => handleDisconnectApi('WB')}
-                className="text-sm text-red-400 hover:text-red-300"
-              >
-                Отключить
-              </button>
-            )}
-          </div>
-
-          {/* Ozon */}
-          <div className="glass-panel p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
-                <span className="text-sm font-bold text-blue-400">O₃</span>
-              </div>
-              <div>
-                <h4 className="font-medium text-white">Ozon</h4>
-                <p className="text-sm text-stone-400">
-                  {user?.ozonKeyRef ? '✅ Подключён' : '❌ Не подключён'}
-                </p>
-              </div>
-            </div>
-            {user?.ozonKeyRef && (
-              <button
-                onClick={() => handleDisconnectApi('Ozon')}
-                className="text-sm text-red-400 hover:text-red-300"
-              >
-                Отключить
-              </button>
-            )}
-          </div>
-        </div>
-      </section>
-
       {/* Subscription */}
       <section className="mb-6">
         <h3 className="text-sm font-medium text-stone-400 uppercase tracking-wider mb-3">
@@ -191,7 +298,7 @@ export function SettingsPage({ onBack }: { onBack: () => void }) {
         `}>
           <div className="flex items-center justify-between mb-2">
             <span className="text-white font-medium">
-              {user?.subscriptionPlan === 'trial' ? 'Пробный период' :
+              {user?.subscriptionPlan === 'trial' ? '🎁 Пробный период (30 дней)' :
                user?.subscriptionPlan === 'basic' ? 'Basic' :
                user?.subscriptionPlan === 'pro' ? 'Pro' : 'Нет подписки'}
             </span>
@@ -228,14 +335,74 @@ export function SettingsPage({ onBack }: { onBack: () => void }) {
         isOpen={showPayment} 
         onClose={() => setShowPayment(false)}
         onSuccess={() => {
-          // Reload user data after payment
           window.location.reload();
         }}
       />
 
+      {/* API Key Modal */}
+      {showApiModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md glass-panel p-6">
+            <h3 className="text-lg font-bold text-white mb-4">
+              Подключить {showApiModal}
+            </h3>
+            
+            {showApiModal === 'Ozon' && (
+              <div className="mb-4">
+                <label className="block text-sm text-stone-400 mb-2">Client ID</label>
+                <input
+                  type="text"
+                  value={clientId}
+                  onChange={(e) => setClientId(e.target.value)}
+                  placeholder="Введите Client ID"
+                  className="w-full p-3 rounded-xl bg-stone-800 border border-stone-700 text-white placeholder:text-stone-500 focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+            )}
+            
+            <div className="mb-6">
+              <label className="block text-sm text-stone-400 mb-2">API Key</label>
+              <input
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="Введите API ключ"
+                className="w-full p-3 rounded-xl bg-stone-800 border border-stone-700 text-white placeholder:text-stone-500 focus:border-amber-500 focus:outline-none"
+              />
+              <p className="text-xs text-stone-500 mt-2">
+                {showApiModal === 'WB' 
+                  ? 'Получить ключ: Личный кабинет WB → API → Создать токен'
+                  : 'Получить: Seller Center → Настройки → API ключи'
+                }
+              </p>
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowApiModal(null);
+                  setApiKey('');
+                  setClientId('');
+                }}
+                className="flex-1 btn-secondary"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handleSaveApiKey}
+                disabled={!apiKey || (showApiModal === 'Ozon' && !clientId) || isSaving}
+                className="flex-1 btn-primary disabled:opacity-50"
+              >
+                {isSaving ? 'Сохранение...' : 'Сохранить'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* App info */}
       <section className="text-center text-stone-500 text-sm">
-        <p>NeuroGUARDIAN v1.0.0</p>
+        <p>NeuroGUARDIAN v2.0.0</p>
         <p>Margin Defense System</p>
       </section>
     </div>

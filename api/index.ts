@@ -180,18 +180,37 @@ async function initializeDatabase() {
 async function createOrUpdateUser(user: TelegramUser) {
   const referralCode = `NG${user.id.toString(36).toUpperCase()}`;
   
-  const result = await sql`
-    INSERT INTO users (id, username, first_name, last_name, photo_url, referral_code)
-    VALUES (${user.id}, ${user.username || null}, ${user.first_name}, ${user.last_name || null}, ${user.photo_url || null}, ${referralCode})
-    ON CONFLICT (id) DO UPDATE SET
-      username = EXCLUDED.username,
-      first_name = EXCLUDED.first_name,
-      last_name = EXCLUDED.last_name,
-      photo_url = EXCLUDED.photo_url,
-      updated_at = CURRENT_TIMESTAMP
-    RETURNING *
-  `;
-  return result.rows[0];
+  // Check if user exists
+  const existingUser = await sql`SELECT id FROM users WHERE id = ${user.id}`;
+  const isNewUser = existingUser.rows.length === 0;
+  
+  // Calculate trial end date (30 days from now)
+  const trialEndDate = new Date();
+  trialEndDate.setDate(trialEndDate.getDate() + 30);
+  
+  if (isNewUser) {
+    // Create new user with trial subscription
+    const result = await sql`
+      INSERT INTO users (id, username, first_name, last_name, photo_url, referral_code, subscription_plan, subscription_end, subscription_active)
+      VALUES (${user.id}, ${user.username || null}, ${user.first_name}, ${user.last_name || null}, ${user.photo_url || null}, ${referralCode}, 'trial', ${trialEndDate.toISOString()}, true)
+      RETURNING *
+    `;
+    console.log(`✅ New user created with trial: ${user.id}`);
+    return result.rows[0];
+  } else {
+    // Update existing user
+    const result = await sql`
+      UPDATE users SET
+        username = ${user.username || null},
+        first_name = ${user.first_name},
+        last_name = ${user.last_name || null},
+        photo_url = ${user.photo_url || null},
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ${user.id}
+      RETURNING *
+    `;
+    return result.rows[0];
+  }
 }
 
 async function getUserById(userId: number) {
@@ -402,8 +421,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
         if (marketplace && apiKey) {
-          const field = marketplace === 'WB' ? 'api_key_wb' : 'api_key_ozon';
-          await sql`UPDATE users SET ${sql(field)} = ${apiKey}, updated_at = CURRENT_TIMESTAMP WHERE id = ${user.id}`;
+          if (marketplace === 'WB') {
+            await sql`UPDATE users SET api_key_wb = ${apiKey}, updated_at = CURRENT_TIMESTAMP WHERE id = ${user.id}`;
+          } else {
+            await sql`UPDATE users SET api_key_ozon = ${apiKey}, updated_at = CURRENT_TIMESTAMP WHERE id = ${user.id}`;
+          }
           return res.json({ success: true, message: `${marketplace} API ключ сохранён` });
         }
 
@@ -521,11 +543,151 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
+      // ========== SYNC PRODUCTS ==========
+      case 'sync-products': {
+        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+        const { initData, marketplace } = req.body;
+        if (!initData) return res.status(401).json({ error: 'Missing initData' });
+
+        const user = getUser(initData);
+        if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+        // Get user's API key
+        const dbUser = await getUserById(user.id);
+        if (!dbUser) return res.status(404).json({ error: 'User not found' });
+
+        const mp = marketplace || 'Ozon';
+        const apiKey = mp === 'WB' ? dbUser.api_key_wb : dbUser.api_key_ozon;
+
+        if (!apiKey) {
+          return res.status(400).json({ error: `${mp} API ключ не настроен` });
+        }
+
+        try {
+          let products: any[] = [];
+
+          if (mp === 'Ozon') {
+            // Fetch products from Ozon API
+            // Ozon requires Client-Id header
+            const clientId = apiKey.split(':')[0]; // Expecting format: clientId:apiKey
+            const apiToken = apiKey.includes(':') ? apiKey.split(':')[1] : apiKey;
+
+            const ozonResponse = await fetch('https://api-seller.ozon.ru/v2/product/list', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Client-Id': clientId,
+                'Api-Key': apiToken,
+              },
+              body: JSON.stringify({
+                filter: { visibility: 'ALL' },
+                limit: 100,
+              }),
+            });
+
+            if (!ozonResponse.ok) {
+              const errorText = await ozonResponse.text();
+              console.error('Ozon API error:', errorText);
+              return res.status(400).json({ error: 'Ошибка Ozon API: ' + ozonResponse.status });
+            }
+
+            const ozonData = await ozonResponse.json();
+            const productIds = ozonData.result?.items?.map((item: any) => item.product_id) || [];
+
+            if (productIds.length > 0) {
+              // Get detailed product info
+              const detailResponse = await fetch('https://api-seller.ozon.ru/v2/product/info/list', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Client-Id': clientId,
+                  'Api-Key': apiToken,
+                },
+                body: JSON.stringify({ product_id: productIds }),
+              });
+
+              if (detailResponse.ok) {
+                const detailData = await detailResponse.json();
+                products = (detailData.result?.items || []).map((item: any) => ({
+                  product_id: `ozon-${item.id}`,
+                  title: item.name || 'Без названия',
+                  image_url: item.primary_image || item.images?.[0] || null,
+                  current_price: Math.round((item.price || item.marketing_price || 0) * 100) / 100,
+                  current_stock: item.stocks?.present || 0,
+                  marketplace: 'Ozon',
+                }));
+              }
+            }
+          } else if (mp === 'WB') {
+            // WB API - get products
+            const wbResponse = await fetch('https://suppliers-api.wildberries.ru/content/v2/get/cards/list', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': apiKey,
+              },
+              body: JSON.stringify({
+                settings: { cursor: { limit: 100 }, filter: { withPhoto: -1 } },
+              }),
+            });
+
+            if (!wbResponse.ok) {
+              return res.status(400).json({ error: 'Ошибка WB API: ' + wbResponse.status });
+            }
+
+            const wbData = await wbResponse.json();
+            products = (wbData.cards || []).map((card: any) => ({
+              product_id: `wb-${card.nmID}`,
+              nm_id: card.nmID,
+              title: card.title || card.subjectName || 'Без названия',
+              image_url: card.photos?.[0]?.big || card.photos?.[0]?.c246x328 || null,
+              current_price: card.sizes?.[0]?.price || 0,
+              current_stock: card.sizes?.reduce((sum: number, s: any) => sum + (s.stocks?.reduce((ss: number, st: any) => ss + st.qty, 0) || 0), 0) || 0,
+              marketplace: 'WB',
+            }));
+          }
+
+          // Save products to database
+          let savedCount = 0;
+          for (const product of products) {
+            try {
+              await sql`
+                INSERT INTO products (user_id, product_id, nm_id, title, image_url, current_price, current_stock, marketplace, status)
+                VALUES (${user.id}, ${product.product_id}, ${product.nm_id || null}, ${product.title}, ${product.image_url}, ${Math.round(product.current_price)}, ${product.current_stock}, ${product.marketplace}, 'active')
+                ON CONFLICT (user_id, product_id) DO UPDATE SET
+                  title = EXCLUDED.title,
+                  image_url = EXCLUDED.image_url,
+                  current_price = EXCLUDED.current_price,
+                  current_stock = EXCLUDED.current_stock,
+                  updated_at = CURRENT_TIMESTAMP
+              `;
+              savedCount++;
+            } catch (e) {
+              console.error('Error saving product:', e);
+            }
+          }
+
+          // Update user's total products count
+          await sql`UPDATE users SET total_products = (SELECT COUNT(*) FROM products WHERE user_id = ${user.id}), updated_at = CURRENT_TIMESTAMP WHERE id = ${user.id}`;
+
+          return res.json({
+            success: true,
+            message: `Синхронизировано ${savedCount} товаров из ${mp}`,
+            count: savedCount,
+            marketplace: mp,
+          });
+        } catch (error) {
+          console.error('Sync error:', error);
+          return res.status(500).json({ error: error instanceof Error ? error.message : 'Ошибка синхронизации' });
+        }
+      }
+
       // ========== DEFAULT ==========
       default:
         return res.status(400).json({ 
           error: 'Unknown action',
-          availableActions: ['auth', 'products', 'settings', 'plans', 'create-payment', 'payment-webhook', 'init-db', 'health'],
+          availableActions: ['auth', 'products', 'settings', 'plans', 'create-payment', 'payment-webhook', 'init-db', 'health', 'sync-products'],
         });
     }
   } catch (error) {

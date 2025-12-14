@@ -144,6 +144,16 @@ export const productsApi = {
     return { success: true, products: response.data.products };
   },
 
+  syncProducts: async (marketplace: 'WB' | 'Ozon' = 'Ozon'): Promise<{ success: boolean; message: string; count: number }> => {
+    const initData = getInitData();
+    const response = await api.post('', {
+      action: 'sync-products',
+      initData,
+      marketplace,
+    });
+    return response.data;
+  },
+
   updateMinPrice: async (productId: string, minPrice: number) => {
     const initData = getInitData();
     const response = await api.post('', {
@@ -218,6 +228,7 @@ export const paymentApi = {
 export const syncApi = {
   saveApiKey: settingsApi.saveApiKey,
   getProducts: productsApi.getProducts,
+  syncProducts: productsApi.syncProducts,
 };
 
 export const productApi = {
