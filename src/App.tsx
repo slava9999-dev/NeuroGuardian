@@ -118,8 +118,13 @@ function App() {
           console.log('🔐 Authenticating...');
           const initData = getInitData();
           const response = await authApi.login(initData || '');
+          console.log('📡 RAW API response:', JSON.stringify(response));
           if (response.success && response.user) {
-            console.log('✅ Authentication successful', response.user);
+            console.log('✅ Authentication successful');
+            console.log('👤 User data:', JSON.stringify(response.user));
+            console.log('💳 subscriptionActive:', response.user.subscriptionActive);
+            console.log('📅 subscriptionExpiresAt:', response.user.subscriptionExpiresAt);
+            console.log('🔑 ozonKeyRef:', response.user.ozonKeyRef);
             setUser(response.user);
           }
         } catch (err) {
