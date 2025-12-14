@@ -50,8 +50,10 @@ const SUBSCRIPTION_PLANS = {
 type PlanId = keyof typeof SUBSCRIPTION_PLANS;
 
 // ============================================
-// TELEGRAM AUTH (simplified for MVP)
+// TELEGRAM AUTH (Production-grade with crypto validation)
 // ============================================
+
+import * as crypto from 'crypto';
 
 interface TelegramUser {
   id: number;
@@ -61,18 +63,22 @@ interface TelegramUser {
   photo_url?: string;
 }
 
-function parseInitDataUnsafe(initData: string): TelegramUser | null {
-  try {
-    const params = new URLSearchParams(initData);
-    const userJson = params.get('user');
-    if (!userJson) return null;
-    return JSON.parse(userJson) as TelegramUser;
-  } catch {
-    return null;
-  }
+interface InitDataValidationResult {
+  valid: boolean;
+  user: TelegramUser | null;
+  error?: string;
 }
 
-// Demo user for testing
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
+const IS_PRODUCTION = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
+const ALLOWED_ORIGINS = [
+  'https://neuro-guardian.vercel.app',
+  'https://neuro-guardian-sos.vercel.app',
+  'https://t.me',
+  process.env.WEBAPP_URL,
+].filter(Boolean);
+
+// Demo user ONLY for development
 const DEMO_USER: TelegramUser = {
   id: 123456789,
   first_name: 'Demo',
@@ -80,19 +86,144 @@ const DEMO_USER: TelegramUser = {
   username: 'demo_user',
 };
 
-function getUser(initData: string): TelegramUser | null {
-  // Try to parse user from initData (simple parsing, no crypto validation for MVP)
-  if (initData && initData !== 'demo' && initData !== '') {
-    const user = parseInitDataUnsafe(initData);
-    if (user) {
-      console.log('✅ User from initData:', user.id);
-      return user;
+/**
+ * Validates Telegram WebApp initData using HMAC-SHA256
+ * As per: https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app
+ */
+function validateTelegramInitData(initData: string): InitDataValidationResult {
+  if (!initData || initData === '' || initData === 'demo') {
+    // In development, allow demo user
+    if (!IS_PRODUCTION) {
+      console.log('🧪 [DEV] Using demo user');
+      return { valid: true, user: DEMO_USER };
     }
+    return { valid: false, user: null, error: 'Missing initData' };
+  }
+
+  try {
+    const params = new URLSearchParams(initData);
+    const hash = params.get('hash');
+    
+    if (!hash) {
+      return { valid: false, user: null, error: 'Missing hash in initData' };
+    }
+
+    // If no bot token configured, allow but log warning
+    if (!TELEGRAM_BOT_TOKEN) {
+      console.warn('⚠️ TELEGRAM_BOT_TOKEN not set, skipping signature validation');
+      const userJson = params.get('user');
+      if (!userJson) {
+        return { valid: false, user: null, error: 'Missing user in initData' };
+      }
+      const user = JSON.parse(userJson) as TelegramUser;
+      return { valid: true, user };
+    }
+
+    // Remove hash for validation
+    params.delete('hash');
+    
+    // Sort params alphabetically and create data-check-string
+    const checkArr = Array.from(params.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, v]) => `${k}=${v}`);
+    const dataCheckString = checkArr.join('\n');
+    
+    // Generate secret key: HMAC-SHA256(bot_token, "WebAppData")
+    const secretKey = crypto
+      .createHmac('sha256', 'WebAppData')
+      .update(TELEGRAM_BOT_TOKEN)
+      .digest();
+    
+    // Calculate hash
+    const calculatedHash = crypto
+      .createHmac('sha256', secretKey)
+      .update(dataCheckString)
+      .digest('hex');
+    
+    // Constant-time comparison to prevent timing attacks
+    const hashBuffer = Buffer.from(hash, 'hex');
+    const calculatedBuffer = Buffer.from(calculatedHash, 'hex');
+    
+    if (hashBuffer.length !== calculatedBuffer.length || !crypto.timingSafeEqual(hashBuffer, calculatedBuffer)) {
+      console.warn('⚠️ Invalid Telegram signature');
+      return { valid: false, user: null, error: 'Invalid signature' };
+    }
+
+    // Validate auth_date (not older than 24 hours)
+    const authDate = params.get('auth_date');
+    if (authDate) {
+      const authTimestamp = parseInt(authDate, 10) * 1000;
+      const now = Date.now();
+      const MAX_AGE = 24 * 60 * 60 * 1000; // 24 hours
+      
+      if (now - authTimestamp > MAX_AGE) {
+        return { valid: false, user: null, error: 'Auth data expired' };
+      }
+    }
+
+    // Parse user
+    const userJson = params.get('user');
+    if (!userJson) {
+      return { valid: false, user: null, error: 'Missing user in initData' };
+    }
+    
+    const user = JSON.parse(userJson) as TelegramUser;
+    
+    // Validate user structure
+    if (!user.id || typeof user.id !== 'number') {
+      return { valid: false, user: null, error: 'Invalid user ID' };
+    }
+    
+    // Mask user ID for logging (security)
+    const maskedId = `${String(user.id).slice(0, 3)}***${String(user.id).slice(-2)}`;
+    console.log(`✅ Valid Telegram user: ${maskedId}`);
+    
+    return { valid: true, user };
+    
+  } catch (error) {
+    console.error('❌ InitData validation error:', error instanceof Error ? error.message : 'Unknown');
+    return { valid: false, user: null, error: 'Validation failed' };
+  }
+}
+
+/**
+ * Rate limiting - simple in-memory store (resets on cold start)
+ * For production, use Redis or similar
+ */
+const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT = 100; // requests per window
+const RATE_WINDOW = 60 * 1000; // 1 minute
+
+function checkRateLimit(identifier: string): { allowed: boolean; remaining: number } {
+  const now = Date.now();
+  const record = rateLimitStore.get(identifier);
+  
+  if (!record || now > record.resetTime) {
+    rateLimitStore.set(identifier, { count: 1, resetTime: now + RATE_WINDOW });
+    return { allowed: true, remaining: RATE_LIMIT - 1 };
   }
   
-  // Fallback: demo user for testing
-  console.log('🧪 Using demo user for testing');
-  return DEMO_USER;
+  if (record.count >= RATE_LIMIT) {
+    return { allowed: false, remaining: 0 };
+  }
+  
+  record.count++;
+  return { allowed: true, remaining: RATE_LIMIT - record.count };
+}
+
+/**
+ * Input sanitization
+ */
+function sanitizeInput(input: unknown): string {
+  if (typeof input !== 'string') return '';
+  return input
+    .slice(0, 10000) // Max length
+    .replace(/[<>]/g, ''); // Basic XSS prevention
+}
+
+function sanitizeApiKey(key: string): string {
+  // API keys should only contain alphanumeric, dashes, underscores, colons
+  return key.replace(/[^a-zA-Z0-9\-_:]/g, '').slice(0, 500);
 }
 
 // ============================================
@@ -313,13 +444,32 @@ async function createYookassaPayment(userId: number, planId: PlanId, returnUrl: 
 }
 
 // ============================================
-// CORS HEADERS
+// CORS HEADERS (Production-grade)
 // ============================================
 
-function setCorsHeaders(res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+function setCorsHeaders(req: VercelRequest, res: VercelResponse) {
+  const origin = req.headers.origin || '';
+  
+  // Check if origin is allowed
+  const isAllowed = !IS_PRODUCTION || ALLOWED_ORIGINS.some(allowed => 
+    allowed && (origin === allowed || origin.startsWith(allowed))
+  );
+  
+  if (isAllowed) {
+    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  } else if (!IS_PRODUCTION) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
+  
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Init-Data, X-Admin-Key');
+  res.setHeader('Access-Control-Max-Age', '86400'); // Cache preflight for 24h
+  
+  // Security headers
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
 }
 
 // ============================================
@@ -327,14 +477,27 @@ function setCorsHeaders(res: VercelResponse) {
 // ============================================
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  setCorsHeaders(res);
+  setCorsHeaders(req, res);
 
   if (req.method === 'OPTIONS') {
     return res.status(204).end();
   }
 
+  // Rate limiting by IP
+  const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0] || 
+                   req.headers['x-real-ip'] as string || 
+                   'unknown';
+  const rateLimit = checkRateLimit(clientIp);
+  
+  res.setHeader('X-RateLimit-Limit', RATE_LIMIT.toString());
+  res.setHeader('X-RateLimit-Remaining', rateLimit.remaining.toString());
+  
+  if (!rateLimit.allowed) {
+    return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+  }
+
   // Parse action from query or body
-  const action = req.query.action as string || req.body?.action;
+  const action = sanitizeInput(req.query.action as string || req.body?.action);
 
   try {
     switch (action) {
@@ -342,11 +505,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'auth': {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
         
-        const { initData } = req.body;
+        const initData = sanitizeInput(req.body?.initData);
         
-        // getUser handles empty initData by returning demo user
-        const telegramUser = getUser(initData || '');
-        if (!telegramUser) return res.status(401).json({ error: 'Invalid initData' });
+        // Validate Telegram initData with cryptographic check
+        const validation = validateTelegramInitData(initData);
+        if (!validation.valid || !validation.user) {
+          return res.status(401).json({ 
+            error: validation.error || 'Invalid initData',
+            code: 'AUTH_FAILED'
+          });
+        }
+        
+        const telegramUser = validation.user;
 
         const user = await createOrUpdateUser(telegramUser);
         const fullUser = await getUserById(telegramUser.id);
@@ -384,10 +554,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // ========== PRODUCTS ==========
       case 'products': {
-        const initData = req.headers['x-init-data'] as string || req.body?.initData || '';
+        const initData = sanitizeInput(req.headers['x-init-data'] as string || req.body?.initData || '');
 
-        const user = getUser(initData);
-        if (!user) return res.status(401).json({ error: 'Unauthorized' });
+        const validation = validateTelegramInitData(initData);
+        if (!validation.valid || !validation.user) {
+          return res.status(401).json({ error: 'Unauthorized', code: 'AUTH_FAILED' });
+        }
+        const user = validation.user;
 
         if (req.method === 'GET') {
           const products = await getProductsByUserId(user.id);
@@ -426,10 +599,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'settings': {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-        const { initData, protectionEnabled, defenseMode, marketplace, apiKey } = req.body;
+        const { protectionEnabled, defenseMode, marketplace } = req.body;
+        const initData = sanitizeInput(req.body?.initData || '');
+        const apiKey = sanitizeApiKey(req.body?.apiKey || '');
 
-        const user = getUser(initData || '');
-        if (!user) return res.status(401).json({ error: 'Unauthorized' });
+        const validation = validateTelegramInitData(initData);
+        if (!validation.valid || !validation.user) {
+          return res.status(401).json({ error: 'Unauthorized', code: 'AUTH_FAILED' });
+        }
+        const user = validation.user;
 
         if (marketplace && apiKey) {
           if (marketplace === 'WB') {
@@ -473,10 +651,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'create-payment': {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-        const { initData, planId } = req.body;
+        const initData = sanitizeInput(req.body?.initData || '');
+        const { planId } = req.body;
 
-        const user = getUser(initData || '');
-        if (!user) return res.status(401).json({ error: 'Unauthorized' });
+        const validation = validateTelegramInitData(initData);
+        if (!validation.valid || !validation.user) {
+          return res.status(401).json({ error: 'Unauthorized', code: 'AUTH_FAILED' });
+        }
+        const user = validation.user;
 
         if (!planId || !SUBSCRIPTION_PLANS[planId as PlanId]) {
           return res.status(400).json({ error: 'Invalid plan' });
@@ -606,10 +788,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'sync-products': {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-        const { initData, marketplace, debug } = req.body;
+        const initData = sanitizeInput(req.body?.initData || '');
+        const { marketplace, debug } = req.body;
 
-        const user = getUser(initData || '');
-        if (!user) return res.status(401).json({ error: 'Unauthorized' });
+        const validation = validateTelegramInitData(initData);
+        if (!validation.valid || !validation.user) {
+          return res.status(401).json({ error: 'Unauthorized', code: 'AUTH_FAILED' });
+        }
+        const user = validation.user;
 
         // Get user's API key
         const dbUser = await getUserById(user.id);
