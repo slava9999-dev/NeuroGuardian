@@ -472,6 +472,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(400).json({ error: 'Invalid plan' });
         }
 
+        const plan = SUBSCRIPTION_PLANS[planId as PlanId];
+
+        // TEST MODE: If YooKassa is not configured, activate subscription immediately
+        if (!SHOP_ID || !SECRET_KEY) {
+          console.log('🧪 TEST MODE: Activating subscription without payment');
+          
+          await activateSubscription(user.id, planId === 'yearly' ? 'pro' : planId, plan.durationDays);
+          
+          return res.json({
+            success: true,
+            testMode: true,
+            message: `Тестовый режим: подписка ${plan.name} активирована на ${plan.durationDays} дней`,
+            plan: { id: planId, name: plan.name, price: plan.price, durationDays: plan.durationDays },
+          });
+        }
+
+        // Production: Create real YooKassa payment
         const returnUrl = process.env.WEBAPP_URL || `https://${process.env.VERCEL_URL}` || 'https://neuro-guardian.vercel.app';
         const result = await createYookassaPayment(user.id, planId as PlanId, `${returnUrl}?payment_complete=true`);
 
@@ -540,6 +557,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           hasPostgresUrl: !!process.env.POSTGRES_URL,
           hasTelegramToken: !!BOT_TOKEN,
           hasYookassaShopId: !!SHOP_ID,
+        });
+      }
+
+      // ========== ADMIN: ACTIVATE TRIAL ==========
+      case 'admin-activate-trial': {
+        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+        const adminKey = req.headers['x-admin-key'] || req.body?.adminKey;
+        if (!ADMIN_API_KEY || adminKey !== ADMIN_API_KEY) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const { userId, days } = req.body;
+        if (!userId) return res.status(400).json({ error: 'Missing userId' });
+
+        const durationDays = days || 30;
+        const endDate = new Date();
+        endDate.setDate(endDate.getDate() + durationDays);
+
+        await sql`
+          UPDATE users SET
+            subscription_plan = 'trial',
+            subscription_end = ${endDate.toISOString()},
+            subscription_active = true,
+            updated_at = CURRENT_TIMESTAMP
+          WHERE id = ${userId}
+        `;
+
+        return res.json({ 
+          success: true, 
+          message: `Trial activated for user ${userId} until ${endDate.toISOString()}`,
+          userId,
+          expiresAt: endDate.toISOString(),
         });
       }
 

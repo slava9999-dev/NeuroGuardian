@@ -176,10 +176,22 @@ export function PaymentModal({ isOpen, onClose, onSuccess }: PaymentModalProps) 
       const result = await paymentApi.createPayment({
         planId: selectedPlan,
         savePaymentMethod: true,
-      });
+      }) as any;
 
       if (!result.success) {
         throw new Error(result.error || 'Ошибка создания платежа');
+      }
+
+      // TEST MODE: Subscription activated without payment
+      if (result.testMode) {
+        hapticFeedback('success');
+        alert(result.message || 'Подписка активирована!');
+        setIsProcessing(false);
+        onSuccess?.();
+        onClose();
+        // Reload to update user state
+        window.location.reload();
+        return;
       }
 
       // If we got confirmation token, show embedded widget
