@@ -613,7 +613,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             console.log('🔍 Ozon sync:', { clientId: clientId.substring(0, 4) + '...', apiTokenLen: apiToken.length });
 
-            const ozonResponse = await fetch('https://api-seller.ozon.ru/v2/product/list', {
+            const ozonResponse = await fetch('https://api-seller.ozon.ru/v3/product/list', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -640,7 +640,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             if (productIds.length > 0) {
               // Get detailed product info
-              const detailResponse = await fetch('https://api-seller.ozon.ru/v2/product/info/list', {
+              const detailResponse = await fetch('https://api-seller.ozon.ru/v3/product/info/list', {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
