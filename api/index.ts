@@ -590,19 +590,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const mp = marketplace || 'Ozon';
         const apiKey = mp === 'WB' ? dbUser.api_key_wb : dbUser.api_key_ozon;
 
-        const debugInfo = {
-          userId: user.id,
-          mp,
-          keyExists: !!apiKey,
-          keyLen: apiKey?.length || 0,
-          hasColon: apiKey?.includes(':') || false,
-          keyPreview: apiKey ? apiKey.substring(0, 15) + '...' : 'NO KEY',
-        };
-
-        console.log('🔑 Debug key info:', debugInfo);
-
         if (!apiKey) {
-          return res.status(400).json({ error: `${mp} API ключ не настроен`, debug: debugInfo });
+          return res.status(400).json({ error: `${mp} API ключ не настроен` });
         }
 
         let apiDetailsDebug: any = null; // Для отладки ответа деталей
@@ -787,10 +776,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             message: `Синхронизировано ${savedCount} товаров из ${mp}`,
             count: savedCount,
             marketplace: mp,
-            debug: {
-              ...debugInfo,
-              details: apiDetailsDebug
-            },
           });
         } catch (error) {
           console.error('Sync error:', error);
