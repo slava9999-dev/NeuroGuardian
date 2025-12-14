@@ -4,6 +4,7 @@
 // ============================================
 
 import { motion } from 'framer-motion';
+import { SecurityBadge } from '../components/ui/SecurityBadge';
 
 interface LegalPageProps {
   onBack?: () => void;
@@ -35,6 +36,9 @@ export function LegalPage({ onBack }: LegalPageProps) {
       )}
 
       <div className="space-y-6">
+        {/* Security Badge */}
+        <SecurityBadge />
+
         {/* Реквизиты */}
         <motion.section 
           initial={{ opacity: 0, y: 20 }}

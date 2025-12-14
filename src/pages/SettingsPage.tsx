@@ -8,6 +8,7 @@ import { useAppStore, useProductsStore } from '../stores';
 import { hapticFeedback } from '../lib/telegram';
 import { PaymentModal } from '../components/ui/PaymentModal';
 import { settingsApi, productsApi } from '../lib/api';
+import { SecurityBadge } from '../components/ui/SecurityBadge';
 import type { DefenseMode } from '../types';
 
 export function SettingsPage({ onBack }: { onBack: () => void }) {
@@ -247,6 +248,11 @@ export function SettingsPage({ onBack }: { onBack: () => void }) {
             )}
           </div>
         </div>
+      </section>
+
+      {/* Security Badge */}
+      <section className="mb-6">
+        <SecurityBadge />
       </section>
 
       {/* Defense Mode */}
