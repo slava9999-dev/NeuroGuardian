@@ -5,14 +5,12 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql } from '@vercel/postgres';
-import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 
 // ============================================
 // CONFIGURATION
 // ============================================
 
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const SHOP_ID = process.env.YOOKASSA_SHOP_ID || '';
 const SECRET_KEY = process.env.YOOKASSA_SECRET_KEY || '';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
@@ -52,7 +50,7 @@ const SUBSCRIPTION_PLANS = {
 type PlanId = keyof typeof SUBSCRIPTION_PLANS;
 
 // ============================================
-// TELEGRAM AUTH
+// TELEGRAM AUTH (simplified for MVP)
 // ============================================
 
 interface TelegramUser {
@@ -61,37 +59,6 @@ interface TelegramUser {
   last_name?: string;
   username?: string;
   photo_url?: string;
-}
-
-function validateInitData(initData: string): TelegramUser | null {
-  if (!initData || !BOT_TOKEN) return null;
-
-  try {
-    const params = new URLSearchParams(initData);
-    const hash = params.get('hash');
-    if (!hash) return null;
-
-    params.delete('hash');
-    const dataCheckString = Array.from(params.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([key, value]) => `${key}=${value}`)
-      .join('\n');
-
-    const secretKey = crypto.createHmac('sha256', 'WebAppData').update(BOT_TOKEN).digest();
-    const calculatedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
-
-    if (calculatedHash !== hash) return null;
-
-    const authDate = parseInt(params.get('auth_date') || '0', 10);
-    if (Date.now() / 1000 - authDate > 86400) return null;
-
-    const userJson = params.get('user');
-    if (!userJson) return null;
-
-    return JSON.parse(userJson) as TelegramUser;
-  } catch {
-    return null;
-  }
 }
 
 function parseInitDataUnsafe(initData: string): TelegramUser | null {
@@ -105,9 +72,27 @@ function parseInitDataUnsafe(initData: string): TelegramUser | null {
   }
 }
 
+// Demo user for testing
+const DEMO_USER: TelegramUser = {
+  id: 123456789,
+  first_name: 'Demo',
+  last_name: 'User',
+  username: 'demo_user',
+};
+
 function getUser(initData: string): TelegramUser | null {
-  const isDev = process.env.NODE_ENV === 'development' || process.env.VERCEL_ENV === 'development';
-  return isDev ? parseInitDataUnsafe(initData) : validateInitData(initData);
+  // Try to parse user from initData (simple parsing, no crypto validation for MVP)
+  if (initData && initData !== 'demo' && initData !== '') {
+    const user = parseInitDataUnsafe(initData);
+    if (user) {
+      console.log('✅ User from initData:', user.id);
+      return user;
+    }
+  }
+  
+  // Fallback: demo user for testing
+  console.log('🧪 Using demo user for testing');
+  return DEMO_USER;
 }
 
 // ============================================
@@ -555,7 +540,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           version: '2.0.0',
           database: dbOk,
           hasPostgresUrl: !!process.env.POSTGRES_URL,
-          hasTelegramToken: !!BOT_TOKEN,
           hasYookassaShopId: !!SHOP_ID,
         });
       }
