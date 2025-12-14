@@ -1,190 +1,142 @@
 # 📋 NeuroGUARDIAN — Контекст для нового диалога
 
 **Дата:** 14 декабря 2024
-**Состояние:** Требуется отладка
+**Цель:** ЛОКАЛЬНОЕ ТЕСТИРОВАНИЕ до полного запуска синхронизации Ozon
 
 ---
 
-## 🎯 ТЕКУЩАЯ ПРОБЛЕМА
+## 🎯 ГЛАВНАЯ ЗАДАЧА
 
-Приложение работает через API (терминал), но **НЕ работает через UI в браузере/Telegram**:
-
-### ✅ Что работает (через терминал):
-
-```
-- Auth: success=True, user=demo_user, subscriptionActive=True
-- Save API key: success=True
-- Sync products: success=True (но 0 товаров — нужно проверить формат v3)
-```
-
-### ❌ Что НЕ работает (в браузере):
-
-- Подписка показывает "не активна"
-- Кнопка сохранения API ключа не работает
-- Кнопка синхронизации не появляется
+1. Запустить локально frontend + backend
+2. Добиться работы синхронизации товаров Ozon (ожидается 11 товаров)
+3. Только после успешного локального теста — деплоить на Vercel
 
 ---
 
-## 🔍 КЛЮЧЕВЫЕ ФАЙЛЫ
+## 🚀 КАК ЗАПУСТИТЬ ЛОКАЛЬНО
 
-### Backend: `api/index.ts`
+### Frontend:
 
-- Unified Vercel Serverless Function
-- Все endpoints через `?action=xxx`
-- Demo user для тестирования (id=123456789)
+```bash
+cd c:\NeuroGUARDIAN
+npm run dev
+```
 
-### Frontend: `src/App.tsx`
+Откроется на http://localhost:5173
 
-- Всегда вызывает API для auth
-- Использует zustand store для user state
+### Backend (Vercel API):
 
-### Frontend: `src/pages/SettingsPage.tsx`
+Backend уже на Vercel, локальный frontend будет обращаться к нему.
 
-- API key модалка
-- Sync products кнопки
+Или для полностью локального запуска:
 
-### Frontend: `src/lib/api.ts`
-
-- Axios client
-- settingsApi.saveApiKey()
-- productsApi.syncProducts()
+```bash
+npx vercel dev
+```
 
 ---
 
-## 🐛 ВОЗМОЖНЫЕ ПРИЧИНЫ
+## ✅ ЧТО УЖЕ РАБОТАЕТ
 
-1. **Frontend получает user из API, но state не обновляется правильно**
-
-   - `setUser()` может не учитывать все поля
-
-2. **subscriptionActive парсится неправильно**
-
-   - API возвращает true, но frontend видит false
-
-3. **user.ozonKeyRef не обновляется после сохранения ключа**
-
-   - Нужен refresh после save
-
-4. **Ozon API v3 формат отличается от v2**
-   - `last_id` вместо `filter.visibility`
+| Компонент               | Через терминал    | Через UI          |
+| ----------------------- | ----------------- | ----------------- |
+| Auth API                | ✅                | ⚠️ иногда 500     |
+| subscriptionActive=true | ✅                | ⚠️ зависит от API |
+| Save API key            | ✅                | ❓ не тестировали |
+| Sync products           | ✅ (но 0 товаров) | ❓                |
 
 ---
 
-## 🔧 НУЖНО СДЕЛАТЬ
+## ❌ ЧТО НЕ РАБОТАЕТ
 
-### 1. Проверить что frontend ПОЛУЧАЕТ от API:
+### Ozon v3 API - возвращает 0 товаров
 
-```javascript
-// В App.tsx после authApi.login():
-console.log("RAW API response:", JSON.stringify(response));
-```
+- У пользователя 11 активных товаров на Ozon
+- Синхронизация возвращает 0
+- Нужно проверить формат запроса v3
 
-### 2. Проверить что store СОХРАНЯЕТ:
+### Возможные причины:
 
-```javascript
-// В appStore.ts setUser():
-console.log("Setting user:", JSON.stringify(user));
-```
-
-### 3. Исправить Ozon v3 формат:
-
-```javascript
-// Новый формат запроса:
-body: JSON.stringify({
-  filter: { visibility: "ALL" },
-  last_id: "",
-  limit: 100,
-});
-```
-
-### 4. Добавить auto-refresh после save API key
+1. Формат body для `/v3/product/list` отличается
+2. `last_id` обязателен в v3
+3. Структура ответа v3 другая
 
 ---
 
-## 📡 КОНФИГУРАЦИЯ
+## 🔑 OZON CREDENTIALS
 
-### Vercel:
+- **Client ID:** 2820442
+- **API Key:** 7bc0e79f-dc16-471e-a2eb-0b... (сохранён в БД как clientId:apiKey)
+- **Ожидаемых товаров:** 11
+
+---
+
+## 📁 КЛЮЧЕВЫЕ ФАЙЛЫ ДЛЯ ОТЛАДКИ
+
+### Backend sync:
+
+`c:\NeuroGUARDIAN\api\index.ts` — строки ~600-700 (case 'sync-products')
+
+### Frontend store:
+
+`c:\NeuroGUARDIAN\src\stores\appStore.ts` — setUser()
+
+### Frontend API client:
+
+`c:\NeuroGUARDIAN\src\lib\api.ts`
+
+---
+
+## 🧪 ТЕСТЫ ЧЕРЕЗ ТЕРМИНАЛ
+
+```powershell
+# 1. Проверить auth
+Invoke-RestMethod -Uri "https://neuro-guardian.vercel.app/api?action=auth" -Method POST -ContentType "application/json" -Body '{}'
+
+# 2. Проверить sync (должен вернуть товары!)
+$body = @{action="sync-products"; marketplace="Ozon"} | ConvertTo-Json
+Invoke-RestMethod -Uri "https://neuro-guardian.vercel.app/api" -Method POST -ContentType "application/json" -Body $body
+
+# 3. Тест Ozon API напрямую с v3
+$headers = @{"Client-Id"="2820442"; "Api-Key"="REAL_KEY_HERE"}
+$body = '{"filter":{},"last_id":"","limit":100}'
+Invoke-RestMethod -Uri "https://api-seller.ozon.ru/v3/product/list" -Method POST -Headers $headers -ContentType "application/json" -Body $body
+```
+
+---
+
+## 📝 ИЗМЕНЕНИЯ ЗА СЕССИЮ
+
+1. ✅ Убрана криптографическая валидация Telegram initData
+2. ✅ Добавлен demo user для тестирования без Telegram
+3. ✅ Обновлён Ozon API с v2 на v3
+4. ✅ Исправлен парсинг subscriptionExpiresAt как Date
+5. ✅ Добавлено детальное логирование
+6. ⏳ Синхронизация Ozon — возвращает 0 товаров (нужен fix)
+
+---
+
+## 🔧 СЛЕДУЮЩИЕ ШАГИ
+
+1. **Проверить формат запроса Ozon v3** — добавить `last_id: ""`
+2. **Проверить структуру ответа v3** — может items в другом месте
+3. **Тестировать локально** через npm run dev
+4. **После успеха — деплой**
+
+---
+
+## 📡 VERCEL CONFIG
 
 - Project: neuro-guardian
 - URL: https://neuro-guardian.vercel.app
-- Region: default
+- DB: Neon Postgres
 
-### Environment Variables (Vercel):
+Environment Variables на Vercel:
 
-- POSTGRES_URL: ✅ configured
-- YOOKASSA_SHOP_ID: ❌ not set (TEST MODE)
-- ADMIN_API_KEY: ✅ configured
-
-### База данных:
-
-- Neon Postgres через Vercel
-- Таблицы: users, products, transactions
+- POSTGRES_URL: ✅
+- YOOKASSA_SHOP_ID: ❌ (TEST MODE)
+- ADMIN_API_KEY: ✅
 
 ---
 
-## 🧪 ТЕСТИРОВАНИЕ
-
-### Терминал (PowerShell):
-
-```powershell
-# Auth
-Invoke-RestMethod -Uri "https://neuro-guardian.vercel.app/api?action=auth" -Method POST -ContentType "application/json" -Body '{}'
-
-# Save Ozon key
-$body = @{action="settings"; marketplace="Ozon"; apiKey="CLIENT_ID:API_KEY"} | ConvertTo-Json
-Invoke-RestMethod -Uri "https://neuro-guardian.vercel.app/api" -Method POST -ContentType "application/json" -Body $body
-
-# Sync products
-$body = @{action="sync-products"; marketplace="Ozon"} | ConvertTo-Json
-Invoke-RestMethod -Uri "https://neuro-guardian.vercel.app/api" -Method POST -ContentType "application/json" -Body $body
-```
-
-### Браузер:
-
-```
-https://neuro-guardian.vercel.app
-```
-
----
-
-## 📁 КЛЮЧЕВЫЕ ПУТИ
-
-```
-c:\NeuroGUARDIAN\
-├── api\
-│   └── index.ts           # Backend API
-├── src\
-│   ├── App.tsx            # Main app + routing
-│   ├── lib\
-│   │   ├── api.ts         # API client
-│   │   └── telegram.ts    # Telegram SDK
-│   ├── stores\
-│   │   └── appStore.ts    # Zustand user store
-│   └── pages\
-│       ├── DashboardPage.tsx
-│       └── SettingsPage.tsx
-├── vercel.json            # Vercel config
-└── package.json
-```
-
----
-
-## 🚀 СЛЕДУЮЩИЕ ШАГИ
-
-1. **Добавить console.log в frontend** чтобы видеть что получает от API
-2. **Проверить subscriptionActive** — почему frontend видит false
-3. **Исправить Ozon v3** — добавить last_id в запрос
-4. **Добавить auto-reload** после save API key
-5. **Тестировать в браузере с DevTools открытым**
-
----
-
-## 📱 OZON CREDENTIALS
-
-- Client ID: 2820442
-- API Key: 7bc0e79f-dc16-471e-a2eb-0b... (hidden)
-- Товаров: 11 активных
-
----
-
-**ВАЖНО:** API работает корректно! Проблема в frontend — state не синхронизируется с данными от API.
+**ВАЖНО:** Начинаем с локального запуска `npm run dev` и добиваемся синхронизации 11 товаров!
