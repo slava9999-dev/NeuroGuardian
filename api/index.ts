@@ -105,12 +105,12 @@ const DEMO_USER: TelegramUser = {
  */
 function validateTelegramInitData(initData: string): InitDataValidationResult {
   if (!initData || initData === '' || initData === 'demo') {
-    // In development AND PRODUCTION (TEMPORARY TEST), allow demo user
-    // if (!IS_PRODUCTION) {
-      console.log('🧪 [TEST] Using demo user (Bypass Auth)');
+    // In development, allow demo user
+    if (!IS_PRODUCTION) {
+      console.log('🧪 [DEV] Using demo user');
       return { valid: true, user: DEMO_USER };
-    // }
-    // return { valid: false, user: null, error: 'Missing initData' };
+    }
+    return { valid: false, user: null, error: 'Missing initData' };
   }
 
   try {
@@ -761,11 +761,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           daysLeft = Math.max(0, Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
         }
 
-        // FAIL-SAFE: If plan is trial, FORCE ACTIVE to allow testing
-        // This overrides any potential DB/Date sync issues
-        if (fullUser?.subscription_plan === 'trial') {
-          subscriptionActive = true;
-          if (!daysLeft || daysLeft <= 0) daysLeft = 3;
+        if (fullUser?.subscription_end) {
+          const endDate = new Date(fullUser.subscription_end);
+          subscriptionActive = endDate > new Date();
+          daysLeft = Math.max(0, Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
         }
 
         return res.json({
@@ -1073,48 +1072,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
-      // ========== RESET TRIAL (TEMPORARY FOR TESTING) ==========
-      case 'reset-trial': {
-        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
-        const initData = sanitizeInput(req.body?.initData || '');
-        const validation = validateTelegramInitData(initData);
-        
-        if (!validation.valid || !validation.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const userId = validation.user.id;
-        
-        // Force update subscription to TRIAL (3 days) using SQL interval
-        // This avoids any timezone issues with JS Date objects
-        const updateResult = await sql`
-          UPDATE users SET
-            subscription_plan = 'trial',
-            subscription_end = (NOW() + INTERVAL '3 days'),
-            subscription_active = true,
-            updated_at = CURRENT_TIMESTAMP
-          WHERE id = ${userId}
-          RETURNING *
-        `;
-
-        if (updateResult.rowCount === 0) {
-           // User not found, create them
-           await sql`
-             INSERT INTO users (id, username, first_name, subscription_plan, subscription_end, subscription_active)
-             VALUES (${userId}, ${validation.user.username || null}, ${validation.user.first_name}, 'trial', (NOW() + INTERVAL '3 days'), true)
-           `;
-        }
-        
-        // Reset products
-        await sql`DELETE FROM products WHERE user_id = ${userId}`;
-        
-        return res.json({ 
-          success: true, 
-          message: `User ${userId} reset. Trial active for 3 days.`,
-        });
-      }
-
       // ========== SYNC PRODUCTS ==========
       case 'sync-products': {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -1363,10 +1320,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const authHeader = req.headers['authorization'];
         const isCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
         const isAdmin = req.query.key === process.env.ADMIN_KEY; // Simple admin key param
-        const isManualTest = req.query.test === 'true'; // Allow manual trigger for testing
         
-        // For MVP manual testing, we allow without strict checks if envs are missing
-        if (!isCron && !isAdmin && !isManualTest && process.env.NODE_ENV === 'production' && process.env.CRON_SECRET) {
+        // Strict check: only Cron or Admin
+        if (!isCron && !isAdmin) {
           return res.status(401).json({ error: 'Unauthorized' });
         }
 

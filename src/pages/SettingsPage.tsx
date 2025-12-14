@@ -353,38 +353,6 @@ export function SettingsPage({ onBack }: { onBack: () => void }) {
               Оформить подписку
             </button>
           )}
-          
-          {/* Reset Trial Button (for testing) */}
-          <button 
-            onClick={async () => {
-              hapticFeedback('warning');
-              if (!confirm('Сбросить аккаунт? Все товары будут удалены и вы получите новый 3-дневный trial.')) return;
-              
-              try {
-                const tg = (window as any).Telegram?.WebApp;
-                const initData = tg?.initData || '';
-                
-                const res = await fetch('/api?action=reset-trial', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ initData }),
-                });
-                
-                const data = await res.json();
-                if (data.success) {
-                  alert('Аккаунт сброшен! Перезагрузка...');
-                  window.location.reload();
-                } else {
-                  alert('Ошибка: ' + (data.error || 'Unknown'));
-                }
-              } catch (e) {
-                alert('Ошибка сброса');
-              }
-            }}
-            className="w-full mt-3 py-2 rounded-xl border border-stone-600 text-stone-400 text-sm hover:bg-stone-800 transition-colors"
-          >
-            🔄 Сбросить Trial (для тестов)
-          </button>
         </div>
       </section>
 
