@@ -1363,9 +1363,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const authHeader = req.headers['authorization'];
         const isCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
         const isAdmin = req.query.key === process.env.ADMIN_KEY; // Simple admin key param
+        const isManualTest = req.query.test === 'true'; // Allow manual trigger for testing
         
         // For MVP manual testing, we allow without strict checks if envs are missing
-        if (!isCron && !isAdmin && process.env.NODE_ENV === 'production' && process.env.CRON_SECRET) {
+        if (!isCron && !isAdmin && !isManualTest && process.env.NODE_ENV === 'production' && process.env.CRON_SECRET) {
           return res.status(401).json({ error: 'Unauthorized' });
         }
 

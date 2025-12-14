@@ -398,6 +398,30 @@ export function DashboardPage({ onGoToSettings }: DashboardPageProps) {
         )}
       </header>
       
+      {/* 🔧 MANUAL CHECK BUTTON (TESTING) */}
+      <motion.button 
+        onClick={async () => {
+          hapticFeedback('medium');
+          const btn = document.getElementById('check-btn');
+          if (btn) btn.innerText = '⏳ Проверка...';
+          
+          try {
+            await fetch('/api?action=check-prices&test=true');
+            alert('✅ Проверка завершена! Проверьте Telegram на наличие уведомлений.');
+            window.location.reload();
+          } catch (e) {
+            alert('Ошибка проверки');
+          } finally {
+            if (btn) btn.innerText = '⚡ Проверить цены сейчас';
+          }
+        }}
+        id="check-btn"
+        className="mb-4 w-full py-3 rounded-2xl bg-stone-800 border border-stone-600 text-stone-300 font-medium hover:bg-stone-700 active:bg-stone-600 transition-all flex items-center justify-center gap-2"
+        whileTap={{ scale: 0.98 }}
+      >
+        ⚡ Проверить цены сейчас (Manual Trigger)
+      </motion.button>
+
       {/* 🔧 CONNECT API BANNER — показывается если API не подключены */}
       {!user?.wbKeyRef && !user?.ozonKeyRef && user?.subscriptionActive && (
         <motion.section 
