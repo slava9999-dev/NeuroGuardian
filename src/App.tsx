@@ -6,9 +6,9 @@ import { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { DashboardPage } from './pages/DashboardPage';
 import { SettingsPage } from './pages/SettingsPage';
-import { useAppStore } from './stores';
+import { useAppStore, useProductsStore } from './stores';
 import { initTelegramWebApp, isTelegramWebApp, getInitData } from './lib/telegram';
-import { authApi } from './lib/api';
+import { authApi, productsApi } from './lib/api';
 import './index.css';
 
 // Loading screen component
@@ -126,6 +126,18 @@ function App() {
             console.log('📅 subscriptionExpiresAt:', response.user.subscriptionExpiresAt);
             console.log('🔑 ozonKeyRef:', response.user.ozonKeyRef);
             setUser(response.user);
+            
+            // Auto-load products after successful auth
+            console.log('📦 Loading products...');
+            try {
+              const productsResult = await productsApi.getProducts();
+              if (productsResult.success && productsResult.products) {
+                console.log(`✅ Loaded ${productsResult.products.length} products`);
+                useProductsStore.getState().setProducts(productsResult.products as any);
+              }
+            } catch (prodErr) {
+              console.warn('⚠️ Failed to load products:', prodErr);
+            }
           }
         } catch (err) {
           console.error("❌ Auth failed, using fallback:", err);
