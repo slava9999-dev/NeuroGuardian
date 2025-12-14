@@ -38,6 +38,7 @@
 ### Защита API ключей
 
 ```
+✅ Шифрование AES-256-GCM (банковский стандарт)
 ✅ Хранятся в защищённой PostgreSQL базе данных
 ✅ Передаются только по HTTPS (TLS 1.3)
 ✅ Используются исключительно для ваших товаров
@@ -205,6 +206,12 @@ YOOKASSA_SECRET_KEY=live_xxx
 
 # Admin
 ADMIN_API_KEY=your-secret-key
+
+# API Key Encryption (32 characters for AES-256-GCM)
+API_KEY_ENCRYPTION_KEY=your-32-character-encryption-key
+
+# Cron (optional)
+CRON_SECRET=your-cron-secret
 ```
 
 ---
@@ -232,4 +239,4 @@ ADMIN_API_KEY=your-secret-key
 
 © 2024 Дерябин В.В. Все права защищены.
 
-NeuroGUARDIAN v2.1.0 — Margin Defense System
+NeuroGUARDIAN v2.2.0 — Margin Defense System

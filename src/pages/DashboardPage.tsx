@@ -6,7 +6,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useAppStore, useProductsStore } from '../stores';
-import { playCashSound } from '../utils/sounds';
+import { playCashSound, playAlertSound } from '../utils/sounds';
 import confetti from 'canvas-confetti';
 import { GlobalSwitch } from '../components/controls/GlobalSwitch';
 import { DashboardGrid } from '../components/dashboard/DashboardGrid';
@@ -193,6 +193,26 @@ export function DashboardPage({ onGoToSettings }: DashboardPageProps) {
       localStorage.setItem('ng_last_saved', stats.savedAmount.toString());
     }
   }, [stats.savedAmount]);
+  
+  // 🚨 Alert Sound Effect Logic - when stop-loss triggers
+  useEffect(() => {
+    if (!stats.triggeredToday || stats.triggeredToday <= 0) return;
+
+    const lastTriggered = Number(localStorage.getItem('ng_last_triggered') || 0);
+
+    // Only play alert if triggered count INCREASED
+    if (stats.triggeredToday > lastTriggered) {
+      console.log('🚨 ALERT! Stop-loss triggered:', stats.triggeredToday);
+      
+      // Play alert sound
+      playAlertSound();
+      
+      hapticFeedback('error'); // Strong vibration for alert
+      
+      // Update local storage
+      localStorage.setItem('ng_last_triggered', stats.triggeredToday.toString());
+    }
+  }, [stats.triggeredToday]);
   
   // 🔄 REAL-TIME SENTINEL POLLING (Client-Side Trigger)
   // Since we don't have Cron Jobs on Hobby plan, we trigger checks from client
@@ -411,8 +431,8 @@ export function DashboardPage({ onGoToSettings }: DashboardPageProps) {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
-                <span>🚀</span>
-                Продлить со скидкой 30%
+                <span>💳</span>
+                Оплата подписки
                 <motion.span
                   animate={{ x: [0, 4, 0] }}
                   transition={{ duration: 1, repeat: Infinity }}

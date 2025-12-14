@@ -99,7 +99,8 @@ export function SecurityBadge({ compact = false }: { compact?: boolean }) {
                     <span>🔑</span> API ключи WB и Ozon
                   </h4>
                   <ul className="space-y-1 pl-6">
-                    <li>• Хранятся в зашифрованной PostgreSQL базе данных</li>
+                    <li>• Шифруются алгоритмом AES-256-GCM (банковский стандарт)</li>
+                    <li>• Хранятся в защищённой PostgreSQL базе данных</li>
                     <li>• Передаются только по HTTPS (TLS 1.3)</li>
                     <li>• Используются исключительно для работы с вашими товарами</li>
                     <li>• Никогда не передаются третьим лицам</li>

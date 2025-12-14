@@ -16,6 +16,103 @@ const SECRET_KEY = process.env.YOOKASSA_SECRET_KEY || '';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 const YOOKASSA_API_URL = 'https://api.yookassa.ru/v3';
 
+// API Key Encryption (AES-256-GCM) — per ТЗ Security Requirements
+const API_KEY_ENCRYPTION_KEY = process.env.API_KEY_ENCRYPTION_KEY || '';
+const ENCRYPTION_ALGORITHM = 'aes-256-gcm';
+
+/**
+ * Encrypt API key using AES-256-GCM
+ * Format: iv:authTag:encryptedData (all hex)
+ */
+function encryptApiKey(apiKey: string): string {
+  if (!API_KEY_ENCRYPTION_KEY || API_KEY_ENCRYPTION_KEY.length < 32) {
+    console.warn('⚠️ API_KEY_ENCRYPTION_KEY not configured, storing key as-is');
+    return apiKey; // Fallback for development
+  }
+  
+  try {
+    const iv = crypto.randomBytes(16);
+    const key = Buffer.from(API_KEY_ENCRYPTION_KEY.slice(0, 32), 'utf8');
+    const cipher = crypto.createCipheriv(ENCRYPTION_ALGORITHM, key, iv);
+    
+    let encrypted = cipher.update(apiKey, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    const authTag = cipher.getAuthTag();
+    
+    return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted}`;
+  } catch (error) {
+    console.error('Encryption error:', error);
+    return apiKey; // Fallback
+  }
+}
+
+/**
+ * Decrypt API key using AES-256-GCM
+ */
+function decryptApiKey(encryptedKey: string): string {
+  if (!encryptedKey) return '';
+  
+  // Check if key is encrypted (contains colons for iv:authTag:data format)
+  if (!encryptedKey.includes(':') || !API_KEY_ENCRYPTION_KEY) {
+    return encryptedKey; // Not encrypted or no key configured
+  }
+  
+  try {
+    const [ivHex, authTagHex, encrypted] = encryptedKey.split(':');
+    if (!ivHex || !authTagHex || !encrypted) return encryptedKey;
+    
+    const key = Buffer.from(API_KEY_ENCRYPTION_KEY.slice(0, 32), 'utf8');
+    const iv = Buffer.from(ivHex, 'hex');
+    const authTag = Buffer.from(authTagHex, 'hex');
+    
+    const decipher = crypto.createDecipheriv(ENCRYPTION_ALGORITHM, key, iv);
+    decipher.setAuthTag(authTag);
+    
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    
+    return decrypted;
+  } catch (error) {
+    console.error('Decryption error:', error);
+    return encryptedKey; // Return as-is if decryption fails
+  }
+}
+
+/**
+ * Exponential backoff for API retries (per ТЗ requirements)
+ */
+async function fetchWithRetry(
+  url: string, 
+  options: RequestInit, 
+  maxRetries: number = 3
+): Promise<Response> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+      
+      // Handle rate limiting with exponential backoff
+      if (response.status === 429) {
+        const retryAfter = response.headers.get('Retry-After');
+        const delay = retryAfter ? parseInt(retryAfter) * 1000 : Math.pow(2, attempt) * 1000;
+        console.warn(`⏳ Rate limited, waiting ${delay}ms before retry ${attempt + 1}/${maxRetries}`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      
+      return response;
+    } catch (error) {
+      lastError = error as Error;
+      const delay = Math.pow(2, attempt) * 1000; // Exponential backoff: 1s, 2s, 4s
+      console.warn(`⚠️ Request failed, retrying in ${delay}ms (${attempt + 1}/${maxRetries})`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  throw lastError || new Error('Max retries exceeded');
+}
+
 // ============================================
 // SUBSCRIPTION PLANS + DISCOUNTS
 // ============================================
@@ -104,9 +201,23 @@ const DEMO_USER: TelegramUser = {
  * As per: https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app
  */
 function validateTelegramInitData(initData: string): InitDataValidationResult {
-  if (!initData || initData === '' || initData === 'demo') {
-    // TESTING MODE: Allow demo user without initData
-    console.log('🧪 [TEST] Using demo user (Bypass Auth for testing)');
+  // PRODUCTION MODE: No demo fallback allowed
+  if (!initData || initData === '') {
+    // In production, require real Telegram auth
+    if (IS_PRODUCTION) {
+      return { valid: false, user: null, error: 'Authentication required' };
+    }
+    // Development only: allow demo user
+    console.log('🧪 [DEV ONLY] Using demo user');
+    return { valid: true, user: DEMO_USER };
+  }
+  
+  // Explicitly allow 'demo' only in development
+  if (initData === 'demo') {
+    if (IS_PRODUCTION) {
+      return { valid: false, user: null, error: 'Demo mode disabled in production' };
+    }
+    console.log('🧪 [DEV ONLY] Demo mode activated');
     return { valid: true, user: DEMO_USER };
   }
 
@@ -302,7 +413,7 @@ async function isFirstPayment(userId: number): Promise<boolean> {
 }
 
 /**
- * Calculate discounted price
+ * Calculate discounted price (with Referral Discount support per ТЗ)
  */
 async function calculatePrice(userId: number, planId: PlanId, promoCode?: string): Promise<{
   originalPrice: number;
@@ -321,6 +432,24 @@ async function calculatePrice(userId: number, planId: PlanId, promoCode?: string
     finalPrice = Number(plan.discountedPrice);
     discount = Math.round((1 - plan.discountedPrice / plan.price) * 100);
     discountReason = 'Скидка 30% на первый месяц';
+  }
+
+  // Check referral discount (20% off for referred users on first payment)
+  if (firstPayment) {
+    const userResult = await sql`SELECT referred_by FROM users WHERE id = ${userId}`;
+    const referredBy = userResult.rows[0]?.referred_by;
+    
+    if (referredBy) {
+      const referralDiscount = Math.round(plan.price * REFERRAL_DISCOUNT_PERCENT / 100);
+      const referralPrice = plan.price - referralDiscount;
+      
+      // Apply if better than current discount
+      if (referralPrice < finalPrice) {
+        finalPrice = referralPrice;
+        discount = REFERRAL_DISCOUNT_PERCENT;
+        discountReason = `Реферальная скидка -${REFERRAL_DISCOUNT_PERCENT}%`;
+      }
+    }
   }
 
   // Check promo code (can stack or override)
@@ -851,12 +980,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const user = validation.user;
 
         if (marketplace && apiKey) {
+          // Encrypt API key before storing (ТЗ Security Requirement)
+          const encryptedKey = encryptApiKey(apiKey);
+          console.log(`🔐 Encrypting ${marketplace} API key for user ${user.id}`);
+          
           if (marketplace === 'WB') {
-            await sql`UPDATE users SET api_key_wb = ${apiKey}, updated_at = CURRENT_TIMESTAMP WHERE id = ${user.id}`;
+            await sql`UPDATE users SET api_key_wb = ${encryptedKey}, updated_at = CURRENT_TIMESTAMP WHERE id = ${user.id}`;
           } else {
-            await sql`UPDATE users SET api_key_ozon = ${apiKey}, updated_at = CURRENT_TIMESTAMP WHERE id = ${user.id}`;
+            await sql`UPDATE users SET api_key_ozon = ${encryptedKey}, updated_at = CURRENT_TIMESTAMP WHERE id = ${user.id}`;
           }
-          return res.json({ success: true, message: `${marketplace} API ключ сохранён` });
+          return res.json({ success: true, message: `${marketplace} API ключ сохранён и зашифрован` });
         }
 
         // Check subscription before enabling protection
@@ -1101,11 +1234,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         const mp = marketplace || 'Ozon';
-        const apiKey = mp === 'WB' ? dbUser.api_key_wb : dbUser.api_key_ozon;
+        const encryptedApiKey = mp === 'WB' ? dbUser.api_key_wb : dbUser.api_key_ozon;
 
-        if (!apiKey) {
+        if (!encryptedApiKey) {
           return res.status(400).json({ error: `${mp} API ключ не настроен` });
         }
+
+        // Decrypt API key (ТЗ Security)
+        const apiKey = decryptApiKey(encryptedApiKey);
+        console.log(`🔓 Decrypted ${mp} API key for sync`);
 
         // Check product limit before sync
         const productLimit = getProductLimit(dbUser.subscription_plan);
@@ -1222,12 +1359,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 // Вычисляем общий сток со всех складов
                 const totalStock = item.stocks?.stocks?.reduce((acc: number, s: any) => acc + (s.present || 0), 0) || 0;
                 
+                // Улучшенный parsing цены (Ozon v3 может возвращать price как объект)
+                let price = 0;
+                if (typeof item.price === 'object' && item.price !== null) {
+                  price = parseFloat(item.price.marketing_price || item.price.price || '0');
+                } else {
+                  price = parseFloat(item.price || item.marketing_price || '0');
+                }
+                
                 return {
                   product_id: `ozon-${item.id}`,
                   title: item.name || 'Без названия',
                   // v3 возвращает массив ссылок
                   image_url: item.primary_image?.[0] || item.images?.[0] || null,
-                  current_price: parseFloat(item.price || item.marketing_price || '0'),
+                  current_price: price,
                   current_stock: totalStock,
                   marketplace: 'Ozon',
                 };
@@ -1365,7 +1510,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         try {
           // 2. Iterate users
           for (const user of targetUsers) {
-             // --- OZON DEFENSE ---
+         // --- OZON DEFENSE ---
              if (user.api_key_ozon) {
                try {
                  // Get monitored products
@@ -1379,12 +1524,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                  const monitoredProducts = productsRes.rows;
 
                  if (monitoredProducts.length > 0) {
-                   const [clientId, apiKey] = (user.api_key_ozon || '').split(':');
+                   // Decrypt API key (ТЗ Security)
+                   const decryptedOzonKey = decryptApiKey(user.api_key_ozon);
+                   const [clientId, apiKey] = (decryptedOzonKey || '').split(':');
                    if (!clientId || !apiKey) continue;
 
-                   // Get current prices from Ozon V3
+                   // Get current prices from Ozon V3 with retry
                    const productIds = monitoredProducts.map(p => parseInt(p.product_id.replace('ozon-', '')));
-                   const ozonRes = await fetch('https://api-seller.ozon.ru/v3/product/info/list', {
+                   const ozonRes = await fetchWithRetry('https://api-seller.ozon.ru/v3/product/info/list', {
                      method: 'POST',
                      headers: { 'Content-Type': 'application/json', 'Client-Id': clientId, 'Api-Key': apiKey },
                      body: JSON.stringify({ product_id: productIds }),
@@ -1394,15 +1541,60 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                      const ozonData = await ozonRes.json();
                      const currentItems = ozonData.result?.items || ozonData.items || [];
                      
+                     // CRITICAL: Also fetch current prices from Ozon Prices API
+                     // /v3/product/info/list doesn't always return accurate prices during promotions
+                     let priceMap: Map<number, number> = new Map();
+                     
+                     try {
+                       const pricesRes = await fetchWithRetry('https://api-seller.ozon.ru/v4/product/info/prices', {
+                         method: 'POST',
+                         headers: { 'Content-Type': 'application/json', 'Client-Id': clientId, 'Api-Key': apiKey },
+                         body: JSON.stringify({ 
+                           filter: { product_id: productIds },
+                           limit: 1000
+                         }),
+                       });
+                       
+                       if (pricesRes.ok) {
+                         const pricesData = await pricesRes.json();
+                         const priceItems = pricesData.result?.items || [];
+                         
+                         for (const p of priceItems) {
+                           // Use marketing_price (actual selling price) or price
+                           const actualPrice = parseFloat(p.price?.marketing_price || p.price?.price || '0');
+                           if (p.product_id && actualPrice > 0) {
+                             priceMap.set(p.product_id, actualPrice);
+                           }
+                         }
+                         console.log(`💰 Fetched ${priceMap.size} prices from Ozon Prices API`);
+                       }
+                     } catch (priceErr) {
+                       console.warn('⚠️ Failed to fetch Ozon prices separately:', priceErr);
+                     }
+                     
                      // Check for violations
                      for (const item of currentItems) {
                        const dbProduct = monitoredProducts.find(p => p.product_id === `ozon-${item.id}`);
                        if (!dbProduct) continue;
 
-                       const currentPrice = parseFloat(item.price || item.marketing_price || '0');
+                       // Use price from dedicated prices API, or fallback to item fields
+                       let currentPrice = priceMap.get(item.id) || 0;
+                       if (currentPrice === 0) {
+                         // Fallback: try item.price object or marketing_price string
+                         currentPrice = parseFloat(
+                           item.price?.marketing_price || 
+                           item.price?.price || 
+                           item.marketing_price || 
+                           item.price || 
+                           '0'
+                         );
+                       }
+                       
                        const minPrice = dbProduct.min_price;
                        
                        totalScanned++;
+                       
+                       console.log(`📊 Check: ${dbProduct.title.substring(0, 30)}... | Current: ${currentPrice} | Min: ${minPrice}`);
 
                        // VIOLATION DETECTED!
                        if (currentPrice > 0 && currentPrice < minPrice) {
@@ -1415,7 +1607,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                          if (user.defense_mode === 'zero_stock') {
                            // Option A: Set Stock to 0
                            defenseAction = 'Zero Stock';
-                           await fetch('https://api-seller.ozon.ru/v1/product/import/stocks', {
+                           await fetchWithRetry('https://api-seller.ozon.ru/v1/product/import/stocks', {
                              method: 'POST',
                              headers: { 'Content-Type': 'application/json', 'Client-Id': clientId, 'Api-Key': apiKey },
                              body: JSON.stringify({
@@ -1425,7 +1617,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                          } else {
                            // Option B: Price Correction (Set to min_price)
                            defenseAction = 'Price Correction';
-                           await fetch('https://api-seller.ozon.ru/v1/product/import/prices', {
+                           await fetchWithRetry('https://api-seller.ozon.ru/v1/product/import/prices', {
                              method: 'POST',
                              headers: { 'Content-Type': 'application/json', 'Client-Id': clientId, 'Api-Key': apiKey },
                              body: JSON.stringify({
@@ -1476,12 +1668,156 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                  }
                } catch (e) {
                  console.error(`Error checking Ozon for user ${user.id}:`, e);
-                 log.push(`Error user ${user.id}: ${e}`);
+                 log.push(`Error Ozon user ${user.id}: ${e}`);
                }
              }
              
-             // --- WB DEFENSE (Future) ---
-             // ... placeholder ...
+             // --- WB DEFENSE (per ТЗ: Module C Sentinel) ---
+             if (user.api_key_wb) {
+               try {
+                 // Get monitored WB products
+                 const wbProductsRes = await sql`
+                   SELECT * FROM products 
+                   WHERE user_id = ${user.id} 
+                   AND marketplace = 'WB' 
+                   AND min_price > 0 
+                   AND status != 'disabled'
+                 `;
+                 const wbMonitoredProducts = wbProductsRes.rows;
+
+                 if (wbMonitoredProducts.length > 0) {
+                   // Decrypt API key (ТЗ Security)
+                   const wbApiKey = decryptApiKey(user.api_key_wb);
+                   if (!wbApiKey) continue;
+
+                   // Get current prices from WB Prices API
+                   const nmIds = wbMonitoredProducts.map(p => p.nm_id).filter(Boolean);
+                   
+                   if (nmIds.length > 0) {
+                     // WB API: Get current prices
+                     const wbPricesRes = await fetchWithRetry('https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter', {
+                       method: 'POST',
+                       headers: { 
+                         'Content-Type': 'application/json', 
+                         'Authorization': wbApiKey 
+                       },
+                       body: JSON.stringify({ 
+                         limit: 1000,
+                         offset: 0,
+                         filterNmID: nmIds
+                       }),
+                     });
+
+                     if (wbPricesRes.ok) {
+                       const wbPricesData = await wbPricesRes.json();
+                       const wbItems = wbPricesData.data?.listGoods || [];
+                       
+                       for (const wbItem of wbItems) {
+                         const dbProduct = wbMonitoredProducts.find(p => p.nm_id === wbItem.nmID);
+                         if (!dbProduct) continue;
+
+                         // WB price logic: use discount price or sizes price
+                         const currentPrice = wbItem.sizes?.[0]?.discountedPrice || wbItem.sizes?.[0]?.price || 0;
+                         const minPrice = dbProduct.min_price;
+                         
+                         totalScanned++;
+
+                         // VIOLATION DETECTED!
+                         if (currentPrice > 0 && currentPrice < minPrice) {
+                           console.warn(`🚨 WB ALARM: ${dbProduct.title} Price: ${currentPrice} < StopLoss: ${minPrice}`);
+                           totalTriggered++;
+                           
+                           let defenseAction = '';
+                           
+                           if (user.defense_mode === 'zero_stock') {
+                             // WB Zero Stock: Set stock to 0 via warehouse API
+                             defenseAction = 'Zero Stock';
+                             
+                             // First get warehouse ID
+                             const warehousesRes = await fetchWithRetry('https://suppliers-api.wildberries.ru/api/v3/warehouses', {
+                               method: 'GET',
+                               headers: { 'Authorization': wbApiKey },
+                             });
+                             
+                             if (warehousesRes.ok) {
+                               const warehousesData = await warehousesRes.json();
+                               const warehouses = warehousesData || [];
+                               
+                               // Zero stock on all warehouses for this SKU
+                               for (const wh of warehouses) {
+                                 await fetchWithRetry(`https://suppliers-api.wildberries.ru/api/v3/stocks/${wh.id}`, {
+                                   method: 'PUT',
+                                   headers: { 
+                                     'Content-Type': 'application/json',
+                                     'Authorization': wbApiKey 
+                                   },
+                                   body: JSON.stringify({
+                                     stocks: [{
+                                       sku: dbProduct.vendor_code || String(dbProduct.nm_id),
+                                       amount: 0
+                                     }]
+                                   }),
+                                 });
+                               }
+                             }
+                           } else {
+                             // WB Price Correction
+                             defenseAction = 'Price Correction';
+                             await fetchWithRetry('https://discounts-prices-api.wildberries.ru/api/v2/upload/task', {
+                               method: 'POST',
+                               headers: { 
+                                 'Content-Type': 'application/json',
+                                 'Authorization': wbApiKey 
+                               },
+                               body: JSON.stringify({
+                                 data: [{
+                                   nmID: dbProduct.nm_id,
+                                   price: minPrice,
+                                   discount: 0
+                                 }]
+                               }),
+                             });
+                           }
+
+                           // UPDATE DB & NOTIFY
+                           await sql`
+                             UPDATE products SET status = 'triggered', updated_at = CURRENT_TIMESTAMP 
+                             WHERE id = ${dbProduct.id}
+                           `;
+                           
+                           const savedAmount = minPrice - currentPrice;
+                           await sql`
+                             UPDATE users SET 
+                               triggered_today = triggered_today + 1,
+                               saved_amount = saved_amount + ${savedAmount}
+                             WHERE id = ${user.id}
+                           `;
+
+                           // TELEGRAM ALERT
+                           if (process.env.TELEGRAM_BOT_TOKEN) {
+                             const msg = `🛡️ <b>NeuroGUARDIAN SENTRY</b>\n\n` +
+                                       `⚠️ <b>WB Демпинг обнаружен!</b>\n` +
+                                       `📦 ${dbProduct.title}\n` +
+                                       `📉 Цена упала: ${currentPrice} ₽ < ${minPrice} ₽\n` +
+                                       `⚔️ <b>Защита активирована:</b> ${defenseAction}\n` +
+                                       `💰 Спасено: ${savedAmount} ₽`;
+                             
+                             await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                               method: 'POST',
+                               headers: { 'Content-Type': 'application/json' },
+                               body: JSON.stringify({ chat_id: user.id, text: msg, parse_mode: 'HTML' }),
+                             });
+                           }
+                         }
+                       }
+                     }
+                   }
+                 }
+               } catch (e) {
+                 console.error(`Error checking WB for user ${user.id}:`, e);
+                 log.push(`Error WB user ${user.id}: ${e}`);
+               }
+             }
           }
 
           return res.json({ 

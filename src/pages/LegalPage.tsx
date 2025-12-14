@@ -310,7 +310,7 @@ export function LegalPage({ onBack }: LegalPageProps) {
             <p>2.1. Мы собираем следующие данные:</p>
             <ul className="list-disc list-inside pl-4 space-y-1">
               <li>Telegram ID и имя пользователя</li>
-              <li>API ключи маркетплейсов (хранятся в зашифрованном виде)</li>
+              <li>API ключи маркетплейсов (шифруются алгоритмом AES-256-GCM)</li>
               <li>Данные о товарах из подключённых аккаунтов</li>
               <li>Информация о платежах</li>
             </ul>
@@ -329,7 +329,7 @@ export function LegalPage({ onBack }: LegalPageProps) {
               4.1. Все данные передаются по защищённым каналам (HTTPS).
             </p>
             <p>
-              4.2. API ключи хранятся в зашифрованном виде и не передаются третьим лицам.
+              4.2. API ключи шифруются алгоритмом AES-256-GCM и не передаются третьим лицам.
             </p>
             
             <p className="font-medium text-white mt-4">5. ПРАВА ПОЛЬЗОВАТЕЛЯ</p>
@@ -390,7 +390,7 @@ export function LegalPage({ onBack }: LegalPageProps) {
           transition={{ delay: 0.6 }}
           className="text-center text-stone-500 text-sm py-4"
         >
-          <p>NeuroGUARDIAN v2.0.0</p>
+          <p>NeuroGUARDIAN v2.2.0</p>
           <p>© 2024 Дерябин В.В. Все права защищены.</p>
           <p className="mt-2">ИНН: 670301543202 | Самозанятый</p>
         </motion.section>

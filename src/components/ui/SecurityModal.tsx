@@ -72,7 +72,7 @@ export function SecurityModal({ isOpen, onClose }: SecurityModalProps) {
               </motion.div>
               <h3 className="text-lg font-bold text-white mb-1">Ваши данные под защитой</h3>
               <p className="text-sm text-emerald-300/80">
-                Мы используем банковский уровень шифрования
+                Шифрование AES-256-GCM — банковский стандарт
               </p>
             </motion.div>
 
@@ -92,8 +92,8 @@ export function SecurityModal({ isOpen, onClose }: SecurityModalProps) {
                 <div className="flex items-start gap-3 p-3 bg-stone-800/50 rounded-xl">
                   <span className="text-emerald-400 mt-0.5">✓</span>
                   <div>
-                    <p className="font-medium text-white">Безопасное хранение</p>
-                    <p className="text-stone-400">API ключи хранятся в защищённой базе данных PostgreSQL с изоляцией на уровне пользователя</p>
+                    <p className="font-medium text-white">Шифрование AES-256-GCM</p>
+                    <p className="text-stone-400">API ключи шифруются перед сохранением в базу данных. Даже при утечке БД ключи останутся защищены</p>
                   </div>
                 </div>
                 
