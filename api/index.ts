@@ -590,6 +590,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const mp = marketplace || 'Ozon';
         const apiKey = mp === 'WB' ? dbUser.api_key_wb : dbUser.api_key_ozon;
 
+        console.log('🔑 Debug key info:', { 
+          mp, 
+          keyExists: !!apiKey, 
+          keyLen: apiKey?.length,
+          hasColon: apiKey?.includes(':'),
+          keyPreview: apiKey?.substring(0, 10) + '...'
+        });
+
         if (!apiKey) {
           return res.status(400).json({ error: `${mp} API ключ не настроен` });
         }
