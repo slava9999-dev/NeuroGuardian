@@ -12,7 +12,7 @@
   "crons": [
     {
       "path": "/api?action=check-prices",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 8 * * *"
     },
     {
       "path": "/api?action=send-reminders",
