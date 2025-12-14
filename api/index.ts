@@ -1066,6 +1066,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
+      // ========== RESET TRIAL (TEMPORARY FOR TESTING) ==========
+      case 'reset-trial': {
+        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+        const initData = sanitizeInput(req.body?.initData || '');
+        const validation = validateTelegramInitData(initData);
+        
+        if (!validation.valid || !validation.user) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const userId = validation.user.id;
+        
+        // Force update subscription to TRIAL (3 days)
+        const endDate = new Date();
+        endDate.setDate(endDate.getDate() + 3); // 3 days trial
+        
+        // Reset products
+        await sql`DELETE FROM products WHERE user_id = ${userId}`;
+        
+        // Force update user subscription
+        await sql`
+          INSERT INTO users (id, username, first_name, subscription_plan, subscription_end, subscription_active)
+          VALUES (${userId}, ${validation.user.username || null}, ${validation.user.first_name}, 'trial', ${endDate.toISOString()}, true)
+          ON CONFLICT (id) DO UPDATE SET
+            subscription_plan = 'trial',
+            subscription_end = ${endDate.toISOString()},
+            subscription_active = true,
+            updated_at = CURRENT_TIMESTAMP
+        `;
+        
+        // Also clean transactions if needed, but keeping them history is safer usually.
+        // For a full hard reset, we could delete them too, but let's stick to fixing the sub.
+        
+        return res.json({ 
+          success: true, 
+          message: `User ${userId} reset. Trial active until ${endDate.toISOString()}.`,
+        });
+      }
+
       // ========== SYNC PRODUCTS ==========
       case 'sync-products': {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
