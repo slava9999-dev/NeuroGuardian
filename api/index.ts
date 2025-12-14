@@ -226,6 +226,53 @@ function sanitizeApiKey(key: string): string {
   return key.replace(/[^a-zA-Z0-9\-_:]/g, '').slice(0, 500);
 }
 
+/**
+ * Check if user has active subscription
+ */
+function isSubscriptionActive(user: any): boolean {
+  if (!user?.subscription_end) return false;
+  const endDate = new Date(user.subscription_end);
+  return endDate > new Date();
+}
+
+/**
+ * Get product limit based on subscription plan
+ */
+function getProductLimit(plan: string | null): number {
+  switch (plan) {
+    case 'pro':
+    case 'yearly':
+      return 500;
+    case 'basic':
+      return 50;
+    case 'trial':
+      return 20; // Trial users get limited access
+    default:
+      return 0;
+  }
+}
+
+/**
+ * Check if user can add more products
+ */
+async function canAddProducts(userId: number, count: number = 1): Promise<{ allowed: boolean; reason?: string }> {
+  const userResult = await sql`SELECT subscription_plan, total_products FROM users WHERE id = ${userId}`;
+  if (userResult.rows.length === 0) return { allowed: false, reason: 'User not found' };
+  
+  const user = userResult.rows[0];
+  const limit = getProductLimit(user.subscription_plan);
+  const currentProducts = user.total_products || 0;
+  
+  if (currentProducts + count > limit) {
+    return { 
+      allowed: false, 
+      reason: `Достигнут лимит товаров (${currentProducts}/${limit}). Обновите тариф для добавления большего количества.`
+    };
+  }
+  
+  return { allowed: true };
+}
+
 // ============================================
 // DATABASE OPERATIONS
 // ============================================
@@ -618,6 +665,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.json({ success: true, message: `${marketplace} API ключ сохранён` });
         }
 
+        // Check subscription before enabling protection
+        if (protectionEnabled === true) {
+          const dbUser = await getUserById(user.id);
+          if (!dbUser || !isSubscriptionActive(dbUser)) {
+            return res.status(403).json({ 
+              error: 'Для включения защиты требуется активная подписка',
+              code: 'SUBSCRIPTION_REQUIRED'
+            });
+          }
+        }
+
         if (protectionEnabled !== undefined) {
           await sql`UPDATE users SET protection_enabled = ${protectionEnabled}, updated_at = CURRENT_TIMESTAMP WHERE id = ${user.id}`;
         }
@@ -801,12 +859,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const dbUser = await getUserById(user.id);
         if (!dbUser) return res.status(404).json({ error: 'User not found' });
 
+        // Check if user has active subscription
+        if (!isSubscriptionActive(dbUser)) {
+          return res.status(403).json({ 
+            error: 'Для синхронизации товаров требуется активная подписка',
+            code: 'SUBSCRIPTION_REQUIRED'
+          });
+        }
+
         const mp = marketplace || 'Ozon';
         const apiKey = mp === 'WB' ? dbUser.api_key_wb : dbUser.api_key_ozon;
 
         if (!apiKey) {
           return res.status(400).json({ error: `${mp} API ключ не настроен` });
         }
+
+        // Check product limit before sync
+        const productLimit = getProductLimit(dbUser.subscription_plan);
 
         let apiDetailsDebug: any = null; // Для отладки ответа деталей
 
@@ -962,9 +1031,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }));
           }
 
+          // Limit products based on subscription plan
+          let productsToSave = products;
+          let limitReached = false;
+          
+          if (products.length > productLimit) {
+            productsToSave = products.slice(0, productLimit);
+            limitReached = true;
+            console.log(`📊 Product limit reached: ${products.length} -> ${productLimit}`);
+          }
+
           // Save products to database
           let savedCount = 0;
-          for (const product of products) {
+          for (const product of productsToSave) {
             try {
               await sql`
                 INSERT INTO products (user_id, product_id, nm_id, title, image_url, current_price, current_stock, marketplace, status)
@@ -985,12 +1064,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           // Update user's total products count
           await sql`UPDATE users SET total_products = (SELECT COUNT(*) FROM products WHERE user_id = ${user.id}), updated_at = CURRENT_TIMESTAMP WHERE id = ${user.id}`;
 
-          return res.json({
+          const response: any = {
             success: true,
             message: `Синхронизировано ${savedCount} товаров из ${mp}`,
             count: savedCount,
             marketplace: mp,
-          });
+          };
+
+          if (limitReached) {
+            response.warning = `Достигнут лимит тарифа: сохранено ${savedCount} из ${products.length} товаров. Обновите тариф для синхронизации всех товаров.`;
+            response.totalAvailable = products.length;
+            response.limit = productLimit;
+          }
+
+          return res.json(response);
         } catch (error) {
           console.error('Sync error:', error);
           return res.status(500).json({ error: error instanceof Error ? error.message : 'Ошибка синхронизации' });
