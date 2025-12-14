@@ -398,6 +398,49 @@ export function DashboardPage({ onGoToSettings }: DashboardPageProps) {
         )}
       </header>
       
+      {/* 🔧 CONNECT API BANNER — показывается если API не подключены */}
+      {!user?.wbKeyRef && !user?.ozonKeyRef && user?.subscriptionActive && (
+        <motion.section 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-purple-500/20 to-blue-500/20 border border-purple-500/40"
+        >
+          <div className="flex items-center gap-4">
+            <motion.div 
+              className="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center flex-shrink-0"
+              animate={{ rotate: [0, 10, -10, 0] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            >
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                <path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3" />
+                <line x1="8" y1="12" x2="16" y2="12" />
+              </svg>
+            </motion.div>
+            <div className="flex-1">
+              <h3 className="text-lg font-bold text-white mb-1">Подключите маркетплейс</h3>
+              <p className="text-sm text-purple-200/70">
+                Добавьте API ключи WB или Ozon чтобы начать защиту товаров
+              </p>
+            </div>
+          </div>
+          <motion.button 
+            onClick={() => {
+              hapticFeedback('light');
+              onGoToSettings?.();
+            }}
+            className="mt-4 w-full py-3 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold flex items-center justify-center gap-2 shadow-lg shadow-purple-500/25"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3" />
+            </svg>
+            Перейти в Настройки
+          </motion.button>
+        </motion.section>
+      )}
+      
       {/* Global Switch */}
       <section className="mb-6">
         <GlobalSwitch />
