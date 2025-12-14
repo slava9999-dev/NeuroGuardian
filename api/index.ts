@@ -105,12 +105,12 @@ const DEMO_USER: TelegramUser = {
  */
 function validateTelegramInitData(initData: string): InitDataValidationResult {
   if (!initData || initData === '' || initData === 'demo') {
-    // In development, allow demo user
-    if (!IS_PRODUCTION) {
-      console.log('🧪 [DEV] Using demo user');
+    // In development AND PRODUCTION (TEMPORARY TEST), allow demo user
+    // if (!IS_PRODUCTION) {
+      console.log('🧪 [TEST] Using demo user (Bypass Auth)');
       return { valid: true, user: DEMO_USER };
-    }
-    return { valid: false, user: null, error: 'Missing initData' };
+    // }
+    // return { valid: false, user: null, error: 'Missing initData' };
   }
 
   try {
