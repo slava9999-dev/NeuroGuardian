@@ -666,8 +666,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const productIds = items.map((item: any) => item.product_id).filter(Boolean);
             console.log(`📋 Product IDs to fetch: ${productIds.slice(0, 5).join(', ')}... (${productIds.length} total)`);
 
-            // Получаем детальную информацию о товарах
-            const detailResponse = await fetch('https://api-seller.ozon.ru/v2/product/info/list', {
+            // Получаем детальную информацию о товарах (API v3)
+            const detailResponse = await fetch('https://api-seller.ozon.ru/v3/product/info/list', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -683,28 +683,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               const detailError = await detailResponse.text();
               console.error('❌ Detail API error:', detailResponse.status, detailError);
               
-              // Fallback: сохраняем базовую информацию без деталей
-              console.log('⚠️ Using fallback: saving basic product info');
+              // Fallback
               products = items.map((item: any) => ({
                 product_id: `ozon-${item.product_id}`,
                 title: `Ozon товар ${item.offer_id || item.product_id}`,
                 image_url: null,
                 current_price: 0,
-                current_stock: (item.has_fbo_stocks || item.has_fbs_stocks) ? 1 : 0,
+                current_stock: 0,
                 marketplace: 'Ozon',
               }));
             } else {
               const detailData = await detailResponse.json();
-              console.log('📦 Detail API response items:', detailData.result?.items?.length || 0);
+              // Поддержка обеих структур ответа (на всякий случай)
+              const detailItems = detailData.result?.items || detailData.items || [];
+              console.log('📦 Detail API response items:', detailItems.length);
               
-              products = (detailData.result?.items || []).map((item: any) => ({
-                product_id: `ozon-${item.id}`,
-                title: item.name || 'Без названия',
-                image_url: item.primary_image || item.images?.[0] || null,
-                current_price: Math.round((item.price || item.marketing_price || 0) * 100) / 100,
-                current_stock: item.stocks?.present || 0,
-                marketplace: 'Ozon',
-              }));
+              products = detailItems.map((item: any) => {
+                // Вычисляем общий сток со всех складов
+                const totalStock = item.stocks?.stocks?.reduce((acc: number, s: any) => acc + (s.present || 0), 0) || 0;
+                
+                return {
+                  product_id: `ozon-${item.id}`,
+                  title: item.name || 'Без названия',
+                  // v3 возвращает массив ссылок
+                  image_url: item.primary_image?.[0] || item.images?.[0] || null,
+                  current_price: parseFloat(item.price || item.marketing_price || '0'),
+                  current_stock: totalStock,
+                  marketplace: 'Ozon',
+                };
+              });
               
               console.log(`✅ Processed ${products.length} products with details`);
             }
