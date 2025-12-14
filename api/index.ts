@@ -605,6 +605,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(400).json({ error: `${mp} API ключ не настроен`, debug: debugInfo });
         }
 
+        let apiDetailsDebug: any = null; // Для отладки ответа деталей
+
         try {
           let products: any[] = [];
 
@@ -683,6 +685,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               const detailError = await detailResponse.text();
               console.error('❌ Detail API error:', detailResponse.status, detailError);
               
+              apiDetailsDebug = {
+                status: detailResponse.status,
+                error: detailError,
+                url: 'https://api-seller.ozon.ru/v3/product/info/list'
+              };
+
               // Fallback
               products = items.map((item: any) => ({
                 product_id: `ozon-${item.product_id}`,
@@ -694,6 +702,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               }));
             } else {
               const detailData = await detailResponse.json();
+              
+              apiDetailsDebug = {
+                status: 200,
+                itemsCount: detailData.result?.items?.length || detailData.items?.length || 0,
+                sampleItem: (detailData.result?.items?.[0] || detailData.items?.[0]) ? 'exists' : 'null'
+              };
+
               // Поддержка обеих структур ответа (на всякий случай)
               const detailItems = detailData.result?.items || detailData.items || [];
               console.log('📦 Detail API response items:', detailItems.length);
@@ -772,7 +787,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             message: `Синхронизировано ${savedCount} товаров из ${mp}`,
             count: savedCount,
             marketplace: mp,
-            debug: debugInfo,
+            debug: {
+              ...debugInfo,
+              details: apiDetailsDebug
+            },
           });
         } catch (error) {
           console.error('Sync error:', error);
