@@ -175,21 +175,53 @@ async function createOrUpdateUser(user: TelegramUser) {
   
   if (isNewUser) {
     // Create new user with trial subscription
-    const result = await sql`
-      INSERT INTO users (id, username, first_name, last_name, photo_url, referral_code, subscription_plan, subscription_end, subscription_active)
-      VALUES (${user.id}, ${user.username || null}, ${user.first_name}, ${user.last_name || null}, ${user.photo_url || null}, ${referralCode}, 'trial', ${trialEndDate.toISOString()}, true)
-      RETURNING *
-    `;
-    console.log(`✅ New user created with trial: ${user.id}`);
-    return result.rows[0];
+    try {
+      const result = await sql`
+        INSERT INTO users (id, username, first_name, last_name, photo_url, referral_code, subscription_plan, subscription_end, subscription_active)
+        VALUES (${user.id}, ${user.username || null}, ${user.first_name}, ${user.last_name || null}, ${user.photo_url || null}, ${referralCode}, 'trial', ${trialEndDate.toISOString()}, true)
+        ON CONFLICT (id) DO UPDATE SET
+          username = EXCLUDED.username,
+          first_name = EXCLUDED.first_name,
+          last_name = EXCLUDED.last_name,
+          photo_url = EXCLUDED.photo_url,
+          subscription_plan = 'trial',
+          subscription_end = EXCLUDED.subscription_end,
+          subscription_active = true,
+          updated_at = CURRENT_TIMESTAMP
+        RETURNING *
+      `;
+      console.log(`✅ New user created/updated with trial: ${user.id}`);
+      return result.rows[0];
+    } catch (e) {
+      console.error('Error creating user:', e);
+      // Fallback update if insert fails
+      const result = await sql`
+        UPDATE users SET
+          username = ${user.username || null},
+          first_name = ${user.first_name},
+          last_name = ${user.last_name || null},
+          photo_url = ${user.photo_url || null},
+          subscription_plan = 'trial',
+          subscription_end = ${trialEndDate.toISOString()},
+          subscription_active = true,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${user.id}
+        RETURNING *
+      `;
+      return result.rows[0];
+    }
   } else {
-    // Update existing user
+    // FORCE TRIAL UPDATE FOR TESTING (Critical for user demo)
+    // Update existing user AND refresh trial
     const result = await sql`
       UPDATE users SET
         username = ${user.username || null},
         first_name = ${user.first_name},
         last_name = ${user.last_name || null},
         photo_url = ${user.photo_url || null},
+        subscription_plan = 'trial',
+        subscription_end = ${trialEndDate.toISOString()},
+        subscription_active = true,
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ${user.id}
       RETURNING *
