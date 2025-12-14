@@ -1079,30 +1079,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const userId = validation.user.id;
         
-        // Force update subscription to TRIAL (3 days)
-        const endDate = new Date();
-        endDate.setDate(endDate.getDate() + 3); // 3 days trial
+        // Force update subscription to TRIAL (3 days) using SQL interval
+        // This avoids any timezone issues with JS Date objects
+        const updateResult = await sql`
+          UPDATE users SET
+            subscription_plan = 'trial',
+            subscription_end = (NOW() + INTERVAL '3 days'),
+            subscription_active = true,
+            updated_at = CURRENT_TIMESTAMP
+          WHERE id = ${userId}
+          RETURNING *
+        `;
+
+        if (updateResult.rowCount === 0) {
+           // User not found, create them
+           await sql`
+             INSERT INTO users (id, username, first_name, subscription_plan, subscription_end, subscription_active)
+             VALUES (${userId}, ${validation.user.username || null}, ${validation.user.first_name}, 'trial', (NOW() + INTERVAL '3 days'), true)
+           `;
+        }
         
         // Reset products
         await sql`DELETE FROM products WHERE user_id = ${userId}`;
         
-        // Force update user subscription
-        await sql`
-          INSERT INTO users (id, username, first_name, subscription_plan, subscription_end, subscription_active)
-          VALUES (${userId}, ${validation.user.username || null}, ${validation.user.first_name}, 'trial', ${endDate.toISOString()}, true)
-          ON CONFLICT (id) DO UPDATE SET
-            subscription_plan = 'trial',
-            subscription_end = ${endDate.toISOString()},
-            subscription_active = true,
-            updated_at = CURRENT_TIMESTAMP
-        `;
-        
-        // Also clean transactions if needed, but keeping them history is safer usually.
-        // For a full hard reset, we could delete them too, but let's stick to fixing the sub.
-        
         return res.json({ 
           success: true, 
-          message: `User ${userId} reset. Trial active until ${endDate.toISOString()}.`,
+          message: `User ${userId} reset. Trial active for 3 days.`,
         });
       }
 
