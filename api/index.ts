@@ -578,7 +578,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'sync-products': {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-        const { initData, marketplace } = req.body;
+        const { initData, marketplace, debug } = req.body;
 
         const user = getUser(initData || '');
         if (!user) return res.status(401).json({ error: 'Unauthorized' });
@@ -590,16 +590,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const mp = marketplace || 'Ozon';
         const apiKey = mp === 'WB' ? dbUser.api_key_wb : dbUser.api_key_ozon;
 
-        console.log('🔑 Debug key info:', { 
-          mp, 
-          keyExists: !!apiKey, 
-          keyLen: apiKey?.length,
-          hasColon: apiKey?.includes(':'),
-          keyPreview: apiKey?.substring(0, 10) + '...'
-        });
+        const debugInfo = {
+          userId: user.id,
+          mp,
+          keyExists: !!apiKey,
+          keyLen: apiKey?.length || 0,
+          hasColon: apiKey?.includes(':') || false,
+          keyPreview: apiKey ? apiKey.substring(0, 15) + '...' : 'NO KEY',
+        };
+
+        console.log('🔑 Debug key info:', debugInfo);
 
         if (!apiKey) {
-          return res.status(400).json({ error: `${mp} API ключ не настроен` });
+          return res.status(400).json({ error: `${mp} API ключ не настроен`, debug: debugInfo });
         }
 
         try {
@@ -613,6 +616,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             console.log('🔍 Ozon sync:', { clientId: clientId.substring(0, 4) + '...', apiTokenLen: apiToken.length });
 
+            // Ozon API v3 — last_id обязателен!
+            const requestBody = {
+              filter: {},  // Пустой фильтр = все товары
+              last_id: '', // Обязательный параметр для v3! Пустая строка = начало
+              limit: 100   // Лимит товаров за запрос
+            };
+            
+            console.log('📤 Ozon v3 request body:', JSON.stringify(requestBody));
+            
             const ozonResponse = await fetch('https://api-seller.ozon.ru/v3/product/list', {
               method: 'POST',
               headers: {
@@ -620,51 +632,81 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 'Client-Id': clientId,
                 'Api-Key': apiToken,
               },
-              body: JSON.stringify({
-                filter: { visibility: 'ALL' },
-                limit: 100,
-              }),
+              body: JSON.stringify(requestBody),
             });
 
             if (!ozonResponse.ok) {
               const errorText = await ozonResponse.text();
-              console.error('Ozon API error:', ozonResponse.status, errorText);
+              console.error('❌ Ozon API error:', ozonResponse.status, errorText);
               return res.status(400).json({ 
                 error: `Ошибка Ozon API: ${ozonResponse.status}`,
-                details: errorText.substring(0, 200),
+                details: errorText.substring(0, 500),
               });
             }
 
             const ozonData = await ozonResponse.json();
-            console.log('📦 Ozon API response:', JSON.stringify(ozonData).substring(0, 500));
+            console.log('📦 Ozon API v3 full response:', JSON.stringify(ozonData));
             
-            // v3 format may differ from v2
-            const items = ozonData.result?.items || ozonData.items || [];
-            const productIds = items.map((item: any) => item.product_id) || [];
-
-            if (productIds.length > 0) {
-              // Get detailed product info
-              const detailResponse = await fetch('https://api-seller.ozon.ru/v3/product/info/list', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Client-Id': clientId,
-                  'Api-Key': apiToken,
-                },
-                body: JSON.stringify({ product_id: productIds }),
+            // v3 структура: { result: { items: [{product_id, offer_id}, ...], total, last_id } }
+            const items = ozonData.result?.items || [];
+            console.log(`📊 Ozon v3 items count: ${items.length}, total in API: ${ozonData.result?.total || 'N/A'}`);
+            
+            if (items.length === 0) {
+              console.log('⚠️ No items returned from Ozon API');
+              return res.json({
+                success: true,
+                message: 'Ozon API вернул 0 товаров. Проверьте настройки магазина.',
+                count: 0,
+                marketplace: mp,
+                debug: { apiResponse: ozonData }
               });
+            }
+            
+            // Извлекаем product_id (числовой ID товара в Ozon)
+            const productIds = items.map((item: any) => item.product_id).filter(Boolean);
+            console.log(`📋 Product IDs to fetch: ${productIds.slice(0, 5).join(', ')}... (${productIds.length} total)`);
 
-              if (detailResponse.ok) {
-                const detailData = await detailResponse.json();
-                products = (detailData.result?.items || []).map((item: any) => ({
-                  product_id: `ozon-${item.id}`,
-                  title: item.name || 'Без названия',
-                  image_url: item.primary_image || item.images?.[0] || null,
-                  current_price: Math.round((item.price || item.marketing_price || 0) * 100) / 100,
-                  current_stock: item.stocks?.present || 0,
-                  marketplace: 'Ozon',
-                }));
-              }
+            // Получаем детальную информацию о товарах
+            const detailResponse = await fetch('https://api-seller.ozon.ru/v2/product/info/list', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Client-Id': clientId,
+                'Api-Key': apiToken,
+              },
+              body: JSON.stringify({ product_id: productIds }),
+            });
+
+            console.log('📡 Detail API response status:', detailResponse.status);
+            
+            if (!detailResponse.ok) {
+              const detailError = await detailResponse.text();
+              console.error('❌ Detail API error:', detailResponse.status, detailError);
+              
+              // Fallback: сохраняем базовую информацию без деталей
+              console.log('⚠️ Using fallback: saving basic product info');
+              products = items.map((item: any) => ({
+                product_id: `ozon-${item.product_id}`,
+                title: `Ozon товар ${item.offer_id || item.product_id}`,
+                image_url: null,
+                current_price: 0,
+                current_stock: (item.has_fbo_stocks || item.has_fbs_stocks) ? 1 : 0,
+                marketplace: 'Ozon',
+              }));
+            } else {
+              const detailData = await detailResponse.json();
+              console.log('📦 Detail API response items:', detailData.result?.items?.length || 0);
+              
+              products = (detailData.result?.items || []).map((item: any) => ({
+                product_id: `ozon-${item.id}`,
+                title: item.name || 'Без названия',
+                image_url: item.primary_image || item.images?.[0] || null,
+                current_price: Math.round((item.price || item.marketing_price || 0) * 100) / 100,
+                current_stock: item.stocks?.present || 0,
+                marketplace: 'Ozon',
+              }));
+              
+              console.log(`✅ Processed ${products.length} products with details`);
             }
           } else if (mp === 'WB') {
             // WB API - get products
@@ -723,6 +765,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             message: `Синхронизировано ${savedCount} товаров из ${mp}`,
             count: savedCount,
             marketplace: mp,
+            debug: debugInfo,
           });
         } catch (error) {
           console.error('Sync error:', error);
