@@ -898,6 +898,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           subscriptionActive = true;
           if (!daysLeft || daysLeft <= 0) daysLeft = 3;
         }
+        
+        // EMERGENCY FIX: Force subscription active if end date is in future
+        if (fullUser?.subscription_end) {
+          const endDate = new Date(fullUser.subscription_end);
+          if (endDate > new Date()) {
+            subscriptionActive = true;
+            daysLeft = Math.max(1, Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+          }
+        }
 
         return res.json({
           success: true,
