@@ -767,6 +767,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           daysLeft = Math.max(0, Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
         }
 
+        // FAIL-SAFE: For Testing, ensure Trial is always active
+        if (fullUser?.subscription_plan === 'trial') {
+          subscriptionActive = true;
+          if (!daysLeft || daysLeft <= 0) daysLeft = 3;
+        }
+
         return res.json({
           success: true,
           user: {
@@ -1318,33 +1324,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'check-prices': {
         // Allow Vercel Cron or manual Admin trigger
         const authHeader = req.headers['authorization'];
-        const isCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
-        const isAdmin = req.query.key === process.env.ADMIN_KEY; // Simple admin key param
+        const initData = req.headers['x-init-data'] as string;
         
-        // Strict check: only Cron or Admin
-        if (!isCron && !isAdmin) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        const isCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+        const isAdmin = req.query.key === process.env.ADMIN_KEY;
+        
+        let targetUsers = [];
+
+        // Scenario A: Auto/Admin Run (All Users)
+        if (isCron || isAdmin) {
+             const usersRes = await sql`
+                SELECT * FROM users 
+                WHERE protection_enabled = true 
+                AND subscription_active = true
+                AND (api_key_ozon IS NOT NULL OR api_key_wb IS NOT NULL)
+              `;
+             targetUsers = usersRes.rows;
+        } 
+        // Scenario B: User Self-Check (Client Polling)
+        else if (initData) {
+             const validation = validateTelegramInitData(initData);
+             if (validation.valid && validation.user) {
+                 // Get full user data from DB to check protection status
+                 const dbUser = await getUserById(validation.user.id);
+                 if (dbUser && dbUser.protection_enabled && (dbUser.api_key_ozon || dbUser.api_key_wb)) {
+                     targetUsers = [dbUser];
+                 } else {
+                     return res.json({ success: true, message: 'Protection disabled or keys missing' });
+                 }
+             } else {
+                 return res.status(401).json({ error: 'Invalid initData' });
+             }
+        } else {
+             return res.status(401).json({ error: 'Unauthorized' });
         }
 
-        console.log('🛡️ SENTINEL: Starting price check cycle...');
+
+        console.log(`🛡️ SENTINEL: Starting price check for ${targetUsers.length} users...`);
         const log = [];
+        let totalScanned = 0;
+        let totalTriggered = 0;
 
         try {
-          // 1. Get users with protection enabled
-          const usersRes = await sql`
-            SELECT * FROM users 
-            WHERE protection_enabled = true 
-            AND subscription_active = true
-            AND (api_key_ozon IS NOT NULL OR api_key_wb IS NOT NULL)
-          `;
-          const users = usersRes.rows;
-          log.push(`Found ${users.length} protected users`);
-
-          let totalScanned = 0;
-          let totalTriggered = 0;
-
           // 2. Iterate users
-          for (const user of users) {
+          for (const user of targetUsers) {
              // --- OZON DEFENSE ---
              if (user.api_key_ozon) {
                try {

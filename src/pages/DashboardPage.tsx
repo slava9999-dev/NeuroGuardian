@@ -6,6 +6,8 @@
 import { useEffect, useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useAppStore, useProductsStore } from '../stores';
+import { playCashSound } from '../utils/sounds';
+import confetti from 'canvas-confetti';
 import { GlobalSwitch } from '../components/controls/GlobalSwitch';
 import { DashboardGrid } from '../components/dashboard/DashboardGrid';
 import { LogConsole } from '../components/logPanel/LogConsole';
@@ -160,6 +162,67 @@ export function DashboardPage({ onGoToSettings }: DashboardPageProps) {
   const [showHelp, setShowHelp] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [showSecurity, setShowSecurity] = useState(false);
+  
+  // 💰 Money Sound Effect Logic
+  useEffect(() => {
+    if (!stats.savedAmount || stats.savedAmount <= 0) return;
+
+    const lastSaved = Number(localStorage.getItem('ng_last_saved') || 0);
+
+    // Only play if amount INCREASED
+    if (stats.savedAmount > lastSaved) {
+      console.log('💰 KA-CHING! Saved money increased:', stats.savedAmount);
+      
+      // Play sound
+      playCashSound();
+      
+      // Fire confetti
+      confetti({
+        particleCount: 150,
+        spread: 100,
+        origin: { y: 0.3 },
+        colors: ['#FFD700', '#FFA500', '#FF4500'],
+        gravity: 0.8,
+        scalar: 1.2,
+        ticks: 200
+      });
+      
+      hapticFeedback('success');
+      
+      // Update local storage
+      localStorage.setItem('ng_last_saved', stats.savedAmount.toString());
+    }
+  }, [stats.savedAmount]);
+  
+  // 🔄 REAL-TIME SENTINEL POLLING (Client-Side Trigger)
+  // Since we don't have Cron Jobs on Hobby plan, we trigger checks from client
+  useEffect(() => {
+    if (!user?.subscriptionActive) return;
+
+    // Run check immediately on mount
+    const runCheck = async () => {
+       const tg = (window as any).Telegram?.WebApp;
+       const initData = tg?.initData;
+       if (!initData) return;
+
+       try {
+         await fetch('/api?action=check-prices', {
+            headers: { 'X-Init-Data': initData }
+         });
+         console.log('⚡ Sentinel cycle triggered by client');
+       } catch (e) {
+         console.error('Sentinel trigger failed', e);
+       }
+    };
+    
+    // Run on mount
+    runCheck();
+
+    // And every 60 seconds
+    const interval = setInterval(runCheck, 60000);
+
+    return () => clearInterval(interval);
+  }, [user?.subscriptionActive]);
   
   return (
     <div className="min-h-screen bg-gradient-to-b from-stone-900 to-stone-800 px-4 py-6 pb-24">
