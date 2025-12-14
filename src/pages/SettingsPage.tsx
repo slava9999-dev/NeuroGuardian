@@ -318,7 +318,7 @@ export function SettingsPage({ onBack }: { onBack: () => void }) {
         `}>
           <div className="flex items-center justify-between mb-2">
             <span className="text-white font-medium">
-              {user?.subscriptionPlan === 'trial' ? '🎁 Пробный период (30 дней)' :
+              {user?.subscriptionPlan === 'trial' ? '🎁 Пробный период (3 дня)' :
                user?.subscriptionPlan === 'basic' ? 'Basic' :
                user?.subscriptionPlan === 'pro' ? 'Pro' : 'Нет подписки'}
             </span>

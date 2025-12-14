@@ -211,17 +211,13 @@ async function createOrUpdateUser(user: TelegramUser) {
       return result.rows[0];
     }
   } else {
-    // FORCE TRIAL UPDATE FOR TESTING (Critical for user demo)
-    // Update existing user AND refresh trial
+    // Existing user: only update profile data, DO NOT reset subscription
     const result = await sql`
       UPDATE users SET
         username = ${user.username || null},
         first_name = ${user.first_name},
         last_name = ${user.last_name || null},
         photo_url = ${user.photo_url || null},
-        subscription_plan = 'trial',
-        subscription_end = ${trialEndDate.toISOString()},
-        subscription_active = true,
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ${user.id}
       RETURNING *
