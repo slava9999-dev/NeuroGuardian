@@ -1,11 +1,13 @@
 // ============================================
 // NeuroGUARDIAN — API Client (Vercel Backend)
+// Unified API endpoint: /api?action=xxx
 // ============================================
 
 import axios from 'axios';
 import { getInitData } from './telegram';
+import type { User } from '../types';
 
-// Use relative /api path for Vercel or explicit base URL
+// API base - uses /api for Vercel
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 const api = axios.create({
@@ -37,18 +39,10 @@ api.interceptors.response.use(
 // AUTH SERVICE
 // ============================================
 
-import type { User } from '../types';
-
-
 export const authApi = {
   login: async (initData: string): Promise<{ success: boolean; user: User }> => {
-    // Demo mode fallback
-    if (!API_BASE_URL || API_BASE_URL === '/api') {
-      // Still try the request, but have fallback
-    }
-
     try {
-      const response = await api.post('/auth', { initData });
+      const response = await api.post('', { action: 'auth', initData });
       
       // Convert date strings to Date objects
       const userData = response.data.user;
@@ -98,7 +92,7 @@ export const settingsApi = {
     autoRenew?: boolean;
   }) => {
     const initData = getInitData();
-    const response = await api.post('/settings', { initData, ...settings });
+    const response = await api.post('', { action: 'settings', initData, ...settings });
     return response.data;
   },
 
@@ -108,7 +102,8 @@ export const settingsApi = {
     clientId?: string
   ) => {
     const initData = getInitData();
-    const response = await api.post('/settings', {
+    const response = await api.post('', {
+      action: 'settings',
       initData,
       marketplace,
       apiKey,
@@ -129,47 +124,30 @@ export interface ProductData {
   nmId?: number;
   offerId?: string;
   vendorCode?: string;
-  barcode?: string;
   title: string;
   imageUrl?: string;
-  brand?: string;
-  category?: string;
   currentPrice: number;
   minPrice: number;
-  originalPrice?: number;
   stock: number;
   marketplace: 'WB' | 'Ozon';
   status: 'active' | 'protected' | 'triggered' | 'disabled';
   isMonitored: boolean;
-  lastCheckedAt?: Date;
-  lastTriggeredAt?: Date;
-  createdAt: Date;
-  updatedAt: Date;
 }
 
 export const productsApi = {
-  getProducts: async (marketplace?: 'WB' | 'Ozon'): Promise<{ success: boolean; products: ProductData[] }> => {
+  getProducts: async (): Promise<{ success: boolean; products: ProductData[] }> => {
     const initData = getInitData();
-    const response = await api.get('/products', {
+    const response = await api.get('', {
+      params: { action: 'products' },
       headers: { 'X-Init-Data': initData || '' },
-      params: { marketplace },
     });
-    
-    // Convert date strings
-    const products = response.data.products.map((p: any) => ({
-      ...p,
-      lastCheckedAt: p.lastCheckedAt ? new Date(p.lastCheckedAt) : null,
-      lastTriggeredAt: p.lastTriggeredAt ? new Date(p.lastTriggeredAt) : null,
-      createdAt: new Date(p.createdAt),
-      updatedAt: new Date(p.updatedAt),
-    }));
-    
-    return { success: true, products };
+    return { success: true, products: response.data.products };
   },
 
   updateMinPrice: async (productId: string, minPrice: number) => {
     const initData = getInitData();
-    const response = await api.post('/products', {
+    const response = await api.post('', {
+      action: 'products',
       initData,
       productId,
       minPrice,
@@ -211,7 +189,7 @@ export interface CreatePaymentResult {
 
 export const paymentApi = {
   getPlans: async (): Promise<{ success: boolean; plans: SubscriptionPlan[] }> => {
-    const response = await api.get('/plans');
+    const response = await api.get('', { params: { action: 'plans' } });
     return response.data;
   },
 
@@ -222,15 +200,14 @@ export const paymentApi = {
     promoCode?: string;
   }): Promise<CreatePaymentResult> => {
     const initData = getInitData();
-    const returnUrl = window.location.origin + '?payment_complete=true';
     
-    const response = await api.post('/create-payment', {
+    const response = await api.post('', {
+      action: 'create-payment',
       initData,
       planId: params.planId,
       email: params.email,
       savePaymentMethod: params.savePaymentMethod ?? true,
       promoCode: params.promoCode,
-      returnUrl,
     });
     
     return response.data;
