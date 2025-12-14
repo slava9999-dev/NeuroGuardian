@@ -52,18 +52,43 @@ export function ProductCard({ product }: ProductCardProps) {
   
   const status = STATUS_CONFIG[product.status] || STATUS_CONFIG.active;
   
-  const handleMinPriceBlur = useCallback(() => {
+  const handleMinPriceBlur = useCallback(async () => {
     setIsEditing(false);
     const newMinPrice = parseFloat(minPriceInput) || 0;
     
     if (newMinPrice !== product.minPrice) {
       hapticFeedback('light');
+      
+      // Update local store
       updateProduct(product.id, { 
         minPrice: newMinPrice,
         status: newMinPrice > 0 ? 'protected' : 'active',
       });
+      
+      // IMPORTANT: Save to server!
+      try {
+        const tg = (window as any).Telegram?.WebApp;
+        const initData = tg?.initData || 'demo';
+        
+        await fetch('/api?action=products', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'X-Init-Data': initData 
+          },
+          body: JSON.stringify({ 
+            action: 'products',
+            initData,
+            productId: product.productId,
+            minPrice: newMinPrice 
+          }),
+        });
+        console.log(`✅ Stop-Loss saved: ${product.productId} → ${newMinPrice}`);
+      } catch (error) {
+        console.error('❌ Failed to save Stop-Loss:', error);
+      }
     }
-  }, [minPriceInput, product.id, product.minPrice, updateProduct]);
+  }, [minPriceInput, product.id, product.productId, product.minPrice, updateProduct]);
   
   const handleMinPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Only allow numbers and one decimal point
