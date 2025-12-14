@@ -43,10 +43,13 @@ export interface User {
   triggeredToday: number;
   savedAmount: number; // Сколько денег сохранено
   
-  // Timestamps
-  createdAt: Date;
-  updatedAt: Date;
-  lastActiveAt: Date;
+  // Timestamps (optional - only used on backend)
+  createdAt?: Date;
+  updatedAt?: Date;
+  lastActiveAt?: Date;
+  
+  // Subscription days left (computed on login)
+  subscriptionDaysLeft?: number | null;
 }
 
 // ============================================

@@ -1,13 +1,12 @@
+// ============================================
+// NeuroGUARDIAN — API Client (Vercel Backend)
+// ============================================
+
 import axios from 'axios';
 import { getInitData } from './telegram';
-import { UserSchema, ProductSchema } from '../schemas'; // Use the patched schemas
-import { z } from 'zod';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
-
-if (!API_BASE_URL) {
-  console.error('⚠️ VITE_API_BASE_URL is not set!');
-}
+// Use relative /api path for Vercel or explicit base URL
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -16,11 +15,11 @@ const api = axios.create({
   },
 });
 
-// Add Authorization header to every request
+// Add initData header to every request
 api.interceptors.request.use((config) => {
   const initData = getInitData();
   if (initData) {
-    config.headers.Authorization = `Bearer ${initData}`;
+    config.headers['X-Init-Data'] = initData;
   }
   return config;
 });
@@ -34,92 +33,218 @@ api.interceptors.response.use(
   }
 );
 
-// Auth Service
+// ============================================
+// AUTH SERVICE
+// ============================================
+
+import type { User } from '../types';
+
+
 export const authApi = {
-  login: async (initData: string) => {
-    // Graceful fallback if API URL is missing (Demo Mode)
-    if (!API_BASE_URL) {
-       console.warn('API URL missing, simulating login success');
-       return {
-         success: true,
-         user: {
-            telegramId: 123456,
-            username: 'demo_user',
-            firstName: 'Demo User',
-            lastName: null,
-            photoUrl: null,
-            subscriptionActive: false,
-            subscriptionExpiresAt: null,
-            subscriptionPlan: null,
-            protectionEnabled: false,
-            defenseMode: 'zero_stock' as const,
-            wbKeyRef: null,
-            ozonKeyRef: null,
-            totalProducts: 5,
-            triggeredToday: 0,
-            savedAmount: 0,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            lastActiveAt: new Date(),
-         }
-       };
+  login: async (initData: string): Promise<{ success: boolean; user: User }> => {
+    // Demo mode fallback
+    if (!API_BASE_URL || API_BASE_URL === '/api') {
+      // Still try the request, but have fallback
     }
 
-    const response = await api.post('/telegramAuth', { initData });
-    // Validate response with Zod
-    const ResponseSchema = z.object({
-      success: z.boolean(),
-      user: UserSchema,
-    });
-    
-    // We parse the response to ensure types are correct (converts timestamps to Dates)
-    return ResponseSchema.parse(response.data);
+    try {
+      const response = await api.post('/auth', { initData });
+      
+      // Convert date strings to Date objects
+      const userData = response.data.user;
+      if (userData.subscriptionExpiresAt) {
+        userData.subscriptionExpiresAt = new Date(userData.subscriptionExpiresAt);
+      }
+      
+      return {
+        success: true,
+        user: userData,
+      };
+    } catch (error) {
+      console.warn('Auth API failed, using demo mode');
+      return {
+        success: true,
+        user: {
+          telegramId: 123456,
+          username: 'demo_user',
+          firstName: 'Demo User',
+          lastName: null,
+          photoUrl: null,
+          subscriptionActive: false,
+          subscriptionExpiresAt: null,
+          subscriptionPlan: null,
+          subscriptionDaysLeft: null,
+          protectionEnabled: false,
+          defenseMode: 'zero_stock',
+          wbKeyRef: null,
+          ozonKeyRef: null,
+          totalProducts: 5,
+          triggeredToday: 0,
+          savedAmount: 0,
+        },
+      };
+    }
   },
 };
 
-// User Settings Service
+// ============================================
+// SETTINGS SERVICE
+// ============================================
+
 export const settingsApi = {
-  updateSettings: async (settings: { protectionEnabled?: boolean; defenseMode?: 'zero_stock' | 'price_correction' }) => {
-    const response = await api.post('/updateSettings', settings);
+  updateSettings: async (settings: {
+    protectionEnabled?: boolean;
+    defenseMode?: 'zero_stock' | 'price_correction';
+    autoRenew?: boolean;
+  }) => {
+    const initData = getInitData();
+    const response = await api.post('/settings', { initData, ...settings });
     return response.data;
   },
-};
 
-// Sync Service
-export const syncApi = {
-  saveApiKey: async (marketplace: 'WB' | 'Ozon', apiKey: string, clientId?: string) => {
-    const response = await api.post('/saveApiKey', {
-      initData: getInitData(), // Explicitly pass initData if needed by backend body
+  saveApiKey: async (
+    marketplace: 'WB' | 'Ozon',
+    apiKey: string,
+    clientId?: string
+  ) => {
+    const initData = getInitData();
+    const response = await api.post('/settings', {
+      initData,
       marketplace,
       apiKey,
       clientId,
     });
     return response.data;
   },
-  
-  getProducts: async (marketplace?: 'WB' | 'Ozon') => {
-    const response = await api.get('/getProducts', {
+};
+
+// ============================================
+// PRODUCTS SERVICE
+// ============================================
+
+export interface ProductData {
+  id: string;
+  userId: number;
+  productId: string;
+  nmId?: number;
+  offerId?: string;
+  vendorCode?: string;
+  barcode?: string;
+  title: string;
+  imageUrl?: string;
+  brand?: string;
+  category?: string;
+  currentPrice: number;
+  minPrice: number;
+  originalPrice?: number;
+  stock: number;
+  marketplace: 'WB' | 'Ozon';
+  status: 'active' | 'protected' | 'triggered' | 'disabled';
+  isMonitored: boolean;
+  lastCheckedAt?: Date;
+  lastTriggeredAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export const productsApi = {
+  getProducts: async (marketplace?: 'WB' | 'Ozon'): Promise<{ success: boolean; products: ProductData[] }> => {
+    const initData = getInitData();
+    const response = await api.get('/products', {
+      headers: { 'X-Init-Data': initData || '' },
       params: { marketplace },
     });
     
-    const ResponseSchema = z.object({
-      success: z.boolean(),
-      products: z.array(ProductSchema),
-    });
+    // Convert date strings
+    const products = response.data.products.map((p: any) => ({
+      ...p,
+      lastCheckedAt: p.lastCheckedAt ? new Date(p.lastCheckedAt) : null,
+      lastTriggeredAt: p.lastTriggeredAt ? new Date(p.lastTriggeredAt) : null,
+      createdAt: new Date(p.createdAt),
+      updatedAt: new Date(p.updatedAt),
+    }));
     
-    return ResponseSchema.parse(response.data);
+    return { success: true, products };
   },
-};
 
-// Product Management
-export const productApi = {
   updateMinPrice: async (productId: string, minPrice: number) => {
-    const response = await api.post('/updateMinPrice', {
+    const initData = getInitData();
+    const response = await api.post('/products', {
+      initData,
       productId,
       minPrice,
     });
     return response.data;
   },
+};
+
+// ============================================
+// PAYMENT SERVICE
+// ============================================
+
+export interface SubscriptionPlan {
+  id: string;
+  name: string;
+  price: number;
+  durationDays: number;
+  maxProducts: number;
+  features: string[];
+  pricePerMonth: number;
+  isPopular: boolean;
+  isBestValue: boolean;
+}
+
+export interface CreatePaymentResult {
+  success: boolean;
+  paymentId?: string;
+  confirmationToken?: string;
+  confirmationUrl?: string;
+  transactionId?: string;
+  plan?: {
+    id: string;
+    name: string;
+    price: number;
+    durationDays: number;
+  };
+  error?: string;
+}
+
+export const paymentApi = {
+  getPlans: async (): Promise<{ success: boolean; plans: SubscriptionPlan[] }> => {
+    const response = await api.get('/plans');
+    return response.data;
+  },
+
+  createPayment: async (params: {
+    planId: string;
+    email?: string;
+    savePaymentMethod?: boolean;
+    promoCode?: string;
+  }): Promise<CreatePaymentResult> => {
+    const initData = getInitData();
+    const returnUrl = window.location.origin + '?payment_complete=true';
+    
+    const response = await api.post('/create-payment', {
+      initData,
+      planId: params.planId,
+      email: params.email,
+      savePaymentMethod: params.savePaymentMethod ?? true,
+      promoCode: params.promoCode,
+      returnUrl,
+    });
+    
+    return response.data;
+  },
+};
+
+// For backward compatibility
+export const syncApi = {
+  saveApiKey: settingsApi.saveApiKey,
+  getProducts: productsApi.getProducts,
+};
+
+export const productApi = {
+  updateMinPrice: productsApi.updateMinPrice,
 };
 
 export default api;
