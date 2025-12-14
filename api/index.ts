@@ -169,9 +169,9 @@ async function createOrUpdateUser(user: TelegramUser) {
   const existingUser = await sql`SELECT id FROM users WHERE id = ${user.id}`;
   const isNewUser = existingUser.rows.length === 0;
   
-  // Calculate trial end date (30 days from now)
+  // Calculate trial end date (3 days from now)
   const trialEndDate = new Date();
-  trialEndDate.setDate(trialEndDate.getDate() + 30);
+  trialEndDate.setDate(trialEndDate.getDate() + 3);
   
   if (isNewUser) {
     // Create new user with trial subscription
