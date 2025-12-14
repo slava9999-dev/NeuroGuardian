@@ -636,7 +636,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
 
             const ozonData = await ozonResponse.json();
-            const productIds = ozonData.result?.items?.map((item: any) => item.product_id) || [];
+            console.log('📦 Ozon API response:', JSON.stringify(ozonData).substring(0, 500));
+            
+            // v3 format may differ from v2
+            const items = ozonData.result?.items || ozonData.items || [];
+            const productIds = items.map((item: any) => item.product_id) || [];
 
             if (productIds.length > 0) {
               // Get detailed product info
