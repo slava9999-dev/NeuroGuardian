@@ -315,9 +315,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
         
         const { initData } = req.body;
-        if (!initData) return res.status(400).json({ error: 'Missing initData' });
-
-        const telegramUser = getUser(initData);
+        
+        // getUser handles empty initData by returning demo user
+        const telegramUser = getUser(initData || '');
         if (!telegramUser) return res.status(401).json({ error: 'Invalid initData' });
 
         const user = await createOrUpdateUser(telegramUser);
@@ -356,8 +356,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // ========== PRODUCTS ==========
       case 'products': {
-        const initData = req.headers['x-init-data'] as string || req.body?.initData;
-        if (!initData) return res.status(401).json({ error: 'Missing initData' });
+        const initData = req.headers['x-init-data'] as string || req.body?.initData || '';
 
         const user = getUser(initData);
         if (!user) return res.status(401).json({ error: 'Unauthorized' });
@@ -400,9 +399,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
         const { initData, protectionEnabled, defenseMode, marketplace, apiKey } = req.body;
-        if (!initData) return res.status(401).json({ error: 'Missing initData' });
 
-        const user = getUser(initData);
+        const user = getUser(initData || '');
         if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
         if (marketplace && apiKey) {
@@ -448,9 +446,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
         const { initData, planId } = req.body;
-        if (!initData) return res.status(401).json({ error: 'Missing initData' });
 
-        const user = getUser(initData);
+        const user = getUser(initData || '');
         if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
         if (!planId || !SUBSCRIPTION_PLANS[planId as PlanId]) {
@@ -582,9 +579,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
         const { initData, marketplace } = req.body;
-        if (!initData) return res.status(401).json({ error: 'Missing initData' });
 
-        const user = getUser(initData);
+        const user = getUser(initData || '');
         if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
         // Get user's API key
