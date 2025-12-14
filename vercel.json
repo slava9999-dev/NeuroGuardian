@@ -18,11 +18,5 @@
         { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization, X-Init-Data, X-Admin-Key" }
       ]
     }
-  ],
-  "crons": [
-    {
-      "path": "/api/cron/daily-reset",
-      "schedule": "0 0 * * *"
-    }
   ]
 }
