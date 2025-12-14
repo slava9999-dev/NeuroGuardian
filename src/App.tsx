@@ -104,26 +104,27 @@ function App() {
       try {
         console.log('🚀 App initialization started...');
         
-        // Initialize Telegram WebApp
+        // Initialize Telegram WebApp if available
         if (isTelegramWebApp()) {
           console.log('📱 Detected Telegram WebApp environment');
           initTelegramWebApp();
-          
-          const initData = getInitData();
-          if (initData) {
-              try {
-                  console.log('🔐 Authenticating with InitData...');
-                  const response = await authApi.login(initData);
-                  if (response.success && response.user) {
-                      console.log('✅ Authentication successful', response.user);
-                      setUser(response.user);
-                  }
-              } catch (err) {
-                  console.error("❌ Auth failed:", err);
-              }
-          }
         } else {
-          console.log('🔧 Development mode: Using mock user');
+          console.log('🌐 Browser mode');
+        }
+        
+        // ALWAYS call API for authentication
+        // API will return demo user if no initData
+        try {
+          console.log('🔐 Authenticating...');
+          const initData = getInitData();
+          const response = await authApi.login(initData || '');
+          if (response.success && response.user) {
+            console.log('✅ Authentication successful', response.user);
+            setUser(response.user);
+          }
+        } catch (err) {
+          console.error("❌ Auth failed, using fallback:", err);
+          // Fallback to mock user only if API fails
           setUser(MOCK_USER);
         }
       } catch (error) {
