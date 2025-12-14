@@ -4,12 +4,14 @@
 // ============================================
 
 import { useEffect, useState, useMemo } from 'react';
+import { motion } from 'framer-motion';
 import { useAppStore, useProductsStore } from '../stores';
 import { GlobalSwitch } from '../components/controls/GlobalSwitch';
 import { DashboardGrid } from '../components/dashboard/DashboardGrid';
 import { LogConsole } from '../components/logPanel/LogConsole';
 import { HelpModal } from '../components/ui/HelpModal';
 import { PaymentModal } from '../components/ui/PaymentModal';
+import { SecurityModal } from '../components/ui/SecurityModal';
 import { hapticFeedback } from '../lib/telegram';
 import type { Product } from '../types';
 
@@ -157,6 +159,7 @@ export function DashboardPage({ onGoToSettings }: DashboardPageProps) {
   
   const [showHelp, setShowHelp] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
+  const [showSecurity, setShowSecurity] = useState(false);
   
   return (
     <div className="min-h-screen bg-gradient-to-b from-stone-900 to-stone-800 px-4 py-6 pb-24">
@@ -170,11 +173,57 @@ export function DashboardPage({ onGoToSettings }: DashboardPageProps) {
         onGoToSettings={onGoToSettings}
       />
       
+      {/* Security Modal */}
+      <SecurityModal isOpen={showSecurity} onClose={() => setShowSecurity(false)} />
+      
       {/* Header */}
       <header className="mb-6">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-xl sm:text-2xl font-bold text-gradient-amber truncate mr-2">NeuroGUARDIAN</h1>
           <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Telegram Help Button */}
+            <a
+              href="https://t.me/Vyacheslav_Neuro"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => hapticFeedback('light')}
+              className="p-2 rounded-xl bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border border-blue-500/40 hover:from-blue-500/30 hover:to-cyan-500/30 transition-all flex items-center justify-center group"
+              title="Написать в поддержку"
+            >
+              <svg 
+                width="18" 
+                height="18" 
+                viewBox="0 0 24 24" 
+                fill="currentColor"
+                className="text-blue-400 group-hover:text-blue-300 transition-colors"
+              >
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+              </svg>
+            </a>
+            
+            {/* Security Button */}
+            <button
+              onClick={() => {
+                hapticFeedback('light');
+                setShowSecurity(true);
+              }}
+              className="p-2 rounded-xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/40 hover:from-emerald-500/30 hover:to-teal-500/30 transition-all flex items-center justify-center group"
+              title="Безопасность"
+            >
+              <svg 
+                width="18" 
+                height="18" 
+                viewBox="0 0 24 24" 
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                className="text-emerald-400 group-hover:text-emerald-300 transition-colors"
+              >
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                <path d="m9 12 2 2 4-4" />
+              </svg>
+            </button>
+            
             {/* Instruction button - prominent */}
             <button
               onClick={() => setShowHelp(true)}
@@ -213,27 +262,139 @@ export function DashboardPage({ onGoToSettings }: DashboardPageProps) {
           Защита маржи от принудительных акций
         </p>
 
-        {/* TRIAL BANNER */}
+        {/* 🎁 TRIAL BANNER - КРАСИВЫЙ */}
         {user?.subscriptionPlan === 'trial' && (
-          <div className="mb-2 p-3 rounded-xl bg-gradient-to-r from-blue-500/20 to-indigo-500/20 border border-blue-500/30 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                </svg>
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-4 relative overflow-hidden"
+          >
+            {/* Animated background */}
+            <div className="absolute inset-0 bg-gradient-to-r from-violet-600/30 via-fuchsia-500/30 to-amber-500/30 rounded-2xl" />
+            <motion.div 
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"
+              animate={{ x: ['-100%', '100%'] }}
+              transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+            />
+            
+            <div className="relative p-4 rounded-2xl border border-purple-500/40 backdrop-blur-sm">
+              <div className="flex items-center justify-between gap-3">
+                {/* Left: Icon + Text */}
+                <div className="flex items-center gap-3">
+                  {/* Animated gift icon */}
+                  <motion.div 
+                    className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center shadow-lg shadow-purple-500/30"
+                    animate={{ 
+                      scale: [1, 1.05, 1],
+                      rotate: [0, -5, 5, 0]
+                    }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                  >
+                    <span className="text-2xl">🎁</span>
+                  </motion.div>
+                  
+                  <div>
+                    <p className="text-base font-bold text-white flex items-center gap-2">
+                      3 дня БЕСПЛАТНО!
+                      <motion.span 
+                        className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                        animate={{ opacity: [1, 0.5, 1] }}
+                        transition={{ duration: 1.5, repeat: Infinity }}
+                      >
+                        АКТИВНО
+                      </motion.span>
+                    </p>
+                    <p className="text-sm text-purple-200/80">
+                      {subscriptionDaysLeft !== null && subscriptionDaysLeft > 0 
+                        ? `Осталось ${subscriptionDaysLeft} ${getDaysWord(subscriptionDaysLeft)} полного доступа`
+                        : 'Полный функционал без ограничений'
+                      }
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Right: Days counter */}
+                <div className="text-center">
+                  <motion.div 
+                    className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-500"
+                    animate={{ scale: [1, 1.1, 1] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                  >
+                    {subscriptionDaysLeft ?? 3}
+                  </motion.div>
+                  <p className="text-xs text-purple-300/60">
+                    {subscriptionDaysLeft === 1 ? 'день' : subscriptionDaysLeft && subscriptionDaysLeft <= 4 ? 'дня' : 'дней'}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-medium text-white">Пробный период активен</p>
-                <p className="text-xs text-blue-300">Вам доступен полный функционал на 3 дня</p>
+              
+              {/* Progress bar */}
+              <div className="mt-3 h-1.5 bg-stone-800/50 rounded-full overflow-hidden">
+                <motion.div 
+                  className="h-full bg-gradient-to-r from-violet-500 via-fuchsia-500 to-amber-500 rounded-full"
+                  initial={{ width: '100%' }}
+                  animate={{ width: `${((subscriptionDaysLeft ?? 3) / 3) * 100}%` }}
+                  transition={{ duration: 0.5 }}
+                />
               </div>
+              
+              {/* CTA Button */}
+              <motion.button 
+                onClick={() => {
+                  hapticFeedback('light');
+                  setShowPayment(true);
+                }}
+                className="mt-3 w-full py-2.5 rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-400 hover:to-fuchsia-400 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-purple-500/25 transition-all"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <span>🚀</span>
+                Продлить со скидкой 30%
+                <motion.span
+                  animate={{ x: [0, 4, 0] }}
+                  transition={{ duration: 1, repeat: Infinity }}
+                >
+                  →
+                </motion.span>
+              </motion.button>
             </div>
-            <button 
-              onClick={() => setShowPayment(true)}
-              className="text-xs font-bold text-blue-400 hover:text-blue-300 uppercase tracking-wide"
-            >
-              Тарифы
-            </button>
-          </div>
+          </motion.div>
+        )}
+        
+        {/* 🔴 EXPIRED SUBSCRIPTION BANNER */}
+        {(!user?.subscriptionActive || subscriptionDaysLeft === 0) && user?.subscriptionPlan !== 'trial' && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-4 p-4 rounded-2xl bg-gradient-to-r from-red-500/20 to-orange-500/20 border border-red-500/40"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <motion.div 
+                  className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center"
+                  animate={{ scale: [1, 1.1, 1] }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                >
+                  <span className="text-xl">⚠️</span>
+                </motion.div>
+                <div>
+                  <p className="font-bold text-red-400">Подписка истекла</p>
+                  <p className="text-sm text-stone-400">Защита товаров приостановлена</p>
+                </div>
+              </div>
+              <motion.button 
+                onClick={() => {
+                  hapticFeedback('light');
+                  setShowPayment(true);
+                }}
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-red-500 to-orange-500 text-white font-bold text-sm shadow-lg"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                Продлить
+              </motion.button>
+            </div>
+          </motion.div>
         )}
       </header>
       
@@ -271,6 +432,34 @@ export function DashboardPage({ onGoToSettings }: DashboardPageProps) {
       
       {/* Log Console */}
       <LogConsole />
+      
+      {/* Floating Telegram Help Button */}
+      <motion.a
+        href="https://t.me/Vyacheslav_Neuro"
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={() => hapticFeedback('light')}
+        className="fixed bottom-24 right-4 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 shadow-lg shadow-blue-500/30 flex items-center justify-center hover:scale-110 transition-transform"
+        initial={{ scale: 0, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ delay: 0.5, type: 'spring' }}
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.9 }}
+        title="Написать в поддержку"
+      >
+        <svg 
+          width="28" 
+          height="28" 
+          viewBox="0 0 24 24" 
+          fill="white"
+        >
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+        </svg>
+        {/* Notification badge */}
+        <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold animate-pulse">
+          ?
+        </span>
+      </motion.a>
     </div>
   );
 }

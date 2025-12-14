@@ -17,7 +17,7 @@ const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 const YOOKASSA_API_URL = 'https://api.yookassa.ru/v3';
 
 // ============================================
-// SUBSCRIPTION PLANS
+// SUBSCRIPTION PLANS + DISCOUNTS
 // ============================================
 
 const SUBSCRIPTION_PLANS = {
@@ -25,6 +25,7 @@ const SUBSCRIPTION_PLANS = {
     id: 'basic',
     name: 'Базовый',
     price: 499,
+    discountedPrice: 349, // 30% off for first month
     durationDays: 30,
     maxProducts: 50,
     features: ['До 50 товаров', 'Защита Zero Stock', 'Telegram уведомления'],
@@ -33,6 +34,7 @@ const SUBSCRIPTION_PLANS = {
     id: 'pro',
     name: 'Профессиональный',
     price: 999,
+    discountedPrice: 699, // 30% off for first month
     durationDays: 30,
     maxProducts: 500,
     features: ['До 500 товаров', 'Оба режима защиты', 'Приоритетная поддержка', 'API доступ'],
@@ -41,6 +43,7 @@ const SUBSCRIPTION_PLANS = {
     id: 'yearly',
     name: 'Годовой Pro',
     price: 9990,
+    discountedPrice: 9990, // No discount on yearly
     durationDays: 365,
     maxProducts: 500,
     features: ['Все из Pro', 'Экономия 2000₽', 'Персональный менеджер'],
@@ -48,6 +51,16 @@ const SUBSCRIPTION_PLANS = {
 } as const;
 
 type PlanId = keyof typeof SUBSCRIPTION_PLANS;
+
+// Referral program configuration
+const REFERRAL_BONUS_DAYS = 30; // 1 month free for referrer
+const REFERRAL_DISCOUNT_PERCENT = 20; // 20% discount for referred user's first payment
+
+// Promo codes
+const PROMO_CODES: Record<string, { discount: number; maxUses?: number; expiresAt?: string }> = {
+  'LAUNCH30': { discount: 30, maxUses: 100 },
+  'NEURO20': { discount: 20 },
+};
 
 // ============================================
 // TELEGRAM AUTH (Production-grade with crypto validation)
@@ -108,15 +121,22 @@ function validateTelegramInitData(initData: string): InitDataValidationResult {
       return { valid: false, user: null, error: 'Missing hash in initData' };
     }
 
-    // If no bot token configured, allow but log warning
+    // Bot token validation
     if (!TELEGRAM_BOT_TOKEN) {
-      console.warn('⚠️ TELEGRAM_BOT_TOKEN not set, skipping signature validation');
-      const userJson = params.get('user');
-      if (!userJson) {
-        return { valid: false, user: null, error: 'Missing user in initData' };
+      // In development, allow without signature validation (with warning)
+      if (!IS_PRODUCTION) {
+        console.warn('⚠️ [DEV] TELEGRAM_BOT_TOKEN not set, skipping signature validation');
+        const userJson = params.get('user');
+        if (!userJson) {
+          return { valid: false, user: null, error: 'Missing user in initData' };
+        }
+        const user = JSON.parse(userJson) as TelegramUser;
+        return { valid: true, user };
       }
-      const user = JSON.parse(userJson) as TelegramUser;
-      return { valid: true, user };
+      
+      // In production, BOT_TOKEN is required
+      console.error('❌ PRODUCTION: TELEGRAM_BOT_TOKEN not configured!');
+      return { valid: false, user: null, error: 'Auth system not configured' };
     }
 
     // Remove hash for validation
@@ -273,6 +293,154 @@ async function canAddProducts(userId: number, count: number = 1): Promise<{ allo
   return { allowed: true };
 }
 
+/**
+ * Check if user is eligible for first-month discount
+ */
+async function isFirstPayment(userId: number): Promise<boolean> {
+  const result = await sql`
+    SELECT COUNT(*) as count FROM transactions 
+    WHERE user_id = ${userId} AND status = 'succeeded'
+  `;
+  return parseInt(result.rows[0]?.count || '0', 10) === 0;
+}
+
+/**
+ * Calculate discounted price
+ */
+async function calculatePrice(userId: number, planId: PlanId, promoCode?: string): Promise<{
+  originalPrice: number;
+  finalPrice: number;
+  discount: number;
+  discountReason: string;
+}> {
+  const plan = SUBSCRIPTION_PLANS[planId];
+  let finalPrice: number = plan.price;
+  let discount = 0;
+  let discountReason = '';
+
+  // Check for first payment discount (30% off)
+  const firstPayment = await isFirstPayment(userId);
+  if (firstPayment && plan.discountedPrice < plan.price) {
+    finalPrice = Number(plan.discountedPrice);
+    discount = Math.round((1 - plan.discountedPrice / plan.price) * 100);
+    discountReason = 'Скидка 30% на первый месяц';
+  }
+
+  // Check promo code (can stack or override)
+  if (promoCode && PROMO_CODES[promoCode.toUpperCase()]) {
+    const promo = PROMO_CODES[promoCode.toUpperCase()];
+    const promoDiscount = Math.round(plan.price * promo.discount / 100);
+    const promoPrice = plan.price - promoDiscount;
+    
+    if (promoPrice < finalPrice) {
+      finalPrice = promoPrice;
+      discount = promo.discount;
+      discountReason = `Промокод ${promoCode.toUpperCase()} (-${promo.discount}%)`;
+    }
+  }
+
+  return {
+    originalPrice: plan.price,
+    finalPrice,
+    discount,
+    discountReason,
+  };
+}
+
+/**
+ * Apply referral bonus to referrer
+ */
+async function applyReferralBonus(referrerId: number): Promise<void> {
+  // Add REFERRAL_BONUS_DAYS to referrer's subscription
+  await sql`
+    UPDATE users SET
+      subscription_end = CASE 
+        WHEN subscription_end IS NULL OR subscription_end < CURRENT_TIMESTAMP 
+        THEN CURRENT_TIMESTAMP + INTERVAL '${REFERRAL_BONUS_DAYS} days'
+        ELSE subscription_end + INTERVAL '${REFERRAL_BONUS_DAYS} days'
+      END,
+      subscription_active = true,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ${referrerId}
+  `;
+  
+  // Send notification
+  await sendTelegramNotification(
+    referrerId,
+    `🎉 <b>Бонус за реферала!</b>\n\n` +
+    `Спасибо! Ваш друг оплатил подписку.\n` +
+    `➕ Добавлено ${REFERRAL_BONUS_DAYS} дней к вашей подписке.`
+  );
+}
+
+/**
+ * Send Telegram notification
+ */
+async function sendTelegramNotification(userId: number, message: string): Promise<boolean> {
+  if (!process.env.TELEGRAM_BOT_TOKEN) {
+    console.warn('⚠️ TELEGRAM_BOT_TOKEN not set, skipping notification');
+    return false;
+  }
+  
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        chat_id: userId, 
+        text: message, 
+        parse_mode: 'HTML',
+        disable_web_page_preview: true
+      }),
+    });
+    return response.ok;
+  } catch (e) {
+    console.error('Telegram notification error:', e);
+    return false;
+  }
+}
+
+/**
+ * Send subscription expiry reminder (called by cron)
+ */
+async function sendExpiryReminders(): Promise<{ sent: number; errors: number }> {
+  const threeDaysFromNow = new Date();
+  threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
+  
+  // Find users whose subscription expires in ~3 days
+  const result = await sql`
+    SELECT id, first_name, subscription_plan, subscription_end 
+    FROM users 
+    WHERE subscription_active = true
+      AND subscription_end IS NOT NULL
+      AND subscription_end BETWEEN CURRENT_TIMESTAMP AND ${threeDaysFromNow.toISOString()}::timestamp
+      AND (last_reminder_sent IS NULL OR last_reminder_sent < CURRENT_DATE - INTERVAL '2 days')
+  `;
+  
+  let sent = 0;
+  let errors = 0;
+  
+  for (const user of result.rows) {
+    const daysLeft = Math.ceil((new Date(user.subscription_end).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    const message = 
+      `⏰ <b>Напоминание о подписке</b>\n\n` +
+      `Привет, ${user.first_name}!\n\n` +
+      `Ваша подписка <b>${user.subscription_plan}</b> истекает через <b>${daysLeft} ${daysLeft === 1 ? 'день' : 'дня'}</b>.\n\n` +
+      `💡 Продлите сейчас, чтобы не потерять защиту товаров!\n\n` +
+      `🔗 Откройте приложение для продления`;
+    
+    const success = await sendTelegramNotification(user.id, message);
+    if (success) {
+      sent++;
+      await sql`UPDATE users SET last_reminder_sent = CURRENT_TIMESTAMP WHERE id = ${user.id}`;
+    } else {
+      errors++;
+    }
+  }
+  
+  return { sent, errors };
+}
+
 // ============================================
 // DATABASE OPERATIONS
 // ============================================
@@ -298,6 +466,8 @@ async function initializeDatabase() {
       triggered_today INTEGER DEFAULT 0,
       saved_amount DECIMAL(12, 2) DEFAULT 0,
       referral_code VARCHAR(50) UNIQUE,
+      referred_by VARCHAR(50),
+      last_reminder_sent TIMESTAMP,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
@@ -462,9 +632,24 @@ async function createYookassaPayment(userId: number, planId: PlanId, returnUrl: 
       amount: { value: plan.price.toFixed(2), currency: 'RUB' },
       confirmation: { type: 'embedded', return_url: returnUrl },
       capture: true,
-      description: `NeuroGUARDIAN: ${plan.name} подписка`,
+      description: `NeuroGUARDIAN: ${plan.name} (${plan.durationDays} дней) — защита маржи WB/Ozon`,
       metadata: { user_id: userId.toString(), plan_id: planId, transaction_id: transactionId },
       save_payment_method: true,
+      receipt: {
+        customer: {
+          email: 'slava-derjbin@list.ru', // Fallback email for receipt
+        },
+        items: [
+          {
+            description: `Подписка NeuroGUARDIAN ${plan.name} (${plan.durationDays} дней)`,
+            amount: { value: plan.price.toFixed(2), currency: 'RUB' },
+            vat_code: 1, // НДС не облагается (самозанятый)
+            quantity: '1',
+            payment_subject: 'service',
+            payment_mode: 'full_payment',
+          }
+        ],
+      },
     }),
   });
 
@@ -724,17 +909,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const plan = SUBSCRIPTION_PLANS[planId as PlanId];
 
-        // TEST MODE: If YooKassa is not configured, activate subscription immediately
+        // PRODUCTION: YooKassa must be configured
         if (!SHOP_ID || !SECRET_KEY) {
-          console.log('🧪 TEST MODE: Activating subscription without payment');
+          // In development, allow test mode
+          if (!IS_PRODUCTION) {
+            console.log('🧪 DEV MODE: Activating subscription without payment');
+            await activateSubscription(user.id, planId === 'yearly' ? 'pro' : planId, plan.durationDays);
+            return res.json({
+              success: true,
+              testMode: true,
+              message: `Тестовый режим: подписка ${plan.name} активирована на ${plan.durationDays} дней`,
+              plan: { id: planId, name: plan.name, price: plan.price, durationDays: plan.durationDays },
+            });
+          }
           
-          await activateSubscription(user.id, planId === 'yearly' ? 'pro' : planId, plan.durationDays);
-          
-          return res.json({
-            success: true,
-            testMode: true,
-            message: `Тестовый режим: подписка ${plan.name} активирована на ${plan.durationDays} дней`,
-            plan: { id: planId, name: plan.name, price: plan.price, durationDays: plan.durationDays },
+          // In production, payment system must be configured
+          console.error('❌ PRODUCTION: YooKassa not configured!');
+          return res.status(503).json({ 
+            error: 'Платёжная система временно недоступна. Попробуйте позже.',
+            code: 'PAYMENT_SYSTEM_UNAVAILABLE'
           });
         }
 
@@ -760,6 +953,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const metadata = payment.metadata || {};
         const userId = parseInt(metadata.user_id, 10);
         const planId = metadata.plan_id as PlanId;
+        const referrerId = metadata.referrer_id ? parseInt(metadata.referrer_id, 10) : null;
+
+        console.log(`💳 Payment webhook: status=${payment.status}, userId=${userId}, plan=${planId}`);
 
         if (payment.status === 'succeeded' && userId && planId) {
           const plan = SUBSCRIPTION_PLANS[planId];
@@ -773,7 +969,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               WHERE user_id = ${userId} AND status = 'pending'
               ORDER BY created_at DESC LIMIT 1
             `;
+
+            // Apply referral bonus if this was a referred user's first payment
+            if (referrerId) {
+              const isFirst = await isFirstPayment(userId);
+              if (isFirst) {
+                await applyReferralBonus(referrerId);
+                console.log(`🎁 Referral bonus applied to user ${referrerId}`);
+              }
+            }
+
+            // Send success notification
+            await sendTelegramNotification(
+              userId,
+              `✅ <b>Оплата успешна!</b>\n\n` +
+              `Подписка <b>${plan.name}</b> активирована.\n` +
+              `📅 Срок действия: ${plan.durationDays} дней\n\n` +
+              `🛡️ Защита ваших товаров уже работает!`
+            );
+
+            console.log(`✅ Subscription activated for user ${userId}: ${actualPlan} for ${plan.durationDays} days`);
           }
+        } else if (payment.status === 'canceled') {
+          // Payment was canceled
+          await sql`
+            UPDATE transactions SET status = 'canceled'
+            WHERE user_id = ${userId} AND status = 'pending'
+            ORDER BY created_at DESC LIMIT 1
+          `;
+          console.log(`❌ Payment canceled for user ${userId}`);
         }
 
         return res.json({ success: true });
@@ -1318,11 +1542,72 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
+      // ========== SEND REMINDERS (CRON) ==========
+      case 'send-reminders': {
+        // Allow Vercel Cron or manual Admin trigger
+        const authHeader = req.headers['authorization'];
+        const isCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+        const isAdmin = req.headers['x-admin-key'] === ADMIN_API_KEY;
+        
+        if (!isCron && !isAdmin && IS_PRODUCTION) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        console.log('📧 Starting subscription expiry reminders...');
+        const result = await sendExpiryReminders();
+        
+        console.log(`📧 Reminders complete: sent=${result.sent}, errors=${result.errors}`);
+        
+        return res.json({
+          success: true,
+          message: `Reminders sent: ${result.sent}, errors: ${result.errors}`,
+          ...result
+        });
+      }
+
+      // ========== GET REFERRAL INFO ==========
+      case 'referral': {
+        if (req.method !== 'GET' && req.method !== 'POST') {
+          return res.status(405).json({ error: 'Method not allowed' });
+        }
+
+        const initData = sanitizeInput(req.headers['x-init-data'] as string || req.body?.initData || '');
+        const validation = validateTelegramInitData(initData);
+        if (!validation.valid || !validation.user) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const dbUser = await getUserById(validation.user.id);
+        if (!dbUser) {
+          return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Count successful referrals
+        const referralsResult = await sql`
+          SELECT COUNT(*) as count FROM users 
+          WHERE referred_by = ${dbUser.referral_code}
+        `;
+        const referralCount = parseInt(referralsResult.rows[0]?.count || '0', 10);
+
+        // Generate referral link
+        const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'NeuroGuardianBot';
+        const referralLink = `https://t.me/${botUsername}?start=ref_${dbUser.referral_code}`;
+
+        return res.json({
+          success: true,
+          referralCode: dbUser.referral_code,
+          referralLink,
+          referralCount,
+          bonusDays: REFERRAL_BONUS_DAYS,
+          discountPercent: REFERRAL_DISCOUNT_PERCENT,
+        });
+      }
+
       // ========== DEFAULT ==========
       default:
         return res.status(400).json({ 
           error: 'Unknown action',
-          availableActions: ['auth', 'products', 'settings', 'plans', 'create-payment', 'payment-webhook', 'init-db', 'health', 'sync-products', 'admin-clone-user'],
+          availableActions: ['auth', 'products', 'settings', 'plans', 'create-payment', 'payment-webhook', 'init-db', 'health', 'sync-products', 'admin-clone-user', 'send-reminders', 'referral'],
         });
     }
   } catch (error) {

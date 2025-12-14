@@ -9,6 +9,16 @@
       "maxDuration": 30
     }
   },
+  "crons": [
+    {
+      "path": "/api?action=check-prices",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api?action=send-reminders",
+      "schedule": "0 10 * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/api/(.*)",

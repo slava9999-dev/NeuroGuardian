@@ -357,6 +357,104 @@ export function PaymentModal({ isOpen, onClose, onSuccess, onGoToSettings }: Pay
                 </div>
               ) : (
                 <>
+                  {/* 🎁 FREE TRIAL BANNER */}
+                  <motion.div 
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mx-4 mt-4 relative overflow-hidden rounded-2xl"
+                  >
+                    {/* Animated gradient background */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 via-teal-500 to-cyan-500" />
+                    <motion.div 
+                      className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                      animate={{ x: ['-100%', '100%'] }}
+                      transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+                    />
+                    
+                    {/* Confetti effect */}
+                    {[...Array(6)].map((_, i) => (
+                      <motion.div
+                        key={i}
+                        className="absolute w-2 h-2 rounded-full"
+                        style={{
+                          background: ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96E6A1', '#DDA0DD'][i],
+                          left: `${15 + i * 15}%`,
+                          top: '20%',
+                        }}
+                        animate={{
+                          y: [0, -10, 0],
+                          opacity: [1, 0.5, 1],
+                          scale: [1, 1.2, 1],
+                        }}
+                        transition={{
+                          duration: 1.5,
+                          repeat: Infinity,
+                          delay: i * 0.2,
+                        }}
+                      />
+                    ))}
+                    
+                    <div className="relative p-4 flex items-center gap-4">
+                      {/* Gift icon */}
+                      <motion.div 
+                        className="w-14 h-14 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0"
+                        animate={{ 
+                          rotate: [0, -10, 10, 0],
+                          scale: [1, 1.1, 1]
+                        }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                      >
+                        <span className="text-3xl">🎁</span>
+                      </motion.div>
+                      
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-xl font-black text-white">3 ДНЯ БЕСПЛАТНО!</h3>
+                          <motion.span 
+                            className="px-2 py-0.5 bg-amber-400 text-stone-900 text-xs font-bold rounded-full"
+                            animate={{ scale: [1, 1.1, 1] }}
+                            transition={{ duration: 1.5, repeat: Infinity }}
+                          >
+                            NEW
+                          </motion.span>
+                        </div>
+                        <p className="text-sm text-white/80 mt-1">
+                          Полный доступ ко всем функциям защиты
+                        </p>
+                        <div className="flex items-center gap-2 mt-2 text-xs text-white/70">
+                          <span className="flex items-center gap-1">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M20 6L9 17l-5-5"/></svg>
+                            Без карты
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M20 6L9 17l-5-5"/></svg>
+                            Автоотключение
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                  
+                  {/* Discount banner */}
+                  <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.3 }}
+                    className="mx-4 mt-3 p-3 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 rounded-xl flex items-center gap-3"
+                  >
+                    <motion.div
+                      animate={{ rotate: [0, 360] }}
+                      transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+                      className="text-2xl"
+                    >
+                      🔥
+                    </motion.div>
+                    <div>
+                      <p className="text-sm font-bold text-amber-400">Скидка 30% на первый месяц!</p>
+                      <p className="text-xs text-stone-400">Оплатите после пробного периода со скидкой</p>
+                    </div>
+                  </motion.div>
+
                   {/* Plans */}
                   <div className="p-4 space-y-4">
                     {isLoadingPlans ? (
@@ -479,7 +577,42 @@ export function PaymentModal({ isOpen, onClose, onSuccess, onGoToSettings }: Pay
                     </button>
                     
                     <p className="text-xs text-stone-500 text-center mt-3">
-                      Безопасная оплата через ЮКасса. Отмена в любой момент.
+                      Нажимая «Оплатить», вы принимаете{' '}
+                      <a 
+                        href="#legal" 
+                        onClick={(e) => { 
+                          e.preventDefault(); 
+                          // Open legal page in Telegram or new tab
+                          const tg = (window as any).Telegram?.WebApp;
+                          if (tg?.openLink) {
+                            tg.openLink(window.location.origin + '/?page=legal');
+                          } else {
+                            window.open('/?page=legal', '_blank');
+                          }
+                        }}
+                        className="text-amber-400 hover:underline"
+                      >
+                        оферту
+                      </a>{' '}
+                      и{' '}
+                      <a 
+                        href="#privacy"
+                        onClick={(e) => { 
+                          e.preventDefault(); 
+                          const tg = (window as any).Telegram?.WebApp;
+                          if (tg?.openLink) {
+                            tg.openLink(window.location.origin + '/?page=legal');
+                          } else {
+                            window.open('/?page=legal', '_blank');
+                          }
+                        }}
+                        className="text-amber-400 hover:underline"
+                      >
+                        политику конфиденциальности
+                      </a>.
+                    </p>
+                    <p className="text-xs text-stone-500 text-center mt-1">
+                      ИП Дерябин В.В. • ИНН 670301543202 • Самозанятый
                     </p>
                   </div>
                 </>

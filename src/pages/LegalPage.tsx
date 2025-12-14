@@ -143,6 +143,26 @@ export function LegalPage({ onBack }: LegalPageProps) {
           </p>
           
           <div className="space-y-4">
+            {/* 🎁 FREE TRIAL */}
+            <div className="p-4 bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 rounded-xl border border-emerald-500/40 relative overflow-hidden">
+              <div className="absolute top-0 right-0 px-3 py-1 bg-emerald-500 text-white text-xs font-bold rounded-bl-xl">
+                🎁 БЕСПЛАТНО
+              </div>
+              <div className="flex justify-between items-center mb-2">
+                <span className="font-medium text-white">Пробный период</span>
+                <span className="text-emerald-400 font-bold">3 дня</span>
+              </div>
+              <ul className="text-sm text-stone-400 space-y-1">
+                <li>• Полный доступ ко всем функциям</li>
+                <li>• До 20 товаров</li>
+                <li>• Без привязки карты</li>
+                <li>• Автоматическое отключение</li>
+              </ul>
+              <p className="text-xs text-emerald-400/70 mt-2">
+                Активируется автоматически при первом входе
+              </p>
+            </div>
+            
             <div className="p-4 bg-stone-800/50 rounded-xl border border-stone-700">
               <div className="flex justify-between items-center mb-2">
                 <span className="font-medium text-white">Базовый</span>
@@ -212,15 +232,23 @@ export function LegalPage({ onBack }: LegalPageProps) {
               1.2. Заказчик обязуется оплатить услуги Исполнителя в соответствии с выбранным тарифом.
             </p>
             
-            <p className="font-medium text-white mt-4">2. СТОИМОСТЬ И ПОРЯДОК ОПЛАТЫ</p>
+            <p className="font-medium text-white mt-4">2. ПРОБНЫЙ ПЕРИОД И СТОИМОСТЬ УСЛУГ</p>
             <p>
-              2.1. Стоимость услуг определяется в соответствии с действующими тарифами.
+              2.1. Новым пользователям предоставляется бесплатный пробный период сроком 3 (три) 
+              календарных дня с полным доступом ко всем функциям сервиса.
             </p>
             <p>
-              2.2. Оплата производится путём 100% предоплаты через платёжную систему ЮKassa.
+              2.2. Пробный период активируется автоматически при первом входе в приложение.
+              По истечении пробного периода доступ к платным функциям приостанавливается.
             </p>
             <p>
-              2.3. Моментом оплаты считается поступление денежных средств на счёт Исполнителя.
+              2.3. Стоимость услуг определяется в соответствии с действующими тарифами.
+            </p>
+            <p>
+              2.4. Оплата производится путём 100% предоплаты через платёжную систему ЮKassa.
+            </p>
+            <p>
+              2.5. Моментом оплаты считается поступление денежных средств на счёт Исполнителя.
             </p>
             
             <p className="font-medium text-white mt-4">3. ПОРЯДОК ВОЗВРАТА</p>
