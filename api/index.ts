@@ -603,6 +603,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const clientId = apiKey.split(':')[0]; // Expecting format: clientId:apiKey
             const apiToken = apiKey.includes(':') ? apiKey.split(':')[1] : apiKey;
 
+            console.log('🔍 Ozon sync:', { clientId: clientId.substring(0, 4) + '...', apiTokenLen: apiToken.length });
+
             const ozonResponse = await fetch('https://api-seller.ozon.ru/v2/product/list', {
               method: 'POST',
               headers: {
@@ -618,8 +620,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             if (!ozonResponse.ok) {
               const errorText = await ozonResponse.text();
-              console.error('Ozon API error:', errorText);
-              return res.status(400).json({ error: 'Ошибка Ozon API: ' + ozonResponse.status });
+              console.error('Ozon API error:', ozonResponse.status, errorText);
+              return res.status(400).json({ 
+                error: `Ошибка Ozon API: ${ozonResponse.status}`,
+                details: errorText.substring(0, 200),
+              });
             }
 
             const ozonData = await ozonResponse.json();
