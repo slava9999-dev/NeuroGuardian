@@ -46,12 +46,26 @@ export const useAppStore = create<AppState>()(
       // Actions
       setUser: (user) => {
         if (user) {
-          const daysLeft = user.subscriptionExpiresAt
-            ? Math.ceil((user.subscriptionExpiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-            : null;
+          // Parse subscriptionExpiresAt as Date if it's a string
+          let expiresAt: Date | null = null;
+          if (user.subscriptionExpiresAt) {
+            expiresAt = user.subscriptionExpiresAt instanceof Date 
+              ? user.subscriptionExpiresAt 
+              : new Date(user.subscriptionExpiresAt as unknown as string);
+          }
+          
+          // Calculate days left
+          const daysLeft = expiresAt
+            ? Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+            : (user.subscriptionDaysLeft ?? null);
+          
+          console.log('🗂️ Store setUser:', { daysLeft, expiresAt, subscriptionActive: user.subscriptionActive });
           
           set({
-            user,
+            user: {
+              ...user,
+              subscriptionExpiresAt: expiresAt,
+            },
             isAuthenticated: true,
             protectionEnabled: user.protectionEnabled,
             defenseMode: user.defenseMode,
