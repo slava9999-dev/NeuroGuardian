@@ -193,7 +193,7 @@ function encryptApiKey(apiKey: string): string {
 **Файл:** `.env`, строка 32
 
 ```
-ADMIN_KEY=neuro_secret_test_key
+ADMIN_KEY=YOUR_SECURE_KEY  # Добавьте в Vercel ENV
 ```
 
 **Рекомендация:** Удалить из репозитория, использовать только Vercel Environment Variables.

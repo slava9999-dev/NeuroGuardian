@@ -71,8 +71,8 @@ _Ничего критичного. Основной флоу исправлен
 
 ## 🔑 OZON CREDENTIALS
 
-- **Client ID:** 2820442
-- **API Key:** 7bc0e79f-dc16-471e-a2eb-0b... (сохранён в БД как clientId:apiKey)
+- **Client ID:** (настраивается в приложении)
+- **API Key:** (вводится через UI, шифруется AES-256-GCM)
 - **Ожидаемых товаров:** 11
 
 ---
@@ -104,7 +104,7 @@ $body = @{action="sync-products"; marketplace="Ozon"} | ConvertTo-Json
 Invoke-RestMethod -Uri "https://neuro-guardian.vercel.app/api" -Method POST -ContentType "application/json" -Body $body
 
 # 3. Тест Ozon API напрямую с v3
-$headers = @{"Client-Id"="2820442"; "Api-Key"="REAL_KEY_HERE"}
+$headers = @{"Client-Id"="YOUR_CLIENT_ID"; "Api-Key"="YOUR_API_KEY"}
 $body = '{"filter":{},"last_id":"","limit":100}'
 Invoke-RestMethod -Uri "https://api-seller.ozon.ru/v3/product/list" -Method POST -Headers $headers -ContentType "application/json" -Body $body
 ```
