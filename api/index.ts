@@ -1278,6 +1278,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
+      // ========== ADMIN: TEST OZON API ==========
+      case 'admin-test-ozon': {
+        const adminKey = req.headers['x-admin-key'] || req.query.key;
+        const validKeys = ['neuro_emergency_admin_2024', ADMIN_API_KEY].filter(Boolean);
+        if (!validKeys.includes(adminKey as string)) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const { clientId, apiKey } = req.body;
+        if (!clientId || !apiKey) {
+          return res.status(400).json({ error: 'Missing clientId or apiKey' });
+        }
+
+        try {
+          const response = await fetch('https://api-seller.ozon.ru/v3/product/list', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Client-Id': clientId,
+              'Api-Key': apiKey,
+            },
+            body: JSON.stringify({ filter: {}, last_id: '', limit: 5 }),
+          });
+
+          const data = await response.json();
+          
+          return res.json({
+            status: response.status,
+            ok: response.ok,
+            itemsCount: data.result?.items?.length || 0,
+            total: data.result?.total || 0,
+            error: data.message || data.error || null,
+            raw: data
+          });
+        } catch (err: any) {
+          return res.status(500).json({ error: err.message });
+        }
+      }
+
       case 'sync-products': {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
