@@ -25,8 +25,8 @@ interface AppState {
   setUser: (user: User | null) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
-  setProtectionEnabled: (enabled: boolean) => void;
-  setDefenseMode: (mode: DefenseMode) => void;
+  setProtectionEnabled: (enabled: boolean) => Promise<void>;
+  setDefenseMode: (mode: DefenseMode) => Promise<void>;
   updateSubscription: (active: boolean, expiresAt: Date | null) => void;
   logout: () => void;
 }
@@ -85,14 +85,50 @@ export const useAppStore = create<AppState>()(
       
       setError: (error) => set({ error }),
       
-      setProtectionEnabled: (enabled) => {
+      setProtectionEnabled: async (enabled) => {
         set({ protectionEnabled: enabled });
-        // TODO: Sync with Firestore
+        // Sync with server
+        try {
+          const tg = (window as any).Telegram?.WebApp;
+          const initData = tg?.initData || '';
+          if (initData) {
+            await fetch('/api?action=settings', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                action: 'settings',
+                initData,
+                protectionEnabled: enabled 
+              }),
+            });
+            console.log('✅ Protection status synced:', enabled);
+          }
+        } catch (error) {
+          console.error('❌ Failed to sync protection status:', error);
+        }
       },
       
-      setDefenseMode: (mode) => {
+      setDefenseMode: async (mode) => {
         set({ defenseMode: mode });
-        // TODO: Sync with Firestore
+        // Sync with server
+        try {
+          const tg = (window as any).Telegram?.WebApp;
+          const initData = tg?.initData || '';
+          if (initData) {
+            await fetch('/api?action=settings', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                action: 'settings',
+                initData,
+                defenseMode: mode 
+              }),
+            });
+            console.log('✅ Defense mode synced:', mode);
+          }
+        } catch (error) {
+          console.error('❌ Failed to sync defense mode:', error);
+        }
       },
       
       updateSubscription: (active, expiresAt) => {
