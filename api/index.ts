@@ -632,8 +632,28 @@ async function initializeDatabase() {
     )
   `;
 
+  // Sentinel audit logs table
+  await sql`
+    CREATE TABLE IF NOT EXISTS sentinel_logs (
+      id SERIAL PRIMARY KEY,
+      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      product_id VARCHAR(255) NOT NULL,
+      product_title VARCHAR(500),
+      detected_price INTEGER NOT NULL,
+      min_price INTEGER NOT NULL,
+      defense_action VARCHAR(50) NOT NULL,
+      saved_amount INTEGER DEFAULT 0,
+      marketplace VARCHAR(10) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+
+  // Optimized indexes for common queries
   await sql`CREATE INDEX IF NOT EXISTS idx_products_user_id ON products(user_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_users_protection ON users(protection_enabled, subscription_active) WHERE protection_enabled = true`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_products_monitoring ON products(user_id, min_price) WHERE min_price > 0`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_sentinel_logs_user ON sentinel_logs(user_id, created_at DESC)`;
 }
 
 async function createOrUpdateUser(user: TelegramUser) {
@@ -990,6 +1010,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(400).json({ error: 'Invalid parameters', received: { productId, minPrice } });
           }
           
+          // SECURITY: Verify product ownership before update (IDOR protection)
+          const ownershipCheck = await sql`
+            SELECT id FROM products WHERE user_id = ${targetUserId} AND product_id = ${productId}
+          `;
+          if (ownershipCheck.rows.length === 0) {
+            console.warn(`⚠️ IDOR attempt: user=${targetUserId} tried to update product=${productId}`);
+            return res.status(403).json({ error: 'Product not found or access denied' });
+          }
+          
           await updateProductMinPrice(targetUserId, productId, minPrice);
           console.log(`✅ Stop-Loss updated: user=${targetUserId}, product=${productId}, minPrice=${minPrice}`);
           return res.json({ success: true, productId, minPrice });
@@ -1120,6 +1149,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // ========== PAYMENT WEBHOOK ==========
       case 'payment-webhook': {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+        // SECURITY: Verify webhook is from YooKassa IP addresses
+        // Official YooKassa IPs: https://yookassa.ru/developers/using-api/webhooks#ip
+        const YOOKASSA_IPS = [
+          '185.71.76.0/27',   // 185.71.76.0 - 185.71.76.31
+          '185.71.77.0/27',   // 185.71.77.0 - 185.71.77.31
+          '77.75.153.0/25',   // 77.75.153.0 - 77.75.153.127
+          '77.75.156.11',
+          '77.75.156.35',
+          '77.75.154.128/25', // 77.75.154.128 - 77.75.154.255
+          '2a02:5180::/32'    // IPv6
+        ];
+        
+        const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || 
+                         req.headers['x-real-ip'] as string || 
+                         'unknown';
+        
+        // Simple IP check (for production, use proper CIDR matching)
+        const isYooKassaIp = YOOKASSA_IPS.some(ip => {
+          if (ip.includes('/')) {
+            // CIDR notation - check prefix
+            const prefix = ip.split('/')[0].split('.').slice(0, 3).join('.');
+            return clientIp.startsWith(prefix);
+          }
+          return clientIp === ip;
+        });
+        
+        if (IS_PRODUCTION && !isYooKassaIp && clientIp !== 'unknown') {
+          console.warn(`⚠️ Webhook from unauthorized IP: ${clientIp}`);
+          // Log but don't block in case of proxy issues - just warn
+        }
 
         const event = req.body;
         if (!event?.object?.id) return res.status(400).json({ error: 'Invalid payload' });
@@ -1681,32 +1741,58 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               console.log(`✅ Processed ${products.length} products with details`);
             }
           } else if (mp === 'WB') {
-            // WB API - get products
-            const wbResponse = await fetch('https://suppliers-api.wildberries.ru/content/v2/get/cards/list', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': apiKey,
-              },
-              body: JSON.stringify({
-                settings: { cursor: { limit: 100 }, filter: { withPhoto: -1 } },
-              }),
-            });
+            // WB API - get products (API v2)
+            console.log('🔍 WB API sync starting...');
+            console.log('🔑 WB API key length:', apiKey.length);
+            
+            try {
+              // WB Content API v2 - requires proper authorization header
+              const wbResponse = await fetch('https://content-api.wildberries.ru/content/v2/get/cards/list', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': apiKey, // WB uses raw token without Bearer prefix
+                },
+                body: JSON.stringify({
+                  settings: { 
+                    cursor: { limit: 100 }, 
+                    filter: { withPhoto: -1 } 
+                  },
+                }),
+              });
 
-            if (!wbResponse.ok) {
-              return res.status(400).json({ error: 'Ошибка WB API: ' + wbResponse.status });
+              console.log('📡 WB API response status:', wbResponse.status);
+
+              if (!wbResponse.ok) {
+                const errorText = await wbResponse.text();
+                console.error('❌ WB API error:', wbResponse.status, errorText);
+                return res.status(400).json({ 
+                  error: `Ошибка WB API: ${wbResponse.status}`,
+                  details: errorText.substring(0, 500),
+                  hint: 'Проверьте, что API ключ имеет права на контент (Content API)'
+                });
+              }
+
+              const wbData = await wbResponse.json();
+              console.log('📦 WB API response cards count:', wbData.cards?.length || 0);
+              
+              products = (wbData.cards || []).map((card: any) => ({
+                product_id: `wb-${card.nmID}`,
+                nm_id: card.nmID,
+                title: card.title || card.subjectName || 'Без названия',
+                image_url: card.photos?.[0]?.big || card.photos?.[0]?.c246x328 || null,
+                current_price: card.sizes?.[0]?.price?.total || card.sizes?.[0]?.price || 0,
+                current_stock: card.sizes?.reduce((sum: number, s: any) => sum + (s.stocks?.reduce((ss: number, st: any) => ss + st.qty, 0) || 0), 0) || 0,
+                marketplace: 'WB',
+              }));
+            } catch (wbError: any) {
+              console.error('❌ WB fetch error:', wbError.message);
+              return res.status(500).json({ 
+                error: 'Ошибка подключения к WB API',
+                details: wbError.message,
+                hint: 'Возможно, API Wildberries временно недоступен. Попробуйте позже.'
+              });
             }
-
-            const wbData = await wbResponse.json();
-            products = (wbData.cards || []).map((card: any) => ({
-              product_id: `wb-${card.nmID}`,
-              nm_id: card.nmID,
-              title: card.title || card.subjectName || 'Без названия',
-              image_url: card.photos?.[0]?.big || card.photos?.[0]?.c246x328 || null,
-              current_price: card.sizes?.[0]?.price || 0,
-              current_stock: card.sizes?.reduce((sum: number, s: any) => sum + (s.stocks?.reduce((ss: number, st: any) => ss + st.qty, 0) || 0), 0) || 0,
-              marketplace: 'WB',
-            }));
           }
 
           // Limit products based on subscription plan
@@ -1910,6 +1996,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                        totalScanned++;
                        
                        console.log(`📊 Check: ${dbProduct.title.substring(0, 30)}... | Current: ${currentPrice} | Min: ${minPrice}`);
+                       
+                       // Update current_price in DB for history and analytics
+                       if (currentPrice > 0) {
+                         await sql`
+                           UPDATE products SET current_price = ${Math.round(currentPrice)}, updated_at = CURRENT_TIMESTAMP 
+                           WHERE id = ${dbProduct.id}
+                         `;
+                       }
 
                        // VIOLATION DETECTED!
                        if (currentPrice > 0 && currentPrice < minPrice) {
@@ -1962,6 +2056,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                              saved_amount = saved_amount + ${savedAmount}
                            WHERE id = ${user.id}
                          `;
+
+                          // Log to sentinel_logs for audit (Ozon)
+                          await sql`
+                            INSERT INTO sentinel_logs (user_id, product_id, product_title, detected_price, min_price, defense_action, saved_amount, marketplace)
+                            VALUES (${user.id}, ${dbProduct.product_id}, ${dbProduct.title}, ${Math.round(currentPrice)}, ${minPrice}, ${defenseAction}, ${savedAmount}, 'Ozon')
+                          `;
 
                           // TELEGRAM ALERT
                           console.log(`📤 Sending Telegram alert to user ${user.id}...`);
@@ -2105,7 +2205,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                              });
                            }
 
-                          // UPDATE DB & NOTIFY
+                           // UPDATE DB & NOTIFY
                            await sql`
                              UPDATE products SET status = 'triggered', updated_at = CURRENT_TIMESTAMP 
                              WHERE id = ${dbProduct.id}
@@ -2117,6 +2217,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                                triggered_today = triggered_today + 1,
                                saved_amount = saved_amount + ${savedAmount}
                              WHERE id = ${user.id}
+                           `;
+
+                           // Log to sentinel_logs for audit
+                           await sql`
+                             INSERT INTO sentinel_logs (user_id, product_id, product_title, detected_price, min_price, defense_action, saved_amount, marketplace)
+                             VALUES (${user.id}, ${dbProduct.product_id}, ${dbProduct.title}, ${Math.round(currentPrice)}, ${minPrice}, ${defenseAction}, ${savedAmount}, 'WB')
                            `;
 
                            // TELEGRAM ALERT
@@ -2295,11 +2401,56 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
+      // ========== ADMIN: SENTINEL LOGS ==========
+      case 'admin-sentinel-logs': {
+        const adminKey = req.headers['x-admin-key'] || req.query.key;
+        const validKeys = [ADMIN_API_KEY].filter(Boolean);
+        if (!validKeys.includes(adminKey as string)) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const userId = req.query.userId || req.body?.userId;
+        const limit = parseInt(req.query.limit as string || '50', 10);
+
+        let logsResult;
+        if (userId) {
+          logsResult = await sql`
+            SELECT * FROM sentinel_logs 
+            WHERE user_id = ${userId}
+            ORDER BY created_at DESC 
+            LIMIT ${limit}
+          `;
+        } else {
+          logsResult = await sql`
+            SELECT * FROM sentinel_logs 
+            ORDER BY created_at DESC 
+            LIMIT ${limit}
+          `;
+        }
+
+        return res.json({
+          success: true,
+          count: logsResult.rows.length,
+          logs: logsResult.rows.map(log => ({
+            id: log.id,
+            userId: log.user_id,
+            productId: log.product_id,
+            productTitle: log.product_title?.substring(0, 50),
+            detectedPrice: log.detected_price,
+            minPrice: log.min_price,
+            defenseAction: log.defense_action,
+            savedAmount: log.saved_amount,
+            marketplace: log.marketplace,
+            createdAt: log.created_at,
+          })),
+        });
+      }
+
       // ========== DEFAULT ==========
       default:
         return res.status(400).json({ 
           error: 'Unknown action',
-          availableActions: ['auth', 'products', 'settings', 'plans', 'create-payment', 'payment-webhook', 'init-db', 'reset-db', 'health', 'sync-products', 'check-prices', 'admin-activate-trial', 'admin-check-user', 'admin-list-users', 'admin-test-ozon', 'admin-clone-user', 'send-reminders', 'referral'],
+          availableActions: ['auth', 'products', 'settings', 'plans', 'create-payment', 'payment-webhook', 'init-db', 'reset-db', 'health', 'sync-products', 'check-prices', 'admin-activate-trial', 'admin-check-user', 'admin-list-users', 'admin-list-products', 'admin-test-ozon', 'admin-clone-user', 'admin-sentinel-logs', 'send-reminders', 'referral'],
         });
     }
   } catch (error) {
