@@ -1328,6 +1328,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
+      // ========== ADMIN: LIST PRODUCTS ==========
+      case 'admin-list-products': {
+        const adminKey = req.headers['x-admin-key'] || req.query.key;
+        const validKeys = [ADMIN_API_KEY].filter(Boolean);
+        if (!validKeys.includes(adminKey as string)) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const userId = req.query.userId || req.body?.userId;
+        if (!userId) return res.status(400).json({ error: 'Missing userId' });
+
+        const result = await sql`SELECT product_id, title, current_price, min_price, status FROM products WHERE user_id = ${userId} ORDER BY created_at DESC LIMIT 50`;
+        
+        return res.json({
+          count: result.rows.length,
+          products: result.rows.map(p => ({
+            productId: p.product_id,
+            title: p.title?.substring(0, 40) + '...',
+            currentPrice: p.current_price,
+            minPrice: p.min_price,
+            status: p.status
+          }))
+        });
+      }
+
       // ========== ADMIN: SET PROTECTION ==========
       case 'admin-set-protection': {
         const adminKey = req.headers['x-admin-key'] || req.query.key;
