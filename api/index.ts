@@ -938,12 +938,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // ========== PRODUCTS ==========
       case 'products': {
         const initData = sanitizeInput(req.headers['x-init-data'] as string || req.body?.initData || '');
+        const adminKey = req.headers['x-admin-key'];
+        const adminUserId = req.body?.userId;
 
-        const validation = validateTelegramInitData(initData);
-        if (!validation.valid || !validation.user) {
-          return res.status(401).json({ error: 'Unauthorized', code: 'AUTH_FAILED' });
+        // Admin bypass for testing
+        let user: any;
+        if (adminKey === ADMIN_API_KEY && adminUserId) {
+          user = { id: parseInt(adminUserId) };
+          console.log(`🔧 Admin auth for products: user=${adminUserId}`);
+        } else {
+          const validation = validateTelegramInitData(initData);
+          if (!validation.valid || !validation.user) {
+            return res.status(401).json({ error: 'Unauthorized', code: 'AUTH_FAILED' });
+          }
+          user = validation.user;
         }
-        const user = validation.user;
 
         if (req.method === 'GET') {
           const products = await getProductsByUserId(user.id);
