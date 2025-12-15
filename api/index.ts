@@ -1963,21 +1963,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                            WHERE id = ${user.id}
                          `;
 
-                         // TELEGRAM ALERT
-                         if (process.env.TELEGRAM_BOT_TOKEN) {
-                           const msg = `🛡️ <b>NeuroGUARDIAN SENTRY</b>\n\n` +
-                                     `⚠️ <b>Демпинг обнаружен!</b>\n` +
-                                     `📦 ${dbProduct.title}\n` +
-                                     `📉 Цена упала: ${currentPrice} ₽ < ${minPrice} ₽\n` +
-                                     `⚔️ <b>Защита активирована:</b> ${defenseAction}\n` +
-                                     `💰 Спасено: ${savedAmount} ₽`;
-                           
-                           await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-                             method: 'POST',
-                             headers: { 'Content-Type': 'application/json' },
-                             body: JSON.stringify({ chat_id: user.id, text: msg, parse_mode: 'HTML' }),
-                           });
-                         }
+                          // TELEGRAM ALERT
+                          console.log(`📤 Sending Telegram alert to user ${user.id}...`);
+                          const token = process.env.TELEGRAM_BOT_TOKEN;
+                          if (token) {
+                            const msg = `🛡️ <b>NeuroGUARDIAN SENTRY</b>\n\n` +
+                                      `⚠️ <b>Демпинг обнаружен!</b>\n` +
+                                      `📦 ${dbProduct.title}\n` +
+                                      `📉 Цена упала: ${currentPrice} ₽ < ${minPrice} ₽\n` +
+                                      `⚔️ <b>Защита активирована:</b> ${defenseAction}\n` +
+                                      `💰 Спасено: ${savedAmount} ₽`;
+                            
+                            try {
+                              const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ chat_id: user.id, text: msg, parse_mode: 'HTML' }),
+                              });
+                              const tgData = await tgRes.json();
+                              console.log(`📤 Telegram result: ok=${tgRes.ok}`, JSON.stringify(tgData).substring(0, 100));
+                            } catch (tgErr) {
+                              console.error(`❌ Telegram send error:`, tgErr);
+                            }
+                          } else {
+                            console.warn(`⚠️ TELEGRAM_BOT_TOKEN not set!`);
+                          }
                        }
                      }
                    }
