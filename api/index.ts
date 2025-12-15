@@ -1561,8 +1561,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 return {
                   product_id: `ozon-${item.id}`,
                   title: item.name || 'Без названия',
-                  // v3 возвращает массив ссылок
-                  image_url: item.primary_image?.[0] || item.images?.[0] || null,
+                  // v3 возвращает primary_image как строку
+                  image_url: (typeof item.primary_image === 'string' ? item.primary_image : item.primary_image?.[0]) || item.images?.[0] || null,
                   current_price: price,
                   current_stock: totalStock,
                   marketplace: 'Ozon',
@@ -1794,11 +1794,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                          
                          // EXECUTE DEFENSE
                          let defenseAction = '';
+                         let ozonUpdateRes;
                          
                          if (user.defense_mode === 'zero_stock') {
                            // Option A: Set Stock to 0
                            defenseAction = 'Zero Stock';
-                           await fetchWithRetry('https://api-seller.ozon.ru/v1/product/import/stocks', {
+                           ozonUpdateRes = await fetchWithRetry('https://api-seller.ozon.ru/v1/product/import/stocks', {
                              method: 'POST',
                              headers: { 'Content-Type': 'application/json', 'Client-Id': clientId, 'Api-Key': apiKey },
                              body: JSON.stringify({
@@ -1808,7 +1809,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                          } else {
                            // Option B: Price Correction (Set to min_price)
                            defenseAction = 'Price Correction';
-                           await fetchWithRetry('https://api-seller.ozon.ru/v1/product/import/prices', {
+                           ozonUpdateRes = await fetchWithRetry('https://api-seller.ozon.ru/v1/product/import/prices', {
                              method: 'POST',
                              headers: { 'Content-Type': 'application/json', 'Client-Id': clientId, 'Api-Key': apiKey },
                              body: JSON.stringify({
@@ -1970,7 +1971,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                              });
                            }
 
-                           // UPDATE DB & NOTIFY
+
+
+
+
+
+                          // UPDATE DB & NOTIFY
                            await sql`
                              UPDATE products SET status = 'triggered', updated_at = CURRENT_TIMESTAMP 
                              WHERE id = ${dbProduct.id}
