@@ -2107,7 +2107,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       default:
         return res.status(400).json({ 
           error: 'Unknown action',
-          availableActions: ['auth', 'products', 'settings', 'plans', 'create-payment', 'payment-webhook', 'init-db', 'health', 'sync-products', 'admin-clone-user', 'send-reminders', 'referral'],
+          availableActions: ['auth', 'products', 'settings', 'plans', 'create-payment', 'payment-webhook', 'init-db', 'reset-db', 'health', 'sync-products', 'check-prices', 'admin-activate-trial', 'admin-check-user', 'admin-list-users', 'admin-test-ozon', 'admin-clone-user', 'send-reminders', 'referral'],
         });
     }
   } catch (error) {
