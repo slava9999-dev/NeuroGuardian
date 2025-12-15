@@ -350,8 +350,9 @@ function sanitizeInput(input: unknown): string {
 }
 
 function sanitizeApiKey(key: string): string {
-  // API keys should only contain alphanumeric, dashes, underscores, colons
-  return key.replace(/[^a-zA-Z0-9\-_:]/g, '').slice(0, 500);
+  // API keys can be JWT tokens (contain dots) or regular tokens
+  // Allow: alphanumeric, dashes, underscores, colons, dots (for JWT)
+  return key.replace(/[^a-zA-Z0-9\-_:.]/g, '').slice(0, 2000);
 }
 
 /**
