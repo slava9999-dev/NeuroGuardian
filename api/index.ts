@@ -1337,6 +1337,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
+      // ========== ADMIN: SET DEFENSE MODE ==========
+      case 'admin-set-defense-mode': {
+        const adminKey = req.headers['x-admin-key'] || req.query.key;
+        const validKeys = [ADMIN_API_KEY].filter(Boolean);
+        if (!validKeys.includes(adminKey as string)) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const userId = req.query.userId || req.body?.userId;
+        const mode = req.query.mode || req.body?.mode; // 'zero_stock' | 'price_correction'
+        
+        if (!userId || !mode) return res.status(400).json({ error: 'Missing userId or mode' });
+
+        await sql`UPDATE users SET defense_mode = ${mode}, updated_at = CURRENT_TIMESTAMP WHERE id = ${userId}`;
+        
+        const result = await sql`SELECT defense_mode FROM users WHERE id = ${userId}`;
+        
+        return res.json({ 
+          success: true, 
+          userId,
+          defense_mode: result.rows[0]?.defense_mode
+        });
+      }
+
       // ========== ADMIN: TEST OZON API ==========
       case 'admin-test-ozon': {
         const adminKey = req.headers['x-admin-key'] || req.query.key;
