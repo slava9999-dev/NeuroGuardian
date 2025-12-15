@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { hapticFeedback } from '../lib/telegram';
+import { settingsApi, productsApi } from '../lib/api';
 
 type Step = 'welcome' | 'marketplace' | 'apiKey' | 'sync' | 'complete';
 type Marketplace = 'WB' | 'Ozon';
@@ -17,6 +18,7 @@ export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
   const [clientId, setClientId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [syncedCount, setSyncedCount] = useState(0);
 
   const handleMarketplaceSelect = (mp: Marketplace) => {
     hapticFeedback('light');
@@ -40,19 +42,29 @@ export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
     hapticFeedback('light');
 
     try {
-      // TODO: Call saveApiKey Cloud Function
-      await new Promise((r) => setTimeout(r, 2000)); // Simulated delay
+      // For Ozon, combine clientId:apiKey
+      const fullKey = selectedMarketplace === 'Ozon' && clientId 
+        ? `${clientId}:${apiKey}` 
+        : apiKey;
+      
+      // REAL: Save API key to database
+      await settingsApi.saveApiKey(selectedMarketplace!, fullKey, clientId);
+      console.log('✅ API key saved successfully');
       
       setStep('sync');
       
-      // Simulate sync
-      await new Promise((r) => setTimeout(r, 3000));
+      // REAL: Sync products from marketplace
+      const syncResult = await productsApi.syncProducts(selectedMarketplace!);
+      console.log('✅ Products synced:', syncResult);
       
+      setSyncedCount(syncResult.count || 0);
       hapticFeedback('success');
       setStep('complete');
     } catch (err: any) {
-      setError(err.message || 'Ошибка сохранения ключа');
+      console.error('❌ Error:', err);
+      setError(err.response?.data?.error || err.message || 'Ошибка сохранения ключа');
       hapticFeedback('error');
+      setStep('apiKey'); // Go back to input on error
     } finally {
       setIsLoading(false);
     }
@@ -359,7 +371,10 @@ export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
               Готово! 🎉
             </h2>
             <p className="text-stone-400 mb-8">
-              Товары синхронизированы. Теперь настройте Stop-Loss уровни для защиты.
+              {syncedCount > 0 
+                ? `Синхронизировано ${syncedCount} товаров. Теперь настройте Stop-Loss уровни.`
+                : 'Товары синхронизированы. Теперь настройте Stop-Loss уровни для защиты.'
+              }
             </p>
 
             <button
