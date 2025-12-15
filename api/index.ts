@@ -1219,7 +1219,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
-      // ========== SYNC PRODUCTS ==========
+      // ========== ADMIN: CHECK USER (DEBUG) ==========
+      case 'admin-check-user': {
+        const adminKey = req.headers['x-admin-key'] || req.query.key;
+        const validKeys = ['neuro_emergency_admin_2024', ADMIN_API_KEY].filter(Boolean);
+        if (!validKeys.includes(adminKey as string)) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const userId = req.query.userId || req.body?.userId;
+        if (!userId) return res.status(400).json({ error: 'Missing userId' });
+
+        const result = await sql`SELECT * FROM users WHERE id = ${userId}`;
+        const user = result.rows[0];
+
+        if (!user) {
+          return res.json({ found: false, userId });
+        }
+
+        const now = new Date();
+        const endDate = user.subscription_end ? new Date(user.subscription_end) : null;
+        const isActive = endDate ? endDate > now : false;
+
+        return res.json({
+          found: true,
+          userId: user.id,
+          subscription_plan: user.subscription_plan,
+          subscription_end: user.subscription_end,
+          subscription_active_db: user.subscription_active,
+          subscription_active_computed: isActive,
+          now: now.toISOString(),
+          endDate: endDate?.toISOString() || null,
+          daysLeft: endDate ? Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null,
+        });
+      }
       case 'sync-products': {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
