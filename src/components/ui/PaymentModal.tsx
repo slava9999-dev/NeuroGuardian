@@ -23,11 +23,7 @@ const FALLBACK_PLANS: SubscriptionPlan[] = [
     price: 499,
     durationDays: 30,
     maxProducts: 50,
-    features: [
-      'До 50 товаров',
-      'Защита Zero Stock',
-      'Telegram уведомления',
-    ],
+    features: ['До 50 товаров', 'Защита Zero Stock', 'Telegram уведомления'],
     pricePerMonth: 499,
     isPopular: false,
     isBestValue: false,
@@ -38,12 +34,7 @@ const FALLBACK_PLANS: SubscriptionPlan[] = [
     price: 999,
     durationDays: 30,
     maxProducts: 500,
-    features: [
-      'До 500 товаров',
-      'Оба режима защиты',
-      'Приоритетная поддержка',
-      'API доступ',
-    ],
+    features: ['До 500 товаров', 'Оба режима защиты', 'Приоритетная поддержка', 'API доступ'],
     pricePerMonth: 999,
     isPopular: true,
     isBestValue: false,
@@ -54,11 +45,7 @@ const FALLBACK_PLANS: SubscriptionPlan[] = [
     price: 9990,
     durationDays: 365,
     maxProducts: 500,
-    features: [
-      'Все из Pro',
-      'Экономия 2000₽',
-      'Персональный менеджер',
-    ],
+    features: ['Все из Pro', 'Экономия 2000₽', 'Персональный менеджер'],
     pricePerMonth: 833,
     isPopular: false,
     isBestValue: true,
@@ -90,10 +77,12 @@ export function PaymentModal({ isOpen, onClose, onSuccess, onGoToSettings }: Pay
   const [error, setError] = useState<string | null>(null);
   const [showWidget, setShowWidget] = useState(false);
   const [confirmationToken, setConfirmationToken] = useState<string | null>(null);
-  
+
   // SUCCESS STATE
   const [showSuccess, setShowSuccess] = useState(false);
-  const [activatedPlan, setActivatedPlan] = useState<{ name: string; durationDays: number } | null>(null);
+  const [activatedPlan, setActivatedPlan] = useState<{ name: string; durationDays: number } | null>(
+    null
+  );
 
   // Load plans on mount
   useEffect(() => {
@@ -128,43 +117,46 @@ export function PaymentModal({ isOpen, onClose, onSuccess, onGoToSettings }: Pay
   };
 
   // Initialize YooKassa Widget
-  const initWidget = useCallback(async (token: string) => {
-    try {
-      await loadYooKassaWidget();
+  const initWidget = useCallback(
+    async (token: string) => {
+      try {
+        await loadYooKassaWidget();
 
-      const YooMoneyCheckoutWidget = (window as any).YooMoneyCheckoutWidget;
-      
-      const checkout = new YooMoneyCheckoutWidget({
-        confirmation_token: token,
-        return_url: window.location.origin + '?payment_complete=true',
-        error_callback: (error: any) => {
-          console.error('YooKassa Widget error:', error);
-          setError('Ошибка виджета оплаты');
+        const YooMoneyCheckoutWidget = (window as any).YooMoneyCheckoutWidget;
+
+        const checkout = new YooMoneyCheckoutWidget({
+          confirmation_token: token,
+          return_url: window.location.origin + '?payment_complete=true',
+          error_callback: (error: any) => {
+            console.error('YooKassa Widget error:', error);
+            setError('Ошибка виджета оплаты');
+            setShowWidget(false);
+            hapticFeedback('error');
+          },
+        });
+
+        checkout.on('success', () => {
+          hapticFeedback('success');
           setShowWidget(false);
+          onSuccess?.();
+          onClose();
+        });
+
+        checkout.on('fail', () => {
           hapticFeedback('error');
-        },
-      });
+          setError('Платёж не прошёл');
+          setShowWidget(false);
+        });
 
-      checkout.on('success', () => {
-        hapticFeedback('success');
+        checkout.render('yookassa-widget-container');
+      } catch (err) {
+        console.error('Widget initialization error:', err);
+        setError('Не удалось загрузить виджет оплаты');
         setShowWidget(false);
-        onSuccess?.();
-        onClose();
-      });
-
-      checkout.on('fail', () => {
-        hapticFeedback('error');
-        setError('Платёж не прошёл');
-        setShowWidget(false);
-      });
-
-      checkout.render('yookassa-widget-container');
-    } catch (err) {
-      console.error('Widget initialization error:', err);
-      setError('Не удалось загрузить виджет оплаты');
-      setShowWidget(false);
-    }
-  }, [onSuccess, onClose]);
+      }
+    },
+    [onSuccess, onClose]
+  );
 
   useEffect(() => {
     if (showWidget && confirmationToken) {
@@ -183,10 +175,10 @@ export function PaymentModal({ isOpen, onClose, onSuccess, onGoToSettings }: Pay
     setError(null);
 
     try {
-      const result = await paymentApi.createPayment({
+      const result = (await paymentApi.createPayment({
         planId: selectedPlan,
         savePaymentMethod: true,
-      }) as any;
+      })) as any;
 
       if (!result.success) {
         throw new Error(result.error || 'Ошибка создания платежа');
@@ -272,7 +264,7 @@ export function PaymentModal({ isOpen, onClose, onSuccess, onGoToSettings }: Pay
           exit={{ y: '100%' }}
           transition={{ type: 'spring', damping: 25 }}
           className="w-full max-w-lg bg-stone-900 rounded-t-3xl sm:rounded-2xl border-t sm:border border-stone-700 overflow-hidden max-h-[90vh] overflow-y-auto"
-          onClick={(e) => e.stopPropagation()}
+          onClick={e => e.stopPropagation()}
         >
           {/* SUCCESS SCREEN */}
           {showSuccess ? (
@@ -284,11 +276,19 @@ export function PaymentModal({ isOpen, onClose, onSuccess, onGoToSettings }: Pay
                 transition={{ type: 'spring', delay: 0.1 }}
                 className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center"
               >
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-white">
+                <svg
+                  width="48"
+                  height="48"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  className="text-white"
+                >
                   <path d="M20 6L9 17l-5-5" />
                 </svg>
               </motion.div>
-              
+
               {/* Title */}
               <motion.h2
                 initial={{ opacity: 0, y: 20 }}
@@ -298,7 +298,7 @@ export function PaymentModal({ isOpen, onClose, onSuccess, onGoToSettings }: Pay
               >
                 🎉 Подписка активирована!
               </motion.h2>
-              
+
               {/* Plan info */}
               <motion.p
                 initial={{ opacity: 0 }}
@@ -306,10 +306,10 @@ export function PaymentModal({ isOpen, onClose, onSuccess, onGoToSettings }: Pay
                 transition={{ delay: 0.3 }}
                 className="text-stone-400 mb-8"
               >
-                Тариф <span className="text-amber-400 font-medium">{activatedPlan?.name}</span> активен на{' '}
-                <span className="text-white">{activatedPlan?.durationDays} дней</span>
+                Тариф <span className="text-amber-400 font-medium">{activatedPlan?.name}</span>{' '}
+                активен на <span className="text-white">{activatedPlan?.durationDays} дней</span>
               </motion.p>
-              
+
               {/* Action buttons */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -323,7 +323,7 @@ export function PaymentModal({ isOpen, onClose, onSuccess, onGoToSettings }: Pay
                 >
                   ⚙️ Подключить API ключи
                 </button>
-                
+
                 <button
                   onClick={handleClose}
                   className="w-full py-3 rounded-xl font-medium text-stone-400 hover:text-white hover:bg-stone-800 transition-all"
@@ -344,7 +344,14 @@ export function PaymentModal({ isOpen, onClose, onSuccess, onGoToSettings }: Pay
                   disabled={isProcessing}
                   className="p-2 rounded-lg hover:bg-stone-800 transition-colors disabled:opacity-50"
                 >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
                     <path d="M18 6L6 18M6 6l12 12" />
                   </svg>
                 </button>
@@ -358,26 +365,33 @@ export function PaymentModal({ isOpen, onClose, onSuccess, onGoToSettings }: Pay
               ) : (
                 <>
                   {/* 🎁 FREE TRIAL BANNER */}
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}
                     className="mx-4 mt-4 relative overflow-hidden rounded-2xl"
                   >
                     {/* Animated gradient background */}
                     <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 via-teal-500 to-cyan-500" />
-                    <motion.div 
+                    <motion.div
                       className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
                       animate={{ x: ['-100%', '100%'] }}
                       transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
                     />
-                    
+
                     {/* Confetti effect */}
                     {[...Array(6)].map((_, i) => (
                       <motion.div
                         key={i}
                         className="absolute w-2 h-2 rounded-full"
                         style={{
-                          background: ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96E6A1', '#DDA0DD'][i],
+                          background: [
+                            '#FFD700',
+                            '#FF6B6B',
+                            '#4ECDC4',
+                            '#45B7D1',
+                            '#96E6A1',
+                            '#DDA0DD',
+                          ][i],
                           left: `${15 + i * 15}%`,
                           top: '20%',
                         }}
@@ -393,24 +407,24 @@ export function PaymentModal({ isOpen, onClose, onSuccess, onGoToSettings }: Pay
                         }}
                       />
                     ))}
-                    
+
                     <div className="relative p-4 flex items-center gap-4">
                       {/* Gift icon */}
-                      <motion.div 
+                      <motion.div
                         className="w-14 h-14 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0"
-                        animate={{ 
+                        animate={{
                           rotate: [0, -10, 10, 0],
-                          scale: [1, 1.1, 1]
+                          scale: [1, 1.1, 1],
                         }}
                         transition={{ duration: 2, repeat: Infinity }}
                       >
                         <span className="text-3xl">🎁</span>
                       </motion.div>
-                      
+
                       <div className="flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="text-xl font-black text-white">3 ДНЯ БЕСПЛАТНО!</h3>
-                          <motion.span 
+                          <motion.span
                             className="px-2 py-0.5 bg-amber-400 text-stone-900 text-xs font-bold rounded-full"
                             animate={{ scale: [1, 1.1, 1] }}
                             transition={{ duration: 1.5, repeat: Infinity }}
@@ -423,35 +437,19 @@ export function PaymentModal({ isOpen, onClose, onSuccess, onGoToSettings }: Pay
                         </p>
                         <div className="flex items-center gap-2 mt-2 text-xs text-white/70">
                           <span className="flex items-center gap-1">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M20 6L9 17l-5-5"/></svg>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M20 6L9 17l-5-5" />
+                            </svg>
                             Без карты
                           </span>
                           <span className="flex items-center gap-1">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M20 6L9 17l-5-5"/></svg>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M20 6L9 17l-5-5" />
+                            </svg>
                             Автоотключение
                           </span>
                         </div>
                       </div>
-                    </div>
-                  </motion.div>
-                  
-                  {/* Discount banner */}
-                  <motion.div 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.3 }}
-                    className="mx-4 mt-3 p-3 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 rounded-xl flex items-center gap-3"
-                  >
-                    <motion.div
-                      animate={{ rotate: [0, 360] }}
-                      transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
-                      className="text-2xl"
-                    >
-                      🔥
-                    </motion.div>
-                    <div>
-                      <p className="text-sm font-bold text-amber-400">Скидка 30% на первый месяц!</p>
-                      <p className="text-xs text-stone-400">Оплатите после пробного периода со скидкой</p>
                     </div>
                   </motion.div>
 
@@ -466,15 +464,16 @@ export function PaymentModal({ isOpen, onClose, onSuccess, onGoToSettings }: Pay
                         />
                       </div>
                     ) : (
-                      plans.map((plan) => (
+                      plans.map(plan => (
                         <button
                           key={plan.id}
                           onClick={() => handleSelectPlan(plan.id)}
                           className={`
                             w-full p-4 rounded-2xl border-2 transition-all text-left relative
-                            ${selectedPlan === plan.id
-                              ? 'border-amber-500 bg-amber-500/10'
-                              : 'border-stone-700 bg-stone-800/50 hover:border-stone-600'
+                            ${
+                              selectedPlan === plan.id
+                                ? 'border-amber-500 bg-amber-500/10'
+                                : 'border-stone-700 bg-stone-800/50 hover:border-stone-600'
                             }
                           `}
                         >
@@ -484,19 +483,21 @@ export function PaymentModal({ isOpen, onClose, onSuccess, onGoToSettings }: Pay
                               ПОПУЛЯРНЫЙ
                             </div>
                           )}
-                          
+
                           {/* Best value badge */}
                           {plan.isBestValue && (
                             <div className="absolute -top-3 left-4 px-3 py-1 bg-gradient-to-r from-emerald-500 to-emerald-400 text-stone-900 text-xs font-bold rounded-full">
                               ВЫГОДНО
                             </div>
                           )}
-                          
+
                           <div className="flex items-center justify-between mb-3">
                             <div>
                               <h3 className="text-lg font-bold text-white">{plan.name}</h3>
                               <div className="flex items-baseline gap-1">
-                                <span className="text-2xl font-bold text-amber-400">{plan.price}₽</span>
+                                <span className="text-2xl font-bold text-amber-400">
+                                  {plan.price}₽
+                                </span>
                                 <span className="text-stone-400">
                                   /{plan.durationDays === 365 ? 'год' : 'месяц'}
                                 </span>
@@ -507,23 +508,44 @@ export function PaymentModal({ isOpen, onClose, onSuccess, onGoToSettings }: Pay
                                 </span>
                               )}
                             </div>
-                            
-                            <div className={`
+
+                            <div
+                              className={`
                               w-6 h-6 rounded-full border-2 flex items-center justify-center
                               ${selectedPlan === plan.id ? 'border-amber-500 bg-amber-500' : 'border-stone-600'}
-                            `}>
+                            `}
+                            >
                               {selectedPlan === plan.id && (
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-stone-900">
+                                <svg
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="3"
+                                  className="text-stone-900"
+                                >
                                   <path d="M20 6L9 17l-5-5" />
                                 </svg>
                               )}
                             </div>
                           </div>
-                          
+
                           <ul className="space-y-2">
                             {plan.features.map((feature, i) => (
-                              <li key={i} className="flex items-center gap-2 text-sm text-stone-300">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-emerald-400 flex-shrink-0">
+                              <li
+                                key={i}
+                                className="flex items-center gap-2 text-sm text-stone-300"
+                              >
+                                <svg
+                                  width="16"
+                                  height="16"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  className="text-emerald-400 flex-shrink-0"
+                                >
                                   <path d="M20 6L9 17l-5-5" />
                                 </svg>
                                 {feature}
@@ -549,9 +571,10 @@ export function PaymentModal({ isOpen, onClose, onSuccess, onGoToSettings }: Pay
                       disabled={!selectedPlan || isProcessing}
                       className={`
                         w-full py-4 rounded-xl font-bold text-lg transition-all flex items-center justify-center gap-2
-                        ${selectedPlan
-                          ? 'bg-gradient-to-r from-amber-500 to-amber-400 text-stone-900 hover:from-amber-400 hover:to-amber-300'
-                          : 'bg-stone-700 text-stone-400 cursor-not-allowed'
+                        ${
+                          selectedPlan
+                            ? 'bg-gradient-to-r from-amber-500 to-amber-400 text-stone-900 hover:from-amber-400 hover:to-amber-300'
+                            : 'bg-stone-700 text-stone-400 cursor-not-allowed'
                         }
                       `}
                     >
@@ -568,20 +591,18 @@ export function PaymentModal({ isOpen, onClose, onSuccess, onGoToSettings }: Pay
                         <>
                           💳 Оплатить
                           {selectedPlan && (
-                            <span>
-                              {plans.find((p) => p.id === selectedPlan)?.price}₽
-                            </span>
+                            <span>{plans.find(p => p.id === selectedPlan)?.price}₽</span>
                           )}
                         </>
                       )}
                     </button>
-                    
+
                     <p className="text-xs text-stone-500 text-center mt-3">
                       Нажимая «Оплатить», вы принимаете{' '}
-                      <a 
-                        href="#legal" 
-                        onClick={(e) => { 
-                          e.preventDefault(); 
+                      <a
+                        href="#legal"
+                        onClick={e => {
+                          e.preventDefault();
                           // Open legal page in Telegram or new tab
                           const tg = (window as any).Telegram?.WebApp;
                           if (tg?.openLink) {
@@ -595,10 +616,10 @@ export function PaymentModal({ isOpen, onClose, onSuccess, onGoToSettings }: Pay
                         оферту
                       </a>{' '}
                       и{' '}
-                      <a 
+                      <a
                         href="#privacy"
-                        onClick={(e) => { 
-                          e.preventDefault(); 
+                        onClick={e => {
+                          e.preventDefault();
                           const tg = (window as any).Telegram?.WebApp;
                           if (tg?.openLink) {
                             tg.openLink(window.location.origin + '/?page=legal');
@@ -609,7 +630,8 @@ export function PaymentModal({ isOpen, onClose, onSuccess, onGoToSettings }: Pay
                         className="text-amber-400 hover:underline"
                       >
                         политику конфиденциальности
-                      </a>.
+                      </a>
+                      .
                     </p>
                     <p className="text-xs text-stone-500 text-center mt-1">
                       ИП Дерябин В.В. • ИНН 670301543202 • Самозанятый
