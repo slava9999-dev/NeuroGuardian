@@ -13,7 +13,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 const SHOP_ID = process.env.YOOKASSA_SHOP_ID || '';
 const SECRET_KEY = process.env.YOOKASSA_SECRET_KEY || '';
-const ADMIN_API_KEY = process.env.ADMIN_API_KEY || 'neuro_emergency_admin_2024';
+const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 const YOOKASSA_API_URL = 'https://api.yookassa.ru/v3';
 
 // API Key Encryption (AES-256-GCM) — per ТЗ Security Requirements
@@ -1190,7 +1190,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const adminKey = req.headers['x-admin-key'] || req.body?.adminKey;
         // EMERGENCY: Allow activation with emergency key
-        const validKeys = ['neuro_emergency_admin_2024', ADMIN_API_KEY].filter(Boolean);
+        const validKeys = [ADMIN_API_KEY].filter(Boolean);
         if (!validKeys.includes(adminKey as string)) {
           return res.status(401).json({ error: 'Unauthorized', hint: 'Use X-Admin-Key header' });
         }
@@ -1222,7 +1222,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // ========== ADMIN: CHECK USER (DEBUG) ==========
       case 'admin-check-user': {
         const adminKey = req.headers['x-admin-key'] || req.query.key;
-        const validKeys = ['neuro_emergency_admin_2024', ADMIN_API_KEY].filter(Boolean);
+        const validKeys = [ADMIN_API_KEY].filter(Boolean);
         if (!validKeys.includes(adminKey as string)) {
           return res.status(401).json({ error: 'Unauthorized' });
         }
@@ -1257,7 +1257,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // ========== ADMIN: LIST ALL USERS ==========
       case 'admin-list-users': {
         const adminKey = req.headers['x-admin-key'] || req.query.key;
-        const validKeys = ['neuro_emergency_admin_2024', ADMIN_API_KEY].filter(Boolean);
+        const validKeys = [ADMIN_API_KEY].filter(Boolean);
         if (!validKeys.includes(adminKey as string)) {
           return res.status(401).json({ error: 'Unauthorized' });
         }
@@ -1281,7 +1281,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // ========== ADMIN: TEST OZON API ==========
       case 'admin-test-ozon': {
         const adminKey = req.headers['x-admin-key'] || req.query.key;
-        const validKeys = ['neuro_emergency_admin_2024', ADMIN_API_KEY].filter(Boolean);
+        const validKeys = [ADMIN_API_KEY].filter(Boolean);
         if (!validKeys.includes(adminKey as string)) {
           return res.status(401).json({ error: 'Unauthorized' });
         }
