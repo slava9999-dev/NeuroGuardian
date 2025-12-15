@@ -1372,6 +1372,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
+      // ========== ADMIN: RESET STATUSES ==========
+      case 'admin-reset-statuses': {
+        const adminKey = req.headers['x-admin-key'] || req.query.key;
+        const validKeys = [ADMIN_API_KEY].filter(Boolean);
+        if (!validKeys.includes(adminKey as string)) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const userId = req.query.userId || req.body?.userId;
+        if (!userId) return res.status(400).json({ error: 'Missing userId' });
+
+        await sql`UPDATE products SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE user_id = ${userId}`;
+        
+        return res.json({ success: true, message: 'All products reset to ACTIVE status' });
+      }
+
       // ========== ADMIN: SET DEFENSE MODE ==========
       case 'admin-set-defense-mode': {
         const adminKey = req.headers['x-admin-key'] || req.query.key;
