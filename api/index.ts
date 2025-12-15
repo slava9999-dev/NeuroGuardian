@@ -1097,6 +1097,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'payment-webhook': {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+        const event = req.body;
+        if (!event?.object?.id) return res.status(400).json({ error: 'Invalid payload' });
+
+        const payment = event.object;
+        const metadata = payment.metadata || {};
+        const userId = parseInt(metadata.user_id, 10);
+        const planId = metadata.plan_id;
+        const referrerId = metadata.referrer_id ? parseInt(metadata.referrer_id, 10) : null;
+
+        console.log(`💳 Payment webhook: status=${payment.status}, userId=${userId}, plan=${planId}`);
+
+        if (payment.status === 'succeeded' && userId && planId) {
+          const plan = SUBSCRIPTION_PLANS[planId as keyof typeof SUBSCRIPTION_PLANS];
+          if (plan) {
+            const actualPlan = planId === 'yearly' ? 'pro' : planId;
             await activateSubscription(userId, actualPlan, plan.durationDays, payment.payment_method?.id);
 
             // Update transaction
@@ -1739,7 +1754,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
 
         console.log(`🛡️ SENTINEL: Starting price check for ${targetUsers.length} users...`);
-        const log = [];
+        
+        // DEBUG MODE VARIABLES
+        const debugInfo: any[] = [];
+        const isDebug = req.query.debug === 'true';
+        
+        // Capture Logs
+        const log: string[] = [];
+        const originalLog = console.log;
+        const originalError = console.error;
+        const safeLog = (...args: any[]) => { log.push(args.join(' ')); originalLog(...args); };
+        const safeError = (...args: any[]) => { log.push('[ERROR] ' + args.join(' ')); originalError(...args); };
+        
+        // Use local loggers
+        console.log = safeLog;
+        console.error = safeError;
+
         let totalScanned = 0;
         let totalTriggered = 0;
 
@@ -2016,11 +2046,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                              });
                            }
 
-
-
-
-
-
                           // UPDATE DB & NOTIFY
                            await sql`
                              UPDATE products SET status = 'triggered', updated_at = CURRENT_TIMESTAMP 
@@ -2062,14 +2087,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
              }
           }
 
-          return res.json({ 
-            success: true, 
-            scanned: totalScanned, 
-            triggered: totalTriggered, 
-            log 
-          });
+          // Restore console
+        console.log = originalLog;
+        console.error = originalError;
 
-        } catch (error) {
+        return res.json({ 
+          success: true, 
+          scanned: totalScanned, 
+          triggered: totalTriggered, 
+          log,
+          debug_info: isDebug ? debugInfo : undefined // Return debug info only if requested
+        });
+      } catch (error) {
           console.error('Sentinel Error:', error);
           return res.status(500).json({ error: 'Sentinel check failed' });
         }
