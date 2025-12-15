@@ -1607,7 +1607,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const initData = req.headers['x-init-data'] as string;
         
         const isCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
-        const isAdmin = req.query.key === process.env.ADMIN_KEY;
+        const isAdmin = req.query.key === ADMIN_API_KEY || req.headers['x-admin-key'] === ADMIN_API_KEY;
         
         let targetUsers = [];
 
