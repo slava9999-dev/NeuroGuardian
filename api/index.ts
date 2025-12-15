@@ -1970,8 +1970,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                             const msg = `🛡️ <b>NeuroGUARDIAN SENTRY</b>\n\n` +
                                       `⚠️ <b>Демпинг обнаружен!</b>\n` +
                                       `📦 ${dbProduct.title}\n` +
-                                      `📉 Цена упала: ${currentPrice} ₽ < ${minPrice} ₽\n` +
-                                      `⚔️ <b>Защита активирована:</b> ${defenseAction}\n` +
+                                      `📉 Цена упала: ${currentPrice} ₽ → ${minPrice} ₽\n` +
+                                      `⚔️ <b>Защита:</b> ${defenseAction}\n` +
                                       `💰 Спасено: ${savedAmount} ₽`;
                             
                             try {
