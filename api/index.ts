@@ -1407,10 +1407,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { marketplace, debug } = req.body;
 
         const validation = validateTelegramInitData(initData);
-        if (!validation.valid || !validation.user) {
+        let user;
+        
+        const adminKey = req.headers['x-admin-key'];
+        const validAdminKeys = [process.env.ADMIN_API_KEY].filter(Boolean);
+
+        if (validation.valid && validation.user) {
+          user = validation.user;
+        } else if (adminKey && validAdminKeys.includes(adminKey as string) && req.body.telegramId) {
+           // Admin override for testing
+           user = { id: parseInt(req.body.telegramId) };
+        } else {
           return res.status(401).json({ error: 'Unauthorized', code: 'AUTH_FAILED' });
         }
-        const user = validation.user;
 
         // Get user's API key
         const dbUser = await getUserById(user.id);
