@@ -967,12 +967,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         if (req.method === 'POST') {
-          const { productId, minPrice } = req.body;
-          if (!productId || typeof minPrice !== 'number') {
-            return res.status(400).json({ error: 'Invalid parameters' });
+          const { productId, minPrice, userId: adminUserId } = req.body;
+          const adminKey = req.headers['x-admin-key'];
+          
+          // Admin bypass for testing
+          let targetUserId = user.id;
+          if (adminKey === ADMIN_API_KEY && adminUserId) {
+            targetUserId = parseInt(adminUserId);
+            console.log(`🔧 Admin override: updating product for user ${targetUserId}`);
           }
-          await updateProductMinPrice(user.id, productId, minPrice);
-          return res.json({ success: true });
+          
+          if (!productId || typeof minPrice !== 'number') {
+            return res.status(400).json({ error: 'Invalid parameters', received: { productId, minPrice } });
+          }
+          
+          await updateProductMinPrice(targetUserId, productId, minPrice);
+          console.log(`✅ Stop-Loss updated: user=${targetUserId}, product=${productId}, minPrice=${minPrice}`);
+          return res.json({ success: true, productId, minPrice });
         }
 
         return res.status(405).json({ error: 'Method not allowed' });
