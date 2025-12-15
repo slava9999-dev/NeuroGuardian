@@ -1097,21 +1097,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'payment-webhook': {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-        const event = req.body;
-        if (!event?.object?.id) return res.status(400).json({ error: 'Invalid payload' });
-
-        const payment = event.object;
-        const metadata = payment.metadata || {};
-        const userId = parseInt(metadata.user_id, 10);
-        const planId = metadata.plan_id as PlanId;
-        const referrerId = metadata.referrer_id ? parseInt(metadata.referrer_id, 10) : null;
-
-        console.log(`💳 Payment webhook: status=${payment.status}, userId=${userId}, plan=${planId}`);
-
-        if (payment.status === 'succeeded' && userId && planId) {
-          const plan = SUBSCRIPTION_PLANS[planId];
-          if (plan) {
-            const actualPlan = planId === 'yearly' ? 'pro' : planId;
             await activateSubscription(userId, actualPlan, plan.durationDays, payment.payment_method?.id);
 
             // Update transaction
