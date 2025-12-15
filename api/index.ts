@@ -1313,6 +1313,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
+      // ========== ADMIN: SET PROTECTION ==========
+      case 'admin-set-protection': {
+        const adminKey = req.headers['x-admin-key'] || req.query.key;
+        const validKeys = [ADMIN_API_KEY].filter(Boolean);
+        if (!validKeys.includes(adminKey as string)) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const userId = req.query.userId || req.body?.userId;
+        const enabled = req.query.enabled === 'true' || req.body?.enabled === true;
+        
+        if (!userId) return res.status(400).json({ error: 'Missing userId' });
+
+        await sql`UPDATE users SET protection_enabled = ${enabled}, updated_at = CURRENT_TIMESTAMP WHERE id = ${userId}`;
+        
+        const result = await sql`SELECT protection_enabled FROM users WHERE id = ${userId}`;
+        
+        return res.json({ 
+          success: true, 
+          userId,
+          protection_enabled: result.rows[0]?.protection_enabled
+        });
+      }
+
       // ========== ADMIN: TEST OZON API ==========
       case 'admin-test-ozon': {
         const adminKey = req.headers['x-admin-key'] || req.query.key;
