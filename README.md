@@ -161,7 +161,7 @@ for (const user of users) {
     // 5. VIOLATION DETECTED!
     if (currentPrice < product.minPrice) {
       // 6. Выполнить защитное действие
-      if (user.defenseMode === "zero_stock") {
+      if (user.defenseMode === 'zero_stock') {
         await setStock(product.id, 0); // Обнулить сток
       } else {
         await setPrice(product.id, product.minPrice); // Вернуть цену
@@ -219,16 +219,16 @@ CRON_SECRET=your-cron-secret
 ## 📞 Поддержка
 
 - **Telegram:** [@Vyacheslav_Neuro](https://t.me/Vyacheslav_Neuro)
-- **Email:** slava-derjbin@list.ru
+- **Email:** support@neuroguardian.app
 - **Телефон:** +7 (904) 047-63-83
 
 ---
 
 ## 📜 Юридическая информация
 
-- **Исполнитель:** Дерябин Вячеслав Валерьевич
-- **Статус:** Самозанятый (НПД)
-- **ИНН:** 670301543202
+- **Исполнитель:** ИП Дмитричев Александр Геннадьевич
+- **Статус:** Индивидуальный предприниматель
+- **ИНН:** 520500573503
 - **Регион:** Нижегородская область
 
 Полная оферта и политика конфиденциальности доступны в приложении (вкладка "Инфо").
@@ -237,6 +237,6 @@ CRON_SECRET=your-cron-secret
 
 ## 📄 Лицензия
 
-© 2024 Дерябин В.В. Все права защищены.
+© 2024 ИП Дмитричев А.Г. Все права защищены.
 
 NeuroGUARDIAN v2.2.0 — Margin Defense System

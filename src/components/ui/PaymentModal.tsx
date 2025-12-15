@@ -634,7 +634,7 @@ export function PaymentModal({ isOpen, onClose, onSuccess, onGoToSettings }: Pay
                       .
                     </p>
                     <p className="text-xs text-stone-500 text-center mt-1">
-                      ИП Дерябин В.В. • ИНН 670301543202 • Самозанятый
+                      ИП Дмитричев А.Г. • ИНН 520500573503
                     </p>
                   </div>
                 </>

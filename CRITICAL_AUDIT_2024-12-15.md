@@ -33,6 +33,11 @@
 7. ✅ **admin-sentinel-logs endpoint** — просмотр истории защиты
 8. ✅ **Улучшенный ErrorBoundary** — красивый UI с поддержкой
 9. ✅ **current_price обновление** — история цен в Sentinel
+10. ✅ **Wildberries Sync Fix** — поддержка JWT токенов (точки в API Key)
+11. ✅ **Code Quality Suite** — Husky, Lint-staged, Prettier, CI
+12. ✅ **Security Policy** — SECURITY.md
+13. ✅ **LazyImage Fix** — исправлен бесконечный рендер
+14. ✅ **Banner Removal** — удален лишний рекламный баннер
 
 ```typescript
 // Текущий подход (опасный):
@@ -130,7 +135,7 @@ email: 'slava-derjbin@list.ru', // Fallback email for receipt
 ```typescript
 // Это нормально для dev, но нужно убедиться что NODE_ENV=production на Vercel
 if (!IS_PRODUCTION) {
-  console.log("🧪 [DEV ONLY] Using demo user");
+  console.log('🧪 [DEV ONLY] Using demo user');
   return { valid: true, user: DEMO_USER };
 }
 ```
@@ -227,12 +232,7 @@ case 'payment-webhook': {
 
 ```typescript
 // Код сохраняет payment_method_id, но не использует его
-await activateSubscription(
-  userId,
-  actualPlan,
-  plan.durationDays,
-  payment.payment_method?.id
-);
+await activateSubscription(userId, actualPlan, plan.durationDays, payment.payment_method?.id);
 // Нет cron для автоматического списания
 ```
 

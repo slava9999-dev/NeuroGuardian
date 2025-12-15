@@ -29,16 +29,16 @@ function encryptApiKey(apiKey: string): string {
     console.warn('⚠️ API_KEY_ENCRYPTION_KEY not configured, storing key as-is');
     return apiKey; // Fallback for development
   }
-  
+
   try {
     const iv = crypto.randomBytes(16);
     const key = Buffer.from(API_KEY_ENCRYPTION_KEY.slice(0, 32), 'utf8');
     const cipher = crypto.createCipheriv(ENCRYPTION_ALGORITHM, key, iv);
-    
+
     let encrypted = cipher.update(apiKey, 'utf8', 'hex');
     encrypted += cipher.final('hex');
     const authTag = cipher.getAuthTag();
-    
+
     return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted}`;
   } catch (error) {
     console.error('Encryption error:', error);
@@ -51,26 +51,26 @@ function encryptApiKey(apiKey: string): string {
  */
 function decryptApiKey(encryptedKey: string): string {
   if (!encryptedKey) return '';
-  
+
   // Check if key is encrypted (contains colons for iv:authTag:data format)
   if (!encryptedKey.includes(':') || !API_KEY_ENCRYPTION_KEY) {
     return encryptedKey; // Not encrypted or no key configured
   }
-  
+
   try {
     const [ivHex, authTagHex, encrypted] = encryptedKey.split(':');
     if (!ivHex || !authTagHex || !encrypted) return encryptedKey;
-    
+
     const key = Buffer.from(API_KEY_ENCRYPTION_KEY.slice(0, 32), 'utf8');
     const iv = Buffer.from(ivHex, 'hex');
     const authTag = Buffer.from(authTagHex, 'hex');
-    
+
     const decipher = crypto.createDecipheriv(ENCRYPTION_ALGORITHM, key, iv);
     decipher.setAuthTag(authTag);
-    
+
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
-    
+
     return decrypted;
   } catch (error) {
     console.error('Decryption error:', error);
@@ -82,25 +82,27 @@ function decryptApiKey(encryptedKey: string): string {
  * Exponential backoff for API retries (per ТЗ requirements)
  */
 async function fetchWithRetry(
-  url: string, 
-  options: RequestInit, 
+  url: string,
+  options: RequestInit,
   maxRetries: number = 3
 ): Promise<Response> {
   let lastError: Error | null = null;
-  
+
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       const response = await fetch(url, options);
-      
+
       // Handle rate limiting with exponential backoff
       if (response.status === 429) {
         const retryAfter = response.headers.get('Retry-After');
         const delay = retryAfter ? parseInt(retryAfter) * 1000 : Math.pow(2, attempt) * 1000;
-        console.warn(`⏳ Rate limited, waiting ${delay}ms before retry ${attempt + 1}/${maxRetries}`);
+        console.warn(
+          `⏳ Rate limited, waiting ${delay}ms before retry ${attempt + 1}/${maxRetries}`
+        );
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
-      
+
       return response;
     } catch (error) {
       lastError = error as Error;
@@ -109,7 +111,7 @@ async function fetchWithRetry(
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
-  
+
   throw lastError || new Error('Max retries exceeded');
 }
 
@@ -155,8 +157,8 @@ const REFERRAL_DISCOUNT_PERCENT = 20; // 20% discount for referred user's first 
 
 // Promo codes
 const PROMO_CODES: Record<string, { discount: number; maxUses?: number; expiresAt?: string }> = {
-  'LAUNCH30': { discount: 30, maxUses: 100 },
-  'NEURO20': { discount: 20 },
+  LAUNCH30: { discount: 30, maxUses: 100 },
+  NEURO20: { discount: 20 },
 };
 
 // ============================================
@@ -180,7 +182,8 @@ interface InitDataValidationResult {
 }
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
-const IS_PRODUCTION = process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
+const IS_PRODUCTION =
+  process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
 const ALLOWED_ORIGINS = [
   'https://neuro-guardian.vercel.app',
   'https://neuro-guardian-sos.vercel.app',
@@ -211,7 +214,7 @@ function validateTelegramInitData(initData: string): InitDataValidationResult {
     console.log('🧪 [DEV ONLY] Using demo user');
     return { valid: true, user: DEMO_USER };
   }
-  
+
   // Explicitly allow 'demo' only in development
   if (initData === 'demo') {
     if (IS_PRODUCTION) {
@@ -224,7 +227,7 @@ function validateTelegramInitData(initData: string): InitDataValidationResult {
   try {
     const params = new URLSearchParams(initData);
     const hash = params.get('hash');
-    
+
     if (!hash) {
       return { valid: false, user: null, error: 'Missing hash in initData' };
     }
@@ -241,7 +244,7 @@ function validateTelegramInitData(initData: string): InitDataValidationResult {
         const user = JSON.parse(userJson) as TelegramUser;
         return { valid: true, user };
       }
-      
+
       // In production, BOT_TOKEN is required
       console.error('❌ PRODUCTION: TELEGRAM_BOT_TOKEN not configured!');
       return { valid: false, user: null, error: 'Auth system not configured' };
@@ -249,30 +252,30 @@ function validateTelegramInitData(initData: string): InitDataValidationResult {
 
     // Remove hash for validation
     params.delete('hash');
-    
+
     // Sort params alphabetically and create data-check-string
     const checkArr = Array.from(params.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([k, v]) => `${k}=${v}`);
     const dataCheckString = checkArr.join('\n');
-    
+
     // Generate secret key: HMAC-SHA256(bot_token, "WebAppData")
-    const secretKey = crypto
-      .createHmac('sha256', 'WebAppData')
-      .update(TELEGRAM_BOT_TOKEN)
-      .digest();
-    
+    const secretKey = crypto.createHmac('sha256', 'WebAppData').update(TELEGRAM_BOT_TOKEN).digest();
+
     // Calculate hash
     const calculatedHash = crypto
       .createHmac('sha256', secretKey)
       .update(dataCheckString)
       .digest('hex');
-    
+
     // Constant-time comparison to prevent timing attacks
     const hashBuffer = Buffer.from(hash, 'hex');
     const calculatedBuffer = Buffer.from(calculatedHash, 'hex');
-    
-    if (hashBuffer.length !== calculatedBuffer.length || !crypto.timingSafeEqual(hashBuffer, calculatedBuffer)) {
+
+    if (
+      hashBuffer.length !== calculatedBuffer.length ||
+      !crypto.timingSafeEqual(hashBuffer, calculatedBuffer)
+    ) {
       console.warn('⚠️ Invalid Telegram signature');
       return { valid: false, user: null, error: 'Invalid signature' };
     }
@@ -283,7 +286,7 @@ function validateTelegramInitData(initData: string): InitDataValidationResult {
       const authTimestamp = parseInt(authDate, 10) * 1000;
       const now = Date.now();
       const MAX_AGE = 24 * 60 * 60 * 1000; // 24 hours
-      
+
       if (now - authTimestamp > MAX_AGE) {
         return { valid: false, user: null, error: 'Auth data expired' };
       }
@@ -294,22 +297,24 @@ function validateTelegramInitData(initData: string): InitDataValidationResult {
     if (!userJson) {
       return { valid: false, user: null, error: 'Missing user in initData' };
     }
-    
+
     const user = JSON.parse(userJson) as TelegramUser;
-    
+
     // Validate user structure
     if (!user.id || typeof user.id !== 'number') {
       return { valid: false, user: null, error: 'Invalid user ID' };
     }
-    
+
     // Mask user ID for logging (security)
     const maskedId = `${String(user.id).slice(0, 3)}***${String(user.id).slice(-2)}`;
     console.log(`✅ Valid Telegram user: ${maskedId}`);
-    
+
     return { valid: true, user };
-    
   } catch (error) {
-    console.error('❌ InitData validation error:', error instanceof Error ? error.message : 'Unknown');
+    console.error(
+      '❌ InitData validation error:',
+      error instanceof Error ? error.message : 'Unknown'
+    );
     return { valid: false, user: null, error: 'Validation failed' };
   }
 }
@@ -325,16 +330,16 @@ const RATE_WINDOW = 60 * 1000; // 1 minute
 function checkRateLimit(identifier: string): { allowed: boolean; remaining: number } {
   const now = Date.now();
   const record = rateLimitStore.get(identifier);
-  
+
   if (!record || now > record.resetTime) {
     rateLimitStore.set(identifier, { count: 1, resetTime: now + RATE_WINDOW });
     return { allowed: true, remaining: RATE_LIMIT - 1 };
   }
-  
+
   if (record.count >= RATE_LIMIT) {
     return { allowed: false, remaining: 0 };
   }
-  
+
   record.count++;
   return { allowed: true, remaining: RATE_LIMIT - record.count };
 }
@@ -384,21 +389,25 @@ function getProductLimit(plan: string | null): number {
 /**
  * Check if user can add more products
  */
-async function canAddProducts(userId: number, count: number = 1): Promise<{ allowed: boolean; reason?: string }> {
-  const userResult = await sql`SELECT subscription_plan, total_products FROM users WHERE id = ${userId}`;
+async function canAddProducts(
+  userId: number,
+  count: number = 1
+): Promise<{ allowed: boolean; reason?: string }> {
+  const userResult =
+    await sql`SELECT subscription_plan, total_products FROM users WHERE id = ${userId}`;
   if (userResult.rows.length === 0) return { allowed: false, reason: 'User not found' };
-  
+
   const user = userResult.rows[0];
   const limit = getProductLimit(user.subscription_plan);
   const currentProducts = user.total_products || 0;
-  
+
   if (currentProducts + count > limit) {
-    return { 
-      allowed: false, 
-      reason: `Достигнут лимит товаров (${currentProducts}/${limit}). Обновите тариф для добавления большего количества.`
+    return {
+      allowed: false,
+      reason: `Достигнут лимит товаров (${currentProducts}/${limit}). Обновите тариф для добавления большего количества.`,
     };
   }
-  
+
   return { allowed: true };
 }
 
@@ -416,7 +425,11 @@ async function isFirstPayment(userId: number): Promise<boolean> {
 /**
  * Calculate discounted price (with Referral Discount support per ТЗ)
  */
-async function calculatePrice(userId: number, planId: PlanId, promoCode?: string): Promise<{
+async function calculatePrice(
+  userId: number,
+  planId: PlanId,
+  promoCode?: string
+): Promise<{
   originalPrice: number;
   finalPrice: number;
   discount: number;
@@ -439,11 +452,11 @@ async function calculatePrice(userId: number, planId: PlanId, promoCode?: string
   if (firstPayment) {
     const userResult = await sql`SELECT referred_by FROM users WHERE id = ${userId}`;
     const referredBy = userResult.rows[0]?.referred_by;
-    
+
     if (referredBy) {
-      const referralDiscount = Math.round(plan.price * REFERRAL_DISCOUNT_PERCENT / 100);
+      const referralDiscount = Math.round((plan.price * REFERRAL_DISCOUNT_PERCENT) / 100);
       const referralPrice = plan.price - referralDiscount;
-      
+
       // Apply if better than current discount
       if (referralPrice < finalPrice) {
         finalPrice = referralPrice;
@@ -456,9 +469,9 @@ async function calculatePrice(userId: number, planId: PlanId, promoCode?: string
   // Check promo code (can stack or override)
   if (promoCode && PROMO_CODES[promoCode.toUpperCase()]) {
     const promo = PROMO_CODES[promoCode.toUpperCase()];
-    const promoDiscount = Math.round(plan.price * promo.discount / 100);
+    const promoDiscount = Math.round((plan.price * promo.discount) / 100);
     const promoPrice = plan.price - promoDiscount;
-    
+
     if (promoPrice < finalPrice) {
       finalPrice = promoPrice;
       discount = promo.discount;
@@ -490,13 +503,13 @@ async function applyReferralBonus(referrerId: number): Promise<void> {
       updated_at = CURRENT_TIMESTAMP
     WHERE id = ${referrerId}
   `;
-  
+
   // Send notification
   await sendTelegramNotification(
     referrerId,
     `🎉 <b>Бонус за реферала!</b>\n\n` +
-    `Спасибо! Ваш друг оплатил подписку.\n` +
-    `➕ Добавлено ${REFERRAL_BONUS_DAYS} дней к вашей подписке.`
+      `Спасибо! Ваш друг оплатил подписку.\n` +
+      `➕ Добавлено ${REFERRAL_BONUS_DAYS} дней к вашей подписке.`
   );
 }
 
@@ -508,18 +521,21 @@ async function sendTelegramNotification(userId: number, message: string): Promis
     console.warn('⚠️ TELEGRAM_BOT_TOKEN not set, skipping notification');
     return false;
   }
-  
+
   try {
-    const response = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        chat_id: userId, 
-        text: message, 
-        parse_mode: 'HTML',
-        disable_web_page_preview: true
-      }),
-    });
+    const response = await fetch(
+      `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: userId,
+          text: message,
+          parse_mode: 'HTML',
+          disable_web_page_preview: true,
+        }),
+      }
+    );
     return response.ok;
   } catch (e) {
     console.error('Telegram notification error:', e);
@@ -533,7 +549,7 @@ async function sendTelegramNotification(userId: number, message: string): Promis
 async function sendExpiryReminders(): Promise<{ sent: number; errors: number }> {
   const threeDaysFromNow = new Date();
   threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
-  
+
   // Find users whose subscription expires in ~3 days
   const result = await sql`
     SELECT id, first_name, subscription_plan, subscription_end 
@@ -543,19 +559,21 @@ async function sendExpiryReminders(): Promise<{ sent: number; errors: number }> 
       AND subscription_end BETWEEN CURRENT_TIMESTAMP AND ${threeDaysFromNow.toISOString()}::timestamp
       AND (last_reminder_sent IS NULL OR last_reminder_sent < CURRENT_DATE - INTERVAL '2 days')
   `;
-  
+
   let sent = 0;
   let errors = 0;
-  
+
   for (const user of result.rows) {
-    const daysLeft = Math.ceil((new Date(user.subscription_end).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-    const message = 
+    const daysLeft = Math.ceil(
+      (new Date(user.subscription_end).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+    );
+    const message =
       `⏰ <b>Напоминание о подписке</b>\n\n` +
       `Привет, ${user.first_name}!\n\n` +
       `Ваша подписка <b>${user.subscription_plan}</b> истекает через <b>${daysLeft} ${daysLeft === 1 ? 'день' : 'дня'}</b>.\n\n` +
       `💡 Продлите сейчас, чтобы не потерять защиту товаров!\n\n` +
       `🔗 Откройте приложение для продления`;
-    
+
     const success = await sendTelegramNotification(user.id, message);
     if (success) {
       sent++;
@@ -564,7 +582,7 @@ async function sendExpiryReminders(): Promise<{ sent: number; errors: number }> 
       errors++;
     }
   }
-  
+
   return { sent, errors };
 }
 
@@ -659,15 +677,15 @@ async function initializeDatabase() {
 
 async function createOrUpdateUser(user: TelegramUser) {
   const referralCode = `NG${user.id.toString(36).toUpperCase()}`;
-  
+
   // Check if user exists
   const existingUser = await sql`SELECT id FROM users WHERE id = ${user.id}`;
   const isNewUser = existingUser.rows.length === 0;
-  
+
   // Calculate trial end date (3 days from now)
   const trialEndDate = new Date();
   trialEndDate.setDate(trialEndDate.getDate() + 3);
-  
+
   if (isNewUser) {
     // Create new user with trial subscription
     try {
@@ -727,7 +745,8 @@ async function getUserById(userId: number) {
 }
 
 async function getProductsByUserId(userId: number) {
-  const result = await sql`SELECT * FROM products WHERE user_id = ${userId} ORDER BY created_at DESC`;
+  const result =
+    await sql`SELECT * FROM products WHERE user_id = ${userId} ORDER BY created_at DESC`;
   return result.rows;
 }
 
@@ -741,7 +760,12 @@ async function updateProductMinPrice(userId: number, productId: string, minPrice
   `;
 }
 
-async function activateSubscription(userId: number, plan: string, durationDays: number, paymentMethodId?: string) {
+async function activateSubscription(
+  userId: number,
+  plan: string,
+  durationDays: number,
+  paymentMethodId?: string
+) {
   const endDate = new Date();
   endDate.setDate(endDate.getDate() + durationDays);
 
@@ -760,7 +784,12 @@ async function activateSubscription(userId: number, plan: string, durationDays: 
 // YOOKASSA OPERATIONS
 // ============================================
 
-async function createYookassaPayment(userId: number, planId: PlanId, returnUrl: string) {
+async function createYookassaPayment(
+  userId: number,
+  planId: PlanId,
+  returnUrl: string,
+  userEmail?: string
+) {
   const plan = SUBSCRIPTION_PLANS[planId];
   if (!plan) return { success: false, error: 'Invalid plan' };
 
@@ -768,11 +797,16 @@ async function createYookassaPayment(userId: number, planId: PlanId, returnUrl: 
   const idempotencyKey = uuidv4();
   const transactionId = uuidv4();
 
+  // Dynamic email: use provided email, fallback to pseudo-email based on Telegram ID
+  // This complies with 54-ФЗ requirements for electronic receipts
+  const receiptEmail = userEmail || `tg${userId}@neuroguardian.app`;
+  console.log(`📧 Payment receipt email: ${receiptEmail}`);
+
   const response = await fetch(`${YOOKASSA_API_URL}/payments`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Basic ${auth}`,
+      Authorization: `Basic ${auth}`,
       'Idempotence-Key': idempotencyKey,
     },
     body: JSON.stringify({
@@ -784,7 +818,7 @@ async function createYookassaPayment(userId: number, planId: PlanId, returnUrl: 
       save_payment_method: true,
       receipt: {
         customer: {
-          email: 'slava-derjbin@list.ru', // Fallback email for receipt
+          email: receiptEmail,
         },
         items: [
           {
@@ -794,7 +828,7 @@ async function createYookassaPayment(userId: number, planId: PlanId, returnUrl: 
             quantity: '1',
             payment_subject: 'service',
             payment_mode: 'full_payment',
-          }
+          },
         ],
       },
     }),
@@ -828,22 +862,25 @@ async function createYookassaPayment(userId: number, planId: PlanId, returnUrl: 
 
 function setCorsHeaders(req: VercelRequest, res: VercelResponse) {
   const origin = req.headers.origin || '';
-  
+
   // Check if origin is allowed
-  const isAllowed = !IS_PRODUCTION || ALLOWED_ORIGINS.some(allowed => 
-    allowed && (origin === allowed || origin.startsWith(allowed))
-  );
-  
+  const isAllowed =
+    !IS_PRODUCTION ||
+    ALLOWED_ORIGINS.some(allowed => allowed && (origin === allowed || origin.startsWith(allowed)));
+
   if (isAllowed) {
     res.setHeader('Access-Control-Allow-Origin', origin || '*');
   } else if (!IS_PRODUCTION) {
     res.setHeader('Access-Control-Allow-Origin', '*');
   }
-  
+
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Init-Data, X-Admin-Key');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'Content-Type, Authorization, X-Init-Data, X-Admin-Key'
+  );
   res.setHeader('Access-Control-Max-Age', '86400'); // Cache preflight for 24h
-  
+
   // Security headers
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
@@ -857,7 +894,10 @@ function setCorsHeaders(req: VercelRequest, res: VercelResponse) {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { method, query, body } = req;
-  console.log(`📥 API Request: ${method} action=${query.action || body?.action}`, JSON.stringify(body || {}).substring(0, 200));
+  console.log(
+    `📥 API Request: ${method} action=${query.action || body?.action}`,
+    JSON.stringify(body || {}).substring(0, 200)
+  );
 
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -867,38 +907,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(req, res);
 
   // Rate limiting by IP
-  const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0] || 
-                   req.headers['x-real-ip'] as string || 
-                   'unknown';
+  const clientIp =
+    (req.headers['x-forwarded-for'] as string)?.split(',')[0] ||
+    (req.headers['x-real-ip'] as string) ||
+    'unknown';
   const rateLimit = checkRateLimit(clientIp);
-  
+
   res.setHeader('X-RateLimit-Limit', RATE_LIMIT.toString());
   res.setHeader('X-RateLimit-Remaining', rateLimit.remaining.toString());
-  
+
   if (!rateLimit.allowed) {
     return res.status(429).json({ error: 'Too many requests. Please try again later.' });
   }
 
   // Parse action from query or body
-  const action = sanitizeInput(req.query.action as string || req.body?.action);
+  const action = sanitizeInput((req.query.action as string) || req.body?.action);
 
   try {
     switch (action) {
       // ========== AUTH ==========
       case 'auth': {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-        
+
         const initData = sanitizeInput(req.body?.initData);
-        
+
         // Validate Telegram initData with cryptographic check
         const validation = validateTelegramInitData(initData);
         if (!validation.valid || !validation.user) {
-          return res.status(401).json({ 
+          return res.status(401).json({
             error: validation.error || 'Invalid initData',
-            code: 'AUTH_FAILED'
+            code: 'AUTH_FAILED',
           });
         }
-        
+
         const telegramUser = validation.user;
 
         const user = await createOrUpdateUser(telegramUser);
@@ -909,13 +950,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (fullUser?.subscription_end) {
           const endDate = new Date(fullUser.subscription_end);
           subscriptionActive = endDate > new Date();
-          daysLeft = Math.max(0, Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+          daysLeft = Math.max(
+            0,
+            Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+          );
         }
 
         if (fullUser?.subscription_end) {
           const endDate = new Date(fullUser.subscription_end);
           subscriptionActive = endDate > new Date();
-          daysLeft = Math.max(0, Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+          daysLeft = Math.max(
+            0,
+            Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+          );
         }
 
         // FAIL-SAFE: For Testing, ensure Trial is always active
@@ -923,13 +970,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           subscriptionActive = true;
           if (!daysLeft || daysLeft <= 0) daysLeft = 3;
         }
-        
+
         // EMERGENCY FIX: Force subscription active if end date is in future
         if (fullUser?.subscription_end) {
           const endDate = new Date(fullUser.subscription_end);
           if (endDate > new Date()) {
             subscriptionActive = true;
-            daysLeft = Math.max(1, Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+            daysLeft = Math.max(
+              1,
+              Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+            );
           }
         }
 
@@ -958,7 +1008,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // ========== PRODUCTS ==========
       case 'products': {
-        const initData = sanitizeInput(req.headers['x-init-data'] as string || req.body?.initData || '');
+        const initData = sanitizeInput(
+          (req.headers['x-init-data'] as string) || req.body?.initData || ''
+        );
         const adminKey = req.headers['x-admin-key'];
         const adminUserId = req.body?.userId;
 
@@ -999,29 +1051,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (req.method === 'POST') {
           const { productId, minPrice, userId: adminUserId } = req.body;
           const adminKey = req.headers['x-admin-key'];
-          
+
           // Admin bypass for testing
           let targetUserId = user.id;
           if (adminKey === ADMIN_API_KEY && adminUserId) {
             targetUserId = parseInt(adminUserId);
             console.log(`🔧 Admin override: updating product for user ${targetUserId}`);
           }
-          
+
           if (!productId || typeof minPrice !== 'number') {
-            return res.status(400).json({ error: 'Invalid parameters', received: { productId, minPrice } });
+            return res
+              .status(400)
+              .json({ error: 'Invalid parameters', received: { productId, minPrice } });
           }
-          
+
           // SECURITY: Verify product ownership before update (IDOR protection)
           const ownershipCheck = await sql`
             SELECT id FROM products WHERE user_id = ${targetUserId} AND product_id = ${productId}
           `;
           if (ownershipCheck.rows.length === 0) {
-            console.warn(`⚠️ IDOR attempt: user=${targetUserId} tried to update product=${productId}`);
+            console.warn(
+              `⚠️ IDOR attempt: user=${targetUserId} tried to update product=${productId}`
+            );
             return res.status(403).json({ error: 'Product not found or access denied' });
           }
-          
+
           await updateProductMinPrice(targetUserId, productId, minPrice);
-          console.log(`✅ Stop-Loss updated: user=${targetUserId}, product=${productId}, minPrice=${minPrice}`);
+          console.log(
+            `✅ Stop-Loss updated: user=${targetUserId}, product=${productId}, minPrice=${minPrice}`
+          );
           return res.json({ success: true, productId, minPrice });
         }
 
@@ -1046,22 +1104,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           // Encrypt API key before storing (ТЗ Security Requirement)
           const encryptedKey = encryptApiKey(apiKey);
           console.log(`🔐 Encrypting ${marketplace} API key for user ${user.id}`);
-          
+
           if (marketplace === 'WB') {
             await sql`UPDATE users SET api_key_wb = ${encryptedKey}, updated_at = CURRENT_TIMESTAMP WHERE id = ${user.id}`;
           } else {
             await sql`UPDATE users SET api_key_ozon = ${encryptedKey}, updated_at = CURRENT_TIMESTAMP WHERE id = ${user.id}`;
           }
-          return res.json({ success: true, message: `${marketplace} API ключ сохранён и зашифрован` });
+          return res.json({
+            success: true,
+            message: `${marketplace} API ключ сохранён и зашифрован`,
+          });
         }
 
         // Check subscription before enabling protection
         if (protectionEnabled === true) {
           const dbUser = await getUserById(user.id);
           if (!dbUser || !isSubscriptionActive(dbUser)) {
-            return res.status(403).json({ 
+            return res.status(403).json({
               error: 'Для включения защиты требуется активная подписка',
-              code: 'SUBSCRIPTION_REQUIRED'
+              code: 'SUBSCRIPTION_REQUIRED',
             });
           }
         }
@@ -1080,7 +1141,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'plans': {
         if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
-        const plans = Object.values(SUBSCRIPTION_PLANS).map((plan) => ({
+        const plans = Object.values(SUBSCRIPTION_PLANS).map(plan => ({
           id: plan.id,
           name: plan.name,
           price: plan.price,
@@ -1119,26 +1180,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           // In development, allow test mode
           if (!IS_PRODUCTION) {
             console.log('🧪 DEV MODE: Activating subscription without payment');
-            await activateSubscription(user.id, planId === 'yearly' ? 'pro' : planId, plan.durationDays);
+            await activateSubscription(
+              user.id,
+              planId === 'yearly' ? 'pro' : planId,
+              plan.durationDays
+            );
             return res.json({
               success: true,
               testMode: true,
               message: `Тестовый режим: подписка ${plan.name} активирована на ${plan.durationDays} дней`,
-              plan: { id: planId, name: plan.name, price: plan.price, durationDays: plan.durationDays },
+              plan: {
+                id: planId,
+                name: plan.name,
+                price: plan.price,
+                durationDays: plan.durationDays,
+              },
             });
           }
-          
+
           // In production, payment system must be configured
           console.error('❌ PRODUCTION: YooKassa not configured!');
-          return res.status(503).json({ 
+          return res.status(503).json({
             error: 'Платёжная система временно недоступна. Попробуйте позже.',
-            code: 'PAYMENT_SYSTEM_UNAVAILABLE'
+            code: 'PAYMENT_SYSTEM_UNAVAILABLE',
           });
         }
 
         // Production: Create real YooKassa payment
-        const returnUrl = process.env.WEBAPP_URL || `https://${process.env.VERCEL_URL}` || 'https://neuro-guardian.vercel.app';
-        const result = await createYookassaPayment(user.id, planId as PlanId, `${returnUrl}?payment_complete=true`);
+        const returnUrl =
+          process.env.WEBAPP_URL ||
+          `https://${process.env.VERCEL_URL}` ||
+          'https://neuro-guardian.vercel.app';
+        const result = await createYookassaPayment(
+          user.id,
+          planId as PlanId,
+          `${returnUrl}?payment_complete=true`
+        );
 
         if (!result.success) {
           return res.status(500).json({ error: result.error });
@@ -1154,19 +1231,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // SECURITY: Verify webhook is from YooKassa IP addresses
         // Official YooKassa IPs: https://yookassa.ru/developers/using-api/webhooks#ip
         const YOOKASSA_IPS = [
-          '185.71.76.0/27',   // 185.71.76.0 - 185.71.76.31
-          '185.71.77.0/27',   // 185.71.77.0 - 185.71.77.31
-          '77.75.153.0/25',   // 77.75.153.0 - 77.75.153.127
+          '185.71.76.0/27', // 185.71.76.0 - 185.71.76.31
+          '185.71.77.0/27', // 185.71.77.0 - 185.71.77.31
+          '77.75.153.0/25', // 77.75.153.0 - 77.75.153.127
           '77.75.156.11',
           '77.75.156.35',
           '77.75.154.128/25', // 77.75.154.128 - 77.75.154.255
-          '2a02:5180::/32'    // IPv6
+          '2a02:5180::/32', // IPv6
         ];
-        
-        const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || 
-                         req.headers['x-real-ip'] as string || 
-                         'unknown';
-        
+
+        const clientIp =
+          (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+          (req.headers['x-real-ip'] as string) ||
+          'unknown';
+
         // Simple IP check (for production, use proper CIDR matching)
         const isYooKassaIp = YOOKASSA_IPS.some(ip => {
           if (ip.includes('/')) {
@@ -1176,10 +1254,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
           return clientIp === ip;
         });
-        
+
         if (IS_PRODUCTION && !isYooKassaIp && clientIp !== 'unknown') {
-          console.warn(`⚠️ Webhook from unauthorized IP: ${clientIp}`);
-          // Log but don't block in case of proxy issues - just warn
+          console.error(`🚫 BLOCKED: Webhook from unauthorized IP: ${clientIp}`);
+          return res.status(403).json({ error: 'Forbidden: Invalid source IP' });
         }
 
         const event = req.body;
@@ -1191,13 +1269,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const planId = metadata.plan_id;
         const referrerId = metadata.referrer_id ? parseInt(metadata.referrer_id, 10) : null;
 
-        console.log(`💳 Payment webhook: status=${payment.status}, userId=${userId}, plan=${planId}`);
+        console.log(
+          `💳 Payment webhook: status=${payment.status}, userId=${userId}, plan=${planId}`
+        );
 
         if (payment.status === 'succeeded' && userId && planId) {
           const plan = SUBSCRIPTION_PLANS[planId as keyof typeof SUBSCRIPTION_PLANS];
           if (plan) {
             const actualPlan = planId === 'yearly' ? 'pro' : planId;
-            await activateSubscription(userId, actualPlan, plan.durationDays, payment.payment_method?.id);
+            await activateSubscription(
+              userId,
+              actualPlan,
+              plan.durationDays,
+              payment.payment_method?.id
+            );
 
             // Update transaction
             await sql`
@@ -1219,12 +1304,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             await sendTelegramNotification(
               userId,
               `✅ <b>Оплата успешна!</b>\n\n` +
-              `Подписка <b>${plan.name}</b> активирована.\n` +
-              `📅 Срок действия: ${plan.durationDays} дней\n\n` +
-              `🛡️ Защита ваших товаров уже работает!`
+                `Подписка <b>${plan.name}</b> активирована.\n` +
+                `📅 Срок действия: ${plan.durationDays} дней\n\n` +
+                `🛡️ Защита ваших товаров уже работает!`
             );
 
-            console.log(`✅ Subscription activated for user ${userId}: ${actualPlan} for ${plan.durationDays} days`);
+            console.log(
+              `✅ Subscription activated for user ${userId}: ${actualPlan} for ${plan.durationDays} days`
+            );
           }
         } else if (payment.status === 'canceled') {
           // Payment was canceled
@@ -1264,21 +1351,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Get current counts before deletion
         const userCountBefore = await sql`SELECT COUNT(*) as count FROM users`;
         const productCountBefore = await sql`SELECT COUNT(*) as count FROM products`;
-        
+
         // Delete all data (order matters due to foreign keys)
         await sql`DELETE FROM transactions`;
         await sql`DELETE FROM products`;
         await sql`DELETE FROM users`;
 
-        console.log(`🗑️ Database reset: deleted ${userCountBefore.rows[0].count} users, ${productCountBefore.rows[0].count} products`);
+        console.log(
+          `🗑️ Database reset: deleted ${userCountBefore.rows[0].count} users, ${productCountBefore.rows[0].count} products`
+        );
 
-        return res.json({ 
-          success: true, 
+        return res.json({
+          success: true,
           message: 'Database reset complete',
           deleted: {
             users: parseInt(userCountBefore.rows[0].count),
-            products: parseInt(productCountBefore.rows[0].count)
-          }
+            products: parseInt(productCountBefore.rows[0].count),
+          },
         });
       }
 
@@ -1326,8 +1415,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           WHERE id = ${userId}
         `;
 
-        return res.json({ 
-          success: true, 
+        return res.json({
+          success: true,
           message: `Trial activated for user ${userId} until ${endDate.toISOString()}`,
           userId,
           expiresAt: endDate.toISOString(),
@@ -1370,7 +1459,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           has_wb_key: !!user.api_key_wb,
           now: now.toISOString(),
           endDate: endDate?.toISOString() || null,
-          daysLeft: endDate ? Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null,
+          daysLeft: endDate
+            ? Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+            : null,
         });
       }
 
@@ -1382,8 +1473,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(401).json({ error: 'Unauthorized' });
         }
 
-        const result = await sql`SELECT id, username, first_name, subscription_plan, subscription_end, subscription_active, created_at FROM users ORDER BY created_at DESC LIMIT 50`;
-        
+        const result =
+          await sql`SELECT id, username, first_name, subscription_plan, subscription_end, subscription_active, created_at FROM users ORDER BY created_at DESC LIMIT 50`;
+
         return res.json({
           count: result.rows.length,
           users: result.rows.map(u => ({
@@ -1393,8 +1485,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             plan: u.subscription_plan,
             endDate: u.subscription_end,
             active: u.subscription_active,
-            created: u.created_at
-          }))
+            created: u.created_at,
+          })),
         });
       }
 
@@ -1409,8 +1501,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const userId = req.query.userId || req.body?.userId;
         if (!userId) return res.status(400).json({ error: 'Missing userId' });
 
-        const result = await sql`SELECT product_id, title, current_price, min_price, status FROM products WHERE user_id = ${userId} ORDER BY created_at DESC LIMIT 50`;
-        
+        const result =
+          await sql`SELECT product_id, title, current_price, min_price, status FROM products WHERE user_id = ${userId} ORDER BY created_at DESC LIMIT 50`;
+
         return res.json({
           count: result.rows.length,
           products: result.rows.map(p => ({
@@ -1418,8 +1511,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             title: p.title?.substring(0, 40) + '...',
             currentPrice: p.current_price,
             minPrice: p.min_price,
-            status: p.status
-          }))
+            status: p.status,
+          })),
         });
       }
 
@@ -1433,17 +1526,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const userId = req.query.userId || req.body?.userId;
         const enabled = req.query.enabled === 'true' || req.body?.enabled === true;
-        
+
         if (!userId) return res.status(400).json({ error: 'Missing userId' });
 
         await sql`UPDATE users SET protection_enabled = ${enabled}, updated_at = CURRENT_TIMESTAMP WHERE id = ${userId}`;
-        
+
         const result = await sql`SELECT protection_enabled FROM users WHERE id = ${userId}`;
-        
-        return res.json({ 
-          success: true, 
+
+        return res.json({
+          success: true,
           userId,
-          protection_enabled: result.rows[0]?.protection_enabled
+          protection_enabled: result.rows[0]?.protection_enabled,
         });
       }
 
@@ -1457,28 +1550,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const userId = req.query.userId || req.body?.userId;
         const token = process.env.TELEGRAM_BOT_TOKEN;
-        
-        if (!token) return res.status(500).json({ error: 'ENV: TELEGRAM_BOT_TOKEN missing on server' });
+
+        if (!token)
+          return res.status(500).json({ error: 'ENV: TELEGRAM_BOT_TOKEN missing on server' });
         if (!userId) return res.status(400).json({ error: 'Missing userId' });
 
         try {
-            const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    chat_id: userId,
-                    text: '🔔 <b>ТЕСТОВАЯ ПРОВЕРКА СВЯЗИ</b>\n\nЕсли вы это читаете, значит бот настроен верно!',
-                    parse_mode: 'HTML'
-                })
-            });
-            const tgData = await tgRes.json();
-            return res.json({ 
-                success: tgRes.ok, 
-                telegram_response: tgData, 
-                token_masked: token.substring(0, 5) + '...' 
-            });
+          const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: userId,
+              text: '🔔 <b>ТЕСТОВАЯ ПРОВЕРКА СВЯЗИ</b>\n\nЕсли вы это читаете, значит бот настроен верно!',
+              parse_mode: 'HTML',
+            }),
+          });
+          const tgData = await tgRes.json();
+          return res.json({
+            success: tgRes.ok,
+            telegram_response: tgData,
+            token_masked: token.substring(0, 5) + '...',
+          });
         } catch (e: any) {
-            return res.status(500).json({ error: 'Fetch Error', details: e.message });
+          return res.status(500).json({ error: 'Fetch Error', details: e.message });
         }
       }
 
@@ -1494,7 +1588,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!userId) return res.status(400).json({ error: 'Missing userId' });
 
         await sql`UPDATE products SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE user_id = ${userId}`;
-        
+
         return res.json({ success: true, message: 'All products reset to ACTIVE status' });
       }
 
@@ -1508,17 +1602,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const userId = req.query.userId || req.body?.userId;
         const mode = req.query.mode || req.body?.mode; // 'zero_stock' | 'price_correction'
-        
+
         if (!userId || !mode) return res.status(400).json({ error: 'Missing userId or mode' });
 
         await sql`UPDATE users SET defense_mode = ${mode}, updated_at = CURRENT_TIMESTAMP WHERE id = ${userId}`;
-        
+
         const result = await sql`SELECT defense_mode FROM users WHERE id = ${userId}`;
-        
-        return res.json({ 
-          success: true, 
+
+        return res.json({
+          success: true,
           userId,
-          defense_mode: result.rows[0]?.defense_mode
+          defense_mode: result.rows[0]?.defense_mode,
         });
       }
 
@@ -1547,7 +1641,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           });
 
           const data = await response.json();
-          
+
           return res.json({
             status: response.status,
             ok: response.ok,
@@ -1576,16 +1670,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.log('🔍 Testing WB API with key length:', apiKey.length);
 
         try {
-          const response = await fetch('https://content-api.wildberries.ru/content/v2/get/cards/list', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': apiKey,
-            },
-            body: JSON.stringify({ 
-              settings: { cursor: { limit: 5 }, filter: { withPhoto: -1 } } 
-            }),
-          });
+          const response = await fetch(
+            'https://content-api.wildberries.ru/content/v2/get/cards/list',
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: apiKey,
+              },
+              body: JSON.stringify({
+                settings: { cursor: { limit: 5 }, filter: { withPhoto: -1 } },
+              }),
+            }
+          );
 
           const responseText = await response.text();
           let data;
@@ -1602,9 +1699,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             cursor: data.cursor || null,
             error: data.message || data.error || null,
             raw: data,
-            hint: response.status === 401 
-              ? 'Ключ отклонён. Убедитесь что токен имеет права на Content API. Создайте новый токен в ЛК WB → Настройки → API.'
-              : null
+            hint:
+              response.status === 401
+                ? 'Ключ отклонён. Убедитесь что токен имеет права на Content API. Создайте новый токен в ЛК WB → Настройки → API.'
+                : null,
           });
         } catch (err: any) {
           return res.status(500).json({ error: err.message, type: 'fetch_error' });
@@ -1619,15 +1717,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const validation = validateTelegramInitData(initData);
         let user;
-        
+
         const adminKey = req.headers['x-admin-key'];
         const validAdminKeys = [process.env.ADMIN_API_KEY].filter(Boolean);
 
         if (validation.valid && validation.user) {
           user = validation.user;
         } else if (adminKey && validAdminKeys.includes(adminKey as string) && req.body.telegramId) {
-           // Admin override for testing
-           user = { id: parseInt(req.body.telegramId) };
+          // Admin override for testing
+          user = { id: parseInt(req.body.telegramId) };
         } else {
           return res.status(401).json({ error: 'Unauthorized', code: 'AUTH_FAILED' });
         }
@@ -1638,9 +1736,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // Check if user has active subscription
         if (!isSubscriptionActive(dbUser)) {
-          return res.status(403).json({ 
+          return res.status(403).json({
             error: 'Для синхронизации товаров требуется активная подписка',
-            code: 'SUBSCRIPTION_REQUIRED'
+            code: 'SUBSCRIPTION_REQUIRED',
           });
         }
 
@@ -1669,17 +1767,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const clientId = apiKey.split(':')[0]; // Expecting format: clientId:apiKey
             const apiToken = apiKey.includes(':') ? apiKey.split(':')[1] : apiKey;
 
-            console.log('🔍 Ozon sync:', { clientId: clientId.substring(0, 4) + '...', apiTokenLen: apiToken.length });
+            console.log('🔍 Ozon sync:', {
+              clientId: clientId.substring(0, 4) + '...',
+              apiTokenLen: apiToken.length,
+            });
 
             // Ozon API v3 — last_id обязателен!
             const requestBody = {
-              filter: {},  // Пустой фильтр = все товары
+              filter: {}, // Пустой фильтр = все товары
               last_id: '', // Обязательный параметр для v3! Пустая строка = начало
-              limit: 100   // Лимит товаров за запрос
+              limit: 100, // Лимит товаров за запрос
             };
-            
+
             console.log('📤 Ozon v3 request body:', JSON.stringify(requestBody));
-            
+
             const ozonResponse = await fetch('https://api-seller.ozon.ru/v3/product/list', {
               method: 'POST',
               headers: {
@@ -1693,7 +1794,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (!ozonResponse.ok) {
               const errorText = await ozonResponse.text();
               console.error('❌ Ozon API error:', ozonResponse.status, errorText);
-              return res.status(400).json({ 
+              return res.status(400).json({
                 error: `Ошибка Ozon API: ${ozonResponse.status}`,
                 details: errorText.substring(0, 500),
               });
@@ -1701,11 +1802,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             const ozonData = await ozonResponse.json();
             console.log('📦 Ozon API v3 full response:', JSON.stringify(ozonData));
-            
+
             // v3 структура: { result: { items: [{product_id, offer_id}, ...], total, last_id } }
             const items = ozonData.result?.items || [];
-            console.log(`📊 Ozon v3 items count: ${items.length}, total in API: ${ozonData.result?.total || 'N/A'}`);
-            
+            console.log(
+              `📊 Ozon v3 items count: ${items.length}, total in API: ${ozonData.result?.total || 'N/A'}`
+            );
+
             if (items.length === 0) {
               console.log('⚠️ No items returned from Ozon API');
               return res.json({
@@ -1713,13 +1816,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 message: 'Ozon API вернул 0 товаров. Проверьте настройки магазина.',
                 count: 0,
                 marketplace: mp,
-                debug: { apiResponse: ozonData }
+                debug: { apiResponse: ozonData },
               });
             }
-            
+
             // Извлекаем product_id (числовой ID товара в Ozon)
             const productIds = items.map((item: any) => item.product_id).filter(Boolean);
-            console.log(`📋 Product IDs to fetch: ${productIds.slice(0, 5).join(', ')}... (${productIds.length} total)`);
+            console.log(
+              `📋 Product IDs to fetch: ${productIds.slice(0, 5).join(', ')}... (${productIds.length} total)`
+            );
 
             // Получаем детальную информацию о товарах (API v3)
             const detailResponse = await fetch('https://api-seller.ozon.ru/v3/product/info/list', {
@@ -1733,15 +1838,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             });
 
             console.log('📡 Detail API response status:', detailResponse.status);
-            
+
             if (!detailResponse.ok) {
               const detailError = await detailResponse.text();
               console.error('❌ Detail API error:', detailResponse.status, detailError);
-              
+
               apiDetailsDebug = {
                 status: detailResponse.status,
                 error: detailError,
-                url: 'https://api-seller.ozon.ru/v3/product/info/list'
+                url: 'https://api-seller.ozon.ru/v3/product/info/list',
               };
 
               // Fallback
@@ -1755,21 +1860,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               }));
             } else {
               const detailData = await detailResponse.json();
-              
+
               apiDetailsDebug = {
                 status: 200,
                 itemsCount: detailData.result?.items?.length || detailData.items?.length || 0,
-                sampleItem: (detailData.result?.items?.[0] || detailData.items?.[0]) ? 'exists' : 'null'
+                sampleItem:
+                  detailData.result?.items?.[0] || detailData.items?.[0] ? 'exists' : 'null',
               };
 
               // Поддержка обеих структур ответа (на всякий случай)
               const detailItems = detailData.result?.items || detailData.items || [];
               console.log('📦 Detail API response items:', detailItems.length);
-              
+
               products = detailItems.map((item: any) => {
                 // Вычисляем общий сток со всех складов
-                const totalStock = item.stocks?.stocks?.reduce((acc: number, s: any) => acc + (s.present || 0), 0) || 0;
-                
+                const totalStock =
+                  item.stocks?.stocks?.reduce((acc: number, s: any) => acc + (s.present || 0), 0) ||
+                  0;
+
                 // Улучшенный parsing цены (Ozon v3 может возвращать price как объект)
                 let price = 0;
                 if (typeof item.price === 'object' && item.price !== null) {
@@ -1777,71 +1885,84 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 } else {
                   price = parseFloat(item.price || item.marketing_price || '0');
                 }
-                
+
                 return {
                   product_id: `ozon-${item.id}`,
                   title: item.name || 'Без названия',
                   // v3 возвращает primary_image как строку
-                  image_url: (typeof item.primary_image === 'string' ? item.primary_image : item.primary_image?.[0]) || item.images?.[0] || null,
+                  image_url:
+                    (typeof item.primary_image === 'string'
+                      ? item.primary_image
+                      : item.primary_image?.[0]) ||
+                    item.images?.[0] ||
+                    null,
                   current_price: price,
                   current_stock: totalStock,
                   marketplace: 'Ozon',
                 };
               });
-              
+
               console.log(`✅ Processed ${products.length} products with details`);
             }
           } else if (mp === 'WB') {
             // WB API - get products (API v2)
             console.log('🔍 WB API sync starting...');
             console.log('🔑 WB API key length:', apiKey.length);
-            
+
             try {
               // WB Content API v2 - requires proper authorization header
-              const wbResponse = await fetch('https://content-api.wildberries.ru/content/v2/get/cards/list', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': apiKey, // WB uses raw token without Bearer prefix
-                },
-                body: JSON.stringify({
-                  settings: { 
-                    cursor: { limit: 100 }, 
-                    filter: { withPhoto: -1 } 
+              const wbResponse = await fetch(
+                'https://content-api.wildberries.ru/content/v2/get/cards/list',
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: apiKey, // WB uses raw token without Bearer prefix
                   },
-                }),
-              });
+                  body: JSON.stringify({
+                    settings: {
+                      cursor: { limit: 100 },
+                      filter: { withPhoto: -1 },
+                    },
+                  }),
+                }
+              );
 
               console.log('📡 WB API response status:', wbResponse.status);
 
               if (!wbResponse.ok) {
                 const errorText = await wbResponse.text();
                 console.error('❌ WB API error:', wbResponse.status, errorText);
-                return res.status(400).json({ 
+                return res.status(400).json({
                   error: `Ошибка WB API: ${wbResponse.status}`,
                   details: errorText.substring(0, 500),
-                  hint: 'Проверьте, что API ключ имеет права на контент (Content API)'
+                  hint: 'Проверьте, что API ключ имеет права на контент (Content API)',
                 });
               }
 
               const wbData = await wbResponse.json();
               console.log('📦 WB API response cards count:', wbData.cards?.length || 0);
-              
+
               products = (wbData.cards || []).map((card: any) => ({
                 product_id: `wb-${card.nmID}`,
                 nm_id: card.nmID,
                 title: card.title || card.subjectName || 'Без названия',
                 image_url: card.photos?.[0]?.big || card.photos?.[0]?.c246x328 || null,
                 current_price: card.sizes?.[0]?.price?.total || card.sizes?.[0]?.price || 0,
-                current_stock: card.sizes?.reduce((sum: number, s: any) => sum + (s.stocks?.reduce((ss: number, st: any) => ss + st.qty, 0) || 0), 0) || 0,
+                current_stock:
+                  card.sizes?.reduce(
+                    (sum: number, s: any) =>
+                      sum + (s.stocks?.reduce((ss: number, st: any) => ss + st.qty, 0) || 0),
+                    0
+                  ) || 0,
                 marketplace: 'WB',
               }));
             } catch (wbError: any) {
               console.error('❌ WB fetch error:', wbError.message);
-              return res.status(500).json({ 
+              return res.status(500).json({
                 error: 'Ошибка подключения к WB API',
                 details: wbError.message,
-                hint: 'Возможно, API Wildberries временно недоступен. Попробуйте позже.'
+                hint: 'Возможно, API Wildberries временно недоступен. Попробуйте позже.',
               });
             }
           }
@@ -1849,7 +1970,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           // Limit products based on subscription plan
           let productsToSave = products;
           let limitReached = false;
-          
+
           if (products.length > productLimit) {
             productsToSave = products.slice(0, productLimit);
             limitReached = true;
@@ -1895,7 +2016,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.json(response);
         } catch (error) {
           console.error('Sync error:', error);
-          return res.status(500).json({ error: error instanceof Error ? error.message : 'Ошибка синхронизации' });
+          return res
+            .status(500)
+            .json({ error: error instanceof Error ? error.message : 'Ошибка синхронизации' });
         }
       }
 
@@ -1904,54 +2027,60 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Allow Vercel Cron or manual Admin trigger
         const authHeader = req.headers['authorization'];
         const initData = req.headers['x-init-data'] as string;
-        
+
         const isCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
-        const isAdmin = req.query.key === ADMIN_API_KEY || req.headers['x-admin-key'] === ADMIN_API_KEY;
-        
+        const isAdmin =
+          req.query.key === ADMIN_API_KEY || req.headers['x-admin-key'] === ADMIN_API_KEY;
+
         let targetUsers = [];
 
         // Scenario A: Auto/Admin Run (All Users)
         if (isCron || isAdmin) {
-             const usersRes = await sql`
+          const usersRes = await sql`
                 SELECT * FROM users 
                 WHERE protection_enabled = true 
                 AND subscription_active = true
                 AND (api_key_ozon IS NOT NULL OR api_key_wb IS NOT NULL)
               `;
-             targetUsers = usersRes.rows;
-        } 
+          targetUsers = usersRes.rows;
+        }
         // Scenario B: User Self-Check (Client Polling)
         else if (initData) {
-             const validation = validateTelegramInitData(initData);
-             if (validation.valid && validation.user) {
-                 // Get full user data from DB to check protection status
-                 const dbUser = await getUserById(validation.user.id);
-                 if (dbUser && dbUser.protection_enabled && (dbUser.api_key_ozon || dbUser.api_key_wb)) {
-                     targetUsers = [dbUser];
-                 } else {
-                     return res.json({ success: true, message: 'Protection disabled or keys missing' });
-                 }
-             } else {
-                 return res.status(401).json({ error: 'Invalid initData' });
-             }
+          const validation = validateTelegramInitData(initData);
+          if (validation.valid && validation.user) {
+            // Get full user data from DB to check protection status
+            const dbUser = await getUserById(validation.user.id);
+            if (dbUser && dbUser.protection_enabled && (dbUser.api_key_ozon || dbUser.api_key_wb)) {
+              targetUsers = [dbUser];
+            } else {
+              return res.json({ success: true, message: 'Protection disabled or keys missing' });
+            }
+          } else {
+            return res.status(401).json({ error: 'Invalid initData' });
+          }
         } else {
-             return res.status(401).json({ error: 'Unauthorized' });
+          return res.status(401).json({ error: 'Unauthorized' });
         }
 
-
         console.log(`🛡️ SENTINEL: Starting price check for ${targetUsers.length} users...`);
-        
+
         // DEBUG MODE VARIABLES
         const debugInfo: any[] = [];
         const isDebug = req.query.debug === 'true';
-        
+
         // Capture Logs
         const log: string[] = [];
         const originalLog = console.log;
         const originalError = console.error;
-        const safeLog = (...args: any[]) => { log.push(args.join(' ')); originalLog(...args); };
-        const safeError = (...args: any[]) => { log.push('[ERROR] ' + args.join(' ')); originalError(...args); };
-        
+        const safeLog = (...args: any[]) => {
+          log.push(args.join(' '));
+          originalLog(...args);
+        };
+        const safeError = (...args: any[]) => {
+          log.push('[ERROR] ' + args.join(' '));
+          originalError(...args);
+        };
+
         // Use local loggers
         console.log = safeLog;
         console.error = safeError;
@@ -1962,359 +2091,439 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         try {
           // 2. Iterate users
           for (const user of targetUsers) {
-         // --- OZON DEFENSE ---
-             if (user.api_key_ozon) {
-               try {
-                 // Get monitored products
-                 const productsRes = await sql`
+            // --- OZON DEFENSE ---
+            if (user.api_key_ozon) {
+              try {
+                // Get monitored products
+                const productsRes = await sql`
                    SELECT * FROM products 
                    WHERE user_id = ${user.id} 
                    AND marketplace = 'Ozon' 
                    AND min_price > 0 
                    AND status != 'disabled'
                  `;
-                 const monitoredProducts = productsRes.rows;
+                const monitoredProducts = productsRes.rows;
 
-                 if (monitoredProducts.length > 0) {
-                   // Decrypt API key (ТЗ Security)
-                   const decryptedOzonKey = decryptApiKey(user.api_key_ozon);
-                   const [clientId, apiKey] = (decryptedOzonKey || '').split(':');
-                   if (!clientId || !apiKey) continue;
+                if (monitoredProducts.length > 0) {
+                  // Decrypt API key (ТЗ Security)
+                  const decryptedOzonKey = decryptApiKey(user.api_key_ozon);
+                  const [clientId, apiKey] = (decryptedOzonKey || '').split(':');
+                  if (!clientId || !apiKey) continue;
 
-                   // Get current prices from Ozon V3 with retry
-                   const productIds = monitoredProducts.map(p => parseInt(p.product_id.replace('ozon-', '')));
-                   const ozonRes = await fetchWithRetry('https://api-seller.ozon.ru/v3/product/info/list', {
-                     method: 'POST',
-                     headers: { 'Content-Type': 'application/json', 'Client-Id': clientId, 'Api-Key': apiKey },
-                     body: JSON.stringify({ product_id: productIds }),
-                   });
+                  // Get current prices from Ozon V3 with retry
+                  const productIds = monitoredProducts.map(p =>
+                    parseInt(p.product_id.replace('ozon-', ''))
+                  );
+                  const ozonRes = await fetchWithRetry(
+                    'https://api-seller.ozon.ru/v3/product/info/list',
+                    {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Client-Id': clientId,
+                        'Api-Key': apiKey,
+                      },
+                      body: JSON.stringify({ product_id: productIds }),
+                    }
+                  );
 
-                   if (ozonRes.ok) {
-                     const ozonData = await ozonRes.json();
-                     const currentItems = ozonData.result?.items || ozonData.items || [];
-                     
-                     // CRITICAL: Also fetch current prices from Ozon Prices API
-                     // /v3/product/info/list doesn't always return accurate prices during promotions
-                     let priceMap: Map<number, number> = new Map();
-                     
-                     try {
-                       const pricesRes = await fetchWithRetry('https://api-seller.ozon.ru/v4/product/info/prices', {
-                         method: 'POST',
-                         headers: { 'Content-Type': 'application/json', 'Client-Id': clientId, 'Api-Key': apiKey },
-                         body: JSON.stringify({ 
-                           filter: { product_id: productIds },
-                           limit: 1000
-                         }),
-                       });
-                       
-                       if (pricesRes.ok) {
-                         const pricesData = await pricesRes.json();
-                         const priceItems = pricesData.result?.items || [];
-                         
-                         for (const p of priceItems) {
-                           // Use marketing_price (actual selling price) or price
-                           const actualPrice = parseFloat(p.price?.marketing_price || p.price?.price || '0');
-                           if (p.product_id && actualPrice > 0) {
-                             priceMap.set(p.product_id, actualPrice);
-                           }
-                         }
-                         console.log(`💰 Fetched ${priceMap.size} prices from Ozon Prices API`);
-                       }
-                     } catch (priceErr) {
-                       console.warn('⚠️ Failed to fetch Ozon prices separately:', priceErr);
-                     }
-                     
-                     // Check for violations
-                     for (const item of currentItems) {
-                       const dbProduct = monitoredProducts.find(p => p.product_id === `ozon-${item.id}`);
-                       if (!dbProduct) continue;
+                  if (ozonRes.ok) {
+                    const ozonData = await ozonRes.json();
+                    const currentItems = ozonData.result?.items || ozonData.items || [];
 
-                       // Use price from dedicated prices API, or fallback to item fields
-                       let currentPrice = priceMap.get(item.id) || 0;
-                       if (currentPrice === 0) {
-                         // Fallback: try item.price object or marketing_price string
-                         currentPrice = parseFloat(
-                           item.price?.marketing_price || 
-                           item.price?.price || 
-                           item.marketing_price || 
-                           item.price || 
-                           '0'
-                         );
-                       }
-                       
-                       const minPrice = dbProduct.min_price;
-                       
-                       totalScanned++;
-                       
-                       console.log(`📊 Check: ${dbProduct.title.substring(0, 30)}... | Current: ${currentPrice} | Min: ${minPrice}`);
-                       
-                       // Update current_price in DB for history and analytics
-                       if (currentPrice > 0) {
-                         await sql`
+                    // CRITICAL: Also fetch current prices from Ozon Prices API
+                    // /v3/product/info/list doesn't always return accurate prices during promotions
+                    const priceMap: Map<number, number> = new Map();
+
+                    try {
+                      const pricesRes = await fetchWithRetry(
+                        'https://api-seller.ozon.ru/v4/product/info/prices',
+                        {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            'Client-Id': clientId,
+                            'Api-Key': apiKey,
+                          },
+                          body: JSON.stringify({
+                            filter: { product_id: productIds },
+                            limit: 1000,
+                          }),
+                        }
+                      );
+
+                      if (pricesRes.ok) {
+                        const pricesData = await pricesRes.json();
+                        const priceItems = pricesData.result?.items || [];
+
+                        for (const p of priceItems) {
+                          // Use marketing_price (actual selling price) or price
+                          const actualPrice = parseFloat(
+                            p.price?.marketing_price || p.price?.price || '0'
+                          );
+                          if (p.product_id && actualPrice > 0) {
+                            priceMap.set(p.product_id, actualPrice);
+                          }
+                        }
+                        console.log(`💰 Fetched ${priceMap.size} prices from Ozon Prices API`);
+                      }
+                    } catch (priceErr) {
+                      console.warn('⚠️ Failed to fetch Ozon prices separately:', priceErr);
+                    }
+
+                    // Check for violations
+                    for (const item of currentItems) {
+                      const dbProduct = monitoredProducts.find(
+                        p => p.product_id === `ozon-${item.id}`
+                      );
+                      if (!dbProduct) continue;
+
+                      // Use price from dedicated prices API, or fallback to item fields
+                      let currentPrice = priceMap.get(item.id) || 0;
+                      if (currentPrice === 0) {
+                        // Fallback: try item.price object or marketing_price string
+                        currentPrice = parseFloat(
+                          item.price?.marketing_price ||
+                            item.price?.price ||
+                            item.marketing_price ||
+                            item.price ||
+                            '0'
+                        );
+                      }
+
+                      const minPrice = dbProduct.min_price;
+
+                      totalScanned++;
+
+                      console.log(
+                        `📊 Check: ${dbProduct.title.substring(0, 30)}... | Current: ${currentPrice} | Min: ${minPrice}`
+                      );
+
+                      // Update current_price in DB for history and analytics
+                      if (currentPrice > 0) {
+                        await sql`
                            UPDATE products SET current_price = ${Math.round(currentPrice)}, updated_at = CURRENT_TIMESTAMP 
                            WHERE id = ${dbProduct.id}
                          `;
-                       }
+                      }
 
-                       // VIOLATION DETECTED!
-                       if (currentPrice > 0 && currentPrice < minPrice) {
-                         console.warn(`🚨 ALARM: ${dbProduct.title} Price: ${currentPrice} < StopLoss: ${minPrice}`);
-                         totalTriggered++;
-                         
-                         // EXECUTE DEFENSE
-                         let defenseAction = '';
-                         let ozonUpdateRes;
-                         
-                         if (user.defense_mode === 'zero_stock') {
-                           // Option A: Set Stock to 0
-                           defenseAction = 'Zero Stock';
-                           ozonUpdateRes = await fetchWithRetry('https://api-seller.ozon.ru/v1/product/import/stocks', {
-                             method: 'POST',
-                             headers: { 'Content-Type': 'application/json', 'Client-Id': clientId, 'Api-Key': apiKey },
-                             body: JSON.stringify({
-                               stocks: [{ offer_id: item.offer_id, product_id: item.id, stock: 0 }]
-                             }),
-                           });
-                         } else {
-                           // Option B: Price Correction (Set to min_price)
-                           defenseAction = 'Price Correction';
-                           ozonUpdateRes = await fetchWithRetry('https://api-seller.ozon.ru/v1/product/import/prices', {
-                             method: 'POST',
-                             headers: { 'Content-Type': 'application/json', 'Client-Id': clientId, 'Api-Key': apiKey },
-                             body: JSON.stringify({
-                               prices: [{ 
-                                 offer_id: item.offer_id, 
-                                 product_id: item.id, 
-                                 price: String(minPrice), 
-                                 old_price: String(Math.round(minPrice * 1.2)), // Fake old price
-                                 min_price: String(minPrice),
-                                 currency_code: 'RUB'
-                               }]
-                             }),
-                           });
-                         }
+                      // VIOLATION DETECTED!
+                      if (currentPrice > 0 && currentPrice < minPrice) {
+                        console.warn(
+                          `🚨 ALARM: ${dbProduct.title} Price: ${currentPrice} < StopLoss: ${minPrice}`
+                        );
+                        totalTriggered++;
 
-                         // UPDATE DB & NOTIFY
-                         await sql`
+                        // EXECUTE DEFENSE
+                        let defenseAction = '';
+                        let ozonUpdateRes;
+
+                        if (user.defense_mode === 'zero_stock') {
+                          // Option A: Set Stock to 0
+                          defenseAction = 'Zero Stock';
+                          ozonUpdateRes = await fetchWithRetry(
+                            'https://api-seller.ozon.ru/v1/product/import/stocks',
+                            {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json',
+                                'Client-Id': clientId,
+                                'Api-Key': apiKey,
+                              },
+                              body: JSON.stringify({
+                                stocks: [
+                                  { offer_id: item.offer_id, product_id: item.id, stock: 0 },
+                                ],
+                              }),
+                            }
+                          );
+                        } else {
+                          // Option B: Price Correction (Set to min_price)
+                          defenseAction = 'Price Correction';
+                          ozonUpdateRes = await fetchWithRetry(
+                            'https://api-seller.ozon.ru/v1/product/import/prices',
+                            {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json',
+                                'Client-Id': clientId,
+                                'Api-Key': apiKey,
+                              },
+                              body: JSON.stringify({
+                                prices: [
+                                  {
+                                    offer_id: item.offer_id,
+                                    product_id: item.id,
+                                    price: String(minPrice),
+                                    old_price: String(Math.round(minPrice * 1.2)), // Fake old price
+                                    min_price: String(minPrice),
+                                    currency_code: 'RUB',
+                                  },
+                                ],
+                              }),
+                            }
+                          );
+                        }
+
+                        // UPDATE DB & NOTIFY
+                        await sql`
                            UPDATE products SET status = 'triggered', updated_at = CURRENT_TIMESTAMP 
                            WHERE id = ${dbProduct.id}
                          `;
-                         
-                         const savedAmount = minPrice - currentPrice;
-                         await sql`
+
+                        const savedAmount = minPrice - currentPrice;
+                        await sql`
                            UPDATE users SET 
                              triggered_today = triggered_today + 1,
                              saved_amount = saved_amount + ${savedAmount}
                            WHERE id = ${user.id}
                          `;
 
-                          // Log to sentinel_logs for audit (Ozon)
-                          await sql`
+                        // Log to sentinel_logs for audit (Ozon)
+                        await sql`
                             INSERT INTO sentinel_logs (user_id, product_id, product_title, detected_price, min_price, defense_action, saved_amount, marketplace)
                             VALUES (${user.id}, ${dbProduct.product_id}, ${dbProduct.title}, ${Math.round(currentPrice)}, ${minPrice}, ${defenseAction}, ${savedAmount}, 'Ozon')
                           `;
 
-                          // TELEGRAM ALERT
-                          console.log(`📤 Sending Telegram alert to user ${user.id}...`);
-                          const token = process.env.TELEGRAM_BOT_TOKEN;
-                          if (token) {
-                            const msg = `🛡️ <b>NeuroGUARDIAN SENTRY</b>\n\n` +
-                                      `⚠️ <b>Демпинг обнаружен!</b>\n` +
-                                      `📦 ${dbProduct.title}\n` +
-                                      `📉 Цена упала: ${currentPrice} ₽ → ${minPrice} ₽\n` +
-                                      `⚔️ <b>Защита:</b> ${defenseAction}\n` +
-                                      `💰 Спасено: ${savedAmount} ₽`;
-                            
-                            try {
-                              const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+                        // TELEGRAM ALERT
+                        console.log(`📤 Sending Telegram alert to user ${user.id}...`);
+                        const token = process.env.TELEGRAM_BOT_TOKEN;
+                        if (token) {
+                          const msg =
+                            `🛡️ <b>NeuroGUARDIAN SENTRY</b>\n\n` +
+                            `⚠️ <b>Демпинг обнаружен!</b>\n` +
+                            `📦 ${dbProduct.title}\n` +
+                            `📉 Цена упала: ${currentPrice} ₽ → ${minPrice} ₽\n` +
+                            `⚔️ <b>Защита:</b> ${defenseAction}\n` +
+                            `💰 Спасено: ${savedAmount} ₽`;
+
+                          try {
+                            const tgRes = await fetch(
+                              `https://api.telegram.org/bot${token}/sendMessage`,
+                              {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ chat_id: user.id, text: msg, parse_mode: 'HTML' }),
-                              });
-                              const tgData = await tgRes.json();
-                              console.log(`📤 Telegram result: ok=${tgRes.ok}`, JSON.stringify(tgData).substring(0, 100));
-                            } catch (tgErr) {
-                              console.error(`❌ Telegram send error:`, tgErr);
-                            }
-                          } else {
-                            console.warn(`⚠️ TELEGRAM_BOT_TOKEN not set!`);
+                                body: JSON.stringify({
+                                  chat_id: user.id,
+                                  text: msg,
+                                  parse_mode: 'HTML',
+                                }),
+                              }
+                            );
+                            const tgData = await tgRes.json();
+                            console.log(
+                              `📤 Telegram result: ok=${tgRes.ok}`,
+                              JSON.stringify(tgData).substring(0, 100)
+                            );
+                          } catch (tgErr) {
+                            console.error(`❌ Telegram send error:`, tgErr);
                           }
-                       }
-                     }
-                   }
-                 }
-               } catch (e) {
-                 console.error(`Error checking Ozon for user ${user.id}:`, e);
-                 log.push(`Error Ozon user ${user.id}: ${e}`);
-               }
-             }
-             
-             // --- WB DEFENSE (per ТЗ: Module C Sentinel) ---
-             if (user.api_key_wb) {
-               try {
-                 // Get monitored WB products
-                 const wbProductsRes = await sql`
+                        } else {
+                          console.warn(`⚠️ TELEGRAM_BOT_TOKEN not set!`);
+                        }
+                      }
+                    }
+                  }
+                }
+              } catch (e) {
+                console.error(`Error checking Ozon for user ${user.id}:`, e);
+                log.push(`Error Ozon user ${user.id}: ${e}`);
+              }
+            }
+
+            // --- WB DEFENSE (per ТЗ: Module C Sentinel) ---
+            if (user.api_key_wb) {
+              try {
+                // Get monitored WB products
+                const wbProductsRes = await sql`
                    SELECT * FROM products 
                    WHERE user_id = ${user.id} 
                    AND marketplace = 'WB' 
                    AND min_price > 0 
                    AND status != 'disabled'
                  `;
-                 const wbMonitoredProducts = wbProductsRes.rows;
+                const wbMonitoredProducts = wbProductsRes.rows;
 
-                 if (wbMonitoredProducts.length > 0) {
-                   // Decrypt API key (ТЗ Security)
-                   const wbApiKey = decryptApiKey(user.api_key_wb);
-                   if (!wbApiKey) continue;
+                if (wbMonitoredProducts.length > 0) {
+                  // Decrypt API key (ТЗ Security)
+                  const wbApiKey = decryptApiKey(user.api_key_wb);
+                  if (!wbApiKey) continue;
 
-                   // Get current prices from WB Prices API
-                   const nmIds = wbMonitoredProducts.map(p => p.nm_id).filter(Boolean);
-                   
-                   if (nmIds.length > 0) {
-                     // WB API: Get current prices
-                     const wbPricesRes = await fetchWithRetry('https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter', {
-                       method: 'POST',
-                       headers: { 
-                         'Content-Type': 'application/json', 
-                         'Authorization': wbApiKey 
-                       },
-                       body: JSON.stringify({ 
-                         limit: 1000,
-                         offset: 0,
-                         filterNmID: nmIds
-                       }),
-                     });
+                  // Get current prices from WB Prices API
+                  const nmIds = wbMonitoredProducts.map(p => p.nm_id).filter(Boolean);
 
-                     if (wbPricesRes.ok) {
-                       const wbPricesData = await wbPricesRes.json();
-                       const wbItems = wbPricesData.data?.listGoods || [];
-                       
-                       for (const wbItem of wbItems) {
-                         const dbProduct = wbMonitoredProducts.find(p => p.nm_id === wbItem.nmID);
-                         if (!dbProduct) continue;
+                  if (nmIds.length > 0) {
+                    // WB API: Get current prices
+                    const wbPricesRes = await fetchWithRetry(
+                      'https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter',
+                      {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          Authorization: wbApiKey,
+                        },
+                        body: JSON.stringify({
+                          limit: 1000,
+                          offset: 0,
+                          filterNmID: nmIds,
+                        }),
+                      }
+                    );
 
-                         // WB price logic: use discount price or sizes price
-                         const currentPrice = wbItem.sizes?.[0]?.discountedPrice || wbItem.sizes?.[0]?.price || 0;
-                         const minPrice = dbProduct.min_price;
-                         
-                         totalScanned++;
+                    if (wbPricesRes.ok) {
+                      const wbPricesData = await wbPricesRes.json();
+                      const wbItems = wbPricesData.data?.listGoods || [];
 
-                         // VIOLATION DETECTED!
-                         if (currentPrice > 0 && currentPrice < minPrice) {
-                           console.warn(`🚨 WB ALARM: ${dbProduct.title} Price: ${currentPrice} < StopLoss: ${minPrice}`);
-                           totalTriggered++;
-                           
-                           let defenseAction = '';
-                           
-                           if (user.defense_mode === 'zero_stock') {
-                             // WB Zero Stock: Set stock to 0 via warehouse API
-                             defenseAction = 'Zero Stock';
-                             
-                             // First get warehouse ID
-                             const warehousesRes = await fetchWithRetry('https://suppliers-api.wildberries.ru/api/v3/warehouses', {
-                               method: 'GET',
-                               headers: { 'Authorization': wbApiKey },
-                             });
-                             
-                             if (warehousesRes.ok) {
-                               const warehousesData = await warehousesRes.json();
-                               const warehouses = warehousesData || [];
-                               
-                               // Zero stock on all warehouses for this SKU
-                               for (const wh of warehouses) {
-                                 await fetchWithRetry(`https://suppliers-api.wildberries.ru/api/v3/stocks/${wh.id}`, {
-                                   method: 'PUT',
-                                   headers: { 
-                                     'Content-Type': 'application/json',
-                                     'Authorization': wbApiKey 
-                                   },
-                                   body: JSON.stringify({
-                                     stocks: [{
-                                       sku: dbProduct.vendor_code || String(dbProduct.nm_id),
-                                       amount: 0
-                                     }]
-                                   }),
-                                 });
-                               }
-                             }
-                           } else {
-                             // WB Price Correction
-                             defenseAction = 'Price Correction';
-                             await fetchWithRetry('https://discounts-prices-api.wildberries.ru/api/v2/upload/task', {
-                               method: 'POST',
-                               headers: { 
-                                 'Content-Type': 'application/json',
-                                 'Authorization': wbApiKey 
-                               },
-                               body: JSON.stringify({
-                                 data: [{
-                                   nmID: dbProduct.nm_id,
-                                   price: minPrice,
-                                   discount: 0
-                                 }]
-                               }),
-                             });
-                           }
+                      for (const wbItem of wbItems) {
+                        const dbProduct = wbMonitoredProducts.find(p => p.nm_id === wbItem.nmID);
+                        if (!dbProduct) continue;
 
-                           // UPDATE DB & NOTIFY
-                           await sql`
+                        // WB price logic: use discount price or sizes price
+                        const currentPrice =
+                          wbItem.sizes?.[0]?.discountedPrice || wbItem.sizes?.[0]?.price || 0;
+                        const minPrice = dbProduct.min_price;
+
+                        totalScanned++;
+
+                        // VIOLATION DETECTED!
+                        if (currentPrice > 0 && currentPrice < minPrice) {
+                          console.warn(
+                            `🚨 WB ALARM: ${dbProduct.title} Price: ${currentPrice} < StopLoss: ${minPrice}`
+                          );
+                          totalTriggered++;
+
+                          let defenseAction = '';
+
+                          if (user.defense_mode === 'zero_stock') {
+                            // WB Zero Stock: Set stock to 0 via warehouse API
+                            defenseAction = 'Zero Stock';
+
+                            // First get warehouse ID
+                            const warehousesRes = await fetchWithRetry(
+                              'https://suppliers-api.wildberries.ru/api/v3/warehouses',
+                              {
+                                method: 'GET',
+                                headers: { Authorization: wbApiKey },
+                              }
+                            );
+
+                            if (warehousesRes.ok) {
+                              const warehousesData = await warehousesRes.json();
+                              const warehouses = warehousesData || [];
+
+                              // Zero stock on all warehouses for this SKU
+                              for (const wh of warehouses) {
+                                await fetchWithRetry(
+                                  `https://suppliers-api.wildberries.ru/api/v3/stocks/${wh.id}`,
+                                  {
+                                    method: 'PUT',
+                                    headers: {
+                                      'Content-Type': 'application/json',
+                                      Authorization: wbApiKey,
+                                    },
+                                    body: JSON.stringify({
+                                      stocks: [
+                                        {
+                                          sku: dbProduct.vendor_code || String(dbProduct.nm_id),
+                                          amount: 0,
+                                        },
+                                      ],
+                                    }),
+                                  }
+                                );
+                              }
+                            }
+                          } else {
+                            // WB Price Correction
+                            defenseAction = 'Price Correction';
+                            await fetchWithRetry(
+                              'https://discounts-prices-api.wildberries.ru/api/v2/upload/task',
+                              {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  Authorization: wbApiKey,
+                                },
+                                body: JSON.stringify({
+                                  data: [
+                                    {
+                                      nmID: dbProduct.nm_id,
+                                      price: minPrice,
+                                      discount: 0,
+                                    },
+                                  ],
+                                }),
+                              }
+                            );
+                          }
+
+                          // UPDATE DB & NOTIFY
+                          await sql`
                              UPDATE products SET status = 'triggered', updated_at = CURRENT_TIMESTAMP 
                              WHERE id = ${dbProduct.id}
                            `;
-                           
-                           const savedAmount = minPrice - currentPrice;
-                           await sql`
+
+                          const savedAmount = minPrice - currentPrice;
+                          await sql`
                              UPDATE users SET 
                                triggered_today = triggered_today + 1,
                                saved_amount = saved_amount + ${savedAmount}
                              WHERE id = ${user.id}
                            `;
 
-                           // Log to sentinel_logs for audit
-                           await sql`
+                          // Log to sentinel_logs for audit
+                          await sql`
                              INSERT INTO sentinel_logs (user_id, product_id, product_title, detected_price, min_price, defense_action, saved_amount, marketplace)
                              VALUES (${user.id}, ${dbProduct.product_id}, ${dbProduct.title}, ${Math.round(currentPrice)}, ${minPrice}, ${defenseAction}, ${savedAmount}, 'WB')
                            `;
 
-                           // TELEGRAM ALERT
-                           if (process.env.TELEGRAM_BOT_TOKEN) {
-                             const msg = `🛡️ <b>NeuroGUARDIAN SENTRY</b>\n\n` +
-                                       `⚠️ <b>WB Демпинг обнаружен!</b>\n` +
-                                       `📦 ${dbProduct.title}\n` +
-                                       `📉 Цена упала: ${currentPrice} ₽ < ${minPrice} ₽\n` +
-                                       `⚔️ <b>Защита активирована:</b> ${defenseAction}\n` +
-                                       `💰 Спасено: ${savedAmount} ₽`;
-                             
-                             await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-                               method: 'POST',
-                               headers: { 'Content-Type': 'application/json' },
-                               body: JSON.stringify({ chat_id: user.id, text: msg, parse_mode: 'HTML' }),
-                             });
-                           }
-                         }
-                       }
-                     }
-                   }
-                 }
-               } catch (e) {
-                 console.error(`Error checking WB for user ${user.id}:`, e);
-                 log.push(`Error WB user ${user.id}: ${e}`);
-               }
-             }
+                          // TELEGRAM ALERT
+                          if (process.env.TELEGRAM_BOT_TOKEN) {
+                            const msg =
+                              `🛡️ <b>NeuroGUARDIAN SENTRY</b>\n\n` +
+                              `⚠️ <b>WB Демпинг обнаружен!</b>\n` +
+                              `📦 ${dbProduct.title}\n` +
+                              `📉 Цена упала: ${currentPrice} ₽ < ${minPrice} ₽\n` +
+                              `⚔️ <b>Защита активирована:</b> ${defenseAction}\n` +
+                              `💰 Спасено: ${savedAmount} ₽`;
+
+                            await fetch(
+                              `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`,
+                              {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  chat_id: user.id,
+                                  text: msg,
+                                  parse_mode: 'HTML',
+                                }),
+                              }
+                            );
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              } catch (e) {
+                console.error(`Error checking WB for user ${user.id}:`, e);
+                log.push(`Error WB user ${user.id}: ${e}`);
+              }
+            }
           }
 
           // Restore console
-        console.log = originalLog;
-        console.error = originalError;
+          console.log = originalLog;
+          console.error = originalError;
 
-        return res.json({ 
-          success: true, 
-          scanned: totalScanned, 
-          triggered: totalTriggered, 
-          log,
-          debug_info: isDebug ? debugInfo : undefined // Return debug info only if requested
-        });
-      } catch (error) {
+          return res.json({
+            success: true,
+            scanned: totalScanned,
+            triggered: totalTriggered,
+            log,
+            debug_info: isDebug ? debugInfo : undefined, // Return debug info only if requested
+          });
+        } catch (error) {
           console.error('Sentinel Error:', error);
           return res.status(500).json({ error: 'Sentinel check failed' });
         }
@@ -2329,7 +2538,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(401).json({ error: 'Unauthorized' });
         }
 
-        const { fromUserId, toUserId, cloneProducts = true, cloneApiKeys = true, activateTrial = true, trialDays = 3 } = req.body;
+        const {
+          fromUserId,
+          toUserId,
+          cloneProducts = true,
+          cloneApiKeys = true,
+          activateTrial = true,
+          trialDays = 3,
+        } = req.body;
         if (!fromUserId || !toUserId) {
           return res.status(400).json({ error: 'Missing fromUserId or toUserId' });
         }
@@ -2367,14 +2583,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (cloneProducts) {
           // Delete existing products for target user
           await sql`DELETE FROM products WHERE user_id = ${toUserId}`;
-          
+
           // Copy products from source user
           await sql`
             INSERT INTO products (user_id, product_id, nm_id, title, image_url, current_price, min_price, current_stock, marketplace, status, is_monitored)
             SELECT ${toUserId}, product_id, nm_id, title, image_url, current_price, min_price, current_stock, marketplace, status, is_monitored
             FROM products WHERE user_id = ${fromUserId}
           `;
-          
+
           // Update product count
           await sql`
             UPDATE users SET 
@@ -2384,8 +2600,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           results.push('Products cloned');
         }
 
-        return res.json({ 
-          success: true, 
+        return res.json({
+          success: true,
           message: `Cloned data from ${fromUserId} to ${toUserId}`,
           actions: results,
         });
@@ -2397,20 +2613,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const authHeader = req.headers['authorization'];
         const isCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
         const isAdmin = req.headers['x-admin-key'] === ADMIN_API_KEY;
-        
+
         if (!isCron && !isAdmin && IS_PRODUCTION) {
           return res.status(401).json({ error: 'Unauthorized' });
         }
 
         console.log('📧 Starting subscription expiry reminders...');
         const result = await sendExpiryReminders();
-        
+
         console.log(`📧 Reminders complete: sent=${result.sent}, errors=${result.errors}`);
-        
+
         return res.json({
           success: true,
           message: `Reminders sent: ${result.sent}, errors: ${result.errors}`,
-          ...result
+          ...result,
         });
       }
 
@@ -2420,7 +2636,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(405).json({ error: 'Method not allowed' });
         }
 
-        const initData = sanitizeInput(req.headers['x-init-data'] as string || req.body?.initData || '');
+        const initData = sanitizeInput(
+          (req.headers['x-init-data'] as string) || req.body?.initData || ''
+        );
         const validation = validateTelegramInitData(initData);
         if (!validation.valid || !validation.user) {
           return res.status(401).json({ error: 'Unauthorized' });
@@ -2461,7 +2679,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         const userId = req.query.userId || req.body?.userId;
-        const limit = parseInt(req.query.limit as string || '50', 10);
+        const limit = parseInt((req.query.limit as string) || '50', 10);
 
         let logsResult;
         if (userId) {
@@ -2499,13 +2717,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // ========== DEFAULT ==========
       default:
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: 'Unknown action',
-          availableActions: ['auth', 'products', 'settings', 'plans', 'create-payment', 'payment-webhook', 'init-db', 'reset-db', 'health', 'sync-products', 'check-prices', 'admin-activate-trial', 'admin-check-user', 'admin-list-users', 'admin-list-products', 'admin-test-ozon', 'admin-clone-user', 'admin-sentinel-logs', 'send-reminders', 'referral'],
+          availableActions: [
+            'auth',
+            'products',
+            'settings',
+            'plans',
+            'create-payment',
+            'payment-webhook',
+            'init-db',
+            'reset-db',
+            'health',
+            'sync-products',
+            'check-prices',
+            'admin-activate-trial',
+            'admin-check-user',
+            'admin-list-users',
+            'admin-list-products',
+            'admin-test-ozon',
+            'admin-clone-user',
+            'admin-sentinel-logs',
+            'send-reminders',
+            'referral',
+          ],
         });
     }
   } catch (error) {
     console.error('API Error:', error);
-    return res.status(500).json({ error: error instanceof Error ? error.message : 'Internal server error' });
+    return res
+      .status(500)
+      .json({ error: error instanceof Error ? error.message : 'Internal server error' });
   }
 }
