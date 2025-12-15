@@ -1167,6 +1167,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.json({ success: true, message: 'Database initialized' });
       }
 
+      // ========== RESET DB (Clean all data) ==========
+      case 'reset-db': {
+        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+        const adminKey = req.headers['x-admin-key'] || req.body?.adminKey;
+        if (!ADMIN_API_KEY || adminKey !== ADMIN_API_KEY) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        // Get current counts before deletion
+        const userCountBefore = await sql`SELECT COUNT(*) as count FROM users`;
+        const productCountBefore = await sql`SELECT COUNT(*) as count FROM products`;
+        
+        // Delete all data (order matters due to foreign keys)
+        await sql`DELETE FROM transactions`;
+        await sql`DELETE FROM products`;
+        await sql`DELETE FROM users`;
+
+        console.log(`🗑️ Database reset: deleted ${userCountBefore.rows[0].count} users, ${productCountBefore.rows[0].count} products`);
+
+        return res.json({ 
+          success: true, 
+          message: 'Database reset complete',
+          deleted: {
+            users: parseInt(userCountBefore.rows[0].count),
+            products: parseInt(productCountBefore.rows[0].count)
+          }
+        });
+      }
+
       // ========== HEALTH ==========
       case 'health': {
         let dbOk = false;
