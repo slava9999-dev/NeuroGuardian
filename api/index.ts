@@ -1337,6 +1337,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
+      // ========== ADMIN: TEST TELEGRAM ==========
+      case 'admin-test-telegram': {
+        const adminKey = req.headers['x-admin-key'] || req.query.key;
+        const validKeys = [ADMIN_API_KEY].filter(Boolean); // Uses the same auth
+        if (!validKeys.includes(adminKey as string)) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const userId = req.query.userId || req.body?.userId;
+        const token = process.env.TELEGRAM_BOT_TOKEN;
+        
+        if (!token) return res.status(500).json({ error: 'ENV: TELEGRAM_BOT_TOKEN missing on server' });
+        if (!userId) return res.status(400).json({ error: 'Missing userId' });
+
+        try {
+            const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: userId,
+                    text: '🔔 <b>ТЕСТОВАЯ ПРОВЕРКА СВЯЗИ</b>\n\nЕсли вы это читаете, значит бот настроен верно!',
+                    parse_mode: 'HTML'
+                })
+            });
+            const tgData = await tgRes.json();
+            return res.json({ 
+                success: tgRes.ok, 
+                telegram_response: tgData, 
+                token_masked: token.substring(0, 5) + '...' 
+            });
+        } catch (e: any) {
+            return res.status(500).json({ error: 'Fetch Error', details: e.message });
+        }
+      }
+
       // ========== ADMIN: SET DEFENSE MODE ==========
       case 'admin-set-defense-mode': {
         const adminKey = req.headers['x-admin-key'] || req.query.key;
