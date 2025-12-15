@@ -1553,10 +1553,60 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             itemsCount: data.result?.items?.length || 0,
             total: data.result?.total || 0,
             error: data.message || data.error || null,
-            raw: data
           });
         } catch (err: any) {
           return res.status(500).json({ error: err.message });
+        }
+      }
+
+      // ========== ADMIN: TEST WB API ==========
+      case 'admin-test-wb': {
+        const adminKey = req.headers['x-admin-key'] || req.query.key;
+        const validKeys = [ADMIN_API_KEY].filter(Boolean);
+        if (!validKeys.includes(adminKey as string)) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const { apiKey } = req.body;
+        if (!apiKey) {
+          return res.status(400).json({ error: 'Missing apiKey' });
+        }
+
+        console.log('🔍 Testing WB API with key length:', apiKey.length);
+
+        try {
+          const response = await fetch('https://content-api.wildberries.ru/content/v2/get/cards/list', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': apiKey,
+            },
+            body: JSON.stringify({ 
+              settings: { cursor: { limit: 5 }, filter: { withPhoto: -1 } } 
+            }),
+          });
+
+          const responseText = await response.text();
+          let data;
+          try {
+            data = JSON.parse(responseText);
+          } catch {
+            data = { rawText: responseText.substring(0, 500) };
+          }
+
+          return res.json({
+            status: response.status,
+            ok: response.ok,
+            cardsCount: data.cards?.length || 0,
+            cursor: data.cursor || null,
+            error: data.message || data.error || null,
+            raw: data,
+            hint: response.status === 401 
+              ? 'Ключ отклонён. Убедитесь что токен имеет права на Content API. Создайте новый токен в ЛК WB → Настройки → API.'
+              : null
+          });
+        } catch (err: any) {
+          return res.status(500).json({ error: err.message, type: 'fetch_error' });
         }
       }
 
