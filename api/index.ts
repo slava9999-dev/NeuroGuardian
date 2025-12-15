@@ -1253,6 +1253,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           daysLeft: endDate ? Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null,
         });
       }
+
+      // ========== ADMIN: LIST ALL USERS ==========
+      case 'admin-list-users': {
+        const adminKey = req.headers['x-admin-key'] || req.query.key;
+        const validKeys = ['neuro_emergency_admin_2024', ADMIN_API_KEY].filter(Boolean);
+        if (!validKeys.includes(adminKey as string)) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const result = await sql`SELECT id, username, first_name, subscription_plan, subscription_end, subscription_active, created_at FROM users ORDER BY created_at DESC LIMIT 50`;
+        
+        return res.json({
+          count: result.rows.length,
+          users: result.rows.map(u => ({
+            id: u.id,
+            username: u.username,
+            firstName: u.first_name,
+            plan: u.subscription_plan,
+            endDate: u.subscription_end,
+            active: u.subscription_active,
+            created: u.created_at
+          }))
+        });
+      }
+
       case 'sync-products': {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
