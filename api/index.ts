@@ -835,11 +835,15 @@ function setCorsHeaders(req: VercelRequest, res: VercelResponse) {
 // ============================================
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  setCorsHeaders(req, res);
+  const { method, query, body } = req;
+  console.log(`📥 API Request: ${method} action=${query.action || body?.action}`, JSON.stringify(body || {}).substring(0, 200));
 
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return res.status(204).end();
+    res.status(200).end();
+    return;
   }
+  setCorsHeaders(req, res);
 
   // Rate limiting by IP
   const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0] || 
