@@ -320,13 +320,84 @@ function validateTelegramInitData(initData: string): InitDataValidationResult {
 }
 
 /**
- * Rate limiting - simple in-memory store (resets on cold start)
- * For production, use Redis or similar
+ * Rate limiting - with Vercel KV support (persists across cold starts)
+ * Falls back to in-memory if KV not configured
  */
+import { createClient, type VercelKV } from '@vercel/kv';
+
+// In-memory fallback store
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
 const RATE_LIMIT = 100; // requests per window
+const RATE_LIMIT_STRICT = 20; // stricter limit for sensitive actions
 const RATE_WINDOW = 60 * 1000; // 1 minute
 
+// Lazy-load KV client (only if configured)
+let kvClient: VercelKV | null = null;
+function getKVClient(): VercelKV | null {
+  if (kvClient) return kvClient;
+
+  const kvUrl = process.env.KV_REST_API_URL;
+  const kvToken = process.env.KV_REST_API_TOKEN;
+
+  if (kvUrl && kvToken) {
+    try {
+      kvClient = createClient({ url: kvUrl, token: kvToken });
+      console.log('✅ Vercel KV Rate Limiter connected');
+      return kvClient;
+    } catch (e) {
+      console.warn('⚠️ Failed to connect to Vercel KV, using in-memory fallback');
+      return null;
+    }
+  }
+  return null;
+}
+
+async function checkRateLimitAsync(
+  identifier: string,
+  strict: boolean = false
+): Promise<{ allowed: boolean; remaining: number }> {
+  const limit = strict ? RATE_LIMIT_STRICT : RATE_LIMIT;
+  const kv = getKVClient();
+
+  // If KV is available, use it for persistent rate limiting
+  if (kv) {
+    try {
+      const key = `ratelimit:${identifier}`;
+      const count = await kv.incr(key);
+
+      // Set expiry on first increment
+      if (count === 1) {
+        await kv.expire(key, 60); // 60 seconds
+      }
+
+      if (count > limit) {
+        return { allowed: false, remaining: 0 };
+      }
+      return { allowed: true, remaining: limit - count };
+    } catch (e) {
+      console.warn('⚠️ KV rate limit check failed, falling back to memory');
+      // Fall through to in-memory
+    }
+  }
+
+  // In-memory fallback
+  const now = Date.now();
+  const record = rateLimitStore.get(identifier);
+
+  if (!record || now > record.resetTime) {
+    rateLimitStore.set(identifier, { count: 1, resetTime: now + RATE_WINDOW });
+    return { allowed: true, remaining: limit - 1 };
+  }
+
+  if (record.count >= limit) {
+    return { allowed: false, remaining: 0 };
+  }
+
+  record.count++;
+  return { allowed: true, remaining: limit - record.count };
+}
+
+// Synchronous fallback (for backwards compatibility in main handler)
 function checkRateLimit(identifier: string): { allowed: boolean; remaining: number } {
   const now = Date.now();
   const record = rateLimitStore.get(identifier);
