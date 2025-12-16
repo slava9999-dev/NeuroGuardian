@@ -2024,11 +2024,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // ========== SENTINEL: CHECK PRICES (CRON) ==========
       case 'check-prices': {
-        // Allow Vercel Cron or manual Admin trigger
+        // Allow Vercel Cron or manual Admin trigger or external cron with secret
         const authHeader = req.headers['authorization'];
         const initData = req.headers['x-init-data'] as string;
+        const querySecret = req.query.secret as string;
 
-        const isCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+        // Check for cron authorization (Bearer header OR query parameter)
+        const cronSecret = process.env.CRON_SECRET;
+        const isCron =
+          authHeader === `Bearer ${cronSecret}` ||
+          (querySecret && cronSecret && querySecret === cronSecret);
         const isAdmin =
           req.query.key === ADMIN_API_KEY || req.headers['x-admin-key'] === ADMIN_API_KEY;
 
