@@ -2715,6 +2715,168 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
+      // ========== BATCH SET STOP-LOSS ==========
+      case 'batch-set-stop-loss': {
+        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+        const initData = sanitizeInput(
+          (req.headers['x-init-data'] as string) || req.body?.initData || ''
+        );
+
+        const validation = validateTelegramInitData(initData);
+        if (!validation.valid || !validation.user) {
+          return res.status(401).json({ error: 'Unauthorized', code: 'AUTH_FAILED' });
+        }
+        const user = validation.user;
+
+        const { percentage, productIds } = req.body;
+
+        // Validate percentage (5-50%)
+        if (typeof percentage !== 'number' || percentage < 5 || percentage > 50) {
+          return res.status(400).json({
+            error: 'Invalid percentage',
+            message: 'Percentage must be between 5 and 50',
+            received: percentage,
+          });
+        }
+
+        // Validate productIds array (optional - if not provided, update all products without stop-loss)
+        let targetProductIds: string[] = [];
+        if (Array.isArray(productIds) && productIds.length > 0) {
+          targetProductIds = productIds.map(String);
+        }
+
+        try {
+          let productsToUpdate;
+
+          if (targetProductIds.length > 0) {
+            // Update specific products - fetch all user products and filter in JS
+            // (Vercel Postgres sql template doesn't support array parameters well)
+            const allProducts = await sql`
+              SELECT product_id, current_price FROM products 
+              WHERE user_id = ${user.id}
+            `;
+            productsToUpdate = {
+              rows: allProducts.rows.filter(p => targetProductIds.includes(p.product_id)),
+            };
+          } else {
+            // Update all products without stop-loss
+            productsToUpdate = await sql`
+              SELECT product_id, current_price FROM products 
+              WHERE user_id = ${user.id} 
+              AND (min_price = 0 OR min_price IS NULL)
+            `;
+          }
+
+          let successCount = 0;
+          let failedCount = 0;
+
+          for (const product of productsToUpdate.rows) {
+            try {
+              const newMinPrice = Math.floor(product.current_price * (1 - percentage / 100));
+
+              await sql`
+                UPDATE products SET 
+                  min_price = ${newMinPrice},
+                  status = 'protected',
+                  updated_at = CURRENT_TIMESTAMP
+                WHERE user_id = ${user.id} AND product_id = ${product.product_id}
+              `;
+
+              successCount++;
+            } catch (e) {
+              console.error(`Failed to update product ${product.product_id}:`, e);
+              failedCount++;
+            }
+          }
+
+          console.log(
+            `✅ Bulk Stop-Loss: user=${user.id}, percentage=${percentage}%, updated=${successCount}, failed=${failedCount}`
+          );
+
+          return res.json({
+            success: true,
+            updated: successCount,
+            failed: failedCount,
+            percentage,
+            message: `Stop-Loss установлен для ${successCount} товаров на -${percentage}% от текущей цены`,
+          });
+        } catch (error) {
+          console.error('Batch stop-loss error:', error);
+          return res.status(500).json({
+            error: 'Failed to set bulk stop-loss',
+            details: error instanceof Error ? error.message : 'Unknown error',
+          });
+        }
+      }
+
+      // ========== SENTINEL LOGS (User-facing) ==========
+      case 'sentinel-logs': {
+        const initData = sanitizeInput(
+          (req.headers['x-init-data'] as string) || req.body?.initData || ''
+        );
+
+        const validation = validateTelegramInitData(initData);
+        if (!validation.valid || !validation.user) {
+          return res.status(401).json({ error: 'Unauthorized', code: 'AUTH_FAILED' });
+        }
+        const user = validation.user;
+
+        const days = parseInt((req.query.days as string) || '7', 10);
+        const limit = Math.min(parseInt((req.query.limit as string) || '50', 10), 100);
+
+        try {
+          const logsResult = await sql`
+            SELECT * FROM sentinel_logs 
+            WHERE user_id = ${user.id}
+            AND created_at > NOW() - INTERVAL '1 day' * ${days}
+            ORDER BY created_at DESC 
+            LIMIT ${limit}
+          `;
+
+          // Calculate summary stats
+          const summaryResult = await sql`
+            SELECT 
+              COUNT(*) as total_triggers,
+              COALESCE(SUM(saved_amount), 0) as total_saved,
+              COUNT(DISTINCT product_id) as unique_products
+            FROM sentinel_logs 
+            WHERE user_id = ${user.id}
+            AND created_at > NOW() - INTERVAL '1 day' * ${days}
+          `;
+
+          const summary = summaryResult.rows[0] || {
+            total_triggers: 0,
+            total_saved: 0,
+            unique_products: 0,
+          };
+
+          return res.json({
+            success: true,
+            period: `${days} days`,
+            summary: {
+              totalTriggers: parseInt(summary.total_triggers) || 0,
+              totalSaved: parseInt(summary.total_saved) || 0,
+              uniqueProducts: parseInt(summary.unique_products) || 0,
+            },
+            logs: logsResult.rows.map((log: any) => ({
+              id: log.id,
+              productId: log.product_id,
+              productTitle: log.product_title,
+              detectedPrice: log.detected_price,
+              minPrice: log.min_price,
+              defenseAction: log.defense_action,
+              savedAmount: log.saved_amount,
+              marketplace: log.marketplace,
+              createdAt: log.created_at,
+            })),
+          });
+        } catch (error) {
+          console.error('Sentinel logs error:', error);
+          return res.status(500).json({ error: 'Failed to fetch sentinel logs' });
+        }
+      }
+
       // ========== DEFAULT ==========
       default:
         return res.status(400).json({
@@ -2731,6 +2893,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             'health',
             'sync-products',
             'check-prices',
+            'batch-set-stop-loss',
+            'sentinel-logs',
             'admin-activate-trial',
             'admin-check-user',
             'admin-list-users',

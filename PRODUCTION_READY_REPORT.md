@@ -19,15 +19,13 @@
 if (!TELEGRAM_BOT_TOKEN) {
   // In development, allow without signature validation (with warning)
   if (!IS_PRODUCTION) {
-    console.warn(
-      "⚠️ [DEV] TELEGRAM_BOT_TOKEN not set, skipping signature validation"
-    );
+    console.warn('⚠️ [DEV] TELEGRAM_BOT_TOKEN not set, skipping signature validation');
     // ... allow
   }
 
   // In production, BOT_TOKEN is required
-  console.error("❌ PRODUCTION: TELEGRAM_BOT_TOKEN not configured!");
-  return { valid: false, user: null, error: "Auth system not configured" };
+  console.error('❌ PRODUCTION: TELEGRAM_BOT_TOKEN not configured!');
+  return { valid: false, user: null, error: 'Auth system not configured' };
 }
 ```
 
@@ -38,15 +36,15 @@ if (!TELEGRAM_BOT_TOKEN) {
 if (!SHOP_ID || !SECRET_KEY) {
   if (!IS_PRODUCTION) {
     // DEV MODE: allow test subscriptions
-    console.log("🧪 DEV MODE: Activating subscription without payment");
+    console.log('🧪 DEV MODE: Activating subscription without payment');
     // ...
   }
 
   // In production, payment system must be configured
-  console.error("❌ PRODUCTION: YooKassa not configured!");
+  console.error('❌ PRODUCTION: YooKassa not configured!');
   return res.status(503).json({
-    error: "Платёжная система временно недоступна.",
-    code: "PAYMENT_SYSTEM_UNAVAILABLE",
+    error: 'Платёжная система временно недоступна.',
+    code: 'PAYMENT_SYSTEM_UNAVAILABLE',
   });
 }
 ```
@@ -91,7 +89,7 @@ receipt: {
   <a href="#privacy" className="text-amber-400 hover:underline">политику конфиденциальности</a>.
 </p>
 <p className="text-xs text-stone-500 text-center mt-1">
-  ИП Дерябин В.В. • ИНН 670301543202 • Самозанятый
+  ИП Дмитричев А.Г. • ИНН 520500573503
 </p>
 ```
 
@@ -136,7 +134,6 @@ receipt: {
 ## 🚀 СЛЕДУЮЩИЕ ШАГИ
 
 1. **Добавить Environment Variables в Vercel:**
-
    - `TELEGRAM_BOT_TOKEN`
    - `YOOKASSA_SHOP_ID`
    - `YOOKASSA_SECRET_KEY`
@@ -144,7 +141,6 @@ receipt: {
    - `WEBAPP_URL`
 
 2. **Настроить YooKassa Webhook:**
-
    - URL: `https://neuro-guardian.vercel.app/api?action=payment-webhook`
 
 3. **Deploy на Vercel:**

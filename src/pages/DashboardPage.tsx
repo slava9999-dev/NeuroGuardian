@@ -10,6 +10,8 @@ import { playCashSound, playAlertSound } from '../utils/sounds';
 import confetti from 'canvas-confetti';
 import { GlobalSwitch } from '../components/controls/GlobalSwitch';
 import { DashboardGrid } from '../components/dashboard/DashboardGrid';
+import { BulkStopLossModal } from '../components/dashboard/BulkStopLossModal';
+import { LogHistory } from '../components/dashboard/LogHistory';
 import { LogConsole } from '../components/logPanel/LogConsole';
 import { HelpModal } from '../components/ui/HelpModal';
 import { PaymentModal } from '../components/ui/PaymentModal';
@@ -162,6 +164,8 @@ export function DashboardPage({ onGoToSettings }: DashboardPageProps) {
   const [showHelp, setShowHelp] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [showSecurity, setShowSecurity] = useState(false);
+  const [showBulkStopLoss, setShowBulkStopLoss] = useState(false);
+  const [showLogHistory, setShowLogHistory] = useState(false);
 
   // 💰 Money Sound Effect Logic
   useEffect(() => {
@@ -258,6 +262,9 @@ export function DashboardPage({ onGoToSettings }: DashboardPageProps) {
 
       {/* Security Modal */}
       <SecurityModal isOpen={showSecurity} onClose={() => setShowSecurity(false)} />
+
+      {/* Bulk Stop-Loss Modal */}
+      <BulkStopLossModal isOpen={showBulkStopLoss} onClose={() => setShowBulkStopLoss(false)} />
 
       {/* Header */}
       <header className="mb-6">
@@ -570,6 +577,52 @@ export function DashboardPage({ onGoToSettings }: DashboardPageProps) {
         <GlobalSwitch />
       </section>
 
+      {/* Bulk Stop-Loss Button - Show only if there are unprotected products */}
+      {products.filter(p => !p.minPrice || p.minPrice === 0).length > 0 && (
+        <motion.section
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6"
+        >
+          <button
+            onClick={() => {
+              hapticFeedback('light');
+              setShowBulkStopLoss(true);
+            }}
+            className="w-full py-4 px-4 rounded-2xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40 hover:from-amber-500/30 hover:to-orange-500/30 transition-all flex items-center justify-between group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center">
+                <span className="text-xl">🛡️</span>
+              </div>
+              <div className="text-left">
+                <p className="font-bold text-white">Защитить все товары</p>
+                <p className="text-xs text-stone-400">
+                  {products.filter(p => !p.minPrice || p.minPrice === 0).length} товаров без
+                  Stop-Loss
+                </p>
+              </div>
+            </div>
+            <motion.div
+              className="text-amber-400"
+              animate={{ x: [0, 4, 0] }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </motion.div>
+          </button>
+        </motion.section>
+      )}
+
       {/* Quick Stats */}
       <section className="grid grid-cols-3 gap-3 mb-6">
         <div className="glass-panel p-4 text-center">
@@ -580,15 +633,38 @@ export function DashboardPage({ onGoToSettings }: DashboardPageProps) {
           <div className="text-2xl font-bold text-emerald-400">{stats.protectedCount}</div>
           <div className="text-xs text-stone-400">Защищено</div>
         </div>
-        <div className="glass-panel p-4 text-center">
+        {/* Clickable card to open log history */}
+        <button
+          onClick={() => {
+            hapticFeedback('light');
+            setShowLogHistory(true);
+          }}
+          className="glass-panel p-4 text-center hover:bg-stone-700/50 transition-colors cursor-pointer"
+        >
           <div
             className={`text-2xl font-bold ${stats.triggeredToday > 0 ? 'text-red-400' : 'text-stone-500'}`}
           >
             {stats.triggeredToday}
           </div>
-          <div className="text-xs text-stone-400">Атак сегодня</div>
-        </div>
+          <div className="text-xs text-stone-400 flex items-center justify-center gap-1">
+            Атак сегодня
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className="text-stone-500"
+            >
+              <path d="M9 18l6-6-6-6" />
+            </svg>
+          </div>
+        </button>
       </section>
+
+      {/* Log History Modal */}
+      <LogHistory isOpen={showLogHistory} onClose={() => setShowLogHistory(false)} />
 
       {/* Products Dashboard */}
       <section>
