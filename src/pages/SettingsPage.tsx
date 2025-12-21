@@ -1,5 +1,5 @@
 // ============================================
-// NeuroGUARDIAN — Settings Page
+// NeuroAgent — Settings Page
 // User settings, API keys, and sync
 // ============================================
 
@@ -20,11 +20,11 @@ export function SettingsPage({ onBack }: { onBack: () => void }) {
   const [apiKey, setApiKey] = useState('');
   const [clientId, setClientId] = useState('');
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
-  
+
   const handleDefenseModeChange = async (mode: DefenseMode) => {
     hapticFeedback('light');
     setDefenseMode(mode);
-    
+
     setIsSaving(true);
     try {
       await settingsApi.updateSettings({ defenseMode: mode });
@@ -35,18 +35,16 @@ export function SettingsPage({ onBack }: { onBack: () => void }) {
 
   const handleSaveApiKey = async () => {
     if (!showApiModal || !apiKey) return;
-    
+
     hapticFeedback('medium');
     setIsSaving(true);
-    
+
     try {
       // For Ozon, combine clientId:apiKey
-      const fullKey = showApiModal === 'Ozon' && clientId 
-        ? `${clientId}:${apiKey}` 
-        : apiKey;
-      
+      const fullKey = showApiModal === 'Ozon' && clientId ? `${clientId}:${apiKey}` : apiKey;
+
       await settingsApi.saveApiKey(showApiModal, fullKey, clientId);
-      
+
       // Update local user state
       if (user) {
         setUser({
@@ -54,7 +52,7 @@ export function SettingsPage({ onBack }: { onBack: () => void }) {
           [showApiModal === 'WB' ? 'wbKeyRef' : 'ozonKeyRef']: 'configured',
         });
       }
-      
+
       setShowApiModal(null);
       setApiKey('');
       setClientId('');
@@ -71,19 +69,19 @@ export function SettingsPage({ onBack }: { onBack: () => void }) {
   const handleSyncProducts = async (marketplace: 'WB' | 'Ozon') => {
     hapticFeedback('medium');
     setSyncStatus(`Синхронизация ${marketplace}...`);
-    
+
     try {
       const result = await productsApi.syncProducts(marketplace);
       setSyncStatus(result.message);
-      
+
       // Reload products
       const productsResult = await productsApi.getProducts();
       if (productsResult.success) {
         setProducts(productsResult.products as any);
       }
-      
+
       hapticFeedback('success');
-      
+
       // Clear status after 3 seconds
       setTimeout(() => setSyncStatus(null), 3000);
     } catch (error: any) {
@@ -106,7 +104,14 @@ export function SettingsPage({ onBack }: { onBack: () => void }) {
           onClick={onBack}
           className="p-2 rounded-xl bg-stone-800 hover:bg-stone-700 transition-colors"
         >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <path d="M19 12H5M12 19l-7-7 7-7" />
           </svg>
         </button>
@@ -144,7 +149,7 @@ export function SettingsPage({ onBack }: { onBack: () => void }) {
         <h3 className="text-sm font-medium text-stone-400 uppercase tracking-wider mb-3">
           Подключённые API
         </h3>
-        
+
         <div className="space-y-3">
           {/* WB */}
           <div className="glass-panel p-4">
@@ -260,7 +265,7 @@ export function SettingsPage({ onBack }: { onBack: () => void }) {
         <h3 className="text-sm font-medium text-stone-400 uppercase tracking-wider mb-3">
           Режим защиты
         </h3>
-        
+
         <div className="space-y-3">
           <button
             onClick={() => handleDefenseModeChange('zero_stock')}
@@ -269,11 +274,21 @@ export function SettingsPage({ onBack }: { onBack: () => void }) {
               ${defenseMode === 'zero_stock' ? 'ring-2 ring-amber-500' : ''}
             `}
           >
-            <div className={`
+            <div
+              className={`
               w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0
               ${defenseMode === 'zero_stock' ? 'bg-amber-500/20' : 'bg-stone-800'}
-            `}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={defenseMode === 'zero_stock' ? 'text-amber-400' : 'text-stone-400'}>
+            `}
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                className={defenseMode === 'zero_stock' ? 'text-amber-400' : 'text-stone-400'}
+              >
                 <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
                 <line x1="12" y1="17" x2="12" y2="22" />
                 <line x1="7" y1="8" x2="17" y2="8" />
@@ -294,11 +309,21 @@ export function SettingsPage({ onBack }: { onBack: () => void }) {
               ${defenseMode === 'price_correction' ? 'ring-2 ring-amber-500' : ''}
             `}
           >
-            <div className={`
+            <div
+              className={`
               w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0
               ${defenseMode === 'price_correction' ? 'bg-amber-500/20' : 'bg-stone-800'}
-            `}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={defenseMode === 'price_correction' ? 'text-amber-400' : 'text-stone-400'}>
+            `}
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                className={defenseMode === 'price_correction' ? 'text-amber-400' : 'text-stone-400'}
+              >
                 <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
               </svg>
             </div>
@@ -317,33 +342,43 @@ export function SettingsPage({ onBack }: { onBack: () => void }) {
         <h3 className="text-sm font-medium text-stone-400 uppercase tracking-wider mb-3">
           Подписка
         </h3>
-        
-        <div className={`
+
+        <div
+          className={`
           glass-panel p-4
           ${user?.subscriptionActive ? 'border-emerald-500/30' : 'border-red-500/30'}
-        `}>
+        `}
+        >
           <div className="flex items-center justify-between mb-2">
             <span className="text-white font-medium">
-              {user?.subscriptionPlan === 'trial' ? '🎁 Пробный период (3 дня)' :
-               user?.subscriptionPlan === 'basic' ? 'Basic' :
-               user?.subscriptionPlan === 'pro' ? 'Pro' : 'Нет подписки'}
+              {user?.subscriptionPlan === 'trial'
+                ? '🎁 Пробный период (3 дня)'
+                : user?.subscriptionPlan === 'yearly'
+                  ? '💎 Годовой Pro'
+                  : user?.subscriptionPlan === 'pro'
+                    ? '⭐ Pro'
+                    : user?.subscriptionPlan === 'basic'
+                      ? 'Basic'
+                      : 'Нет подписки'}
             </span>
-            <span className={`
+            <span
+              className={`
               px-2 py-0.5 rounded-full text-xs font-medium
               ${user?.subscriptionActive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}
-            `}>
+            `}
+            >
               {user?.subscriptionActive ? 'Активна' : 'Неактивна'}
             </span>
           </div>
-          
+
           {user?.subscriptionExpiresAt && (
             <p className="text-sm text-stone-400">
               Действует до: {new Date(user.subscriptionExpiresAt).toLocaleDateString('ru-RU')}
             </p>
           )}
-          
+
           {!user?.subscriptionActive && (
-            <button 
+            <button
               onClick={() => {
                 hapticFeedback('light');
                 setShowPayment(true);
@@ -357,8 +392,8 @@ export function SettingsPage({ onBack }: { onBack: () => void }) {
       </section>
 
       {/* Payment Modal */}
-      <PaymentModal 
-        isOpen={showPayment} 
+      <PaymentModal
+        isOpen={showPayment}
         onClose={() => setShowPayment(false)}
         onSuccess={() => {
           window.location.reload();
@@ -369,40 +404,37 @@ export function SettingsPage({ onBack }: { onBack: () => void }) {
       {showApiModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <div className="w-full max-w-md glass-panel p-6">
-            <h3 className="text-lg font-bold text-white mb-4">
-              Подключить {showApiModal}
-            </h3>
-            
+            <h3 className="text-lg font-bold text-white mb-4">Подключить {showApiModal}</h3>
+
             {showApiModal === 'Ozon' && (
               <div className="mb-4">
                 <label className="block text-sm text-stone-400 mb-2">Client ID</label>
                 <input
                   type="text"
                   value={clientId}
-                  onChange={(e) => setClientId(e.target.value)}
+                  onChange={e => setClientId(e.target.value)}
                   placeholder="Введите Client ID"
                   className="w-full p-3 rounded-xl bg-stone-800 border border-stone-700 text-white placeholder:text-stone-500 focus:border-amber-500 focus:outline-none"
                 />
               </div>
             )}
-            
+
             <div className="mb-6">
               <label className="block text-sm text-stone-400 mb-2">API Key</label>
               <input
                 type="password"
                 value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
+                onChange={e => setApiKey(e.target.value)}
                 placeholder="Введите API ключ"
                 className="w-full p-3 rounded-xl bg-stone-800 border border-stone-700 text-white placeholder:text-stone-500 focus:border-amber-500 focus:outline-none"
               />
               <p className="text-xs text-stone-500 mt-2">
-                {showApiModal === 'WB' 
+                {showApiModal === 'WB'
                   ? 'Получить ключ: Личный кабинет WB → API → Создать токен'
-                  : 'Получить: Seller Center → Настройки → API ключи'
-                }
+                  : 'Получить: Seller Center → Настройки → API ключи'}
               </p>
             </div>
-            
+
             <div className="flex gap-3">
               <button
                 onClick={() => {
@@ -428,8 +460,8 @@ export function SettingsPage({ onBack }: { onBack: () => void }) {
 
       {/* App info */}
       <section className="text-center text-stone-500 text-sm">
-        <p>NeuroGUARDIAN v2.0.0</p>
-        <p>Margin Defense System</p>
+        <p>NeuroAgent v2.4.0</p>
+        <p>AI-ассистент для селлеров</p>
       </section>
     </div>
   );

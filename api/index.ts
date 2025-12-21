@@ -164,7 +164,8 @@ type PlanId = keyof typeof SUBSCRIPTION_PLANS;
 const REFERRAL_BONUS_DAYS = 30; // 1 month free for referrer
 const REFERRAL_DISCOUNT_PERCENT = 20; // 20% discount for referred user's first payment
 
-// Promo codes
+// Promo codes (reserved for future use)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const PROMO_CODES: Record<string, { discount: number; maxUses?: number; expiresAt?: string }> = {
   LAUNCH30: { discount: 30, maxUses: 100 },
   NEURO20: { discount: 20 },
@@ -353,7 +354,7 @@ function getKVClient(): VercelKV | null {
       kvClient = createClient({ url: kvUrl, token: kvToken });
       console.log('✅ Vercel KV Rate Limiter connected');
       return kvClient;
-    } catch (e) {
+    } catch (_e) {
       console.warn('⚠️ Failed to connect to Vercel KV, using in-memory fallback');
       return null;
     }
@@ -930,7 +931,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const telegramUser = validation.user;
 
-        const user = await createOrUpdateUser(telegramUser);
+        const _user = await createOrUpdateUser(telegramUser);
         const fullUser = await getUserById(telegramUser.id);
 
         let subscriptionActive = false;
@@ -1703,7 +1704,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
         const initData = sanitizeInput(req.body?.initData || '');
-        const { marketplace, debug } = req.body;
+        const { marketplace, debug: _debug } = req.body;
 
         const validation = validateTelegramInitData(initData);
         let user;
@@ -3026,7 +3027,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(401).json({ error: 'Unauthorized' });
 
         const userId = validation.user.id;
-        const { operation, confirmed, details } = req.body;
+        const { operation, confirmed, details: _details } = req.body;
 
         if (!confirmed) {
           return res.json({ success: true, content: '👍 Операция отменена.', executed: false });

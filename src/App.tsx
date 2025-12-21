@@ -123,7 +123,7 @@ function App() {
                 useProductsStore.getState().setProducts(products);
                 console.log('📦 Products loaded:', products.length);
               }
-            } catch (err) {
+            } catch (_err) {
               console.log('📦 No products yet');
             }
           }

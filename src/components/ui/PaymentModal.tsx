@@ -1,5 +1,5 @@
 // ============================================
-// NeuroGUARDIAN — Payment Modal
+// NeuroAgent — Payment Modal
 // YooKassa Widget integration + Test Mode
 // ============================================
 
@@ -13,28 +13,18 @@ interface PaymentModalProps {
   onClose: () => void;
   onSuccess?: () => void;
   onGoToSettings?: () => void;
+  selectedPlan?: string; // Pre-selected plan ID
 }
 
 // Fallback plans if API is not available
 const FALLBACK_PLANS: SubscriptionPlan[] = [
   {
-    id: 'basic',
-    name: 'Базовый',
-    price: 499,
-    durationDays: 30,
-    maxProducts: 50,
-    features: ['До 50 товаров', 'Защита Zero Stock', 'Telegram уведомления'],
-    pricePerMonth: 499,
-    isPopular: false,
-    isBestValue: false,
-  },
-  {
     id: 'pro',
-    name: 'Профессиональный',
+    name: 'Pro',
     price: 999,
     durationDays: 30,
     maxProducts: 500,
-    features: ['До 500 товаров', 'Оба режима защиты', 'Приоритетная поддержка', 'API доступ'],
+    features: ['До 500 товаров', 'Все режимы защиты', 'AI-агент', 'Приоритетная поддержка'],
     pricePerMonth: 999,
     isPopular: true,
     isBestValue: false,
@@ -45,7 +35,7 @@ const FALLBACK_PLANS: SubscriptionPlan[] = [
     price: 9990,
     durationDays: 365,
     maxProducts: 500,
-    features: ['Все из Pro', 'Экономия 2000₽', 'Персональный менеджер'],
+    features: ['Все из Pro', 'Экономия 2000₽', '2 месяца бесплатно', 'Персональный менеджер'],
     pricePerMonth: 833,
     isPopular: false,
     isBestValue: true,
@@ -69,9 +59,15 @@ function loadYooKassaWidget(): Promise<void> {
   });
 }
 
-export function PaymentModal({ isOpen, onClose, onSuccess, onGoToSettings }: PaymentModalProps) {
+export function PaymentModal({
+  isOpen,
+  onClose,
+  onSuccess,
+  onGoToSettings,
+  selectedPlan: initialPlan,
+}: PaymentModalProps) {
   const [plans, setPlans] = useState<SubscriptionPlan[]>(FALLBACK_PLANS);
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoadingPlans, setIsLoadingPlans] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -91,10 +87,10 @@ export function PaymentModal({ isOpen, onClose, onSuccess, onGoToSettings }: Pay
       // Reset state when opening
       setShowSuccess(false);
       setActivatedPlan(null);
-      setSelectedPlan(null);
+      setSelectedPlanId(initialPlan || null);
       setError(null);
     }
-  }, [isOpen]);
+  }, [isOpen, initialPlan]);
 
   const loadPlans = async () => {
     setIsLoadingPlans(true);
@@ -112,7 +108,7 @@ export function PaymentModal({ isOpen, onClose, onSuccess, onGoToSettings }: Pay
 
   const handleSelectPlan = (planId: string) => {
     hapticFeedback('light');
-    setSelectedPlan(planId);
+    setSelectedPlanId(planId);
     setError(null);
   };
 
@@ -165,7 +161,7 @@ export function PaymentModal({ isOpen, onClose, onSuccess, onGoToSettings }: Pay
   }, [showWidget, confirmationToken, initWidget]);
 
   const handlePayment = async () => {
-    if (!selectedPlan) {
+    if (!selectedPlanId) {
       setError('Выберите тариф');
       return;
     }
@@ -176,7 +172,7 @@ export function PaymentModal({ isOpen, onClose, onSuccess, onGoToSettings }: Pay
 
     try {
       const result = (await paymentApi.createPayment({
-        planId: selectedPlan,
+        planId: selectedPlanId,
         savePaymentMethod: true,
       })) as any;
 
@@ -188,7 +184,7 @@ export function PaymentModal({ isOpen, onClose, onSuccess, onGoToSettings }: Pay
       if (result.testMode) {
         hapticFeedback('success');
         setActivatedPlan({
-          name: result.plan?.name || selectedPlan,
+          name: result.plan?.name || selectedPlanId,
           durationDays: result.plan?.durationDays || 30,
         });
         setShowSuccess(true);
@@ -471,7 +467,7 @@ export function PaymentModal({ isOpen, onClose, onSuccess, onGoToSettings }: Pay
                           className={`
                             w-full p-4 rounded-2xl border-2 transition-all text-left relative
                             ${
-                              selectedPlan === plan.id
+                              selectedPlanId === plan.id
                                 ? 'border-amber-500 bg-amber-500/10'
                                 : 'border-stone-700 bg-stone-800/50 hover:border-stone-600'
                             }
@@ -512,10 +508,10 @@ export function PaymentModal({ isOpen, onClose, onSuccess, onGoToSettings }: Pay
                             <div
                               className={`
                               w-6 h-6 rounded-full border-2 flex items-center justify-center
-                              ${selectedPlan === plan.id ? 'border-amber-500 bg-amber-500' : 'border-stone-600'}
+                              ${selectedPlanId === plan.id ? 'border-amber-500 bg-amber-500' : 'border-stone-600'}
                             `}
                             >
-                              {selectedPlan === plan.id && (
+                              {selectedPlanId === plan.id && (
                                 <svg
                                   width="14"
                                   height="14"
@@ -568,11 +564,11 @@ export function PaymentModal({ isOpen, onClose, onSuccess, onGoToSettings }: Pay
                   <div className="sticky bottom-0 bg-stone-900 p-4 border-t border-stone-700">
                     <button
                       onClick={handlePayment}
-                      disabled={!selectedPlan || isProcessing}
+                      disabled={!selectedPlanId || isProcessing}
                       className={`
                         w-full py-4 rounded-xl font-bold text-lg transition-all flex items-center justify-center gap-2
                         ${
-                          selectedPlan
+                          selectedPlanId
                             ? 'bg-gradient-to-r from-amber-500 to-amber-400 text-stone-900 hover:from-amber-400 hover:to-amber-300'
                             : 'bg-stone-700 text-stone-400 cursor-not-allowed'
                         }
@@ -590,8 +586,8 @@ export function PaymentModal({ isOpen, onClose, onSuccess, onGoToSettings }: Pay
                       ) : (
                         <>
                           💳 Оплатить
-                          {selectedPlan && (
-                            <span>{plans.find(p => p.id === selectedPlan)?.price}₽</span>
+                          {selectedPlanId && (
+                            <span>{plans.find(p => p.id === selectedPlanId)?.price}₽</span>
                           )}
                         </>
                       )}

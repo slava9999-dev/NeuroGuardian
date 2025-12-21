@@ -24,30 +24,30 @@ export interface User {
   firstName: string;
   lastName: string | null;
   photoUrl: string | null;
-  
+
   // Subscription
   subscriptionActive: boolean;
   subscriptionExpiresAt: Date | null;
-  subscriptionPlan: 'trial' | 'basic' | 'pro' | null;
-  
+  subscriptionPlan: 'trial' | 'basic' | 'pro' | 'yearly' | null;
+
   // Protection settings
   protectionEnabled: boolean;
   defenseMode: DefenseMode;
-  
+
   // API Keys (references to Secret Manager)
   wbKeyRef: string | null;
   ozonKeyRef: string | null;
-  
+
   // Stats
   totalProducts: number;
   triggeredToday: number;
   savedAmount: number; // Сколько денег сохранено
-  
+
   // Timestamps (optional - only used on backend)
   createdAt?: Date;
   updatedAt?: Date;
   lastActiveAt?: Date;
-  
+
   // Subscription days left (computed on login)
   subscriptionDaysLeft?: number | null;
 }
@@ -58,36 +58,36 @@ export interface User {
 export interface Product {
   id: string;
   userId: number;
-  
+
   // Identifiers
-  productId: string;        // Universal ID
-  nmId?: number;            // WB specific
-  offerId?: string;         // Ozon specific
+  productId: string; // Universal ID
+  nmId?: number; // WB specific
+  offerId?: string; // Ozon specific
   vendorCode: string;
   barcode?: string;
-  
+
   // Display info
   title: string;
   imageUrl: string;
   brand?: string;
   category?: string;
-  
+
   // Pricing
   currentPrice: number;
-  minPrice: number;         // Stop-Loss level (0 = disabled)
-  originalPrice?: number;   // Price before any drops
-  
+  minPrice: number; // Stop-Loss level (0 = disabled)
+  originalPrice?: number; // Price before any drops
+
   // Stock
   stock: number;
   warehouses?: WarehouseStock[];
-  
+
   // Marketplace
   marketplace: Marketplace;
-  
+
   // Status
   status: ProductStatus;
   isMonitored: boolean;
-  
+
   // Timestamps
   lastCheckedAt: Date;
   lastTriggeredAt: Date | null;
@@ -107,13 +107,13 @@ export interface WarehouseStock {
 export interface LogEntry {
   id: string;
   userId: number;
-  
+
   type: LogType;
   productId?: string;
-  
+
   title: string;
   message: string;
-  
+
   metadata: {
     oldPrice?: number;
     newPrice?: number;
@@ -124,7 +124,7 @@ export interface LogEntry {
     error?: string;
     [key: string]: unknown;
   };
-  
+
   isRead: boolean;
   createdAt: Date;
 }
@@ -168,14 +168,14 @@ export interface TelegramWebApp {
   isExpanded: boolean;
   viewportHeight: number;
   viewportStableHeight: number;
-  
+
   expand: () => void;
   close: () => void;
   ready: () => void;
   showAlert: (message: string, callback?: () => void) => void;
   showConfirm: (message: string, callback: (confirmed: boolean) => void) => void;
   showPopup: (params: PopupParams, callback?: (buttonId: string) => void) => void;
-  
+
   MainButton: MainButton;
   BackButton: BackButton;
   HapticFeedback: HapticFeedback;
@@ -188,7 +188,7 @@ export interface MainButton {
   isVisible: boolean;
   isActive: boolean;
   isProgressVisible: boolean;
-  
+
   setText: (text: string) => void;
   onClick: (callback: () => void) => void;
   offClick: (callback: () => void) => void;
@@ -233,7 +233,7 @@ export interface AppState {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  
+
   // Actions
   setUser: (user: User | null) => void;
   setLoading: (loading: boolean) => void;
@@ -245,16 +245,22 @@ export interface ProductsState {
   filteredProducts: Product[];
   isLoading: boolean;
   error: string | null;
-  
+
   // Filters
   marketplaceFilter: Marketplace | 'all';
   statusFilter: ProductStatus | 'all';
   searchQuery: string;
-  
+
   // Actions
   setProducts: (products: Product[]) => void;
   updateProduct: (id: string, updates: Partial<Product>) => void;
-  setFilter: (filter: Partial<{ marketplace: Marketplace | 'all'; status: ProductStatus | 'all'; search: string }>) => void;
+  setFilter: (
+    filter: Partial<{
+      marketplace: Marketplace | 'all';
+      status: ProductStatus | 'all';
+      search: string;
+    }>
+  ) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
 }
@@ -263,7 +269,7 @@ export interface LogsState {
   logs: LogEntry[];
   unreadCount: number;
   isLoading: boolean;
-  
+
   // Actions
   addLog: (log: LogEntry) => void;
   markAsRead: (logId: string) => void;

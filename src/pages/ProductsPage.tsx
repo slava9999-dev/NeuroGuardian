@@ -1,6 +1,6 @@
 // ============================================
 // NeuroAgent — Products & Metrics Page
-// Combined view for products and statistics
+// Clean, organized view for products
 // ============================================
 
 import { useEffect, useState, useMemo } from 'react';
@@ -79,8 +79,11 @@ const MOCK_PRODUCTS: Product[] = [
 
 // Format money
 function formatMoney(amount: number): string {
+  if (amount >= 1000000) {
+    return `₽${(amount / 1000000).toFixed(1)}M`;
+  }
   if (amount >= 1000) {
-    return `₽${(amount / 1000).toFixed(1)}k`;
+    return `₽${(amount / 1000).toFixed(0)}k`;
   }
   return `₽${amount}`;
 }
@@ -119,13 +122,13 @@ export function ProductsPage({ onBack }: ProductsPageProps) {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-stone-900 to-stone-800 pb-24">
-      {/* Header */}
+      {/* Header - Clean & Simple */}
       <header className="sticky top-0 z-10 bg-stone-900/95 backdrop-blur-md border-b border-stone-800 px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
               onClick={onBack}
-              className="p-2 rounded-lg hover:bg-stone-800 transition-colors"
+              className="p-2 -ml-2 rounded-lg hover:bg-stone-800 transition-colors text-stone-400"
             >
               <svg
                 width="20"
@@ -139,8 +142,10 @@ export function ProductsPage({ onBack }: ProductsPageProps) {
               </svg>
             </button>
             <div>
-              <h1 className="text-lg font-bold text-white">Товары и метрики</h1>
-              <p className="text-xs text-stone-400">{stats.total} товаров</p>
+              <h1 className="text-lg font-bold text-white">Мои товары</h1>
+              <p className="text-xs text-stone-400">
+                {stats.total} товаров • {stats.protected} защищено
+              </p>
             </div>
           </div>
 
@@ -150,32 +155,48 @@ export function ProductsPage({ onBack }: ProductsPageProps) {
       </header>
 
       <div className="px-4 py-4 space-y-4">
-        {/* Quick Stats */}
-        <div className="grid grid-cols-3 gap-3">
-          <motion.div className="glass-panel p-3 text-center" whileHover={{ scale: 1.02 }}>
-            <p className="text-2xl font-bold text-emerald-400">{stats.protected}</p>
-            <p className="text-xs text-stone-400">Защищено</p>
+        {/* Stats Cards - Compact Row */}
+        <div className="grid grid-cols-4 gap-2">
+          <motion.div
+            className="p-3 rounded-xl bg-stone-800/50 border border-stone-700/50 text-center"
+            whileHover={{ scale: 1.02 }}
+          >
+            <p className="text-xl font-bold text-white">{stats.total}</p>
+            <p className="text-[10px] text-stone-500 uppercase tracking-wide">Всего</p>
           </motion.div>
-          <motion.div className="glass-panel p-3 text-center" whileHover={{ scale: 1.02 }}>
-            <p className="text-2xl font-bold text-amber-400">{stats.unprotected}</p>
-            <p className="text-xs text-stone-400">Без защиты</p>
+          <motion.div
+            className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-center"
+            whileHover={{ scale: 1.02 }}
+          >
+            <p className="text-xl font-bold text-emerald-400">{stats.protected}</p>
+            <p className="text-[10px] text-stone-500 uppercase tracking-wide">Защита</p>
           </motion.div>
-          <motion.div className="glass-panel p-3 text-center" whileHover={{ scale: 1.02 }}>
-            <p className="text-2xl font-bold text-red-400">{stats.triggered}</p>
-            <p className="text-xs text-stone-400">Сработало</p>
+          <motion.div
+            className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-center"
+            whileHover={{ scale: 1.02 }}
+          >
+            <p className="text-xl font-bold text-amber-400">{stats.unprotected}</p>
+            <p className="text-[10px] text-stone-500 uppercase tracking-wide">Без</p>
+          </motion.div>
+          <motion.div
+            className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-center"
+            whileHover={{ scale: 1.02 }}
+          >
+            <p className="text-xl font-bold text-red-400">{stats.triggered}</p>
+            <p className="text-[10px] text-stone-500 uppercase tracking-wide">Триггер</p>
           </motion.div>
         </div>
 
-        {/* Saved Amount */}
+        {/* Saved Amount - Only if > 0 */}
         {stats.savedAmount > 0 && (
           <motion.div
-            className="glass-panel p-4 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border-emerald-500/30"
+            className="p-4 rounded-xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/30"
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-stone-400">Сэкономлено на защите</p>
+                <p className="text-sm text-stone-400">Сэкономлено благодаря защите</p>
                 <p className="text-2xl font-bold text-emerald-400">
                   {formatMoney(stats.savedAmount)}
                 </p>
@@ -185,8 +206,8 @@ export function ProductsPage({ onBack }: ProductsPageProps) {
           </motion.div>
         )}
 
-        {/* Quick Actions */}
-        <div className="flex gap-3">
+        {/* Action Buttons - Clean Row */}
+        <div className="flex gap-2">
           <button
             onClick={() => {
               hapticFeedback('light');
@@ -204,14 +225,15 @@ export function ProductsPage({ onBack }: ProductsPageProps) {
             >
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             </svg>
-            Массовый Stop-Loss
+            <span className="text-sm">Массовый Stop-Loss</span>
           </button>
           <button
             onClick={() => {
               hapticFeedback('light');
               setShowLogHistory(true);
             }}
-            className="py-3 px-4 rounded-xl bg-stone-800 border border-stone-700 text-stone-300 hover:bg-stone-700 transition-all"
+            className="py-3 px-4 rounded-xl bg-stone-800 border border-stone-700 text-stone-400 hover:bg-stone-700 hover:text-stone-300 transition-all"
+            title="История защиты"
           >
             <svg
               width="18"
@@ -226,21 +248,38 @@ export function ProductsPage({ onBack }: ProductsPageProps) {
           </button>
         </div>
 
-        {/* Agent Hint */}
-        <div className="p-3 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center gap-3">
-          <img
-            src="/agent-avatar.png"
-            alt="Agent"
-            className="w-10 h-10 rounded-full object-cover border border-violet-400/50"
-          />
-          <p className="text-sm text-stone-300 flex-1">
-            Хотите настроить цены голосом? Напишите мне во вкладке{' '}
-            <span className="text-violet-400 font-medium">Агент</span>!
-          </p>
-        </div>
-
         {/* Products Grid */}
         <DashboardGrid />
+
+        {/* Empty State */}
+        {products.length === 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center py-12"
+          >
+            <div className="text-5xl mb-4">📦</div>
+            <h3 className="text-lg font-bold text-white mb-2">Нет товаров</h3>
+            <p className="text-stone-400 text-sm max-w-xs mx-auto">
+              Подключите API маркетплейса в настройках, чтобы синхронизировать товары
+            </p>
+          </motion.div>
+        )}
+
+        {/* Hint for Agent */}
+        {products.length > 0 && (
+          <div className="p-3 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center gap-3">
+            <img
+              src="/agent-avatar.png"
+              alt="Agent"
+              className="w-8 h-8 rounded-full object-cover border border-violet-400/50"
+            />
+            <p className="text-sm text-stone-300 flex-1">
+              💡 Напишите мне «защити все товары» во вкладке{' '}
+              <span className="text-violet-400 font-medium">Агент</span>!
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Modals */}
