@@ -231,4 +231,47 @@ export const AGENT_TOOLS = [
       },
     },
   },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'scan_competitors',
+      description:
+        'Сканировать конкурентов по артикулу WB или ключевому слову. Возвращает цены, рейтинги, количество продаж похожих товаров. Используй для анализа конкуренции.',
+      parameters: {
+        type: 'object',
+        properties: {
+          nm_id: {
+            type: 'number',
+            description: 'Артикул WB товара для поиска аналогов',
+          },
+          keyword: {
+            type: 'string',
+            description: 'Ключевое слово для поиска конкурентов (если нет артикула)',
+          },
+          limit: {
+            type: 'number',
+            description: 'Максимум конкурентов для анализа (по умолчанию 10, макс 50)',
+          },
+        },
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'get_competitor_price_history',
+      description:
+        'Получить историю изменения цены конкурента за последние 30 дней. Помогает понять стратегию ценообразования.',
+      parameters: {
+        type: 'object',
+        properties: {
+          competitor_nm_id: {
+            type: 'number',
+            description: 'Артикул WB конкурента',
+          },
+        },
+        required: ['competitor_nm_id'],
+      },
+    },
+  },
 ];

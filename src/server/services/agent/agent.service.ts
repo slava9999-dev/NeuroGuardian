@@ -7,6 +7,7 @@ import { logger } from '../../utils/logger';
 import { AGENT_TOOLS } from './agent.tools';
 import { productService } from '../product/product.service';
 import { analyticsService } from '../analytics/analytics.service';
+import { competitorService } from '../competitor/competitor.service';
 import { type User } from '../../schemas/user.schema';
 import {
   GetProductsArgsSchema,
@@ -220,6 +221,23 @@ export class AgentService {
 
           const result = await productService.updateMarketplacePrice(userId, updates);
           return result;
+        }
+
+        case 'scan_competitors': {
+          const { nm_id, keyword, limit } = args;
+          return competitorService.scanCompetitors({
+            nmId: nm_id,
+            keyword,
+            limit,
+          });
+        }
+
+        case 'get_competitor_price_history': {
+          const { competitor_nm_id } = args;
+          if (!competitor_nm_id) {
+            return { error: 'competitor_nm_id is required' };
+          }
+          return competitorService.getCompetitorPriceHistory(competitor_nm_id);
         }
 
         default:

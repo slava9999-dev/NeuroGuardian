@@ -3278,6 +3278,116 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
+      // ========== DAILY DIGEST (CRON) ==========
+      case 'daily-digest': {
+        // Only allow from Cron or Admin
+        const authHeader = req.headers['authorization'];
+        const isCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+        const isAdmin = req.headers['x-admin-key'] === ADMIN_API_KEY;
+
+        if (!isCron && !isAdmin && IS_PRODUCTION) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        console.log('📊 Starting daily digest...');
+
+        try {
+          // Get all users with active subscription
+          const usersResult = await sql`
+            SELECT id, first_name, subscription_plan, total_products, triggered_today, saved_amount
+            FROM users 
+            WHERE subscription_active = true 
+            AND (subscription_end IS NULL OR subscription_end > NOW())
+          `;
+
+          let sent = 0;
+          let errors = 0;
+
+          for (const user of usersResult.rows) {
+            try {
+              // Get yesterday's stats
+              const yesterday = new Date();
+              yesterday.setDate(yesterday.getDate() - 1);
+              const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+              // Get sentinel events from yesterday
+              const sentinelResult = await sql`
+                SELECT COUNT(*) as triggers, COALESCE(SUM(saved_amount), 0) as saved
+                FROM sentinel_logs 
+                WHERE user_id = ${user.id}
+                AND created_at >= ${yesterdayStr}::date
+                AND created_at < (${yesterdayStr}::date + INTERVAL '1 day')
+              `;
+
+              // Get product stats
+              const productsResult = await sql`
+                SELECT 
+                  COUNT(*) as total,
+                  COUNT(CASE WHEN status = 'protected' THEN 1 END) as protected,
+                  COUNT(CASE WHEN status = 'triggered' THEN 1 END) as triggered
+                FROM products WHERE user_id = ${user.id}
+              `;
+
+              const stats = sentinelResult.rows[0] || { triggers: 0, saved: 0 };
+              const products = productsResult.rows[0] || { total: 0, protected: 0, triggered: 0 };
+
+              // Build digest message
+              const msg =
+                `☀️ <b>Доброе утро, ${user.first_name || 'Seller'}!</b>\n\n` +
+                `📊 <b>Ваш ежедневный дайджест NeuroGUARDIAN</b>\n\n` +
+                `📦 <b>Товары:</b>\n` +
+                `├ Всего: ${products.total}\n` +
+                `├ Защищено: ${products.protected}\n` +
+                `└ Сработало вчера: ${products.triggered}\n\n` +
+                `🛡️ <b>Защита маржи:</b>\n` +
+                `├ Срабатываний вчера: ${stats.triggers}\n` +
+                `└ Сохранено: ${stats.saved}₽\n\n` +
+                (parseInt(stats.saved) > 0
+                  ? `💰 <b>Отлично!</b> Sentinel спас вам ${stats.saved}₽ вчера.\n\n`
+                  : `✅ <b>Всё спокойно!</b> Демпинга не обнаружено.\n\n`) +
+                `🤖 <i>Напишите мне для аналитики или управления ценами!</i>`;
+
+              // Send via Telegram
+              if (process.env.TELEGRAM_BOT_TOKEN) {
+                await fetch(
+                  `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`,
+                  {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      chat_id: user.id,
+                      text: msg,
+                      parse_mode: 'HTML',
+                    }),
+                  }
+                );
+                sent++;
+              }
+
+              // Reset daily counters
+              await sql`
+                UPDATE users SET triggered_today = 0 WHERE id = ${user.id}
+              `;
+            } catch (userError) {
+              console.error(`Daily digest error for user ${user.id}:`, userError);
+              errors++;
+            }
+          }
+
+          console.log(`📊 Daily digest complete: sent=${sent}, errors=${errors}`);
+
+          return res.json({
+            success: true,
+            message: `Daily digest sent to ${sent} users`,
+            sent,
+            errors,
+          });
+        } catch (error) {
+          console.error('Daily digest error:', error);
+          return res.status(500).json({ error: 'Daily digest failed' });
+        }
+      }
+
       // ========== DEFAULT ==========
       default:
         return res.status(400).json({
@@ -3311,6 +3421,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             'admin-clone-user',
             'admin-sentinel-logs',
             'send-reminders',
+            'daily-digest',
             'referral',
           ],
         });
