@@ -23,6 +23,7 @@ export const getKVClient = () => {
 export { sql };
 
 // Helper to check standard user fields or transform from DB result
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const mapDbUser = (row: any): any => {
   // Type as generic or specific user type
   if (!row) return null;

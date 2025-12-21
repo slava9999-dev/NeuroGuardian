@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { sql } from '../../core/db';
-import type { Product } from '../../core/types';
+import { ProductSchema, type Product } from '../../schemas/product.schema';
 import { logger } from '../../utils/logger';
 
 export class ProductService {
@@ -59,6 +59,9 @@ export class ProductService {
    */
   async updatePrice(userId: number, productId: string, newPrice: number): Promise<void> {
     try {
+      // Validate input (basic check using schema logic)
+      ProductSchema.shape.current_price.parse(newPrice);
+
       await sql`
             UPDATE products 
             SET 

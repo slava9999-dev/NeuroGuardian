@@ -3004,6 +3004,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Use new service
         const user = await userService.getUserById(userId);
 
+        if (!user) {
+          return res.status(401).json({ error: 'User not found' });
+        }
+
         // Check subscription
         if (!userService.isSubscriptionActive(user)) {
           return res.json({
@@ -3023,10 +3027,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             success: true,
             content: '⏳ **Превышен лимит запросов.**\n\nПодождите минуту.',
           });
-        }
-
-        if (!user) {
-          return res.status(401).json({ error: 'User not found' });
         }
 
         try {

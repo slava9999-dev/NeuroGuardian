@@ -18,7 +18,7 @@ const api = axios.create({
 });
 
 // Add initData header to every request
-api.interceptors.request.use((config) => {
+api.interceptors.request.use(config => {
   const initData = getInitData();
   if (initData) {
     config.headers['X-Init-Data'] = initData;
@@ -28,8 +28,8 @@ api.interceptors.request.use((config) => {
 
 // Response interceptor for logging
 api.interceptors.response.use(
-  (response) => response,
-  (error) => {
+  response => response,
+  error => {
     console.error('API Error:', error.response?.data || error.message);
     return Promise.reject(error);
   }
@@ -43,18 +43,18 @@ export const authApi = {
   login: async (initData: string): Promise<{ success: boolean; user: User }> => {
     try {
       const response = await api.post('', { action: 'auth', initData });
-      
+
       // Convert date strings to Date objects
       const userData = response.data.user;
       if (userData.subscriptionExpiresAt) {
         userData.subscriptionExpiresAt = new Date(userData.subscriptionExpiresAt);
       }
-      
+
       return {
         success: true,
         user: userData,
       };
-    } catch (error) {
+    } catch {
       console.warn('Auth API failed, using demo mode');
       return {
         success: true,
@@ -96,11 +96,7 @@ export const settingsApi = {
     return response.data;
   },
 
-  saveApiKey: async (
-    marketplace: 'WB' | 'Ozon',
-    apiKey: string,
-    clientId?: string
-  ) => {
+  saveApiKey: async (marketplace: 'WB' | 'Ozon', apiKey: string, clientId?: string) => {
     const initData = getInitData();
     const response = await api.post('', {
       action: 'settings',
@@ -144,7 +140,9 @@ export const productsApi = {
     return { success: true, products: response.data.products };
   },
 
-  syncProducts: async (marketplace: 'WB' | 'Ozon' = 'Ozon'): Promise<{ success: boolean; message: string; count: number }> => {
+  syncProducts: async (
+    marketplace: 'WB' | 'Ozon' = 'Ozon'
+  ): Promise<{ success: boolean; message: string; count: number }> => {
     const initData = getInitData();
     const response = await api.post('', {
       action: 'sync-products',
@@ -210,7 +208,7 @@ export const paymentApi = {
     promoCode?: string;
   }): Promise<CreatePaymentResult> => {
     const initData = getInitData();
-    
+
     const response = await api.post('', {
       action: 'create-payment',
       initData,
@@ -219,7 +217,7 @@ export const paymentApi = {
       savePaymentMethod: params.savePaymentMethod ?? true,
       promoCode: params.promoCode,
     });
-    
+
     return response.data;
   },
 };

@@ -58,6 +58,7 @@ export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
       setSyncedCount(syncResult.count || 0);
       hapticFeedback('success');
       setStep('complete');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       console.error('❌ Error:', err);
       setError(err.response?.data?.error || err.message || 'Ошибка сохранения ключа');

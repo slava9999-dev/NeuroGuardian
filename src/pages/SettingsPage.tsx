@@ -77,6 +77,7 @@ export function SettingsPage({ onBack }: { onBack: () => void }) {
       // Reload products
       const productsResult = await productsApi.getProducts();
       if (productsResult.success) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         setProducts(productsResult.products as any);
       }
 
@@ -84,6 +85,7 @@ export function SettingsPage({ onBack }: { onBack: () => void }) {
 
       // Clear status after 3 seconds
       setTimeout(() => setSyncStatus(null), 3000);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.error('Sync error:', error);
       setSyncStatus(`Ошибка: ${error.response?.data?.error || error.message}`);

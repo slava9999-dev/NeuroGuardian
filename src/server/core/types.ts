@@ -32,7 +32,7 @@ export interface Product {
   current_stock: number;
   status: 'active' | 'protected' | 'archived';
   last_updated: string;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }
 
 // Sentinel Log Interface
@@ -52,7 +52,7 @@ export interface SentinelLog {
 export interface AgentResult {
   success: boolean;
   content: string;
-  actionRequired?: any;
+  actionRequired?: unknown;
   metadata?: {
     executionTime: number;
     model: string;
@@ -62,6 +62,7 @@ export interface AgentResult {
 }
 
 // Common Service Response
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface ServiceResponse<T = any> {
   success: boolean;
   data?: T;

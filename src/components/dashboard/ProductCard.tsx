@@ -46,41 +46,42 @@ const STATUS_CONFIG: Record<string, StatusConfig> = {
 };
 
 export function ProductCard({ product }: ProductCardProps) {
-  const updateProduct = useProductsStore((s) => s.updateProduct);
+  const updateProduct = useProductsStore(s => s.updateProduct);
   const [isEditing, setIsEditing] = useState(false);
   const [minPriceInput, setMinPriceInput] = useState(product.minPrice.toString());
-  
+
   const status = STATUS_CONFIG[product.status] || STATUS_CONFIG.active;
-  
+
   const handleMinPriceBlur = useCallback(async () => {
     setIsEditing(false);
     const newMinPrice = parseFloat(minPriceInput) || 0;
-    
+
     if (newMinPrice !== product.minPrice) {
       hapticFeedback('light');
-      
+
       // Update local store
-      updateProduct(product.id, { 
+      updateProduct(product.id, {
         minPrice: newMinPrice,
         status: newMinPrice > 0 ? 'protected' : 'active',
       });
-      
+
       // IMPORTANT: Save to server!
       try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const tg = (window as any).Telegram?.WebApp;
         const initData = tg?.initData || 'demo';
-        
+
         await fetch('/api?action=products', {
           method: 'POST',
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
-            'X-Init-Data': initData 
+            'X-Init-Data': initData,
           },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             action: 'products',
             initData,
             productId: product.productId,
-            minPrice: newMinPrice 
+            minPrice: newMinPrice,
           }),
         });
         console.log(`✅ Stop-Loss saved: ${product.productId} → ${newMinPrice}`);
@@ -89,17 +90,18 @@ export function ProductCard({ product }: ProductCardProps) {
       }
     }
   }, [minPriceInput, product.id, product.productId, product.minPrice, updateProduct]);
-  
+
   const handleMinPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Only allow numbers and one decimal point
     const value = e.target.value.replace(/[^0-9.]/g, '');
     setMinPriceInput(value);
   };
-  
+
   const priceDiff = product.currentPrice - product.minPrice;
-  const pricePercent = product.minPrice > 0 
-    ? ((product.currentPrice / product.minPrice) * 100 - 100).toFixed(1)
-    : null;
+  const pricePercent =
+    product.minPrice > 0
+      ? ((product.currentPrice / product.minPrice) * 100 - 100).toFixed(1)
+      : null;
 
   return (
     <div className="glass-panel glass-panel-hover p-4 relative overflow-hidden transition-all duration-300 transform hover:-translate-y-1">
@@ -107,20 +109,23 @@ export function ProductCard({ product }: ProductCardProps) {
       {product.status === 'triggered' && (
         <div className="absolute inset-0 bg-red-500/10 pointer-events-none animate-pulse" />
       )}
-      
+
       {/* Header: Image + Title + Status */}
       <div className="flex gap-3 mb-3">
         {/* Product image */}
         <div className="w-16 h-16 rounded-xl bg-stone-800 overflow-hidden flex-shrink-0">
           {product.imageUrl ? (
-            <LazyImage
-              src={product.imageUrl}
-              alt={product.title}
-              className="w-full h-full"
-            />
+            <LazyImage src={product.imageUrl} alt={product.title} className="w-full h-full" />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-stone-600">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
                 <circle cx="8.5" cy="8.5" r="1.5" />
                 <path d="m21 15-5-5L5 21" />
@@ -128,43 +133,48 @@ export function ProductCard({ product }: ProductCardProps) {
             </div>
           )}
         </div>
-        
+
         {/* Title and meta */}
         <div className="flex-1 min-w-0">
           <h3 className="font-medium text-white text-sm truncate" title={product.title}>
             {product.title}
           </h3>
-          <p className="text-xs text-stone-400 font-mono">
-            {product.vendorCode}
-          </p>
-          
+          <p className="text-xs text-stone-400 font-mono">{product.vendorCode}</p>
+
           {/* Status badge */}
           <div className="flex items-center gap-2 mt-1">
-            <div className={`
+            <div
+              className={`
               flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium
               ${status.color} ${status.glow ? 'shadow-lg' : ''}
-            `}>
-              <span className={`
+            `}
+            >
+              <span
+                className={`
                 w-1.5 h-1.5 rounded-full bg-current
                 ${status.pulse ? 'animate-pulse' : ''}
-              `} />
+              `}
+              />
               {status.label}
             </div>
-            
+
             {/* Marketplace badge */}
-            <span className={`
+            <span
+              className={`
               px-2 py-0.5 rounded-full text-xs font-medium
-              ${product.marketplace === 'WB' 
-                ? 'bg-purple-500/20 text-purple-400' 
-                : 'bg-blue-500/20 text-blue-400'
+              ${
+                product.marketplace === 'WB'
+                  ? 'bg-purple-500/20 text-purple-400'
+                  : 'bg-blue-500/20 text-blue-400'
               }
-            `}>
+            `}
+            >
               {product.marketplace}
             </span>
           </div>
         </div>
       </div>
-      
+
       {/* Price info */}
       <div className="grid grid-cols-2 gap-3 mb-3">
         {/* Current price */}
@@ -174,9 +184,9 @@ export function ProductCard({ product }: ProductCardProps) {
             {product.currentPrice.toLocaleString('ru-RU')} ₽
           </p>
         </div>
-        
+
         {/* Min price (editable) */}
-        <div 
+        <div
           className={`
             bg-stone-800/50 rounded-xl p-3 transition-all
             ${isEditing ? 'ring-2 ring-amber-500' : ''}
@@ -190,52 +200,63 @@ export function ProductCard({ product }: ProductCardProps) {
               value={minPriceInput}
               onChange={handleMinPriceChange}
               onBlur={handleMinPriceBlur}
-              onKeyDown={(e) => e.key === 'Enter' && handleMinPriceBlur()}
+              onKeyDown={e => e.key === 'Enter' && handleMinPriceBlur()}
               autoFocus
               className="w-full bg-transparent text-lg font-bold text-amber-400 outline-none"
             />
           ) : (
-            <p 
+            <p
               className="text-lg font-bold text-amber-400 cursor-pointer hover:text-amber-300"
               onClick={() => {
                 setIsEditing(true);
                 setMinPriceInput(product.minPrice.toString());
               }}
             >
-              {product.minPrice > 0 
+              {product.minPrice > 0
                 ? `${product.minPrice.toLocaleString('ru-RU')} ₽`
-                : 'Установить'
-              }
+                : 'Установить'}
             </p>
           )}
         </div>
       </div>
-      
+
       {/* Footer: Price diff + Stock */}
       <div className="flex items-center justify-between text-xs">
         {/* Price difference */}
         {product.minPrice > 0 && (
-          <div className={`
+          <div
+            className={`
             flex items-center gap-1
             ${priceDiff >= 0 ? 'text-emerald-400' : 'text-red-400'}
-          `}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              {priceDiff >= 0 ? (
-                <path d="m18 15-6-6-6 6" />
-              ) : (
-                <path d="m6 9 6 6 6-6" />
-              )}
+          `}
+          >
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              {priceDiff >= 0 ? <path d="m18 15-6-6-6 6" /> : <path d="m6 9 6 6 6-6" />}
             </svg>
             <span>
-              {priceDiff >= 0 ? '+' : ''}{priceDiff.toLocaleString('ru-RU')} ₽
-              {pricePercent && ` (${pricePercent}%)`}
+              {priceDiff >= 0 ? '+' : ''}
+              {priceDiff.toLocaleString('ru-RU')} ₽{pricePercent && ` (${pricePercent}%)`}
             </span>
           </div>
         )}
-        
+
         {/* Stock */}
         <div className="flex items-center gap-1 text-stone-400">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
           </svg>
           <span>{product.stock} шт</span>

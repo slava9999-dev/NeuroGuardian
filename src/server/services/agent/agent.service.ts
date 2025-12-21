@@ -2,11 +2,17 @@
 // import fetch from 'node-fetch';
 
 import { getKVClient } from '../../core/db';
-import type { AgentResult, User } from '../../core/types';
+import type { AgentResult } from '../../core/types';
 import { logger } from '../../utils/logger';
 import { AGENT_TOOLS } from './agent.tools';
 import { productService } from '../product/product.service';
 import { analyticsService } from '../analytics/analytics.service';
+import { type User } from '../../schemas/user.schema';
+import {
+  GetProductsArgsSchema,
+  CalculateUnitEconomicsArgsSchema,
+  GetSalesStatsArgsSchema,
+} from '../../schemas/agent.schema';
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
@@ -31,6 +37,7 @@ export class AgentService {
 
     const kv = getKVClient();
     const historyKey = `chat:${userId}`;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let history: any[] = [];
 
     // 1. Load History
@@ -117,17 +124,31 @@ export class AgentService {
   private async executeTool(name: string, args: any, userId: number, userContext: any) {
     logger.info(`🔨 Tool Exec: ${name}`, args, userId);
 
-    switch (name) {
-      case 'get_products':
-        return productService.getProductsByUserId(userId);
-      case 'calculate_unit_economics':
-        return analyticsService.calculateUnitEconomics(userId, args);
-      case 'get_abc_analysis':
-        return analyticsService.getAbcAnalysis(userId);
-      case 'get_sales_stats':
-        return analyticsService.getSalesStats(userId, args.period, userContext.api_key_wb);
-      default:
-        return { error: `Tool ${name} not implemented yet` };
+    try {
+      switch (name) {
+        case 'get_products':
+          GetProductsArgsSchema.parse(args); // Validate args even if not used directly yet
+          // Limit is handled in service or DB query usually. logger.debug('gpArgs', gpArgs);
+          return productService.getProductsByUserId(userId);
+        case 'calculate_unit_economics': {
+          const cueArgs = CalculateUnitEconomicsArgsSchema.parse(args);
+          return analyticsService.calculateUnitEconomics(userId, cueArgs);
+        }
+        case 'get_abc_analysis':
+          // No args for ABC currently?
+          return analyticsService.getAbcAnalysis(userId);
+        case 'get_sales_stats': {
+          const gssArgs = GetSalesStatsArgsSchema.parse(args);
+          return analyticsService.getSalesStats(userId, gssArgs.period, userContext.api_key_wb);
+        }
+        default:
+          return { error: `Tool ${name} not implemented yet` };
+      }
+    } catch (error) {
+      logger.error(`Validation failed for tool ${name}`, error, { userId, args });
+      return {
+        error: `Invalid arguments for ${name}: ${error instanceof Error ? error.message : String(error)}`,
+      };
     }
   }
 

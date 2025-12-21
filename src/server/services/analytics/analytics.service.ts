@@ -104,6 +104,7 @@ export class AnalyticsService {
         groupB: analyzed.filter(p => p.category === 'B').length,
         groupC: analyzed.filter(p => p.category === 'C').length,
       },
+      items: analyzed,
       topAProducts: analyzed.filter(p => p.category === 'A').slice(0, 5),
     };
   }

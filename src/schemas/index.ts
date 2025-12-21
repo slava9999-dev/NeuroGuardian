@@ -6,6 +6,7 @@
 import { z } from 'zod';
 
 // Helper to handle Firestore Timestamps and ISO strings
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const zTimestamp = z.preprocess((val: any) => {
   if (val && typeof val === 'object' && '_seconds' in val) {
     return new Date(val._seconds * 1000);
@@ -31,24 +32,34 @@ export const WBCardSchema = z.object({
   vendorCode: z.string(),
   brand: z.string().optional(),
   title: z.string().optional(),
-  photos: z.array(z.object({
-    big: z.string().optional(),
-    c246x328: z.string().optional(),
-  })).optional(),
-  sizes: z.array(z.object({
-    techSize: z.string(),
-    skus: z.array(z.string()),
-    price: z.number().optional(),
-  })).optional(),
+  photos: z
+    .array(
+      z.object({
+        big: z.string().optional(),
+        c246x328: z.string().optional(),
+      })
+    )
+    .optional(),
+  sizes: z
+    .array(
+      z.object({
+        techSize: z.string(),
+        skus: z.array(z.string()),
+        price: z.number().optional(),
+      })
+    )
+    .optional(),
 });
 
 export const WBCardsListResponseSchema = z.object({
   cards: z.array(WBCardSchema).optional().default([]),
-  cursor: z.object({
-    updatedAt: z.string().optional(),
-    nmID: z.number().optional(),
-    total: z.number().optional(),
-  }).optional(),
+  cursor: z
+    .object({
+      updatedAt: z.string().optional(),
+      nmID: z.number().optional(),
+      total: z.number().optional(),
+    })
+    .optional(),
 });
 
 // WB Prices API Response
@@ -103,11 +114,13 @@ export const OzonProductInfoSchema = z.object({
   marketing_price: z.string().optional(),
   min_price: z.string().optional(),
   price: z.string().optional(),
-  stocks: z.object({
-    present: z.number(),
-    reserved: z.number(),
-    101: z.number().optional(), // Often separate fields
-  }).optional(),
+  stocks: z
+    .object({
+      present: z.number(),
+      reserved: z.number(),
+      101: z.number().optional(), // Often separate fields
+    })
+    .optional(),
 });
 
 export const OzonProductInfoResponseSchema = z.object({

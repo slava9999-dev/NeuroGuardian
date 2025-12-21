@@ -62,25 +62,27 @@ export function initTelegramWebApp(): void {
     console.warn('⚠️ Not running in Telegram WebApp environment');
     return;
   }
-  
+
   isInitialized = true;
-  
+
   // Signal that the app is ready
   tg.ready();
-  
+
   // Expand to full height
   tg.expand();
-  
+
   // Set header color
   if ('setHeaderColor' in tg) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (tg as any).setHeaderColor('#0c0c0e');
   }
-  
+
   // Set background color
   if ('setBackgroundColor' in tg) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (tg as any).setBackgroundColor('#0c0c0e');
   }
-  
+
   console.log('✅ Telegram WebApp initialized', {
     version: tg.version,
     platform: tg.platform,
@@ -92,7 +94,7 @@ export function initTelegramWebApp(): void {
  * Show Telegram native alert
  */
 export function showAlert(message: string): Promise<void> {
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     const tg = getTelegramWebApp();
     if (tg) {
       tg.showAlert(message, resolve);
@@ -107,7 +109,7 @@ export function showAlert(message: string): Promise<void> {
  * Show Telegram native confirm dialog
  */
 export function showConfirm(message: string): Promise<boolean> {
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     const tg = getTelegramWebApp();
     if (tg) {
       tg.showConfirm(message, resolve);
@@ -120,10 +122,12 @@ export function showConfirm(message: string): Promise<boolean> {
 /**
  * Trigger haptic feedback
  */
-export function hapticFeedback(type: 'light' | 'medium' | 'heavy' | 'success' | 'warning' | 'error'): void {
+export function hapticFeedback(
+  type: 'light' | 'medium' | 'heavy' | 'success' | 'warning' | 'error'
+): void {
   const tg = getTelegramWebApp();
   if (!tg?.HapticFeedback) return;
-  
+
   switch (type) {
     case 'light':
     case 'medium':
@@ -153,32 +157,32 @@ export const MainButton = {
   show(text: string, onClick: () => void): void {
     const tg = getTelegramWebApp();
     if (!tg?.MainButton) return;
-    
+
     tg.MainButton.setText(text);
     tg.MainButton.onClick(onClick);
     tg.MainButton.show();
   },
-  
+
   hide(): void {
     const tg = getTelegramWebApp();
     tg?.MainButton?.hide();
   },
-  
+
   showProgress(): void {
     const tg = getTelegramWebApp();
     tg?.MainButton?.showProgress(true);
   },
-  
+
   hideProgress(): void {
     const tg = getTelegramWebApp();
     tg?.MainButton?.hideProgress();
   },
-  
+
   enable(): void {
     const tg = getTelegramWebApp();
     tg?.MainButton?.enable();
   },
-  
+
   disable(): void {
     const tg = getTelegramWebApp();
     tg?.MainButton?.disable();
@@ -192,11 +196,11 @@ export const BackButton = {
   show(onClick: () => void): void {
     const tg = getTelegramWebApp();
     if (!tg?.BackButton) return;
-    
+
     tg.BackButton.onClick(onClick);
     tg.BackButton.show();
   },
-  
+
   hide(): void {
     const tg = getTelegramWebApp();
     tg?.BackButton?.hide();

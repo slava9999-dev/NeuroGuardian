@@ -13,14 +13,14 @@ interface AppState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
-  
+
   // Global protection toggle
   protectionEnabled: boolean;
   defenseMode: DefenseMode;
-  
+
   // Subscription status
   subscriptionDaysLeft: number | null;
-  
+
   // Actions
   setUser: (user: User | null) => void;
   setLoading: (loading: boolean) => void;
@@ -33,7 +33,7 @@ interface AppState {
 
 export const useAppStore = create<AppState>()(
   persist(
-    (set) => ({
+    set => ({
       // Initial state
       user: null,
       isAuthenticated: false,
@@ -42,25 +42,30 @@ export const useAppStore = create<AppState>()(
       protectionEnabled: false,
       defenseMode: 'zero_stock',
       subscriptionDaysLeft: null,
-      
+
       // Actions
-      setUser: (user) => {
+      setUser: user => {
         if (user) {
           // Parse subscriptionExpiresAt as Date if it's a string
           let expiresAt: Date | null = null;
           if (user.subscriptionExpiresAt) {
-            expiresAt = user.subscriptionExpiresAt instanceof Date 
-              ? user.subscriptionExpiresAt 
-              : new Date(user.subscriptionExpiresAt as unknown as string);
+            expiresAt =
+              user.subscriptionExpiresAt instanceof Date
+                ? user.subscriptionExpiresAt
+                : new Date(user.subscriptionExpiresAt as unknown as string);
           }
-          
+
           // Calculate days left
           const daysLeft = expiresAt
             ? Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
             : (user.subscriptionDaysLeft ?? null);
-          
-          console.log('🗂️ Store setUser:', { daysLeft, expiresAt, subscriptionActive: user.subscriptionActive });
-          
+
+          console.log('🗂️ Store setUser:', {
+            daysLeft,
+            expiresAt,
+            subscriptionActive: user.subscriptionActive,
+          });
+
           set({
             user: {
               ...user,
@@ -80,25 +85,26 @@ export const useAppStore = create<AppState>()(
           });
         }
       },
-      
-      setLoading: (loading) => set({ isLoading: loading }),
-      
-      setError: (error) => set({ error }),
-      
-      setProtectionEnabled: async (enabled) => {
+
+      setLoading: loading => set({ isLoading: loading }),
+
+      setError: error => set({ error }),
+
+      setProtectionEnabled: async enabled => {
         set({ protectionEnabled: enabled });
         // Sync with server
         try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const tg = (window as any).Telegram?.WebApp;
           const initData = tg?.initData || '';
           if (initData) {
             await fetch('/api?action=settings', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
+              body: JSON.stringify({
                 action: 'settings',
                 initData,
-                protectionEnabled: enabled 
+                protectionEnabled: enabled,
               }),
             });
             console.log('✅ Protection status synced:', enabled);
@@ -107,21 +113,22 @@ export const useAppStore = create<AppState>()(
           console.error('❌ Failed to sync protection status:', error);
         }
       },
-      
-      setDefenseMode: async (mode) => {
+
+      setDefenseMode: async mode => {
         set({ defenseMode: mode });
         // Sync with server
         try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const tg = (window as any).Telegram?.WebApp;
           const initData = tg?.initData || '';
           if (initData) {
             await fetch('/api?action=settings', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
+              body: JSON.stringify({
                 action: 'settings',
                 initData,
-                defenseMode: mode 
+                defenseMode: mode,
               }),
             });
             console.log('✅ Defense mode synced:', mode);
@@ -130,20 +137,20 @@ export const useAppStore = create<AppState>()(
           console.error('❌ Failed to sync defense mode:', error);
         }
       },
-      
+
       updateSubscription: (active, expiresAt) => {
         const daysLeft = expiresAt
           ? Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
           : null;
-        
-        set((state) => ({
+
+        set(state => ({
           user: state.user
             ? { ...state.user, subscriptionActive: active, subscriptionExpiresAt: expiresAt }
             : null,
           subscriptionDaysLeft: daysLeft,
         }));
       },
-      
+
       logout: () => {
         set({
           user: null,
@@ -157,7 +164,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'neuroguardian-app',
-      partialize: (state) => ({
+      partialize: state => ({
         // Only persist these fields
         protectionEnabled: state.protectionEnabled,
         defenseMode: state.defenseMode,
