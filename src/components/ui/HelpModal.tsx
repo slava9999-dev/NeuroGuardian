@@ -15,9 +15,9 @@ interface HelpModalProps {
 const TUTORIAL_STEPS = [
   {
     id: 1,
-    title: '👋 Добро пожаловать!',
-    content: 'NeuroGUARDIAN — система автоматической защиты вашей маржи от принудительных акций WB и Ozon.',
-    tip: 'Когда маркетплейс снижает вашу цену ниже минимума — мы мгновенно реагируем!',
+    title: '🤖 Знакомьтесь — NeuroAgent!',
+    content: 'Ваш личный AI-помощник для управления магазином на Wildberries и Ozon.',
+    tip: 'Общайтесь через чат, защищайте маржу автоматически и управляйте ценами голосом!',
   },
   {
     id: 2,
@@ -83,36 +83,36 @@ const TUTORIAL_STEPS = [
 
 export function HelpModal({ isOpen, onClose }: HelpModalProps) {
   const [currentStep, setCurrentStep] = useState(0);
-  
+
   const step = TUTORIAL_STEPS[currentStep];
   const isFirst = currentStep === 0;
   const isLast = currentStep === TUTORIAL_STEPS.length - 1;
-  
+
   const handleNext = () => {
     hapticFeedback('light');
     if (isLast) {
       onClose();
       setCurrentStep(0);
     } else {
-      setCurrentStep((p) => p + 1);
+      setCurrentStep(p => p + 1);
     }
   };
-  
+
   const handlePrev = () => {
     hapticFeedback('light');
     if (!isFirst) {
-      setCurrentStep((p) => p - 1);
+      setCurrentStep(p => p - 1);
     }
   };
-  
+
   const handleClose = () => {
     hapticFeedback('light');
     onClose();
     setCurrentStep(0);
   };
-  
+
   if (!isOpen) return null;
-  
+
   return (
     <AnimatePresence>
       <motion.div
@@ -127,7 +127,7 @@ export function HelpModal({ isOpen, onClose }: HelpModalProps) {
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.9, opacity: 0 }}
           className="w-full max-w-md bg-stone-900 rounded-2xl border border-stone-700 overflow-hidden"
-          onClick={(e) => e.stopPropagation()}
+          onClick={e => e.stopPropagation()}
         >
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-stone-700">
@@ -141,12 +141,19 @@ export function HelpModal({ isOpen, onClose }: HelpModalProps) {
               onClick={handleClose}
               className="p-1 rounded-lg hover:bg-stone-800 transition-colors"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
                 <path d="M18 6L6 18M6 6l12 12" />
               </svg>
             </button>
           </div>
-          
+
           {/* Progress bar */}
           <div className="h-1 bg-stone-800">
             <motion.div
@@ -156,7 +163,7 @@ export function HelpModal({ isOpen, onClose }: HelpModalProps) {
               transition={{ duration: 0.3 }}
             />
           </div>
-          
+
           {/* Content */}
           <div className="p-6">
             <AnimatePresence mode="wait">
@@ -167,14 +174,10 @@ export function HelpModal({ isOpen, onClose }: HelpModalProps) {
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.2 }}
               >
-                <h3 className="text-xl font-bold text-white mb-4">
-                  {step.title}
-                </h3>
-                
-                <p className="text-stone-300 mb-4">
-                  {step.content}
-                </p>
-                
+                <h3 className="text-xl font-bold text-white mb-4">{step.title}</h3>
+
+                <p className="text-stone-300 mb-4">{step.content}</p>
+
                 {step.steps && (
                   <ul className="space-y-2 mb-4">
                     {step.steps.map((s, i) => (
@@ -185,18 +188,16 @@ export function HelpModal({ isOpen, onClose }: HelpModalProps) {
                     ))}
                   </ul>
                 )}
-                
+
                 {step.tip && (
                   <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl">
-                    <p className="text-sm text-amber-400">
-                      {step.tip}
-                    </p>
+                    <p className="text-sm text-amber-400">{step.tip}</p>
                   </div>
                 )}
               </motion.div>
             </AnimatePresence>
           </div>
-          
+
           {/* Footer */}
           <div className="flex items-center justify-between p-4 border-t border-stone-700">
             <button
@@ -204,15 +205,16 @@ export function HelpModal({ isOpen, onClose }: HelpModalProps) {
               disabled={isFirst}
               className={`
                 px-4 py-2 rounded-xl font-medium transition-all
-                ${isFirst 
-                  ? 'text-stone-600 cursor-not-allowed' 
-                  : 'text-stone-300 hover:bg-stone-800'
+                ${
+                  isFirst
+                    ? 'text-stone-600 cursor-not-allowed'
+                    : 'text-stone-300 hover:bg-stone-800'
                 }
               `}
             >
               ← Назад
             </button>
-            
+
             <div className="flex gap-1.5">
               {TUTORIAL_STEPS.map((_, i) => (
                 <button
@@ -225,7 +227,7 @@ export function HelpModal({ isOpen, onClose }: HelpModalProps) {
                 />
               ))}
             </div>
-            
+
             <button
               onClick={handleNext}
               className="px-4 py-2 rounded-xl font-medium bg-amber-500 text-stone-900 hover:bg-amber-400 transition-colors"

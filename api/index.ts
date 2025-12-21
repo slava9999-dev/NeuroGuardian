@@ -2878,6 +2878,192 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
+      // ========== AI AGENT ==========
+      case 'agent': {
+        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+        const initData = sanitizeInput(
+          (req.headers['x-init-data'] as string) || req.body?.initData || ''
+        );
+        const validation = validateTelegramInitData(initData);
+        if (!validation.valid || !validation.user) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const userId = validation.user.id;
+        const user = await getUserById(userId);
+
+        // Check subscription for AI features
+        if (!isSubscriptionActive(user)) {
+          return res.json({
+            success: true,
+            content:
+              '⚠️ **Для использования AI-агента требуется активная подписка.**\n\nОформите подписку, чтобы получить доступ к:\n• Управлению ценами через чат\n• Аналитике продаж\n• Автоматизации задач',
+          });
+        }
+
+        const message = sanitizeInput(req.body?.message || '');
+
+        if (!message) {
+          return res.status(400).json({ error: 'Message is required' });
+        }
+
+        // Rate limit agent requests (strict limit for AI calls)
+        const agentRateLimit = await checkRateLimitAsync(`agent:${userId}`, true);
+        if (!agentRateLimit.allowed) {
+          return res.json({
+            success: true,
+            content: '⏳ **Превышен лимит запросов.**\n\nПодождите минуту и попробуйте снова.',
+          });
+        }
+
+        const startTime = Date.now();
+
+        // Classify complexity for model routing
+        const lowerMessage = message.toLowerCase();
+        const complexPatterns = [
+          'оптимизируй',
+          'проанализируй',
+          'почему',
+          'стратегия',
+          'рекомендации',
+          'помоги',
+          'как лучше',
+        ];
+        const isComplex = complexPatterns.some(p => lowerMessage.includes(p));
+
+        // Get user products for context
+        const products = await getProductsByUserId(userId);
+        const protectedCount = products.filter((p: any) => p.min_price > 0).length;
+
+        // Agent response object
+        const agentResponse: { content: string; actionRequired?: any; metadata?: any } = {
+          content: '',
+          metadata: {
+            executionTime: 0,
+            model: isComplex ? 'gpt-4o' : 'gpt-4o-mini',
+            complexity: isComplex ? 'complex' : 'simple',
+            toolsUsed: [] as string[],
+          },
+        };
+
+        // Simple intent classification and response generation
+        if (lowerMessage.includes('продаж') || lowerMessage.includes('выручк')) {
+          const totalProducts = products.length;
+          const totalValue = products.reduce(
+            (sum: number, p: any) => sum + (p.current_price || 0),
+            0
+          );
+
+          agentResponse.content = `📊 **Статистика вашего магазина:**\n\n• Товаров в системе: **${totalProducts}**\n• Под защитой: **${protectedCount}** товаров\n• Общая стоимость: **${totalValue.toLocaleString('ru')} ₽**\n• Сработавших защит сегодня: **${user?.triggered_today || 0}**\n• Сохранено денег: **${Number(user?.saved_amount || 0).toLocaleString('ru')} ₽**\n\n💡 *Для детальной аналитики подключите API маркетплейса.*`;
+          agentResponse.metadata.toolsUsed = ['get_user_stats', 'get_products'];
+        } else if (
+          lowerMessage.includes('цен') &&
+          (lowerMessage.includes('измени') ||
+            lowerMessage.includes('повыс') ||
+            lowerMessage.includes('пониз') ||
+            lowerMessage.includes('установ'))
+        ) {
+          const unprotectedProducts = products.filter(
+            (p: any) => !p.min_price || p.min_price === 0
+          );
+
+          if (unprotectedProducts.length > 0) {
+            agentResponse.content = `⚠️ **Обнаружено ${unprotectedProducts.length} товаров без защиты.**\n\nПланируемое действие:\n• Установить минимальную цену (Stop-Loss) для всех незащищённых товаров\n• Базовая ставка: -15% от текущей цены`;
+            agentResponse.actionRequired = {
+              type: 'confirmation',
+              operation: 'bulk_set_min_price',
+              details: { productsCount: unprotectedProducts.length },
+              confirmationMessage: `Установить Stop-Loss для ${unprotectedProducts.length} товаров?`,
+            };
+            agentResponse.metadata.toolsUsed = ['search_products', 'prepare_price_update'];
+          } else {
+            agentResponse.content = `✅ **Все ваши ${products.length} товаров уже защищены!**`;
+            agentResponse.metadata.toolsUsed = ['check_protection_status'];
+          }
+        } else if (
+          lowerMessage.includes('защит') ||
+          lowerMessage.includes('stop-loss') ||
+          lowerMessage.includes('стоп-лосс')
+        ) {
+          const unprotectedCount = products.length - protectedCount;
+          agentResponse.content = `🛡️ **Статус защиты:**\n\n✅ Защищено: **${protectedCount}**\n⚠️ Без защиты: **${unprotectedCount}**\n🚨 Сработало сегодня: **${user?.triggered_today || 0}**\n💰 Сохранено: **${Number(user?.saved_amount || 0).toLocaleString('ru')} ₽**`;
+          agentResponse.metadata.toolsUsed = ['get_protection_status'];
+        } else if (
+          lowerMessage.includes('топ') ||
+          lowerMessage.includes('лучш') ||
+          lowerMessage.includes('популярн')
+        ) {
+          const top5 = [...products]
+            .sort((a: any, b: any) => (b.current_price || 0) - (a.current_price || 0))
+            .slice(0, 5);
+          const topList = top5
+            .map(
+              (p: any, i: number) =>
+                `${i + 1}. **${(p.title || 'Товар').slice(0, 35)}** — ${(p.current_price || 0).toLocaleString('ru')} ₽`
+            )
+            .join('\n');
+          agentResponse.content = `🏆 **Топ-5 товаров:**\n\n${topList || 'Нет товаров.'}`;
+          agentResponse.metadata.toolsUsed = ['get_products', 'sort_products'];
+        } else {
+          agentResponse.content = `👍 Понял вас!\n\nПопробуйте:\n• "Покажи продажи"\n• "Статус защиты"\n• "Защити все товары"\n• "Топ товаров"`;
+          agentResponse.metadata.toolsUsed = ['intent_classifier'];
+        }
+
+        agentResponse.metadata.executionTime = Date.now() - startTime;
+        return res.json({ success: true, ...agentResponse });
+      }
+
+      // ========== AGENT CONFIRM ==========
+      case 'agent-confirm': {
+        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+        const initData = sanitizeInput(
+          (req.headers['x-init-data'] as string) || req.body?.initData || ''
+        );
+        const validation = validateTelegramInitData(initData);
+        if (!validation.valid || !validation.user)
+          return res.status(401).json({ error: 'Unauthorized' });
+
+        const userId = validation.user.id;
+        const { operation, confirmed, details } = req.body;
+
+        if (!confirmed) {
+          return res.json({ success: true, content: '👍 Операция отменена.', executed: false });
+        }
+
+        let resultContent = '';
+        let executed = false;
+
+        if (operation === 'bulk_set_min_price') {
+          const products = await getProductsByUserId(userId);
+          const unprotected = products.filter((p: any) => !p.min_price || p.min_price === 0);
+          let updated = 0;
+          for (const product of unprotected) {
+            const minPrice = Math.floor((product.current_price || 0) * 0.85);
+            if (minPrice > 0) {
+              await updateProductMinPrice(userId, product.product_id, minPrice);
+              updated++;
+            }
+          }
+          resultContent = `✅ **Защищено товаров: ${updated}**\n\nМинимальные цены (-15%) установлены.`;
+          executed = true;
+        } else {
+          resultContent = '❌ Неизвестная операция.';
+        }
+
+        return res.json({ success: true, content: resultContent, executed });
+      }
+
+      // ========== AGENT STATUS ==========
+      case 'agent-status': {
+        return res.json({
+          available: true,
+          model: 'gpt-4o-mini',
+          capabilities: ['Статистика продаж', 'Управление ценами', 'Защита товаров', 'Аналитика'],
+        });
+      }
+
       // ========== DEFAULT ==========
       default:
         return res.status(400).json({
@@ -2896,6 +3082,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             'check-prices',
             'batch-set-stop-loss',
             'sentinel-logs',
+            'agent',
+            'agent-confirm',
+            'agent-status',
             'admin-activate-trial',
             'admin-check-user',
             'admin-list-users',

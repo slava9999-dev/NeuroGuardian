@@ -2,6 +2,37 @@
 
 All notable changes to NeuroGUARDIAN project.
 
+## [2.4.0] - 2024-12-21
+
+### 🤖 NeuroAgent AI Assistant
+
+- **New Agent Page**: Full-featured chat interface for AI-powered marketplace management
+- **Smart Responses**: Pattern-based intent classification with contextual responses
+- **Quick Actions**: One-click buttons for common operations
+- **Confirmation Flow**: Safe operation execution with user confirmation
+- **Metadata Display**: Shows execution time, model used, and tools involved
+
+### 🔧 API Endpoints
+
+- `action=agent` — Process agent messages with intent recognition
+- `action=agent-confirm` — Execute confirmed operations
+- `action=agent-status` — Get agent capabilities and status
+
+### 🎨 UI/UX
+
+- New "Агент" tab in bottom navigation with robot icon
+- Purple accent color for AI features (distinct from amber protection theme)
+- Animated message bubbles with smooth transitions
+- Inline confirmation buttons in chat messages
+- Responsive mobile-first design
+
+### 📚 Documentation
+
+- Added `NEUROAGENT_PROGRESS.md` with implementation roadmap
+- Updated available actions list in API
+
+---
+
 ## [2.3.0] - 2024-12-21
 
 ### 🔒 Security

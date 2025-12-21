@@ -1,10 +1,12 @@
 // ============================================
-// NeuroGUARDIAN — Main App Entry
+// NeuroAgent — Main App Entry
+// Agent-first interface for WB & Ozon sellers
 // ============================================
 
 import { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { DashboardPage } from './pages/DashboardPage';
+import { AgentPage } from './pages/AgentPage';
+import { ProductsPage } from './pages/ProductsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { LegalPage } from './pages/LegalPage';
 import { useAppStore, useProductsStore } from './stores';
@@ -12,50 +14,38 @@ import { initTelegramWebApp, isTelegramWebApp, getInitData } from './lib/telegra
 import { authApi, productsApi } from './lib/api';
 import './index.css';
 
-// Loading screen component
+// Loading screen with agent branding
 function LoadingScreen() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-stone-900">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-stone-900 to-stone-800">
       <motion.div
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
         className="text-center"
       >
-        {/* Logo */}
+        {/* Agent Avatar */}
         <motion.div
-          className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center"
+          className="relative mx-auto mb-6"
           animate={{
-            boxShadow: [
-              '0 0 20px rgba(245, 158, 11, 0.3)',
-              '0 0 40px rgba(245, 158, 11, 0.5)',
-              '0 0 20px rgba(245, 158, 11, 0.3)',
-            ],
+            scale: [1, 1.02, 1],
           }}
           transition={{ duration: 2, repeat: Infinity }}
         >
-          <svg
-            width="40"
-            height="40"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="text-stone-900"
-          >
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-            <path d="m9 12 2 2 4-4" />
-          </svg>
+          <div className="absolute inset-0 rounded-full bg-gradient-to-r from-violet-500 to-purple-500 blur-xl opacity-50" />
+          <img
+            src="/agent-avatar.png"
+            alt="NeuroAgent"
+            className="relative w-24 h-24 rounded-full object-cover border-2 border-violet-400/50"
+          />
         </motion.div>
 
         {/* Title */}
-        <h1 className="text-2xl font-bold text-gradient-amber mb-2">NeuroGUARDIAN</h1>
-        <p className="text-stone-400 text-sm mb-6">Инициализация системы защиты...</p>
+        <h1 className="text-2xl font-bold text-white mb-2">NeuroAgent</h1>
+        <p className="text-stone-400 text-sm mb-6">Загрузка вашего помощника...</p>
 
         {/* Loading spinner */}
         <motion.div
-          className="w-8 h-8 border-3 border-amber-500 border-t-transparent rounded-full mx-auto"
+          className="w-8 h-8 border-3 border-violet-500 border-t-transparent rounded-full mx-auto"
           animate={{ rotate: 360 }}
           transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
         />
@@ -67,24 +57,24 @@ function LoadingScreen() {
 // Mock user for development outside Telegram
 const MOCK_USER = {
   telegramId: 123456789,
-  username: 'dev_user',
-  firstName: 'Developer',
-  lastName: 'Mode',
+  username: 'demo_user',
+  firstName: 'Demo User',
+  lastName: '',
   photoUrl: null,
-  subscriptionActive: false,
-  subscriptionExpiresAt: null,
-  subscriptionPlan: null,
-  protectionEnabled: false,
+  subscriptionActive: true,
+  subscriptionExpiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+  subscriptionPlan: 'trial' as const,
+  protectionEnabled: true,
   defenseMode: 'zero_stock' as const,
   wbKeyRef: null,
   ozonKeyRef: null,
-  totalProducts: 0,
-  triggeredToday: 0,
-  savedAmount: 0,
+  totalProducts: 5,
+  triggeredToday: 2,
+  savedAmount: 15600,
 };
 
-// Pages enum
-type Page = 'dashboard' | 'settings' | 'legal';
+// Pages enum - Agent is first!
+type Page = 'agent' | 'products' | 'settings' | 'info';
 
 function App() {
   const setUser = useAppStore(state => state.setUser);
@@ -92,80 +82,74 @@ function App() {
   const isLoading = useAppStore(state => state.isLoading);
 
   const [isInitialized, setIsInitialized] = useState(false);
-  const [currentPage, setCurrentPage] = useState<Page>('dashboard');
+  const [currentPage, setCurrentPage] = useState<Page>('agent'); // Agent is default!
 
   const initPerformed = useRef(false);
 
   useEffect(() => {
-    // Prevent double initialization (especially in React Strict Mode)
     if (initPerformed.current) return;
     initPerformed.current = true;
 
     async function init() {
+      setLoading(true);
+
       try {
-        console.log('🚀 App initialization started...');
-
-        // Initialize Telegram WebApp if available
         if (isTelegramWebApp()) {
-          console.log('📱 Detected Telegram WebApp environment');
+          console.log('🚀 Telegram WebApp detected');
           initTelegramWebApp();
-        } else {
-          console.log('🌐 Browser mode');
-        }
 
-        // ALWAYS call API for authentication
-        // API will return demo user if no initData
-        try {
-          console.log('🔐 Authenticating...');
           const initData = getInitData();
-          const response = await authApi.login(initData || '');
-          console.log('📡 RAW API response:', JSON.stringify(response));
-          if (response.success && response.user) {
-            console.log('✅ Authentication successful');
-            console.log('👤 User data:', JSON.stringify(response.user));
-            console.log('💳 subscriptionActive:', response.user.subscriptionActive);
-            console.log('📅 subscriptionExpiresAt:', response.user.subscriptionExpiresAt);
-            console.log('🔑 ozonKeyRef:', response.user.ozonKeyRef);
-            setUser(response.user);
+          if (initData) {
+            console.log('📱 Authenticating with Telegram...');
+            const authResult = await authApi.login(initData);
+            console.log('✅ Auth successful:', authResult.user);
 
-            // Auto-load products after successful auth
-            console.log('📦 Loading products...');
+            setUser(authResult.user);
+
+            // Load products
             try {
               const productsResult = await productsApi.getProducts();
-              if (productsResult.success && productsResult.products) {
-                console.log(`✅ Loaded ${productsResult.products.length} products`);
-                useProductsStore.getState().setProducts(productsResult.products as any);
+              if (productsResult.products) {
+                // Convert ProductData to Product with required timestamps
+                const products = productsResult.products.map(p => ({
+                  ...p,
+                  vendorCode: p.vendorCode || '',
+                  imageUrl: p.imageUrl || '',
+                  lastCheckedAt: new Date(),
+                  lastTriggeredAt: null,
+                  createdAt: new Date(),
+                  updatedAt: new Date(),
+                }));
+                useProductsStore.getState().setProducts(products);
+                console.log('📦 Products loaded:', products.length);
               }
-            } catch (prodErr) {
-              console.warn('⚠️ Failed to load products:', prodErr);
+            } catch (err) {
+              console.log('📦 No products yet');
             }
           }
-        } catch (err) {
-          console.error('❌ Auth failed, using fallback:', err);
-          // Fallback to mock user only if API fails
+        } else {
+          console.log('🔧 Dev mode - using mock user');
           setUser(MOCK_USER);
         }
       } catch (error) {
-        console.error('❌ Initialization error:', error);
-      }
-
-      // Always complete initialization after delay
-      console.log('⏳ Completing initialization in 1s...');
-      setTimeout(() => {
-        console.log('✨ Initialization complete');
+        console.error('❌ Init error:', error);
+        if (import.meta.env.DEV) {
+          setUser(MOCK_USER);
+        }
+      } finally {
         setLoading(false);
         setIsInitialized(true);
-      }, 1000);
+      }
     }
 
     init();
-    // Note: setUser and setLoading are stable Zustand functions, safe to include
   }, [setUser, setLoading]);
 
   // Navigation functions
+  const goToAgent = () => setCurrentPage('agent');
+  const goToProducts = () => setCurrentPage('products');
   const goToSettings = () => setCurrentPage('settings');
-  const goToDashboard = () => setCurrentPage('dashboard');
-  const goToLegal = () => setCurrentPage('legal');
+  const goToInfo = () => setCurrentPage('info');
 
   if (!isInitialized || isLoading) {
     return <LoadingScreen />;
@@ -173,74 +157,131 @@ function App() {
 
   return (
     <>
-      {currentPage === 'dashboard' && <DashboardPage onGoToSettings={goToSettings} />}
-      {currentPage === 'settings' && <SettingsPage onBack={goToDashboard} />}
-      {currentPage === 'legal' && <LegalPage onBack={goToDashboard} />}
+      {/* Pages */}
+      {currentPage === 'agent' && <AgentPage />}
+      {currentPage === 'products' && <ProductsPage onBack={goToAgent} />}
+      {currentPage === 'settings' && <SettingsPage onBack={goToAgent} />}
+      {currentPage === 'info' && <LegalPage onBack={goToAgent} />}
 
-      {/* Bottom Tab Bar */}
+      {/* Bottom Tab Bar - Simplified */}
       <nav className="fixed bottom-0 left-0 right-0 bg-stone-900/95 backdrop-blur-md border-t border-stone-800 safe-area-inset-bottom z-40">
         <div className="flex justify-around py-2">
+          {/* Agent Tab - Primary */}
           <button
-            onClick={goToDashboard}
-            className={`flex flex-col items-center gap-1 px-6 py-2 transition-colors ${
-              currentPage === 'dashboard' ? 'text-amber-400' : 'text-stone-400 hover:text-stone-200'
+            onClick={goToAgent}
+            className={`flex flex-col items-center gap-1 px-5 py-2 transition-all relative ${
+              currentPage === 'agent' ? 'text-violet-400' : 'text-stone-400 hover:text-stone-200'
             }`}
           >
+            {currentPage === 'agent' && (
+              <motion.div
+                layoutId="tab-indicator"
+                className="absolute inset-0 rounded-xl bg-violet-500/15"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+              />
+            )}
+            <div className="relative">
+              <img
+                src="/agent-avatar.png"
+                alt="Agent"
+                className="w-6 h-6 rounded-full object-cover"
+              />
+              {currentPage !== 'agent' && (
+                <motion.span
+                  className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400"
+                  animate={{ scale: [1, 1.2, 1] }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                />
+              )}
+            </div>
+            <span className="text-xs font-medium relative">Агент</span>
+          </button>
+
+          {/* Products Tab */}
+          <button
+            onClick={goToProducts}
+            className={`flex flex-col items-center gap-1 px-5 py-2 transition-all relative ${
+              currentPage === 'products' ? 'text-amber-400' : 'text-stone-400 hover:text-stone-200'
+            }`}
+          >
+            {currentPage === 'products' && (
+              <motion.div
+                layoutId="tab-indicator"
+                className="absolute inset-0 rounded-xl bg-amber-500/15"
+              />
+            )}
             <svg
-              width="24"
-              height="24"
+              width="22"
+              height="22"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
               strokeWidth="2"
+              className="relative"
             >
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-              <path d="m9 12 2 2 4-4" />
+              <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <path d="M16 10a4 4 0 0 1-8 0" />
             </svg>
-            <span className="text-xs font-medium">Защита</span>
+            <span className="text-xs font-medium relative">Товары</span>
           </button>
 
+          {/* Settings Tab */}
           <button
             onClick={goToSettings}
-            className={`flex flex-col items-center gap-1 px-6 py-2 transition-colors ${
+            className={`flex flex-col items-center gap-1 px-5 py-2 transition-all relative ${
               currentPage === 'settings' ? 'text-amber-400' : 'text-stone-400 hover:text-stone-200'
             }`}
           >
+            {currentPage === 'settings' && (
+              <motion.div
+                layoutId="tab-indicator"
+                className="absolute inset-0 rounded-xl bg-amber-500/15"
+              />
+            )}
             <svg
-              width="24"
-              height="24"
+              width="22"
+              height="22"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
               strokeWidth="2"
+              className="relative"
             >
               <circle cx="12" cy="12" r="3" />
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
             </svg>
-            <span className="text-xs font-medium">Настройки</span>
+            <span className="text-xs font-medium relative">Настройки</span>
           </button>
 
+          {/* Info Tab */}
           <button
-            onClick={goToLegal}
-            className={`flex flex-col items-center gap-1 px-6 py-2 transition-colors ${
-              currentPage === 'legal' ? 'text-amber-400' : 'text-stone-400 hover:text-stone-200'
+            onClick={goToInfo}
+            className={`flex flex-col items-center gap-1 px-5 py-2 transition-all relative ${
+              currentPage === 'info' ? 'text-amber-400' : 'text-stone-400 hover:text-stone-200'
             }`}
           >
+            {currentPage === 'info' && (
+              <motion.div
+                layoutId="tab-indicator"
+                className="absolute inset-0 rounded-xl bg-amber-500/15"
+              />
+            )}
             <svg
-              width="24"
-              height="24"
+              width="22"
+              height="22"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
               strokeWidth="2"
+              className="relative"
             >
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <path d="M14 2v6h6" />
-              <line x1="16" y1="13" x2="8" y2="13" />
-              <line x1="16" y1="17" x2="8" y2="17" />
-              <line x1="10" y1="9" x2="8" y2="9" />
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
             </svg>
-            <span className="text-xs font-medium">Инфо</span>
+            <span className="text-xs font-medium relative">Инфо</span>
           </button>
         </div>
       </nav>

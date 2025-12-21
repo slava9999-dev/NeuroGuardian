@@ -1,6 +1,6 @@
 // ============================================
-// NeuroGUARDIAN — Dashboard Page
-// Main application dashboard
+// NeuroAgent — Protection Dashboard
+// Margin protection for WB & Ozon sellers
 // ============================================
 
 import { useEffect, useState, useMemo } from 'react';
@@ -16,6 +16,7 @@ import { LogConsole } from '../components/logPanel/LogConsole';
 import { HelpModal } from '../components/ui/HelpModal';
 import { PaymentModal } from '../components/ui/PaymentModal';
 import { SecurityModal } from '../components/ui/SecurityModal';
+import { WelcomeBanner } from '../components/ui/WelcomeBanner';
 import { hapticFeedback } from '../lib/telegram';
 import type { Product } from '../types';
 
@@ -133,9 +134,10 @@ const MOCK_PRODUCTS: Product[] = [
 
 interface DashboardPageProps {
   onGoToSettings?: () => void;
+  onGoToAgent?: () => void;
 }
 
-export function DashboardPage({ onGoToSettings }: DashboardPageProps) {
+export function DashboardPage({ onGoToSettings, onGoToAgent }: DashboardPageProps) {
   const subscriptionDaysLeft = useAppStore(state => state.subscriptionDaysLeft);
   const user = useAppStore(state => state.user);
   const setProducts = useProductsStore(state => state.setProducts);
@@ -266,6 +268,9 @@ export function DashboardPage({ onGoToSettings }: DashboardPageProps) {
       {/* Bulk Stop-Loss Modal */}
       <BulkStopLossModal isOpen={showBulkStopLoss} onClose={() => setShowBulkStopLoss(false)} />
 
+      {/* Welcome Banner with Agent */}
+      <WelcomeBanner onAskAgent={onGoToAgent} />
+
       {/* Header */}
       <header className="mb-6">
         <div className="flex items-center justify-between mb-3">
@@ -372,7 +377,7 @@ export function DashboardPage({ onGoToSettings }: DashboardPageProps) {
         </div>
 
         <p className="text-stone-400 text-sm mb-4">
-          Защита маржи от принудительных акций WB и Ozon
+          Автоматическая защита маржи с помощью AI-агента
         </p>
 
         {/* 🎁 TRIAL BANNER - КРАСИВЫЙ */}

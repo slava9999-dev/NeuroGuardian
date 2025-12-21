@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
@@ -10,10 +10,35 @@
     <meta name="theme-color" content="#0c0c0e" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+    <!-- SEO Meta Tags -->
+    <title>NeuroAgent — AI-помощник для Wildberries и Ozon | Управляй магазином через чат</title>
     <meta
-      name="apple-mobile-web-app-status-bar-style"
-      content="black-translucent"
+      name="description"
+      content="Твой личный AI-агент для управления продажами на Wildberries и Ozon. Автоматическая защита маржи, статистика продаж и оптимизация цен через умный чат. Бесплатный пробный период 3 дня."
     />
+    <meta
+      name="keywords"
+      content="wildberries, ozon, маркетплейс, AI агент, искусственный интеллект, продажи, аналитика, защита маржи, стоп-лосс, автоматизация, управление ценами, telegram бот"
+    />
+    <meta name="author" content="NeuroAgent" />
+    <meta name="robots" content="index, follow" />
+
+    <!-- Open Graph / Social Media -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="NeuroAgent — AI-помощник для Wildberries и Ozon" />
+    <meta
+      property="og:description"
+      content="Управляй магазином через умный чат. Статистика продаж, защита маржи, оптимизация цен — всё в одном AI-агенте."
+    />
+    <meta property="og:image" content="/og-image.png" />
+    <meta property="og:locale" content="ru_RU" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="NeuroAgent — AI для Wildberries и Ozon" />
+    <meta name="twitter:description" content="Твой личный AI-агент для управления маркетплейсами" />
 
     <!-- Telegram WebApp Script -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -26,11 +51,31 @@
       rel="stylesheet"
     />
 
-    <title>NeuroGUARDIAN — Защита маржи</title>
-    <meta
-      name="description"
-      content="Автоматическая защита от принудительных акций WB и Ozon. Kill Switch система для продавцов маркетплейсов."
-    />
+    <!-- Structured Data / JSON-LD -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "NeuroAgent",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web, Telegram",
+        "description": "AI-помощник для управления продажами на Wildberries и Ozon",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "RUB",
+          "description": "3 дня бесплатно"
+        },
+        "featureList": [
+          "AI-чат для управления магазином",
+          "Автоматическая защита маржи",
+          "Статистика продаж",
+          "Оптимизация цен",
+          "Интеграция с Wildberries",
+          "Интеграция с Ozon"
+        ]
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -1,20 +1,29 @@
-# 🛡️ NeuroGUARDIAN
+# 🤖 NeuroAgent | WB & Ozon
 
-[![Version](https://img.shields.io/badge/version-2.3.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.4.0-blue.svg)](CHANGELOG.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue.svg)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19-61dafb.svg)](https://react.dev/)
 [![Vercel](https://img.shields.io/badge/Deployed-Vercel-black.svg)](https://vercel.com/)
 [![License](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
 
-> **Автоматическая защита маржи для продавцов WB и Ozon**
+> **Ваш личный AI-агент для управления магазином на Wildberries и Ozon**
 
-Система мониторинга и защиты цен от принудительных акций маркетплейсов. Когда маркетплейс снижает вашу цену ниже установленного минимума — NeuroGUARDIAN мгновенно реагирует!
+Управляйте продажами через чат с искусственным интеллектом. NeuroAgent знает всё о вашем магазине и готов помочь 24/7!
 
-📚 **Документация:** [CHANGELOG](CHANGELOG.md) | [AUDIT](AUDIT_FINAL_2024-12-21.md) | [VSCode Setup](VSCODE_SETUP.md)
+📚 **Документация:** [CHANGELOG](CHANGELOG.md) | [AUDIT](AUDIT_FINAL_2024-12-21.md) | [NeuroAgent](NEUROAGENT_PROGRESS.md) | [Telegram Setup](TELEGRAM_QUICK_SETUP.md)
 
 ---
 
 ## ✨ Возможности
+
+### 🤖 NeuroAgent — AI-помощник (NEW!)
+
+Управляйте магазином через чат с искусственным интеллектом:
+
+- **"Покажи продажи"** — мгновенная статистика
+- **"Защити все товары"** — массовая установка Stop-Loss
+- **"Топ товаров"** — аналитика по цене
+- **"Статус защиты"** — обзор состояния защиты
 
 ### 🎁 3 Дня Бесплатно
 

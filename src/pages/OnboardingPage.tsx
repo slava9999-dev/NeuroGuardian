@@ -1,6 +1,6 @@
 // ============================================
-// NeuroGUARDIAN — Onboarding Page
-// API Key setup flow
+// NeuroAgent — Onboarding Page
+// AI Assistant setup flow for WB & Ozon
 // ============================================
 
 import { useState } from 'react';
@@ -31,7 +31,7 @@ export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
       setError('Введите API ключ');
       return;
     }
-    
+
     if (selectedMarketplace === 'Ozon' && !clientId.trim()) {
       setError('Для Ozon требуется Client ID');
       return;
@@ -43,20 +43,18 @@ export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
 
     try {
       // For Ozon, combine clientId:apiKey
-      const fullKey = selectedMarketplace === 'Ozon' && clientId 
-        ? `${clientId}:${apiKey}` 
-        : apiKey;
-      
+      const fullKey = selectedMarketplace === 'Ozon' && clientId ? `${clientId}:${apiKey}` : apiKey;
+
       // REAL: Save API key to database
       await settingsApi.saveApiKey(selectedMarketplace!, fullKey, clientId);
       console.log('✅ API key saved successfully');
-      
+
       setStep('sync');
-      
+
       // REAL: Sync products from marketplace
       const syncResult = await productsApi.syncProducts(selectedMarketplace!);
       console.log('✅ Products synced:', syncResult);
-      
+
       setSyncedCount(syncResult.count || 0);
       hapticFeedback('success');
       setStep('complete');
@@ -113,11 +111,9 @@ export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
               </svg>
             </motion.div>
 
-            <h1 className="text-3xl font-bold text-gradient-amber mb-4">
-              Добро пожаловать!
-            </h1>
+            <h1 className="text-3xl font-bold text-gradient-amber mb-4">Привет! Я NeuroAgent 🤖</h1>
             <p className="text-stone-400 mb-8 max-w-xs">
-              NeuroGUARDIAN защитит вашу маржу от принудительных акций маркетплейсов
+              Твой личный AI-помощник для управления магазином на Wildberries и Ozon
             </p>
 
             <button
@@ -138,11 +134,9 @@ export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
             exit={{ opacity: 0, y: -20 }}
             className="py-8"
           >
-            <h2 className="text-2xl font-bold text-white mb-2">
-              Выберите маркетплейс
-            </h2>
+            <h2 className="text-2xl font-bold text-white mb-2">Подключите маркетплейс</h2>
             <p className="text-stone-400 mb-8">
-              Подключите API для синхронизации товаров
+              Я загружу ваши товары и настрою защиту автоматически
             </p>
 
             <div className="space-y-4">
@@ -188,43 +182,50 @@ export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
               onClick={() => setStep('marketplace')}
               className="flex items-center gap-2 text-stone-400 mb-6 hover:text-white transition-colors"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
                 <path d="M19 12H5M12 19l-7-7 7-7" />
               </svg>
               Назад
             </button>
 
             <div className="flex items-center gap-3 mb-6">
-              <div className={`
+              <div
+                className={`
                 w-12 h-12 rounded-xl flex items-center justify-center
                 ${selectedMarketplace === 'WB' ? 'bg-purple-500/20' : 'bg-blue-500/20'}
-              `}>
-                <span className={`
+              `}
+              >
+                <span
+                  className={`
                   text-lg font-bold
                   ${selectedMarketplace === 'WB' ? 'text-purple-400' : 'text-blue-400'}
-                `}>
+                `}
+                >
                   {selectedMarketplace === 'WB' ? 'WB' : 'O₃'}
                 </span>
               </div>
               <div>
-                <h2 className="text-xl font-bold text-white">
-                  API ключ {selectedMarketplace}
-                </h2>
-                <p className="text-sm text-stone-400">
-                  Введите ваш API ключ
-                </p>
+                <h2 className="text-xl font-bold text-white">API ключ {selectedMarketplace}</h2>
+                <p className="text-sm text-stone-400">Введите ваш API ключ</p>
               </div>
             </div>
 
             {/* Collapsible instructions */}
             <details className="mb-6 group">
               <summary className="flex items-center gap-2 cursor-pointer text-amber-400 text-sm hover:text-amber-300 transition-colors">
-                <svg 
-                  width="16" 
-                  height="16" 
-                  viewBox="0 0 24 24" 
-                  fill="none" 
-                  stroke="currentColor" 
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
                   strokeWidth="2"
                   className="transition-transform group-open:rotate-90"
                 >
@@ -232,34 +233,73 @@ export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
                 </svg>
                 Где получить API ключ?
               </summary>
-              
+
               <div className="mt-4 p-4 bg-stone-800/50 rounded-xl border border-stone-700">
                 {selectedMarketplace === 'WB' ? (
                   <div className="space-y-3 text-sm text-stone-300">
                     <p className="font-medium text-white">Инструкция для Wildberries:</p>
                     <ol className="list-decimal list-inside space-y-2">
-                      <li>Откройте <a href="https://seller.wildberries.ru" target="_blank" rel="noopener" className="text-purple-400 underline">seller.wildberries.ru</a></li>
-                      <li>Перейдите в <span className="text-white">Профиль → Настройки</span></li>
-                      <li>Выберите <span className="text-white">Доступ к API</span></li>
-                      <li>Нажмите <span className="text-white">"Создать новый токен"</span></li>
-                      <li>Выберите права: <span className="text-amber-400">Контент, Цены, Склад</span></li>
+                      <li>
+                        Откройте{' '}
+                        <a
+                          href="https://seller.wildberries.ru"
+                          target="_blank"
+                          rel="noopener"
+                          className="text-purple-400 underline"
+                        >
+                          seller.wildberries.ru
+                        </a>
+                      </li>
+                      <li>
+                        Перейдите в <span className="text-white">Профиль → Настройки</span>
+                      </li>
+                      <li>
+                        Выберите <span className="text-white">Доступ к API</span>
+                      </li>
+                      <li>
+                        Нажмите <span className="text-white">"Создать новый токен"</span>
+                      </li>
+                      <li>
+                        Выберите права: <span className="text-amber-400">Контент, Цены, Склад</span>
+                      </li>
                       <li>Скопируйте полученный ключ</li>
                     </ol>
                     <div className="mt-3 p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-                      <p className="text-amber-400 text-xs">⚠️ Ключ показывается только 1 раз! Сохраните его.</p>
+                      <p className="text-amber-400 text-xs">
+                        ⚠️ Ключ показывается только 1 раз! Сохраните его.
+                      </p>
                     </div>
                   </div>
                 ) : (
                   <div className="space-y-3 text-sm text-stone-300">
                     <p className="font-medium text-white">Инструкция для Ozon:</p>
                     <ol className="list-decimal list-inside space-y-2">
-                      <li>Откройте <a href="https://seller.ozon.ru" target="_blank" rel="noopener" className="text-blue-400 underline">seller.ozon.ru</a></li>
-                      <li>Перейдите в <span className="text-white">Настройки → API ключи</span></li>
-                      <li>Нажмите <span className="text-white">"Создать ключ"</span></li>
-                      <li>Скопируйте <span className="text-blue-400">API-ключ</span> и <span className="text-blue-400">Client ID</span></li>
+                      <li>
+                        Откройте{' '}
+                        <a
+                          href="https://seller.ozon.ru"
+                          target="_blank"
+                          rel="noopener"
+                          className="text-blue-400 underline"
+                        >
+                          seller.ozon.ru
+                        </a>
+                      </li>
+                      <li>
+                        Перейдите в <span className="text-white">Настройки → API ключи</span>
+                      </li>
+                      <li>
+                        Нажмите <span className="text-white">"Создать ключ"</span>
+                      </li>
+                      <li>
+                        Скопируйте <span className="text-blue-400">API-ключ</span> и{' '}
+                        <span className="text-blue-400">Client ID</span>
+                      </li>
                     </ol>
                     <div className="mt-3 p-2 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-                      <p className="text-blue-400 text-xs">📌 Для Ozon нужны ОБА значения: API-ключ и Client ID</p>
+                      <p className="text-blue-400 text-xs">
+                        📌 Для Ozon нужны ОБА значения: API-ключ и Client ID
+                      </p>
                     </div>
                   </div>
                 )}
@@ -272,7 +312,7 @@ export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
                 <input
                   type="password"
                   value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
+                  onChange={e => setApiKey(e.target.value)}
                   placeholder="Вставьте API ключ..."
                   className="input-field"
                   autoComplete="off"
@@ -285,7 +325,7 @@ export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
                   <input
                     type="text"
                     value={clientId}
-                    onChange={(e) => setClientId(e.target.value)}
+                    onChange={e => setClientId(e.target.value)}
                     placeholder="Введите Client ID..."
                     className="input-field"
                   />
@@ -338,12 +378,8 @@ export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
               animate={{ rotate: 360 }}
               transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
             />
-            <h2 className="text-2xl font-bold text-white mb-2">
-              Синхронизация товаров
-            </h2>
-            <p className="text-stone-400">
-              Загружаем ваши товары с {selectedMarketplace}...
-            </p>
+            <h2 className="text-2xl font-bold text-white mb-2">Синхронизация товаров</h2>
+            <p className="text-stone-400">Загружаем ваши товары с {selectedMarketplace}...</p>
           </motion.div>
         )}
 
@@ -362,26 +398,28 @@ export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
               transition={{ type: 'spring', stiffness: 200 }}
               className="w-24 h-24 mb-6 rounded-full bg-emerald-500/20 flex items-center justify-center"
             >
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-emerald-400">
+              <svg
+                width="48"
+                height="48"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                className="text-emerald-400"
+              >
                 <path d="M20 6L9 17l-5-5" />
               </svg>
             </motion.div>
 
-            <h2 className="text-2xl font-bold text-white mb-2">
-              Готово! 🎉
-            </h2>
+            <h2 className="text-2xl font-bold text-white mb-2">Отлично! Я готов работать 🎉</h2>
             <p className="text-stone-400 mb-8">
-              {syncedCount > 0 
-                ? `Синхронизировано ${syncedCount} товаров. Теперь настройте Stop-Loss уровни.`
-                : 'Товары синхронизированы. Теперь настройте Stop-Loss уровни для защиты.'
-              }
+              {syncedCount > 0
+                ? `Загружено ${syncedCount} товаров. Теперь можете управлять магазином через чат!`
+                : 'Товары загружены. Напишите мне в чат — я помогу настроить защиту!'}
             </p>
 
-            <button
-              onClick={handleComplete}
-              className="btn-primary px-8 py-4 text-lg"
-            >
-              Перейти к товарам
+            <button onClick={handleComplete} className="btn-primary px-8 py-4 text-lg">
+              Начать работу с агентом
             </button>
           </motion.div>
         )}
