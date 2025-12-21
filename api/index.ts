@@ -12,6 +12,8 @@ import { userService } from '../src/server/services/user/user.service';
 import { logger } from '../src/server/utils/logger';
 import { taskQueue, taskProcessor } from '../src/server/services/queue';
 import { notificationService } from '../src/server/services/notification/notification.service';
+import { rulesService } from '../src/server/services/rules/rules.service';
+import { RULE_TEMPLATES } from '../src/server/services/rules/rules.types';
 
 // ============================================
 // CONFIGURATION
@@ -3161,6 +3163,223 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
+      // ========== USER RULES: LIST ==========
+      case 'rules': {
+        const initData = sanitizeInput(
+          (req.headers['x-init-data'] as string) || req.body?.initData || ''
+        );
+        const validation = validateTelegramInitData(initData);
+        if (!validation.valid || !validation.user) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const rules = await rulesService.getUserRules(validation.user.id);
+
+        return res.json({
+          success: true,
+          rules: rules.map(r => ({
+            id: r.id,
+            name: r.name,
+            description: r.description,
+            isActive: r.isActive,
+            priority: r.priority,
+            triggerType: r.condition.triggerType,
+            actionType: r.action.actionType,
+            triggersToday: r.triggersToday,
+            maxTriggersPerDay: r.maxTriggersPerDay,
+            createdAt: r.createdAt,
+          })),
+        });
+      }
+
+      // ========== USER RULES: CREATE ==========
+      case 'rules-create': {
+        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+        const initData = sanitizeInput(
+          (req.headers['x-init-data'] as string) || req.body?.initData || ''
+        );
+        const validation = validateTelegramInitData(initData);
+        if (!validation.valid || !validation.user) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const {
+          name,
+          description,
+          condition,
+          action,
+          priority,
+          maxTriggersPerDay,
+          cooldownMinutes,
+        } = req.body;
+
+        if (!name || !condition || !action) {
+          return res.status(400).json({
+            error: 'Missing required fields',
+            required: ['name', 'condition', 'action'],
+          });
+        }
+
+        const rule = await rulesService.createRule(validation.user.id, {
+          name,
+          description,
+          condition,
+          action,
+          priority,
+          maxTriggersPerDay,
+          cooldownMinutes,
+        });
+
+        return res.json({
+          success: true,
+          message: 'Rule created',
+          rule: {
+            id: rule.id,
+            name: rule.name,
+            isActive: rule.isActive,
+          },
+        });
+      }
+
+      // ========== USER RULES: UPDATE ==========
+      case 'rules-update': {
+        if (req.method !== 'POST' && req.method !== 'PUT') {
+          return res.status(405).json({ error: 'Method not allowed' });
+        }
+
+        const initData = sanitizeInput(
+          (req.headers['x-init-data'] as string) || req.body?.initData || ''
+        );
+        const validation = validateTelegramInitData(initData);
+        if (!validation.valid || !validation.user) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const { ruleId, ...updateData } = req.body;
+        if (!ruleId) {
+          return res.status(400).json({ error: 'ruleId is required' });
+        }
+
+        const updated = await rulesService.updateRule(validation.user.id, ruleId, updateData);
+
+        if (!updated) {
+          return res.status(404).json({ error: 'Rule not found' });
+        }
+
+        return res.json({
+          success: true,
+          message: 'Rule updated',
+          rule: {
+            id: updated.id,
+            name: updated.name,
+            isActive: updated.isActive,
+          },
+        });
+      }
+
+      // ========== USER RULES: DELETE ==========
+      case 'rules-delete': {
+        if (req.method !== 'POST' && req.method !== 'DELETE') {
+          return res.status(405).json({ error: 'Method not allowed' });
+        }
+
+        const initData = sanitizeInput(
+          (req.headers['x-init-data'] as string) || req.body?.initData || ''
+        );
+        const validation = validateTelegramInitData(initData);
+        if (!validation.valid || !validation.user) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const { ruleId } = req.body;
+        if (!ruleId) {
+          return res.status(400).json({ error: 'ruleId is required' });
+        }
+
+        const deleted = await rulesService.deleteRule(validation.user.id, ruleId);
+
+        return res.json({
+          success: deleted,
+          message: deleted ? 'Rule deleted' : 'Rule not found',
+        });
+      }
+
+      // ========== USER RULES: TOGGLE ==========
+      case 'rules-toggle': {
+        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+        const initData = sanitizeInput(
+          (req.headers['x-init-data'] as string) || req.body?.initData || ''
+        );
+        const validation = validateTelegramInitData(initData);
+        if (!validation.valid || !validation.user) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const { ruleId } = req.body;
+        if (!ruleId) {
+          return res.status(400).json({ error: 'ruleId is required' });
+        }
+
+        const toggled = await rulesService.toggleRule(validation.user.id, ruleId);
+
+        if (!toggled) {
+          return res.status(404).json({ error: 'Rule not found' });
+        }
+
+        return res.json({
+          success: true,
+          message: `Rule ${toggled.isActive ? 'activated' : 'deactivated'}`,
+          isActive: toggled.isActive,
+        });
+      }
+
+      // ========== USER RULES: TEMPLATES ==========
+      case 'rules-templates': {
+        return res.json({
+          success: true,
+          templates: Object.entries(RULE_TEMPLATES).map(([key, template]) => ({
+            id: key,
+            description: template.description,
+            condition: template.condition,
+            action: template.action,
+            maxTriggersPerDay: template.maxTriggersPerDay,
+            cooldownMinutes: template.cooldownMinutes,
+          })),
+        });
+      }
+
+      // ========== USER RULES: LOGS ==========
+      case 'rules-logs': {
+        const initData = sanitizeInput(
+          (req.headers['x-init-data'] as string) || req.body?.initData || ''
+        );
+        const validation = validateTelegramInitData(initData);
+        if (!validation.valid || !validation.user) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const ruleId = req.query.ruleId as string | undefined;
+        const limit = parseInt((req.query.limit as string) || '50', 10);
+
+        const logs = await rulesService.getRuleLogs(validation.user.id, ruleId, limit);
+
+        return res.json({
+          success: true,
+          logs: logs.map(l => ({
+            id: l.id,
+            ruleId: l.ruleId,
+            productId: l.productId,
+            triggerType: l.triggerData.triggerType,
+            actionType: l.actionData.actionType,
+            success: l.success,
+            error: l.error,
+            executedAt: l.executedAt,
+          })),
+        });
+      }
+
       // ========== TASK QUEUE: LIST TASKS ==========
       case 'tasks': {
         const initData = sanitizeInput(
@@ -3409,6 +3628,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             'agent',
             'agent-confirm',
             'agent-status',
+            'rules',
+            'rules-create',
+            'rules-update',
+            'rules-delete',
+            'rules-toggle',
+            'rules-templates',
+            'rules-logs',
             'tasks',
             'task-enqueue',
             'task-cancel',
