@@ -159,7 +159,8 @@ function App() {
     }
 
     init();
-  }, []);
+    // Note: setUser and setLoading are stable Zustand functions, safe to include
+  }, [setUser, setLoading]);
 
   // Navigation functions
   const goToSettings = () => setCurrentPage('settings');

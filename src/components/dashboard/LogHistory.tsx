@@ -3,7 +3,7 @@
 // Shows recent protection triggers with details
 // ============================================
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { hapticFeedback } from '../../lib/telegram';
 
@@ -43,13 +43,7 @@ export function LogHistory({ isOpen, onClose }: LogHistoryProps) {
   const [error, setError] = useState<string | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState(7);
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchLogs();
-    }
-  }, [isOpen, selectedPeriod]);
-
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
@@ -73,7 +67,13 @@ export function LogHistory({ isOpen, onClose }: LogHistoryProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [selectedPeriod]);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchLogs();
+    }
+  }, [isOpen, fetchLogs]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);

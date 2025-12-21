@@ -374,7 +374,7 @@ async function checkRateLimitAsync(
         return { allowed: false, remaining: 0 };
       }
       return { allowed: true, remaining: limit - count };
-    } catch (e) {
+    } catch (_err) {
       console.warn('⚠️ KV rate limit check failed, falling back to memory');
       // Fall through to in-memory
     }
@@ -397,23 +397,7 @@ async function checkRateLimitAsync(
   return { allowed: true, remaining: limit - record.count };
 }
 
-// Synchronous fallback (for backwards compatibility in main handler)
-function checkRateLimit(identifier: string): { allowed: boolean; remaining: number } {
-  const now = Date.now();
-  const record = rateLimitStore.get(identifier);
-
-  if (!record || now > record.resetTime) {
-    rateLimitStore.set(identifier, { count: 1, resetTime: now + RATE_WINDOW });
-    return { allowed: true, remaining: RATE_LIMIT - 1 };
-  }
-
-  if (record.count >= RATE_LIMIT) {
-    return { allowed: false, remaining: 0 };
-  }
-
-  record.count++;
-  return { allowed: true, remaining: RATE_LIMIT - record.count };
-}
+// Note: Synchronous checkRateLimitSync was removed - all rate limiting now uses async KV-backed version
 
 /**
  * Input sanitization
@@ -457,30 +441,8 @@ function getProductLimit(plan: string | null): number {
   }
 }
 
-/**
- * Check if user can add more products
- */
-async function canAddProducts(
-  userId: number,
-  count: number = 1
-): Promise<{ allowed: boolean; reason?: string }> {
-  const userResult =
-    await sql`SELECT subscription_plan, total_products FROM users WHERE id = ${userId}`;
-  if (userResult.rows.length === 0) return { allowed: false, reason: 'User not found' };
-
-  const user = userResult.rows[0];
-  const limit = getProductLimit(user.subscription_plan);
-  const currentProducts = user.total_products || 0;
-
-  if (currentProducts + count > limit) {
-    return {
-      allowed: false,
-      reason: `Достигнут лимит товаров (${currentProducts}/${limit}). Обновите тариф для добавления большего количества.`,
-    };
-  }
-
-  return { allowed: true };
-}
+// Product limit check is done inline in sync-products handler
+// Removed canAddProducts function to fix unused warning
 
 /**
  * Check if user is eligible for first-month discount
@@ -493,70 +455,8 @@ async function isFirstPayment(userId: number): Promise<boolean> {
   return parseInt(result.rows[0]?.count || '0', 10) === 0;
 }
 
-/**
- * Calculate discounted price (with Referral Discount support per ТЗ)
- */
-async function calculatePrice(
-  userId: number,
-  planId: PlanId,
-  promoCode?: string
-): Promise<{
-  originalPrice: number;
-  finalPrice: number;
-  discount: number;
-  discountReason: string;
-}> {
-  const plan = SUBSCRIPTION_PLANS[planId];
-  let finalPrice: number = plan.price;
-  let discount = 0;
-  let discountReason = '';
-
-  // Check for first payment discount (30% off)
-  const firstPayment = await isFirstPayment(userId);
-  if (firstPayment && plan.discountedPrice < plan.price) {
-    finalPrice = Number(plan.discountedPrice);
-    discount = Math.round((1 - plan.discountedPrice / plan.price) * 100);
-    discountReason = 'Скидка 30% на первый месяц';
-  }
-
-  // Check referral discount (20% off for referred users on first payment)
-  if (firstPayment) {
-    const userResult = await sql`SELECT referred_by FROM users WHERE id = ${userId}`;
-    const referredBy = userResult.rows[0]?.referred_by;
-
-    if (referredBy) {
-      const referralDiscount = Math.round((plan.price * REFERRAL_DISCOUNT_PERCENT) / 100);
-      const referralPrice = plan.price - referralDiscount;
-
-      // Apply if better than current discount
-      if (referralPrice < finalPrice) {
-        finalPrice = referralPrice;
-        discount = REFERRAL_DISCOUNT_PERCENT;
-        discountReason = `Реферальная скидка -${REFERRAL_DISCOUNT_PERCENT}%`;
-      }
-    }
-  }
-
-  // Check promo code (can stack or override)
-  if (promoCode && PROMO_CODES[promoCode.toUpperCase()]) {
-    const promo = PROMO_CODES[promoCode.toUpperCase()];
-    const promoDiscount = Math.round((plan.price * promo.discount) / 100);
-    const promoPrice = plan.price - promoDiscount;
-
-    if (promoPrice < finalPrice) {
-      finalPrice = promoPrice;
-      discount = promo.discount;
-      discountReason = `Промокод ${promoCode.toUpperCase()} (-${promo.discount}%)`;
-    }
-  }
-
-  return {
-    originalPrice: plan.price,
-    finalPrice,
-    discount,
-    discountReason,
-  };
-}
+// NOTE: calculatePrice function was removed as unused (promo/discount logic handled in create-payment)
+// Can be re-added when discount functionality is implemented in frontend
 
 /**
  * Apply referral bonus to referrer
@@ -977,12 +877,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   setCorsHeaders(req, res);
 
-  // Rate limiting by IP
+  // Rate limiting by IP - using async KV-backed limiter for persistence across cold starts
   const clientIp =
     (req.headers['x-forwarded-for'] as string)?.split(',')[0] ||
     (req.headers['x-real-ip'] as string) ||
     'unknown';
-  const rateLimit = checkRateLimit(clientIp);
+  const rateLimit = await checkRateLimitAsync(clientIp);
 
   res.setHeader('X-RateLimit-Limit', RATE_LIMIT.toString());
   res.setHeader('X-RateLimit-Remaining', rateLimit.remaining.toString());
@@ -1448,7 +1348,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         try {
           await sql`SELECT 1`;
           dbOk = true;
-        } catch {}
+        } catch (_dbError) {
+          // Database check failed, dbOk remains false
+        }
 
         return res.json({
           status: dbOk ? 'healthy' : 'unhealthy',
@@ -1827,7 +1729,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Check product limit before sync
         const productLimit = getProductLimit(dbUser.subscription_plan);
 
-        let apiDetailsDebug: any = null; // Для отладки ответа деталей
+        // Debug info collected during sync
+        const syncDebugInfo: Record<string, unknown> = {};
 
         try {
           let products: any[] = [];
@@ -1914,7 +1817,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               const detailError = await detailResponse.text();
               console.error('❌ Detail API error:', detailResponse.status, detailError);
 
-              apiDetailsDebug = {
+              syncDebugInfo.apiDetails = {
                 status: detailResponse.status,
                 error: detailError,
                 url: 'https://api-seller.ozon.ru/v3/product/info/list',
@@ -1932,7 +1835,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             } else {
               const detailData = await detailResponse.json();
 
-              apiDetailsDebug = {
+              syncDebugInfo.apiDetails = {
                 status: 200,
                 itemsCount: detailData.result?.items?.length || detailData.items?.length || 0,
                 sampleItem:
@@ -2340,6 +2243,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                             }
                           );
                         }
+
+                        // Log defense action result
+                        console.log(
+                          `🛡️ Defense API response: ${ozonUpdateRes.status} ${ozonUpdateRes.ok ? 'OK' : 'FAILED'}`
+                        );
 
                         // UPDATE DB & NOTIFY
                         await sql`
