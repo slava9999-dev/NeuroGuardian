@@ -12,6 +12,9 @@ import {
   GetProductsArgsSchema,
   CalculateUnitEconomicsArgsSchema,
   GetSalesStatsArgsSchema,
+  SetStopLossArgsSchema,
+  BulkProtectArgsSchema,
+  UpdatePricesArgsSchema,
 } from '../../schemas/agent.schema';
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
@@ -115,9 +118,15 @@ export class AgentService {
 
   private buildSystemPrompt(user: Partial<User>): string {
     return `Ты — NeuroAgent, умный AI-ассистент для селлеров.
-ТВОЯ ЗАДАЧА: Помогать продавцам Wildberries/Ozon уничтожать конкурентов с помощью аналитики.
-КОНТЕКСТ: Пользователь ${user.first_name || 'Seller'}.
-ИНСТРУМЕНТЫ: Используй unit economics и ABC analysis для конкретных цифр.`;
+ТВОЯ ЗАДАЧА: Помогать продавцам Wildberries/Ozon уничтожать конкурентов с помощью аналитики и автоматизации.
+КОНТЕКСТ: Пользователь ${user.first_name || 'Seller'} (ID: ${user.id}).
+
+ПРАВИЛА:
+1. Используй инструменты (Function Calling) для получения реальных данных.
+2. Если просят изменить цену или Stop-Loss - ВСЕГДА уточняй подтверждение, если это не явный приказ.
+3. Отвечай кратко, по делу, с использованием цифр.
+4. В unit economics учитывай комиссию WB (около 23-25% в среднем) если точной нет.
+`;
   }
 
   /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -127,34 +136,106 @@ export class AgentService {
     try {
       switch (name) {
         case 'get_products':
-          GetProductsArgsSchema.parse(args); // Validate args even if not used directly yet
-          // Limit is handled in service or DB query usually. logger.debug('gpArgs', gpArgs);
+          GetProductsArgsSchema.parse(args); // Validate args
           return productService.getProductsByUserId(userId);
+
         case 'calculate_unit_economics': {
           const cueArgs = CalculateUnitEconomicsArgsSchema.parse(args);
           return analyticsService.calculateUnitEconomics(userId, cueArgs);
         }
+
         case 'get_abc_analysis':
-          // No args for ABC currently?
           return analyticsService.getAbcAnalysis(userId);
+
         case 'get_sales_stats': {
           const gssArgs = GetSalesStatsArgsSchema.parse(args);
           return analyticsService.getSalesStats(userId, gssArgs.period, userContext.api_key_wb);
         }
+
+        case 'set_stop_loss': {
+          const sslArgs = SetStopLossArgsSchema.parse(args);
+          let minPrice = sslArgs.min_price;
+
+          // If percentage provided, calculate based on current price
+          if (minPrice === undefined && sslArgs.percentage !== undefined) {
+            const products = await productService.getProductsByUserId(userId);
+            const product = products.find(p => p.product_id === sslArgs.product_id);
+            if (product) {
+              minPrice = Math.round(product.current_price * (1 - sslArgs.percentage / 100));
+            }
+          }
+
+          if (minPrice !== undefined && minPrice > 0) {
+            await productService.updateMinPrice(userId, sslArgs.product_id, minPrice);
+            return {
+              success: true,
+              message: `Set Stop-Loss for ${sslArgs.product_id} to ${minPrice}₽`,
+            };
+          }
+          return { error: 'Product not found or invalid calculation for stop-loss' };
+        }
+
+        case 'bulk_protect_products': {
+          const bpArgs = BulkProtectArgsSchema.parse(args);
+          const products = await productService.getProductsByUserId(userId);
+          let count = 0;
+
+          for (const p of products) {
+            if (bpArgs.only_unprotected && p.status === 'protected') continue;
+
+            const minPrice = Math.round(p.current_price * (1 - bpArgs.percentage / 100));
+            if (minPrice > 0) {
+              await productService.updateMinPrice(userId, p.product_id, minPrice);
+              count++;
+            }
+          }
+          return {
+            success: true,
+            message: `Protected ${count} products with ${bpArgs.percentage}% stop-loss`,
+          };
+        }
+
+        case 'update_prices': {
+          const upArgs = UpdatePricesArgsSchema.parse(args);
+          const updates = [];
+          const products = await productService.getProductsByUserId(userId);
+
+          for (const pid of upArgs.product_ids) {
+            const p = products.find(prod => prod.product_id === pid);
+            if (!p) continue;
+
+            let newPrice = p.current_price;
+            if (upArgs.price_change) {
+              newPrice = newPrice + upArgs.price_change;
+            } else if (upArgs.price_change_percent) {
+              newPrice = newPrice * (1 + upArgs.price_change_percent / 100);
+            }
+
+            // Ensure price is positive and rounded
+            newPrice = Math.max(1, Math.round(newPrice));
+            updates.push({ productId: pid, newPrice });
+          }
+
+          if (updates.length === 0) return { error: 'No valid products found for update' };
+
+          const result = await productService.updateMarketplacePrice(userId, updates);
+          return result;
+        }
+
         default:
           return { error: `Tool ${name} not implemented yet` };
       }
     } catch (error) {
-      logger.error(`Validation failed for tool ${name}`, error, { userId, args });
+      logger.error(`Tool Error: ${name}`, error, { userId, args });
       return {
-        error: `Invalid arguments for ${name}: ${error instanceof Error ? error.message : String(error)}`,
+        error: `Error executing ${name}: ${error instanceof Error ? error.message : String(error)}`,
       };
     }
   }
 
   private async callOpenAI(messages: any[], tools?: any[], toolChoice?: any): Promise<any> {
     const body: any = {
-      model: 'gpt-4o', // Or mini
+      model: 'gpt-4o',
       messages,
       temperature: 0.7,
     };

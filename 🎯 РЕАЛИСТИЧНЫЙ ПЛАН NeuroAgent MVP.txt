@@ -1,0 +1,713 @@
+🎯 РЕАЛИСТИЧНЫЙ ПЛАН: NeuroAgent MVP за 6 недель
+📌 Часть 1: Что оставить, что выбросить (резюме)
+✅ Оставляем (критично для бизнеса):
+
+1. Валидация данных — но не "тотальную", а на ключевых границах (вход от пользователя, ответ от WB API)
+2. Audit log — но не ClickHouse, а просто отдельная таблица в Postgres
+3. RAG — но не векторную базу на 10M записей, а простую поисковую систему по истории
+4. Фоновые воркеры — но не Kafka/BullMQ, а простое очередь на Redis
+5. Circuit Breaker — простая реализация на 20 строках
+
+❌ Выбрасываем (переусложнение):
+
+1. Микросервисы — пока один монолит (Python FastAPI)
+2. Hexagonal Architecture — для MVP используем чистую структуру, но без избыточных абстракций
+3. ClickHouse + Kafka — заменяем на Postgres + Redis
+4. Eval Framework — оставляем на фазу после MVP
+5. Playwright для парсинга — нарушает ToS WB, используем только API
+
+
+📌 Часть 2: MVP Архитектура "Один умный сервис"
+┌─────────────────────────────────────────────────────────┐
+│  Telegram WebApp (React 19 + Vite)                     │
+└──────────────────────────┬──────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────┐
+│  FastAPI Backend (Python) — ОДИН СЕРВИС                │
+│  ┌──────────────────────────────────────────────────┐  │
+│  │  1. API Routes (auth, tools, chat)              │  │
+│  │  2. Agent Core (LangChain + memory)             │  │
+│  │  3. Tools Hub (WB/Ozon API wrappers)            │  │
+│  │  4. RAG Lite (поиск по истории)                 │  │
+│  │  5. Workers (Redis Queue)                       │  │
+│  │  6. Audit Log (Postgres)                        │  │
+│  └──────────────────────────────────────────────────┘  │
+└──────────────┬──────────────────────────────────────────┘
+               │
+        ┌──────┴──────┐
+        │             │
+        ▼             ▼
+┌────────────┐  ┌──────────┐
+│  Postgres  │  │  Redis   │
+│  +pgvector │  │  (Queue) │
+└────────────┘  └──────────┘
+
+Почему один сервис? Потому что вы один разработчик, а не команда из 10. Разделим позже, когда будет 100+ клиентов.
+
+📌 Часть 3: Техническая реализация (по файлам)
+Структура проекта:
+neuroagent/
+├── app/
+│   ├── main.py                 # FastAPI app
+│   ├── auth.py                 # Telegram WebApp auth
+│   ├── config.py               # Settings
+│   └── __init__.py
+├── agent/
+│   ├── core.py                 # LangChain agent
+│   ├── memory.py               # RAG Lite
+│   └── prompts.py              # Системные промпты
+├── tools/
+│   ├── wb/
+│   │   ├── prices.py           # Цены WB (с валидацией)
+│   │   └── analytics.py        # Аналитика WB
+│   └── ozon/
+│       └── prices.py           # Цены Ozon
+├── workers/
+│   ├── queue.py                # Redis Queue
+│   └── tasks.py                # Фоновые задачи
+├── schemas/
+│   ├── requests.py             # Pydantic модели
+│   └── responses.py
+├── audit/
+│   └── logger.py               # Audit log
+└── tests/
+    ├── test_wb_tool.py         # Тесты для WB
+    └── test_agent.py           # Тесты агента
+
+
+1. База данных агента (RAG Lite)
+pythonDownloadCopy code# agent/memory.py
+from sqlalchemy import Column, Integer, String, Text, DateTime, JSON
+from sqlalchemy.ext.declarative import declarative_base
+from openai import OpenAI
+import json
+
+Base = declarative_base()
+
+class AgentMemory(Base):
+    """Простая таблица памяти агента."""
+    __tablename__ = "agent_memory"
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(String, index=True)  # tg_123456
+    memory_type = Column(String)  # strategy, report, error, success
+    content = Column(Text)  # Текст
+    metadata = Column(JSON)  # {nm_ids: [123, 456], margin: 0.25}
+    embedding = Column(String)  # Сериализованный вектор (для MVP просто текстовый поиск)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class RAGLite:
+    def __init__(self, db_session, openai_client: OpenAI):
+        self.db = db_session
+        self.openai = openai_client
+    
+    async def store(self, user_id: str, memory_type: str, content: str, metadata: dict = None):
+        """Сохраняет событие в память."""
+        
+        # Для MVP: создаем эмбеддинг, но ищем просто по LIKE
+        embedding = await self.openai.embeddings.create(
+            input=content,
+            model="text-embedding-3-small"
+        )
+        
+        memory = AgentMemory(
+            user_id=user_id,
+            memory_type=memory_type,
+            content=content,
+            metadata=metadata or {},
+            embedding=json.dumps(embedding.data[0].embedding)
+        )
+        
+        self.db.add(memory)
+        self.db.commit()
+    
+    async def search(self, user_id: str, query: str, limit: int = 5):
+        """Ищет похожие события (для MVP - ILIKE, для продакшена - pgvector)."""
+        
+        # MVP: простой текстовый поиск
+        results = self.db.query(AgentMemory).filter(
+            AgentMemory.user_id == user_id,
+            AgentMemory.content.ilike(f"%{query}%")
+        ).order_by(AgentMemory.created_at.desc()).limit(limit).all()
+        
+        return [
+            {"content": m.content, "metadata": m.metadata, "date": m.created_at}
+            for m in results
+        ]
+    
+    async def get_last_strategy(self, user_id: str):
+        """Получает последнюю стратегию пользователя."""
+        
+        return self.db.query(AgentMemory).filter(
+            AgentMemory.user_id == user_id,
+            AgentMemory.memory_type == "strategy"
+        ).order_by(AgentMemory.created_at.desc()).first()
+Использование в агенте:
+pythonDownloadCopy code# agent/core.py
+from langchain_openai import ChatOpenAI
+from langchain.memory import ConversationBufferMemory
+
+class NeuroAgent:
+    def __init__(self, rag: RAGLite, wb_tool, ozon_tool):
+        self.rag = rag
+        self.tools = [wb_tool, ozon_tool]
+        self.llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.2)
+        self.memory = ConversationBufferMemory()
+    
+    async def chat(self, user_id: str, message: str):
+        # 1. Ищем контекст в памяти
+        context = await self.rag.search(user_id, message, limit=3)
+        
+        # 2. Добавляем в промпт
+        system_prompt = f"""
+        Ты помощник продавца на WB/Ozon. 
+        Контекст из прошлого: {context}
+        Отвечай кратко, по-русски, с цифрами.
+        """
+        
+        # 3. Определяем интент
+        if "цена" in message:
+            return await self.handle_price_request(user_id, message)
+        elif "конкурент" in message:
+            return await self.handle_competitor_request(user_id, message)
+        
+        # 4. Общий чат
+        response = await self.llm.ainvoke([
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": message}
+        ])
+        
+        # 5. Сохраняем в память
+        await self.rag.store(user_id, "chat", message, {"response": response.content})
+        
+        return response.content
+
+2. Валидация + Circuit Breaker (в одном файле)
+pythonDownloadCopy code# tools/circuit_breaker.py
+from pydantic import BaseModel, validator, conlist, Field
+from datetime import datetime, timedelta
+import asyncio
+
+class WbPriceUpdate(BaseModel):
+    """Валидация изменения цен WB."""
+    
+    nm_ids: conlist(int, min_items=1, max_items=500)
+    change_type: str
+    value: float = Field(ge=-50, le=50)  # Ограничение ±50%
+    
+    @validator('nm_ids')
+    def validate_nm_ids(cls, v):
+        if any(not isinstance(x, int) or x <= 0 for x in v):
+            raise ValueError("Некорректный nm_id")
+        return v
+    
+    @validator('change_type')
+    def validate_change_type(cls, v):
+        if v not in ["absolute", "percentage", "relative"]:
+            raise ValueError("Неподдерживаемый тип изменения")
+        return v
+
+class SimpleCircuitBreaker:
+    def __init__(self, threshold=3, timeout=30):
+        self.threshold = threshold
+        self.timeout = timeout
+        self.failures = 0
+        self.last_failure = None
+        self._lock = asyncio.Lock()
+    
+    async def guard(self, func, *args, **kwargs):
+        async with self._lock:
+            now = datetime.now()
+            
+            # Проверяем, не открыт ли breaker
+            if self.last_failure and (now - self.last_failure).seconds < self.timeout:
+                if self.failures >= self.threshold:
+                    raise Exception(f"WB API недоступен. Ожидание: {self.timeout - (now - self.last_failure).seconds}сек")
+            
+            try:
+                result = await func(*args, **kwargs)
+                self.failures = 0  # Сброс при успехе
+                return result
+            except Exception as e:
+                self.failures += 1
+                self.last_failure = now
+                raise e
+
+# Использование
+circuit = SimpleCircuitBreaker()
+
+async def update_prices_safe(wb_tool, data: dict):
+    # Валидация
+    validated = WbPriceUpdate(**data)
+    
+    # Выполнение с защитой
+    return await circuit.guard(wb_tool.update_prices, validated)
+
+3. Фоновые воркеры (Redis Queue)
+pythonDownloadCopy code# workers/queue.py
+from rq import Queue
+from redis import Redis
+import os
+
+redis_client = Redis.from_url(os.getenv("REDIS_URL", "redis://localhost:6379"))
+queue = Queue("neuroagent", connection=redis_client)
+
+def enqueue_price_update(user_id: str, operation_data: dict):
+    """Добавляет задачу в очередь."""
+    
+    job = queue.enqueue(
+        "workers.tasks.execute_price_update",
+        user_id=user_id,
+        operation_data=operation_data,
+        job_timeout=300,  # 5 минут
+        result_ttl=86400,  # Храним результат 1 день
+        failure_ttl=604800  # Храним ошибку 7 дней
+    )
+    
+    return job.id
+
+# workers/tasks.py
+import time
+from audit.logger import AuditLogger
+
+def execute_price_update(user_id: str, operation_data: dict):
+    """Выполняет изменение цен в фоне."""
+    
+    logger = AuditLogger()
+    
+    try:
+        # 1. Получаем токен пользователя
+        wb_api_key = get_user_key(user_id, "wb")
+        
+        # 2. Выполняем по одному (безопасно)
+        results = []
+        for nm_id in operation_data["nm_ids"]:
+            result = wb_api.update_price(nm_id, operation_data["new_price"])
+            results.append(result)
+            time.sleep(0.5)  # Чтобы не попасть под rate limit
+        
+        # 3. Логируем успех
+        logger.log(
+            user_id=user_id,
+            operation="price_update",
+            status="success",
+            items=len(results),
+            marketplace="wb"
+        )
+        
+        # 4. Сохраняем в RAG
+        rag.store(user_id, "price_update", f"Обновлено {len(results)} цен")
+        
+        return {"status": "success", "updated": len(results)}
+    
+    except Exception as e:
+        logger.log(user_id=user_id, operation="price_update", status="error", error=str(e))
+        raise
+
+4. Audit Log (просто и надежно)
+pythonDownloadCopy code# audit/logger.py
+from sqlalchemy import Column, Integer, String, Text, DateTime, JSON
+from datetime import datetime
+
+class AuditLog(Base):
+    __tablename__ = "audit_log"
+    
+    id = Column(Integer, primary_key=True)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+    user_id = Column(String, index=True)
+    operation = Column(String)  # price_update, analytics, chat
+    status = Column(String)  # success, error, pending
+    items_count = Column(Integer, default=0)
+    marketplace = Column(String)
+    error = Column(Text, nullable=True)
+    ip_address = Column(String, nullable=True)
+    llm_prompt = Column(Text, nullable=True)
+
+def log_operation(db, user_id: str, operation: str, **kwargs):
+    """Простой логгер, который пишет в Postgres."""
+    
+    log = AuditLog(user_id=user_id, operation=operation, **kwargs)
+    db.add(log)
+    db.commit()
+
+5. Telegram 2FA для критических операций
+pythonDownloadCopy code# auth/confirmation.py
+import uuid
+import asyncio
+
+class ConfirmationManager:
+    def __init__(self, redis_client):
+        self.redis = redis_client
+    
+    async def request_confirmation(self, user_id: str, operation: dict) -> str:
+        """Генерирует код подтверждения."""
+        
+        confirm_id = str(uuid.uuid4())
+        code = str(random.randint(100000, 999999))
+        
+        # Сохраняем в Redis на 10 минут
+        await self.redis.setex(
+            f"confirm:{confirm_id}",
+            600,
+            json.dumps({"user_id": user_id, "code": code, "operation": operation})
+        )
+        
+        # Отправляем в Telegram
+        await bot.send_message(
+            user_id,
+            f"🔐 Подтверждение операции:\n"
+            f"Изменить цену на {len(operation['nm_ids'])} товаров?\n"
+            f"Код: **{code}**\n"
+            f"Отправьте код в ответ."
+        )
+        
+        return confirm_id
+    
+    async def verify_code(self, confirm_id: str, user_code: str) -> bool:
+        """Проверяет код."""
+        
+        data = await self.redis.get(f"confirm:{confirm_id}")
+        if not data:
+            return False
+        
+        data = json.loads(data)
+        return data["code"] == user_code
+
+📌 Часть 4: Пошаговый план (6 недель)
+Неделя 1: Фундамент безопасности
+
+* Понедельник: poetry new neuroagent, пишем первый тест для WbPriceUpdate
+* Вторник: Добавляем Pydantic валидаторы ко всем входным данным
+* Среда: Простой AuditLog в Postgres
+* Четверг: SimpleCircuitBreaker для WB API
+* Пятница: Интеграция с Telegram 2FA для массовых изменений
+* Суббота: Code review, исправляем найденные any
+
+Результат: Нельзя сломать данные случайно.
+
+Неделя 2: Agent Core + RAG Lite
+
+* Понедельник: Таблица agent_memory в Postgres
+* Вторник: RAGLite.search() по LIKE (для MVP)
+* Среда: NeuroAgent с памятью на 10 последних сообщений
+* Четверг: Сохранение стратегий в RAG
+* Пятница: Тест: агент находит стратегию из прошлого
+* Суббота: Оптимизация
+
+Результат: "Помнишь, в прошлый раз мы обсуждали..." — работает.
+
+Неделя 3: Tools Hub + Валидация
+
+* Понедельник: WbPriceTool с полной валидацией
+* Вторник: OzonPriceTool (аналогично)
+* Среда: WbAnalyticsTool (юнит-экономика)
+* Четверг: CompetitorTool (простой поиск по артикулу)
+* Пятница: Интеграция всех tools в агента
+* Суббота: Тестирование end-to-end
+
+Результат: Агент может ответить "Какая маржинальность товара X?"
+
+Неделя 4: Фоновые воркеры
+
+* Понедельник: Redis Queue (RQ) + тестовая задача
+* Вторник: execute_price_update воркер
+* Среда: execute_competitor_scan воркер
+* Четверг: Telegram уведомления о статусе задачи
+* Пятница: Retry logic с экспоненциальной задержкой
+* Суббота: Тест: таймаут → retry → успех
+
+Результат: "Обновлю цены на 500 товаров за 15 минут, сообщу когда готово"
+
+Неделя 5: Проактивность + Правила
+
+* Понедельник: ProactiveMonitor (каждые 30 мин)
+* Вторник: Простые правила "Если конкурент < X, то Y"
+* Среда: Сохранение правил в RAG
+* Четверг: Автоматическое срабатывание правил (с подтверждением)
+* Пятница: Ежедневный отчет в 9:00
+* Суббота: Тестирование
+
+Результат: "Внимание! Конкурент снизил цену на 15%. Применить ваше правило?"
+
+Неделя 6: Интеграция + Полировка
+
+* Понедельник: Подключаем к NeuroGUARDIAN
+* Вторник: UI в Telegram для просмотра очереди задач
+* Среда: Обработка ошибок (понятные сообщения)
+* Четверг: Документация для пользователя
+* Пятница: Load testing (50 пользователей)
+* Суббота: Фиксы, деплой на Railway/Render
+
+Результат: MVP готов к первым 10 клиентам.
+
+📌 Часть 5: Техзадание для агента-кодера
+🎯 Задача: Создать NeuroAgent MVP
+Общее описание: Telegram-бот на Python/FastAPI, который помогает продавцам WB/Ozon. Работает в диалоговом режиме, может выполнять команды, помнит историю, работает в фоне.
+
+1. Что должен уметь агент:
+Базовые команды (Week 1-2):
+
+* /help — показать список команд
+* /status — статус API маркетплейсов
+* Какая маржинальность товара 123456? → считает юнит-экономику
+* Покажи конкурентов для 123456 → показывает топ-5 конкурентов
+
+Работа с ценами (Week 3-4):
+
+* Измени цену 123456 на 8500 → меняет цену + лог
+* Подними цены на все Nike на 10% → создает задачу в очереди
+* Покажи очередь задач → список активных задач
+
+Память и стратегии (Week 2-3):
+
+* Запомни: моя маржа должна быть минимум 20% → сохраняет правило
+* Какие правила у меня есть? → показать сохраненные
+* Найди стратегию демпинга → поиск в истории
+
+Проактивность (Week 5):
+
+* Каждые 30 мин сканит конкурентов
+* Если цена конкурента ниже вашей на >10% → отправляет уведомление
+* В 9:00 отправляет дайджест продаж
+
+
+2. Технические требования:
+Стек:
+
+* Python 3.11+
+* FastAPI
+* SQLAlchemy + Pydantic v2
+* PostgreSQL (Vercel) + pgvector
+* Redis (Upstash)
+* LangChain
+* OpenAI API
+
+Валидация:
+
+* ВСЕ входные данные проходят через Pydantic
+* ВСЕ выходные данные от WB API валидируются перед использованием
+* Circuit Breaker на 3 ошибки, таймаут 30 сек
+
+Безопасность:
+
+* Audit Log в таблице audit_log
+* 2FA для массовых операций (>10 товаров)
+* Rate limiting 100 запросов/мин на пользователя
+
+Тесты:
+
+* Минимум 1 тест на каждый tool
+* Минимум 1 E2E тест на основной сценарий
+* Coverage > 50% на логику валидации
+
+
+3. Что НЕ нужно делать (запрещено):
+
+* ❌ Парсить WB сайт через Playwright (нарушение ToS)
+* ❌ Хранить API ключи в открытом виде (только в Vercel env)
+* ❌ Делать микросервисы (пока монолит)
+* ❌ Использовать тип any или dict без валидации
+* ❌ Деплоить без тестов
+
+
+4. Критерии приемки (Definition of Done):
+Для каждой фичи:
+
+*  Код проходит mypy --strict
+*  Есть минимум 1 unit test
+*  Есть обработка ошибок (try/except + лог)
+*  Записывается в audit_log
+*  Протестировано вручную через Telegram
+
+Для MVP:
+
+*  3 основных сценария работают без ошибок:
+
+Изменить цену на 1 товар
+Собрать аналитику за 7 дней
+Найти конкурентов
+
+
+*  Агент помнит последнюю команду (в рамках сессии)
+*  Фоновая задача выполняется и уведомляет
+*  Падение WB API не ломает систему
+
+
+5. Первый рабочий день (что сделать в понедельник):
+
+1. 
+10:00-12:00: Создать репозиторий, настроить Poetry, добавить зависимости
+bashDownloadCopy codepoetry new neuroagent
+cd neuroagent
+poetry add fastapi uvicorn sqlalchemy pydantic openai langchain redis rq
+poetry add --group dev pytest mypy
+
+2. 
+12:00-14:00: Написать первый тест для валидации цены
+pythonDownloadCopy code# tests/test_schemas.py
+def test_price_change_validation():
+    # Успех
+    valid = WbPriceUpdate(nm_ids=[123], change_type="absolute", value=1000)
+    assert valid.value == 1000
+    
+    # Ошибка: nm_id отрицательный
+    with pytest.raises(ValidationError):
+        WbPriceUpdate(nm_ids=[-1], change_type="absolute", value=1000)
+
+3. 
+14:00-16:00: Создать таблицы в Postgres (с помощью Alembic)
+bashDownloadCopy codealembic init migrations
+# Создаем миграцию для audit_log и agent_memory
+alembic revision --autogenerate -m "Initial tables"
+
+4. 
+16:00-18:00: Написать простой эндпоинт /health и задеплоить на Railway
+pythonDownloadCopy code# app/main.py
+@app.get("/health")
+def health():
+    return {"status": "ok", "version": "0.1.0"}
+
+5. 
+18:00-19:00: Проверить деплой, настроить ENV переменные
+
+
+Итог дня: Работающий сервис на Railway, который проходит тесты и пишет в БД.
+
+6. Сколько это стоит (месяц работы):
+
+* Время: 6 недель × 5 дней × 8 часов = 240 часов
+* Деньги (если нанимать): 240ч × 30/ч = **\7200**
+* Инфраструктура (месяц):
+
+Railway Pro: $5
+Vercel Postgres: $5
+Upstash Redis: $3
+OpenAI API: ~$50 (зависит от объема)
+Итого: ~$63/месяц
+
+
+
+
+7. Когда можно показать первому клиенту:
+На конец 3-й недели будет готов прототип с:
+
+* ✅ Базовым чатом
+* ✅ Ценообразованием (1 товар)
+* ✅ Аналитикой (7 дней)
+* ⚠️ Без фоновых задач, без RAG, без проактивности
+
+На конец 6-й недели будет готов MVP с:
+
+* ✅ Всем вышеперечисленным
+* ✅ Фоновыми задачами
+* ✅ Правилами и уведомлениями
+* ✅ RAG Lite
+
+
+Раздел "Вопросы и риски":
+Риски:
+
+* WB может заблокировать API ключ при частых запросах (решение: rate limit 1 запрос/сек)
+* OpenAI API может подорожать (решение: использовать gpt-4o-mini для большинства задач)
+* Telegram может заблокировать бота за спам (решение: не отправлять >10 сообщений/час на пользователя)
+
+Вопросы к вам:
+
+1. Какой средний чек ваших клиентов? (чтобы понять, стоит ли делать 2FA)
+2. Сколько товаров в среднем у клиента? (чтобы настроить лимиты)
+3. Есть ли у вас тестовый аккаунт WB? (нужен для тестов)
+
+
+📌 Часть 6: Пример кода "Как это будет работать"
+Сценарий: Пользователь говорит "Подними цены на Nike на 15%"
+pythonDownloadCopy code# app/main.py
+@app.post("/api/chat")
+async def chat_endpoint(
+    request: ChatRequest,
+    db: Session = Depends(get_db),
+    user = Depends(verify_telegram_auth)
+):
+    # 1. Валидация входа
+    validated_request = ChatRequest(**request.dict())
+    
+    # 2. Инициализация агента
+    agent = NeuroAgent(
+        rag=RAGLite(db, openai_client),
+        wb_tool=WbPriceTool(user.wb_key),
+        ozon_tool=OzonPriceTool(user.ozon_key)
+    )
+    
+    # 3. Определяем интент
+    if "цена" in validated_request.message and "подними" in validated_request.message:
+        # 4. Парсим параметры
+        brand = extract_brand(validated_request.message)  # "Nike"
+        percent = extract_percent(validated_request.message)  # 15
+        
+        # 5. Ищем товары
+        products = await agent.wb_tool.search_by_brand(brand)
+        
+        if len(products) > 10:
+            # 6. Требуется подтверждение
+            confirm_id = await confirmation_manager.request_confirmation(
+                user.id,
+                {
+                    "nm_ids": [p.nm_id for p in products],
+                    "change_type": "percentage",
+                    "value": percent
+                }
+            )
+            
+            return {
+                "status": "confirmation_required",
+                "confirm_id": confirm_id,
+                "message": f"Найдено {len(products)} товаров. Подтвердите кодом."
+            }
+        
+        # 7. Выполняем сразу
+        job_id = enqueue_price_update(user.id, {
+            "nm_ids": [p.nm_id for p in products],
+            "change_type": "percentage",
+            "value": percent
+        })
+        
+        return {
+            "status": "queued",
+            "job_id": job_id,
+            "message": "Задача добавлена в очередь"
+        }
+    
+    # 8. Обычный чат
+    response = await agent.chat(user.id, validated_request.message)
+    
+    # 9. Логируем
+    audit_logger.log(
+        user_id=user.id,
+        operation="chat",
+        status="success",
+        llm_prompt=validated_request.message
+    )
+    
+    return {"status": "ok", "response": response}
+Фронтенд (React) показывает статус:
+typescriptDownloadCopy code// TelegramWebApp.tsx
+function PriceUpdateStatus({ jobId }) {
+  const [status, setStatus] = useState('pending');
+  
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const res = await fetch(`/api/job/${jobId}`);
+      const data = await res.json();
+      setStatus(data.status);
+      
+      if (data.status === 'completed') {
+        clearInterval(interval);
+        WebApp.showAlert(`Обновлено ${data.result.updated} товаров`);
+      }
+    }, 5000);
+    
+    return () => clearInterval(interval);
+  }, [jobId]);
+  
+  return <ProgressBar status={status} />;
+}

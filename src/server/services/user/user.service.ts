@@ -2,21 +2,32 @@ import { sql, mapDbUser } from '../../core/db';
 import { UserSchema, type User, UpdateUserSchema } from '../../schemas/user.schema';
 import { logger } from '../../utils/logger';
 
+// TEST_MODE flag - mirrors the one in api/index.ts
+const TEST_MODE = process.env.TEST_MODE === 'true';
+
 export class UserService {
+  /**
+   * Get user by ID (Telegram user ID)
+   */
   async getUserById(userId: number): Promise<User | null> {
     try {
       const result = await sql`SELECT * FROM users WHERE id = ${userId}`;
       if (result.rows.length === 0) return null;
 
       const rawUser = mapDbUser(result.rows[0]);
+
       // Validate data coming from DB to ensure it matches our application schema
       const parseResult = UserSchema.safeParse(rawUser);
 
       if (!parseResult.success) {
-        logger.error('DB Validation Error', parseResult.error, { userId });
-        // In production, we might want to return null or throw, but for now log and return raw casted
+        logger.warn('DB User Validation Warning', {
+          userId,
+          errors: parseResult.error.issues.map(i => `${i.path}: ${i.message}`),
+        });
+        // Return raw user data even if validation fails (for backwards compatibility)
         return rawUser as User;
       }
+
       return parseResult.data;
     } catch (error) {
       logger.error('Failed to get user', error, { userId });
@@ -24,36 +35,64 @@ export class UserService {
     }
   }
 
+  /**
+   * Update user data
+   */
   async updateUser(userId: number, data: Partial<User>): Promise<void> {
     try {
       // Validate update payload
       const validatedData = UpdateUserSchema.parse(data);
 
-      // This is a dynamic query builder (simplified)
-      // In a real ORM we'd have better tools, but with sql template literals we have to be careful
-      // For now, let's just log as this is a placeholder implementation from previous step
-      logger.info('Update user requested (validated)', { userId, validatedData });
+      logger.info('Update user requested', { userId, fields: Object.keys(validatedData) });
 
-      // Example implementation if we were actually updating:
-      // const setParams = Object.entries(validatedData).map(([k, v]) => sql`${sql(k)} = ${v}`);
-      // await sql`UPDATE users SET ... WHERE id = ${userId}`;
+      // Build dynamic update - for now just log
+      // TODO: Implement actual dynamic SQL update
     } catch (error) {
       logger.error('Update user validation failed', error, { userId });
       throw error;
     }
   }
 
+  /**
+   * Check if user has active subscription
+   * In TEST_MODE, always returns true (free Pro for everyone)
+   */
   isSubscriptionActive(user: User | null): boolean {
+    // TEST MODE: everyone gets free access
+    if (TEST_MODE) return true;
+
     if (!user) return false;
-    if (user.is_premium) return true;
-    if (user.subscription_status === 'active') return true;
+
+    // Check subscription_active flag
+    if (user.subscription_active) return true;
 
     // Check dates if needed
-    if (user.subscription_end_date) {
-      return new Date(user.subscription_end_date) > new Date();
+    if (user.subscription_end) {
+      const endDate = new Date(user.subscription_end);
+      return endDate > new Date();
     }
 
     return false;
+  }
+
+  /**
+   * Get product limit based on subscription plan
+   * In TEST_MODE, always returns Pro limit (500)
+   */
+  getProductLimit(plan: string | null): number {
+    if (TEST_MODE) return 500;
+
+    switch (plan) {
+      case 'pro':
+      case 'yearly':
+        return 500;
+      case 'basic':
+        return 50;
+      case 'trial':
+        return 20;
+      default:
+        return 0;
+    }
   }
 }
 

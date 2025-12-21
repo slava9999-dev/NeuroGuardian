@@ -10,6 +10,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { agentService } from '../src/server/services/agent/agent.service';
 import { userService } from '../src/server/services/user/user.service';
 import { logger } from '../src/server/utils/logger';
+import { taskQueue, taskProcessor } from '../src/server/services/queue';
+import { notificationService } from '../src/server/services/notification/notification.service';
 
 // ============================================
 // CONFIGURATION
@@ -3159,6 +3161,123 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
+      // ========== TASK QUEUE: LIST TASKS ==========
+      case 'tasks': {
+        const initData = sanitizeInput(
+          (req.headers['x-init-data'] as string) || req.body?.initData || ''
+        );
+        const validation = validateTelegramInitData(initData);
+        if (!validation.valid || !validation.user) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const tasks = await taskQueue.getUserTasks(validation.user.id, 20);
+        const stats = await taskQueue.getStats();
+
+        return res.json({
+          success: true,
+          tasks: tasks.map(t => ({
+            id: t.id,
+            type: t.type,
+            status: t.status,
+            priority: t.priority,
+            progress: t.progress,
+            createdAt: t.createdAt,
+            completedAt: t.completedAt,
+            lastError: t.lastError,
+          })),
+          stats,
+        });
+      }
+
+      // ========== TASK QUEUE: ENQUEUE TASK ==========
+      case 'task-enqueue': {
+        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+        const initData = sanitizeInput(
+          (req.headers['x-init-data'] as string) || req.body?.initData || ''
+        );
+        const validation = validateTelegramInitData(initData);
+        if (!validation.valid || !validation.user) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const { taskType, payload, priority } = req.body;
+
+        if (!taskType || !payload) {
+          return res.status(400).json({ error: 'taskType and payload are required' });
+        }
+
+        // Validate task type
+        const validTypes = ['price_update', 'bulk_stop_loss', 'sync_products'];
+        if (!validTypes.includes(taskType)) {
+          return res.status(400).json({
+            error: 'Invalid task type',
+            validTypes,
+          });
+        }
+
+        const task = await taskQueue.enqueue(validation.user.id, taskType, payload, {
+          priority: priority || 'normal',
+        });
+
+        return res.json({
+          success: true,
+          message: 'Task enqueued',
+          task: {
+            id: task.id,
+            type: task.type,
+            status: task.status,
+          },
+        });
+      }
+
+      // ========== TASK QUEUE: CANCEL TASK ==========
+      case 'task-cancel': {
+        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+        const initData = sanitizeInput(
+          (req.headers['x-init-data'] as string) || req.body?.initData || ''
+        );
+        const validation = validateTelegramInitData(initData);
+        if (!validation.valid || !validation.user) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const { taskId } = req.body;
+        if (!taskId) {
+          return res.status(400).json({ error: 'taskId is required' });
+        }
+
+        const cancelled = await taskQueue.cancel(taskId, validation.user.id);
+
+        return res.json({
+          success: cancelled,
+          message: cancelled ? 'Task cancelled' : 'Could not cancel task',
+        });
+      }
+
+      // ========== TASK QUEUE: PROCESS TASKS (CRON) ==========
+      case 'process-tasks': {
+        // Only allow from Cron or Admin
+        const authHeader = req.headers['authorization'];
+        const isCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+        const isAdmin = req.headers['x-admin-key'] === ADMIN_API_KEY;
+
+        if (!isCron && !isAdmin && IS_PRODUCTION) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        console.log('⚙️ Processing task queue...');
+        const result = await taskProcessor.processPendingTasks();
+
+        return res.json({
+          success: true,
+          message: 'Task processing complete',
+          ...result,
+        });
+      }
+
       // ========== DEFAULT ==========
       default:
         return res.status(400).json({
@@ -3180,6 +3299,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             'agent',
             'agent-confirm',
             'agent-status',
+            'tasks',
+            'task-enqueue',
+            'task-cancel',
+            'process-tasks',
             'admin-activate-trial',
             'admin-check-user',
             'admin-list-users',
