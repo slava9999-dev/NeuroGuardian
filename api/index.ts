@@ -371,7 +371,7 @@ async function callOpenAI(
  * Call OpenAI with Function Calling (Tools)
  * GPT сам решает какую функцию вызвать!
  */
-async function callOpenAIWithTools(
+export async function callOpenAIWithTools(
   messages: OpenAIMessage[],
   userId: number,
   userContext: {
@@ -517,7 +517,7 @@ async function callOpenAIWithTools(
 /**
  * Выполнение инструмента агента
  */
-async function executeAgentTool(
+export async function executeAgentTool(
   toolName: string,
   args: any,
   userId: number,
@@ -534,23 +534,37 @@ async function executeAgentTool(
     // ========== GET PRODUCTS ==========
     case 'get_products': {
       const { marketplace = 'all', limit = 20, sort_by = 'price' } = args;
-      let query = `SELECT * FROM products WHERE user_id = ${userId}`;
 
-      if (marketplace !== 'all') {
-        query += ` AND marketplace = '${marketplace}'`;
-      }
+      // SECURITY: Валидация входных данных от GPT
+      const safeMarketplace = ['WB', 'Ozon', 'all'].includes(marketplace) ? marketplace : 'all';
+      const safeLimit = Math.min(Math.max(1, parseInt(limit) || 20), 100); // 1-100
+      const safeSortBy = ['price', 'stock', 'name'].includes(sort_by) ? sort_by : 'price';
 
-      if (sort_by === 'price') {
-        query += ' ORDER BY current_price DESC';
-      } else if (sort_by === 'stock') {
-        query += ' ORDER BY current_stock DESC';
+      // SECURITY: Используем параметризованные запросы вместо строковой интерполяции
+      let result;
+      if (safeMarketplace === 'all') {
+        if (safeSortBy === 'price') {
+          result =
+            await sql`SELECT * FROM products WHERE user_id = ${userId} ORDER BY current_price DESC LIMIT ${safeLimit}`;
+        } else if (safeSortBy === 'stock') {
+          result =
+            await sql`SELECT * FROM products WHERE user_id = ${userId} ORDER BY current_stock DESC LIMIT ${safeLimit}`;
+        } else {
+          result =
+            await sql`SELECT * FROM products WHERE user_id = ${userId} ORDER BY title ASC LIMIT ${safeLimit}`;
+        }
       } else {
-        query += ' ORDER BY title ASC';
+        if (safeSortBy === 'price') {
+          result =
+            await sql`SELECT * FROM products WHERE user_id = ${userId} AND marketplace = ${safeMarketplace} ORDER BY current_price DESC LIMIT ${safeLimit}`;
+        } else if (safeSortBy === 'stock') {
+          result =
+            await sql`SELECT * FROM products WHERE user_id = ${userId} AND marketplace = ${safeMarketplace} ORDER BY current_stock DESC LIMIT ${safeLimit}`;
+        } else {
+          result =
+            await sql`SELECT * FROM products WHERE user_id = ${userId} AND marketplace = ${safeMarketplace} ORDER BY title ASC LIMIT ${safeLimit}`;
+        }
       }
-
-      query += ` LIMIT ${limit}`;
-
-      const result = await sql.query(query);
       const products = result.rows.map((p: any) => ({
         id: p.product_id,
         name: p.title?.substring(0, 50),
@@ -4001,6 +4015,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const startTime = Date.now();
 
+        // ============================================
+        // ИСТОРИЯ ДИАЛОГА (сохраняется в Vercel KV)
+        // ============================================
+        const kv = getKVClient();
+        const historyKey = `chat:${userId}`;
+        let conversationHistory: Array<{ role: string; content: string }> = [];
+
+        // Загружаем историю из KV
+        if (kv) {
+          try {
+            const savedHistory = await kv.get(historyKey);
+            if (savedHistory && Array.isArray(savedHistory)) {
+              conversationHistory = savedHistory as Array<{ role: string; content: string }>;
+              console.log(`📜 Loaded ${conversationHistory.length} messages from history`);
+            }
+          } catch (e) {
+            console.warn('⚠️ Failed to load chat history:', e);
+          }
+        }
+
+        // Ограничиваем историю последними 10 сообщениями (для экономии токенов)
+        if (conversationHistory.length > 20) {
+          conversationHistory = conversationHistory.slice(-20);
+        }
+
         // Get user products for context
         const products = await getProductsByUserId(userId);
         const protectedCount = products.filter((p: any) => p.min_price > 0).length;
@@ -4058,11 +4097,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           ozonClientId: undefined, // TODO: добавить если есть
         };
 
-        // Prepare messages for GPT with tools
-        const messages: OpenAIMessage[] = [
-          { role: 'system', content: enhancedSystemPrompt },
-          { role: 'user', content: message },
-        ];
+        // Prepare messages for GPT with tools (включая историю!)
+        const messages: OpenAIMessage[] = [{ role: 'system', content: enhancedSystemPrompt }];
+
+        // Добавляем историю диалога (последние сообщения)
+        for (const histMsg of conversationHistory.slice(-10)) {
+          if (histMsg.role === 'user' || histMsg.role === 'assistant') {
+            messages.push({ role: histMsg.role as 'user' | 'assistant', content: histMsg.content });
+          }
+        }
+
+        // Добавляем текущее сообщение пользователя
+        messages.push({ role: 'user', content: message });
 
         // Call OpenAI with Function Calling!
         const gptResult = await callOpenAIWithTools(
@@ -4091,6 +4137,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           // Pass through action required from tools
           if (gptResult.actionRequired) {
             agentResponse.actionRequired = gptResult.actionRequired;
+          }
+
+          // СОХРАНЯЕМ ИСТОРИЮ в Vercel KV
+          if (kv) {
+            try {
+              // Добавляем новые сообщения в историю
+              conversationHistory.push({ role: 'user', content: message });
+              conversationHistory.push({ role: 'assistant', content: gptResult.content });
+
+              // Ограничиваем до 20 последних сообщений
+              if (conversationHistory.length > 20) {
+                conversationHistory = conversationHistory.slice(-20);
+              }
+
+              // Сохраняем с TTL 24 часа
+              await kv.set(historyKey, conversationHistory, { ex: 86400 });
+              console.log(`💾 Saved ${conversationHistory.length} messages to history`);
+            } catch (e) {
+              console.warn('⚠️ Failed to save chat history:', e);
+            }
           }
         } else {
           // Fallback to static logic if OpenAI fails
@@ -4157,19 +4223,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         let resultContent = '';
         let executed = false;
 
+        const details = typeof _details === 'string' ? JSON.parse(_details) : _details || {};
+
         if (operation === 'bulk_set_min_price') {
+          // Массовая установка Stop-Loss
+          const percentage = details.percentage || 15;
           const products = await getProductsByUserId(userId);
-          const unprotected = products.filter((p: any) => !p.min_price || p.min_price === 0);
+
+          const filteredProducts = details.only_unprotected
+            ? products.filter((p: any) => !p.min_price || p.min_price === 0)
+            : products;
+
           let updated = 0;
-          for (const product of unprotected) {
-            const minPrice = Math.floor((product.current_price || 0) * 0.85);
+          for (const product of filteredProducts) {
+            const minPrice = Math.floor((product.current_price || 0) * (1 - percentage / 100));
             if (minPrice > 0) {
               await updateProductMinPrice(userId, product.product_id, minPrice);
               updated++;
             }
           }
-          resultContent = `✅ **Защищено товаров: ${updated}**\n\nМинимальные цены (-15%) установлены.`;
+          resultContent = `✅ **Успешно!**\n\nДля ${updated} товаров установлен Stop-Loss (-${percentage}%).`;
           executed = true;
+        } else if (operation === 'set_stop_loss') {
+          // Одиночная установка Stop-Loss
+          const { product_id, min_price } = details;
+          if (product_id && min_price) {
+            await updateProductMinPrice(userId, product_id, min_price);
+            resultContent = `✅ **Stop-Loss установлен!**\n\nНовая минимальная цена: ${min_price} ₽`;
+            executed = true;
+          } else {
+            resultContent = '❌ Ошибка: не указан товар или цена.';
+          }
+        } else if (operation === 'update_prices') {
+          // Изменение цен (заглушка, так как API изменения цен только для чтения пока)
+          // TODO: Реализовать реальный updateProductPrice
+          const { product_ids, price_change, price_change_percent } = details;
+
+          if (product_ids && (price_change || price_change_percent)) {
+            // Здесь должен быть вызов WB/Ozon API для изменения цен
+            // Пока просто логируем и сообщаем пользователю (безопасность)
+            console.log(`[STUB] Updating prices for ${userId}:`, details);
+            resultContent = `✅ **Цены обновлены!** (в режиме симуляции)\n\nТоваров: ${product_ids.length}\nИзменение: ${price_change ? `${price_change} ₽` : `${price_change_percent}%`}`;
+            executed = true;
+          } else {
+            resultContent = '❌ Ошибка данных для обновления цен.';
+          }
         } else {
           resultContent = '❌ Неизвестная операция.';
         }
