@@ -3,18 +3,9 @@
 // All endpoints in one file (Vercel Hobby limit: 12 functions)
 // ============================================
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql } from '@vercel/postgres';
 import { v4 as uuidv4 } from 'uuid';
-import { agentService } from '../src/server/services/agent/agent.service';
-import { userService } from '../src/server/services/user/user.service';
-import { logger } from '../src/server/utils/logger';
-import { taskQueue, taskProcessor } from '../src/server/services/queue';
-import { notificationService } from '../src/server/services/notification/notification.service';
-// TODO: Re-enable after fixing import issue
-// import { rulesService } from '../src/server/services/rules/rules.service';
-// import { RULE_TEMPLATES } from '../src/server/services/rules/rules.types';
 
 // ============================================
 // CONFIGURATION
@@ -32,27 +23,1097 @@ const ENCRYPTION_ALGORITHM = 'aes-256-gcm';
 // ============================================
 // OPENAI CONFIGURATION
 // ============================================
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
 // AI Agent System Prompt - defines the agent's behavior
+const AGENT_SYSTEM_PROMPT = `Ты — NeuroAgent, умный AI-ассистент для селлеров Wildberries и Ozon.
+
+🎯 ТВОЯ РОЛЬ:
+Ты помогаешь продавцам маркетплейсов управлять их бизнесом через чат. Ты дружелюбный, профессиональный и всегда даёшь конкретные советы.
+
+📊 ДОСТУПНЫЕ ИНСТРУМЕНТЫ:
+- get_products: список товаров пользователя
+- get_stats: статистика (защищённые товары, триггеры, сэкономлено)
+- set_stop_loss: установить минимальную цену на товар
+- bulk_protect: защитить все товары сразу
+
+🛡️ ЧТО ТАКОЕ ЗАЩИТА (STOP-LOSS):
+- Минимальная цена — это порог, ниже которого продавать невыгодно
+- Когда маркетплейс снижает цену ниже этого порога (например, во время акции), система:
+  - Либо обнуляет остаток товара (снимает с продажи)
+  - Либо возвращает цену обратно
+- Это защищает продавца от убытков
+
+💬 КАК ОТВЕЧАТЬ:
+1. Всегда отвечай на русском языке
+2. Используй emoji для структурирования ответа
+3. Форматируй важные числа жирным: **123**
+4. Если нужно действие — запроси подтверждение
+5. Давай конкретные советы, не абстрактные
+6. Если чего-то не знаешь — честно скажи
+
+📋 КОНТЕКСТ ПОЛЬЗОВАТЕЛЯ (передаётся отдельно):
+- Имя, количество товаров, статус подписки
+- Список товаров с ценами и статусами защиты
+- История срабатываний защиты
+
+⚠️ ОГРАНИЧЕНИЯ:
+- Ты НЕ можешь напрямую менять цены — только предлагать и запрашивать подтверждение
+- Ты НЕ имеешь доступа к реальным продажам маркетплейса (только к товарам в системе)
+- Для детальной аналитики пользователю нужно подключить API маркетплейса
+
+Отвечай кратко и по делу!`;
 
 // ============================================
 // AI AGENT TOOLS DEFINITIONS (Function Calling)
 // Эти инструменты GPT может вызывать сам!
 // ============================================
 
+const AGENT_TOOLS = [
+  {
+    type: 'function' as const,
+    function: {
+      name: 'get_products',
+      description:
+        'Получить список товаров пользователя с ценами, остатками и статусом защиты. Используй когда пользователь спрашивает о своих товарах.',
+      parameters: {
+        type: 'object',
+        properties: {
+          marketplace: {
+            type: 'string',
+            enum: ['WB', 'Ozon', 'all'],
+            description: 'Маркетплейс для фильтрации. По умолчанию all.',
+          },
+          limit: {
+            type: 'number',
+            description: 'Максимум товаров. По умолчанию 20.',
+          },
+          sort_by: {
+            type: 'string',
+            enum: ['price', 'stock', 'name'],
+            description: 'Сортировка: price (по цене), stock (по остаткам), name (по названию)',
+          },
+        },
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'get_sales_stats',
+      description:
+        'Получить статистику продаж за период. Используй когда пользователь спрашивает о продажах, выручке, заказах.',
+      parameters: {
+        type: 'object',
+        properties: {
+          period: {
+            type: 'string',
+            enum: ['today', 'yesterday', 'week', 'month', '3months'],
+            description: 'Период для статистики',
+          },
+          marketplace: {
+            type: 'string',
+            enum: ['WB', 'Ozon', 'all'],
+            description: 'Маркетплейс',
+          },
+        },
+        required: ['period'],
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'calculate_unit_economics',
+      description:
+        'Расчёт юнит-экономики: прибыль на товар с учётом комиссий, логистики, налогов. Используй когда пользователь спрашивает о прибыли, рентабельности, маржинальности.',
+      parameters: {
+        type: 'object',
+        properties: {
+          product_id: {
+            type: 'string',
+            description: 'ID конкретного товара (опционально)',
+          },
+          cost_price: {
+            type: 'number',
+            description: 'Себестоимость товара в рублях (если пользователь указал)',
+          },
+          marketplace: {
+            type: 'string',
+            enum: ['WB', 'Ozon'],
+            description: 'Маркетплейс для расчёта комиссий',
+          },
+        },
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'get_abc_analysis',
+      description:
+        'ABC-анализ товаров: какие приносят 80% выручки (A), 15% (B), 5% (C). Используй когда пользователь хочет понять какие товары самые важные.',
+      parameters: {
+        type: 'object',
+        properties: {
+          period: {
+            type: 'string',
+            enum: ['week', 'month', '3months'],
+            description: 'Период для анализа',
+          },
+        },
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'get_stock_forecast',
+      description:
+        'Прогноз остатков: когда товар закончится на складе. Используй когда пользователь спрашивает о запасах, когда заказывать товар.',
+      parameters: {
+        type: 'object',
+        properties: {
+          product_id: {
+            type: 'string',
+            description: 'ID товара (опционально, если не указан - все товары)',
+          },
+        },
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'set_stop_loss',
+      description:
+        'Установить минимальную цену (Stop-Loss) для защиты от демпинга. ТРЕБУЕТ ПОДТВЕРЖДЕНИЯ!',
+      parameters: {
+        type: 'object',
+        properties: {
+          product_id: {
+            type: 'string',
+            description: 'ID товара',
+          },
+          min_price: {
+            type: 'number',
+            description: 'Минимальная цена в рублях',
+          },
+          percentage: {
+            type: 'number',
+            description: 'Или процент от текущей цены (например 15 = -15%)',
+          },
+        },
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'bulk_protect_products',
+      description: 'Массовая защита товаров Stop-Loss. ТРЕБУЕТ ПОДТВЕРЖДЕНИЯ!',
+      parameters: {
+        type: 'object',
+        properties: {
+          percentage: {
+            type: 'number',
+            description: 'Процент от текущей цены для Stop-Loss (5-50%)',
+          },
+          only_unprotected: {
+            type: 'boolean',
+            description: 'Только незащищённые товары',
+          },
+        },
+        required: ['percentage'],
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'update_prices',
+      description:
+        'Изменить цены на товары. ТРЕБУЕТ ПОДТВЕРЖДЕНИЯ! Используй когда пользователь хочет поднять/понизить цены.',
+      parameters: {
+        type: 'object',
+        properties: {
+          product_ids: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Список ID товаров',
+          },
+          price_change: {
+            type: 'number',
+            description: 'Изменение цены в рублях (+500 или -200)',
+          },
+          price_change_percent: {
+            type: 'number',
+            description: 'Или изменение в процентах (+10 или -5)',
+          },
+        },
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'get_orders',
+      description:
+        'Получить список заказов за период. Используй когда пользователь спрашивает о заказах.',
+      parameters: {
+        type: 'object',
+        properties: {
+          period: {
+            type: 'string',
+            enum: ['today', 'yesterday', 'week', 'month'],
+            description: 'Период',
+          },
+          marketplace: {
+            type: 'string',
+            enum: ['WB', 'Ozon', 'all'],
+          },
+          status: {
+            type: 'string',
+            enum: ['all', 'new', 'processing', 'delivered', 'cancelled'],
+            description: 'Статус заказов',
+          },
+        },
+        required: ['period'],
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'get_warehouse_stocks',
+      description: 'Получить остатки на складах маркетплейса в реальном времени.',
+      parameters: {
+        type: 'object',
+        properties: {
+          marketplace: {
+            type: 'string',
+            enum: ['WB', 'Ozon'],
+          },
+          low_stock_only: {
+            type: 'boolean',
+            description: 'Только товары с низким остатком (< 10 шт)',
+          },
+        },
+      },
+    },
+  },
+];
+
 // Типы для tool calls
+interface ToolCall {
+  id: string;
+  type: 'function';
+  function: {
+    name: string;
+    arguments: string;
+  };
+}
+
+interface OpenAIMessage {
+  role: 'system' | 'user' | 'assistant' | 'tool';
+  content: string | null;
+  tool_calls?: ToolCall[];
+  tool_call_id?: string;
+}
 
 /**
  * Call OpenAI Chat Completion API (базовая версия без tools)
  */
+async function callOpenAI(
+  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+  model: 'gpt-4o-mini' | 'gpt-4o' = 'gpt-4o-mini',
+  maxTokens: number = 800
+): Promise<{ success: boolean; content: string; tokensUsed?: number }> {
+  if (!OPENAI_API_KEY) {
+    console.warn('⚠️ OPENAI_API_KEY not configured, using fallback responses');
+    return { success: false, content: '' };
+  }
+
+  try {
+    const response = await fetch(OPENAI_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        max_tokens: maxTokens,
+        temperature: 0.7,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('OpenAI API error:', response.status, errorData);
+      return { success: false, content: '' };
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || '';
+    const tokensUsed = data.usage?.total_tokens || 0;
+
+    return { success: true, content, tokensUsed };
+  } catch (error) {
+    console.error('OpenAI API call failed:', error);
+    return { success: false, content: '' };
+  }
+}
+
+/**
+ * Call OpenAI with Function Calling (Tools)
+ * GPT сам решает какую функцию вызвать!
+ */
+export async function callOpenAIWithTools(
+  messages: OpenAIMessage[],
+  userId: number,
+  userContext: {
+    wbApiKey?: string;
+    ozonApiKey?: string;
+    ozonClientId?: string;
+  },
+  model: 'gpt-4o-mini' | 'gpt-4o' = 'gpt-4o-mini',
+  maxTokens: number = 1500
+): Promise<{
+  success: boolean;
+  content: string;
+  toolsUsed: string[];
+  tokensUsed: number;
+  actionRequired?: {
+    type: string;
+    operation: string;
+    details: any;
+    confirmationMessage: string;
+  };
+}> {
+  if (!OPENAI_API_KEY) {
+    return { success: false, content: '', toolsUsed: [], tokensUsed: 0 };
+  }
+
+  const toolsUsed: string[] = [];
+  let totalTokens = 0;
+
+  try {
+    // Первый вызов - GPT решает нужны ли tools
+    const response = await fetch(OPENAI_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        tools: AGENT_TOOLS,
+        tool_choice: 'auto',
+        max_tokens: maxTokens,
+        temperature: 0.5,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('OpenAI Tools API error:', response.status, errorData);
+      return { success: false, content: '', toolsUsed: [], tokensUsed: 0 };
+    }
+
+    const data = await response.json();
+    totalTokens += data.usage?.total_tokens || 0;
+
+    const assistantMessage = data.choices?.[0]?.message;
+
+    // Если GPT не хочет использовать tools - возвращаем текст
+    if (!assistantMessage?.tool_calls || assistantMessage.tool_calls.length === 0) {
+      return {
+        success: true,
+        content: assistantMessage?.content || '',
+        toolsUsed: [],
+        tokensUsed: totalTokens,
+      };
+    }
+
+    // GPT хочет вызвать функции!
+    console.log(`🔧 GPT wants to call ${assistantMessage.tool_calls.length} tools`);
+
+    const updatedMessages: OpenAIMessage[] = [...messages, assistantMessage];
+    let pendingConfirmation: any = null;
+
+    // Выполняем каждый tool call
+    for (const toolCall of assistantMessage.tool_calls) {
+      const functionName = toolCall.function.name;
+      const args = JSON.parse(toolCall.function.arguments || '{}');
+
+      console.log(`🔧 Executing tool: ${functionName}`, args);
+      toolsUsed.push(functionName);
+
+      // Выполняем функцию
+      const result = await executeAgentTool(functionName, args, userId, userContext);
+
+      // Проверяем нужно ли подтверждение
+      if (result.requiresConfirmation) {
+        pendingConfirmation = {
+          type: 'confirmation',
+          operation: functionName,
+          details: result.confirmationDetails,
+          confirmationMessage: result.confirmationMessage,
+        };
+      }
+
+      // Добавляем результат в messages
+      updatedMessages.push({
+        role: 'tool',
+        tool_call_id: toolCall.id,
+        content: JSON.stringify(result.data),
+      });
+    }
+
+    // Второй вызов - GPT формирует финальный ответ
+    const finalResponse = await fetch(OPENAI_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: updatedMessages,
+        max_tokens: maxTokens,
+        temperature: 0.7,
+      }),
+    });
+
+    if (!finalResponse.ok) {
+      return {
+        success: false,
+        content: 'Ошибка обработки данных',
+        toolsUsed,
+        tokensUsed: totalTokens,
+      };
+    }
+
+    const finalData = await finalResponse.json();
+    totalTokens += finalData.usage?.total_tokens || 0;
+
+    return {
+      success: true,
+      content: finalData.choices?.[0]?.message?.content || '',
+      toolsUsed,
+      tokensUsed: totalTokens,
+      actionRequired: pendingConfirmation,
+    };
+  } catch (error) {
+    console.error('OpenAI Tools call failed:', error);
+    return { success: false, content: '', toolsUsed, tokensUsed: totalTokens };
+  }
+}
 
 /**
  * Выполнение инструмента агента
  */
+export async function executeAgentTool(
+  toolName: string,
+  args: any,
+  userId: number,
+  userContext: { wbApiKey?: string; ozonApiKey?: string; ozonClientId?: string }
+): Promise<{
+  data: any;
+  requiresConfirmation?: boolean;
+  confirmationMessage?: string;
+  confirmationDetails?: any;
+}> {
+  const { wbApiKey, ozonApiKey, ozonClientId } = userContext;
+
+  switch (toolName) {
+    // ========== GET PRODUCTS ==========
+    case 'get_products': {
+      const { marketplace = 'all', limit = 20, sort_by = 'price' } = args;
+
+      // SECURITY: Валидация входных данных от GPT
+      const safeMarketplace = ['WB', 'Ozon', 'all'].includes(marketplace) ? marketplace : 'all';
+      const safeLimit = Math.min(Math.max(1, parseInt(limit) || 20), 100); // 1-100
+      const safeSortBy = ['price', 'stock', 'name'].includes(sort_by) ? sort_by : 'price';
+
+      // SECURITY: Используем параметризованные запросы вместо строковой интерполяции
+      let result;
+      if (safeMarketplace === 'all') {
+        if (safeSortBy === 'price') {
+          result =
+            await sql`SELECT * FROM products WHERE user_id = ${userId} ORDER BY current_price DESC LIMIT ${safeLimit}`;
+        } else if (safeSortBy === 'stock') {
+          result =
+            await sql`SELECT * FROM products WHERE user_id = ${userId} ORDER BY current_stock DESC LIMIT ${safeLimit}`;
+        } else {
+          result =
+            await sql`SELECT * FROM products WHERE user_id = ${userId} ORDER BY title ASC LIMIT ${safeLimit}`;
+        }
+      } else {
+        if (safeSortBy === 'price') {
+          result =
+            await sql`SELECT * FROM products WHERE user_id = ${userId} AND marketplace = ${safeMarketplace} ORDER BY current_price DESC LIMIT ${safeLimit}`;
+        } else if (safeSortBy === 'stock') {
+          result =
+            await sql`SELECT * FROM products WHERE user_id = ${userId} AND marketplace = ${safeMarketplace} ORDER BY current_stock DESC LIMIT ${safeLimit}`;
+        } else {
+          result =
+            await sql`SELECT * FROM products WHERE user_id = ${userId} AND marketplace = ${safeMarketplace} ORDER BY title ASC LIMIT ${safeLimit}`;
+        }
+      }
+      const products = result.rows.map((p: any) => ({
+        id: p.product_id,
+        name: p.title?.substring(0, 50),
+        price: p.current_price,
+        stock: p.current_stock,
+        minPrice: p.min_price,
+        protected: p.min_price > 0,
+        marketplace: p.marketplace,
+      }));
+
+      return {
+        data: {
+          total: products.length,
+          products,
+          summary: {
+            totalProducts: products.length,
+            protected: products.filter((p: any) => p.protected).length,
+            unprotected: products.filter((p: any) => !p.protected).length,
+            avgPrice: Math.round(
+              products.reduce((s: number, p: any) => s + p.price, 0) / products.length || 0
+            ),
+          },
+        },
+      };
+    }
+
+    // ========== GET SALES STATS ==========
+    case 'get_sales_stats': {
+      const { period = 'week', marketplace = 'all' } = args;
+
+      // Получаем данные из WB API если доступен
+      if (wbApiKey && (marketplace === 'all' || marketplace === 'WB')) {
+        try {
+          const dateFrom = getDateFromPeriod(period);
+          const dateTo = new Date().toISOString().split('T')[0];
+
+          const salesResponse = await fetchWithRetry(
+            `https://statistics-api.wildberries.ru/api/v1/supplier/sales?dateFrom=${dateFrom}`,
+            {
+              method: 'GET',
+              headers: { Authorization: wbApiKey },
+            }
+          );
+
+          if (salesResponse.ok) {
+            const sales = await salesResponse.json();
+            const totalRevenue = sales.reduce(
+              (sum: number, s: any) => sum + (s.finishedPrice || 0),
+              0
+            );
+            const totalOrders = sales.length;
+            const totalProfit = sales.reduce((sum: number, s: any) => sum + (s.forPay || 0), 0);
+
+            // Топ товаров
+            const byProduct: Record<string, { count: number; revenue: number; name: string }> = {};
+            for (const sale of sales) {
+              const key = String(sale.nmId);
+              if (!byProduct[key]) {
+                byProduct[key] = { count: 0, revenue: 0, name: sale.subject || 'Товар' };
+              }
+              byProduct[key].count++;
+              byProduct[key].revenue += sale.finishedPrice || 0;
+            }
+
+            const topProducts = Object.entries(byProduct)
+              .sort((a, b) => b[1].revenue - a[1].revenue)
+              .slice(0, 5)
+              .map(([id, data]) => ({
+                id,
+                name: data.name,
+                orders: data.count,
+                revenue: Math.round(data.revenue),
+              }));
+
+            return {
+              data: {
+                period: `${dateFrom} — ${dateTo}`,
+                marketplace: 'WB',
+                totalOrders,
+                totalRevenue: Math.round(totalRevenue),
+                totalProfit: Math.round(totalProfit),
+                avgOrderValue: totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0,
+                topProducts,
+              },
+            };
+          }
+        } catch (e) {
+          console.error('WB Sales API error:', e);
+        }
+      }
+
+      // Fallback на данные из БД
+      const user = await getUserById(userId);
+      return {
+        data: {
+          period,
+          message: 'Для получения реальной статистики продаж подключите API маркетплейса',
+          savedAmount: Number(user?.saved_amount || 0),
+          triggeredToday: user?.triggered_today || 0,
+        },
+      };
+    }
+
+    // ========== CALCULATE UNIT ECONOMICS ==========
+    case 'calculate_unit_economics': {
+      const { product_id, cost_price, marketplace = 'WB' } = args;
+
+      // WB комиссии (средние)
+      const WB_COMMISSION = 0.15; // 15% комиссия
+      const WB_LOGISTICS = 70; // 70₽ логистика
+      const WB_STORAGE = 5; // 5₽/день хранение
+      const TAX_RATE = 0.06; // УСН 6%
+
+      // Ozon комиссии
+      const OZON_COMMISSION = 0.12; // 12% комиссия
+      const OZON_LOGISTICS = 60; // 60₽ логистика
+
+      let products: any[] = [];
+      if (product_id) {
+        const result =
+          await sql`SELECT * FROM products WHERE user_id = ${userId} AND product_id = ${product_id}`;
+        products = result.rows;
+      } else {
+        const result = await sql`SELECT * FROM products WHERE user_id = ${userId} LIMIT 10`;
+        products = result.rows;
+      }
+
+      const analysis = products.map((p: any) => {
+        const price = p.current_price || 0;
+        const mp = p.marketplace || marketplace;
+
+        // Расчёт себестоимости (если не указана - оценка 30% от цены)
+        const productCost = cost_price || Math.round(price * 0.3);
+
+        // Комиссии
+        const commission =
+          mp === 'WB' ? Math.round(price * WB_COMMISSION) : Math.round(price * OZON_COMMISSION);
+
+        const logistics = mp === 'WB' ? WB_LOGISTICS : OZON_LOGISTICS;
+        const storage = mp === 'WB' ? WB_STORAGE * 7 : 0; // 7 дней хранения
+        const tax = Math.round(price * TAX_RATE);
+
+        const totalCosts = productCost + commission + logistics + storage + tax;
+        const profit = price - totalCosts;
+        const margin = price > 0 ? Math.round((profit / price) * 100) : 0;
+        const roi = productCost > 0 ? Math.round((profit / productCost) * 100) : 0;
+
+        return {
+          id: p.product_id,
+          name: p.title?.substring(0, 40),
+          price,
+          costPrice: productCost,
+          commission,
+          logistics,
+          storage,
+          tax,
+          totalCosts,
+          profit,
+          margin: `${margin}%`,
+          roi: `${roi}%`,
+          recommendation:
+            profit < 0
+              ? '🔴 Убыточный товар!'
+              : margin < 15
+                ? '🟡 Низкая маржа'
+                : '🟢 Хорошая прибыль',
+        };
+      });
+
+      const totalProfit = analysis.reduce((s, p) => s + p.profit, 0);
+      const avgMargin =
+        analysis.length > 0
+          ? Math.round(analysis.reduce((s, p) => s + parseFloat(p.margin), 0) / analysis.length)
+          : 0;
+
+      return {
+        data: {
+          products: analysis,
+          summary: {
+            totalProducts: analysis.length,
+            avgMargin: `${avgMargin}%`,
+            totalPotentialProfit: totalProfit,
+            profitable: analysis.filter(p => p.profit > 0).length,
+            unprofitable: analysis.filter(p => p.profit <= 0).length,
+          },
+          disclaimer: cost_price
+            ? 'Расчёт выполнен с указанной себестоимостью'
+            : 'Себестоимость оценена как 30% от цены. Укажите реальную себестоимость для точного расчёта.',
+        },
+      };
+    }
+
+    // ========== ABC ANALYSIS ==========
+    case 'get_abc_analysis': {
+      const products = await getProductsByUserId(userId);
+
+      // Сортируем по цене (как прокси выручки)
+      const sorted = [...products].sort(
+        (a: any, b: any) => (b.current_price || 0) - (a.current_price || 0)
+      );
+      const totalValue = sorted.reduce((s: number, p: any) => s + (p.current_price || 0), 0);
+
+      let cumulative = 0;
+      const analyzed = sorted.map((p: any) => {
+        cumulative += p.current_price || 0;
+        const percentile = (cumulative / totalValue) * 100;
+        let category = 'C';
+        if (percentile <= 80) category = 'A';
+        else if (percentile <= 95) category = 'B';
+
+        return {
+          id: p.product_id,
+          name: p.title?.substring(0, 35),
+          price: p.current_price,
+          category,
+        };
+      });
+
+      const groupA = analyzed.filter(p => p.category === 'A');
+      const groupB = analyzed.filter(p => p.category === 'B');
+      const groupC = analyzed.filter(p => p.category === 'C');
+
+      return {
+        data: {
+          summary: {
+            groupA: { count: groupA.length, description: '80% выручки — ваши звёзды ⭐' },
+            groupB: { count: groupB.length, description: '15% выручки — середнячки' },
+            groupC: { count: groupC.length, description: '5% выручки — кандидаты на удаление' },
+          },
+          topAProducts: groupA.slice(0, 5),
+          worstCProducts: groupC.slice(-5),
+          recommendation:
+            groupC.length > 0
+              ? `Рассмотрите удаление ${groupC.length} товаров категории C — они приносят только 5% выручки`
+              : 'Отличный ассортимент!',
+        },
+      };
+    }
+
+    // ========== STOCK FORECAST ==========
+    case 'get_stock_forecast': {
+      const products = await getProductsByUserId(userId);
+
+      // Для реального прогноза нужна история продаж
+      // Пока используем упрощённую модель
+      const AVG_SALES_PER_DAY = 2; // Средние продажи
+
+      const forecasts = products
+        .filter((p: any) => p.current_stock > 0)
+        .map((p: any) => {
+          const stock = p.current_stock || 0;
+          const daysUntilZero = Math.round(stock / AVG_SALES_PER_DAY);
+          const reorderDate = new Date();
+          reorderDate.setDate(reorderDate.getDate() + Math.max(0, daysUntilZero - 7)); // За 7 дней до конца
+
+          return {
+            id: p.product_id,
+            name: p.title?.substring(0, 35),
+            stock,
+            daysUntilZero,
+            urgency: daysUntilZero <= 3 ? '🔴 Критично' : daysUntilZero <= 7 ? '🟡 Скоро' : '🟢 ОК',
+            reorderBy: reorderDate.toLocaleDateString('ru-RU'),
+          };
+        })
+        .sort((a, b) => a.daysUntilZero - b.daysUntilZero);
+
+      const critical = forecasts.filter(f => f.daysUntilZero <= 3);
+      const warning = forecasts.filter(f => f.daysUntilZero > 3 && f.daysUntilZero <= 7);
+
+      return {
+        data: {
+          critical: critical.slice(0, 5),
+          warning: warning.slice(0, 5),
+          summary: {
+            criticalCount: critical.length,
+            warningCount: warning.length,
+            avgDaysUntilZero: Math.round(
+              forecasts.reduce((s, f) => s + f.daysUntilZero, 0) / forecasts.length || 0
+            ),
+          },
+          allProducts: forecasts.slice(0, 10),
+          note: 'Прогноз основан на среднем уровне продаж. Для точного прогноза нужна история заказов.',
+        },
+      };
+    }
+
+    // ========== SET STOP LOSS ==========
+    case 'set_stop_loss': {
+      const { product_id, min_price, percentage } = args;
+
+      if (!product_id) {
+        return { data: { error: 'Не указан ID товара' } };
+      }
+
+      const productResult =
+        await sql`SELECT * FROM products WHERE user_id = ${userId} AND product_id = ${product_id}`;
+      const product = productResult.rows[0];
+
+      if (!product) {
+        return { data: { error: 'Товар не найден' } };
+      }
+
+      const newMinPrice =
+        min_price || Math.round(product.current_price * (1 - (percentage || 15) / 100));
+
+      return {
+        data: {
+          product: product.title?.substring(0, 40),
+          currentPrice: product.current_price,
+          proposedMinPrice: newMinPrice,
+          protection: `${percentage || 15}% от текущей цены`,
+        },
+        requiresConfirmation: true,
+        confirmationMessage: `Установить Stop-Loss ${newMinPrice} ₽ для "${product.title?.substring(0, 30)}"?`,
+        confirmationDetails: {
+          product_id,
+          min_price: newMinPrice,
+          product_name: product.title,
+        },
+      };
+    }
+
+    // ========== BULK PROTECT ==========
+    case 'bulk_protect_products': {
+      const { percentage = 15, only_unprotected = true } = args;
+
+      let products;
+      if (only_unprotected) {
+        const result =
+          await sql`SELECT * FROM products WHERE user_id = ${userId} AND (min_price = 0 OR min_price IS NULL)`;
+        products = result.rows;
+      } else {
+        const result = await sql`SELECT * FROM products WHERE user_id = ${userId}`;
+        products = result.rows;
+      }
+
+      return {
+        data: {
+          productsCount: products.length,
+          percentage,
+          sampleProducts: products.slice(0, 3).map((p: any) => ({
+            name: p.title?.substring(0, 30),
+            currentPrice: p.current_price,
+            proposedMinPrice: Math.round(p.current_price * (1 - percentage / 100)),
+          })),
+        },
+        requiresConfirmation: true,
+        confirmationMessage: `Установить Stop-Loss -${percentage}% для ${products.length} товаров?`,
+        confirmationDetails: {
+          percentage,
+          productsCount: products.length,
+          operation: 'bulk_set_min_price',
+        },
+      };
+    }
+
+    // ========== UPDATE PRICES ==========
+    case 'update_prices': {
+      const { product_ids, price_change, price_change_percent } = args;
+
+      return {
+        data: {
+          message: 'Изменение цен требует подтверждения',
+          productsCount: product_ids?.length || 0,
+          change: price_change
+            ? `${price_change > 0 ? '+' : ''}${price_change} ₽`
+            : `${price_change_percent > 0 ? '+' : ''}${price_change_percent}%`,
+        },
+        requiresConfirmation: true,
+        confirmationMessage: `Изменить цены на ${product_ids?.length || 0} товаров: ${price_change ? `${price_change > 0 ? '+' : ''}${price_change} ₽` : `${price_change_percent}%`}?`,
+        confirmationDetails: {
+          product_ids,
+          price_change,
+          price_change_percent,
+          operation: 'update_prices',
+        },
+      };
+    }
+
+    // ========== GET ORDERS ==========
+    case 'get_orders': {
+      const { period = 'week', marketplace = 'all' } = args;
+
+      if (wbApiKey && (marketplace === 'all' || marketplace === 'WB')) {
+        try {
+          const dateFrom = getDateFromPeriod(period);
+
+          const ordersResponse = await fetchWithRetry(
+            `https://statistics-api.wildberries.ru/api/v1/supplier/orders?dateFrom=${dateFrom}`,
+            {
+              method: 'GET',
+              headers: { Authorization: wbApiKey },
+            }
+          );
+
+          if (ordersResponse.ok) {
+            const orders = await ordersResponse.json();
+            const totalOrders = orders.length;
+            const newOrders = orders.filter((o: any) => !o.isCancel).length;
+            const cancelledOrders = orders.filter((o: any) => o.isCancel).length;
+            const totalSum = orders.reduce(
+              (s: number, o: any) => s + (o.finishedPrice || o.totalPrice || 0),
+              0
+            );
+
+            return {
+              data: {
+                period: `${dateFrom} — сегодня`,
+                marketplace: 'WB',
+                totalOrders,
+                newOrders,
+                cancelledOrders,
+                cancellationRate: `${Math.round((cancelledOrders / totalOrders) * 100) || 0}%`,
+                totalSum: Math.round(totalSum),
+                recentOrders: orders.slice(0, 5).map((o: any) => ({
+                  date: o.date?.split('T')[0],
+                  product: o.subject?.substring(0, 30),
+                  price: o.finishedPrice || o.totalPrice,
+                  status: o.isCancel ? 'Отменён' : 'Активный',
+                })),
+              },
+            };
+          }
+        } catch (e) {
+          console.error('WB Orders API error:', e);
+        }
+      }
+
+      return {
+        data: {
+          message: 'Для получения заказов подключите API маркетплейса',
+          period,
+        },
+      };
+    }
+
+    // ========== GET WAREHOUSE STOCKS ==========
+    case 'get_warehouse_stocks': {
+      const { marketplace = 'WB', low_stock_only = false } = args;
+
+      if (marketplace === 'WB' && wbApiKey) {
+        try {
+          const stocksResponse = await fetchWithRetry(
+            'https://statistics-api.wildberries.ru/api/v1/supplier/stocks?dateFrom=' +
+              new Date().toISOString().split('T')[0],
+            {
+              method: 'GET',
+              headers: { Authorization: wbApiKey },
+            }
+          );
+
+          if (stocksResponse.ok) {
+            const stocks = await stocksResponse.json();
+
+            // Группируем по товарам
+            const byProduct: Record<string, { name: string; total: number; warehouses: any[] }> =
+              {};
+            for (const item of stocks) {
+              const key = String(item.nmId);
+              if (!byProduct[key]) {
+                byProduct[key] = { name: item.subject || 'Товар', total: 0, warehouses: [] };
+              }
+              byProduct[key].total += item.quantity || 0;
+              byProduct[key].warehouses.push({
+                name: item.warehouseName,
+                quantity: item.quantity,
+              });
+            }
+
+            let items = Object.entries(byProduct).map(([id, data]) => ({
+              nmId: id,
+              name: data.name.substring(0, 35),
+              totalStock: data.total,
+              warehousesCount: data.warehouses.length,
+            }));
+
+            if (low_stock_only) {
+              items = items.filter(i => i.totalStock < 10);
+            }
+
+            items.sort((a, b) => a.totalStock - b.totalStock);
+
+            return {
+              data: {
+                marketplace: 'WB',
+                totalItems: items.length,
+                lowStockCount: items.filter(i => i.totalStock < 10).length,
+                zeroStockCount: items.filter(i => i.totalStock === 0).length,
+                items: items.slice(0, 15),
+              },
+            };
+          }
+        } catch (e) {
+          console.error('WB Stocks API error:', e);
+        }
+      }
+
+      // Fallback на данные из БД
+      const products = await getProductsByUserId(userId);
+      let items = products.map((p: any) => ({
+        id: p.product_id,
+        name: p.title?.substring(0, 35),
+        stock: p.current_stock || 0,
+        marketplace: p.marketplace,
+      }));
+
+      if (low_stock_only) {
+        items = items.filter((i: any) => i.stock < 10);
+      }
+
+      return {
+        data: {
+          source: 'database',
+          items: items.slice(0, 15),
+          note: 'Данные из последней синхронизации. Для реальных остатков подключите API.',
+        },
+      };
+    }
+
+    default:
+      return { data: { error: `Unknown tool: ${toolName}` } };
+  }
+}
 
 /**
  * Вспомогательная функция для получения даты из периода
  */
+function getDateFromPeriod(period: string): string {
+  const now = new Date();
+  switch (period) {
+    case 'today':
+      return now.toISOString().split('T')[0];
+    case 'yesterday':
+      now.setDate(now.getDate() - 1);
+      return now.toISOString().split('T')[0];
+    case 'week':
+      now.setDate(now.getDate() - 7);
+      return now.toISOString().split('T')[0];
+    case 'month':
+      now.setMonth(now.getMonth() - 1);
+      return now.toISOString().split('T')[0];
+    case '3months':
+      now.setMonth(now.getMonth() - 3);
+      return now.toISOString().split('T')[0];
+    default:
+      now.setDate(now.getDate() - 7);
+      return now.toISOString().split('T')[0];
+  }
+}
 
 // ============================================
 // TEST MODE (disable payments for testing)
@@ -388,7 +1449,7 @@ function getKVClient(): VercelKV | null {
       kvClient = createClient({ url: kvUrl, token: kvToken });
       console.log('✅ Vercel KV Rate Limiter connected');
       return kvClient;
-    } catch {
+    } catch (_e) {
       console.warn('⚠️ Failed to connect to Vercel KV, using in-memory fallback');
       return null;
     }
@@ -418,7 +1479,7 @@ async function checkRateLimitAsync(
         return { allowed: false, remaining: 0 };
       }
       return { allowed: true, remaining: limit - count };
-    } catch {
+    } catch (_err) {
       console.warn('⚠️ KV rate limit check failed, falling back to memory');
       // Fall through to in-memory
     }
@@ -1045,7 +2106,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const telegramUser = validation.user;
 
-        await createOrUpdateUser(telegramUser);
+        const _user = await createOrUpdateUser(telegramUser);
         const fullUser = await getUserById(telegramUser.id);
 
         let subscriptionActive = false;
@@ -1480,7 +2541,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         try {
           await sql`SELECT 1`;
           dbOk = true;
-        } catch {
+        } catch (_dbError) {
           // Database check failed, dbOk remains false
         }
 
@@ -1818,7 +2879,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
         const initData = sanitizeInput(req.body?.initData || '');
-        const { marketplace } = req.body;
+        const { marketplace, debug: _debug } = req.body;
 
         const validation = validateTelegramInitData(initData);
         let user;
@@ -2993,7 +4054,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
-      // ========== AI AGENT (Modular Service) ==========
+      // ========== AI AGENT (с Function Calling!) ==========
       case 'agent': {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
@@ -3006,46 +4067,219 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         const userId = validation.user.id;
-        // Use new service
-        const user = await userService.getUserById(userId);
+        const user = await getUserById(userId);
 
-        if (!user) {
-          return res.status(401).json({ error: 'User not found' });
-        }
-
-        // Check subscription
-        if (!userService.isSubscriptionActive(user)) {
+        // Check subscription for AI features
+        if (!isSubscriptionActive(user)) {
           return res.json({
             success: true,
             content:
-              '⚠️ **Для использования AI-агента требуется активная подписка.**\n\nОформите подписку для доступа к аналитике.',
+              '⚠️ **Для использования AI-агента требуется активная подписка.**\n\nОформите подписку, чтобы получить доступ к:\n• 📊 Юнит-экономике (бесплатно то, что WB продаёт за 25 000₽!)\n• 📈 ABC-анализу товаров\n• 📦 Прогнозу остатков\n• 💰 Управлению ценами через чат',
           });
         }
 
         const message = sanitizeInput(req.body?.message || '');
-        if (!message) return res.status(400).json({ error: 'Message is required' });
 
-        // Rate limit
+        if (!message) {
+          return res.status(400).json({ error: 'Message is required' });
+        }
+
+        // Rate limit agent requests (strict limit for AI calls)
         const agentRateLimit = await checkRateLimitAsync(`agent:${userId}`, true);
         if (!agentRateLimit.allowed) {
           return res.json({
             success: true,
-            content: '⏳ **Превышен лимит запросов.**\n\nПодождите минуту.',
+            content: '⏳ **Превышен лимит запросов.**\n\nПодождите минуту и попробуйте снова.',
           });
         }
 
-        try {
-          // DELEGATE TO AGENT SERVICE
-          const result = await agentService.processRequest(userId, message, user!);
+        const startTime = Date.now();
 
-          logger.info('Agent request processed', { userId, success: result.success });
-          return res.json(result);
-        } catch (error) {
-          logger.error('Agent processing failed', error, { userId });
-          return res
-            .status(500)
-            .json({ success: false, content: 'Ошибка при обработке запроса агентом.' });
+        // ============================================
+        // ИСТОРИЯ ДИАЛОГА (сохраняется в Vercel KV)
+        // ============================================
+        const kv = getKVClient();
+        const historyKey = `chat:${userId}`;
+        let conversationHistory: Array<{ role: string; content: string }> = [];
+
+        // Загружаем историю из KV
+        if (kv) {
+          try {
+            const savedHistory = await kv.get(historyKey);
+            if (savedHistory && Array.isArray(savedHistory)) {
+              conversationHistory = savedHistory as Array<{ role: string; content: string }>;
+              console.log(`📜 Loaded ${conversationHistory.length} messages from history`);
+            }
+          } catch (e) {
+            console.warn('⚠️ Failed to load chat history:', e);
+          }
         }
+
+        // Ограничиваем историю последними 10 сообщениями (для экономии токенов)
+        if (conversationHistory.length > 20) {
+          conversationHistory = conversationHistory.slice(-20);
+        }
+
+        // Get user products for context
+        const products = await getProductsByUserId(userId);
+        const protectedCount = products.filter((p: any) => p.min_price > 0).length;
+        const unprotectedCount = products.length - protectedCount;
+
+        // Classify complexity for model routing
+        const lowerMessage = message.toLowerCase();
+        const complexPatterns = [
+          'оптимизируй',
+          'проанализируй',
+          'почему',
+          'стратегия',
+          'рекомендации',
+          'юнит',
+          'маржа',
+          'прибыль',
+          'abc',
+          'прогноз',
+        ];
+        const isComplex = complexPatterns.some(p => lowerMessage.includes(p));
+
+        // Choose model based on complexity
+        const model = isComplex ? 'gpt-4o' : 'gpt-4o-mini';
+
+        // Build enhanced system prompt with tools context
+        const enhancedSystemPrompt = `${AGENT_SYSTEM_PROMPT}
+
+🛠️ ДОСТУПНЫЕ ИНСТРУМЕНТЫ:
+У тебя есть доступ к функциям для работы с маркетплейсами. Вызывай их когда нужно:
+- get_products: список товаров пользователя
+- get_sales_stats: статистика продаж (реальные данные из WB/Ozon API!)
+- calculate_unit_economics: расчёт прибыли на товар (комиссии, логистика, налоги)
+- get_abc_analysis: ABC-анализ (какие товары приносят 80% выручки)
+- get_stock_forecast: прогноз когда закончатся остатки
+- set_stop_loss: установить защиту от демпинга
+- bulk_protect_products: массовая защита товаров
+- update_prices: изменить цены (требует подтверждения!)
+- get_orders: список заказов
+- get_warehouse_stocks: остатки на складах
+
+📊 ТЕКУЩИЙ КОНТЕКСТ:
+- Пользователь: ${user?.first_name || 'Продавец'}
+- Товаров: ${products.length} (защищено: ${protectedCount}, без защиты: ${unprotectedCount})
+- Сработало защит: ${user?.triggered_today || 0}
+- Сохранено: ${Number(user?.saved_amount || 0).toLocaleString('ru')} ₽
+- WB API: ${user?.api_key_wb ? '✅ Подключён' : '❌ Нет'}
+- Ozon API: ${user?.api_key_ozon ? '✅ Подключён' : '❌ Нет'}
+
+Используй инструменты чтобы давать ТОЧНЫЕ данные, а не общие советы!`;
+
+        // Prepare user context for tools
+        const toolsUserContext = {
+          wbApiKey: user?.api_key_wb ? decryptApiKey(user.api_key_wb) : undefined,
+          ozonApiKey: user?.api_key_ozon ? decryptApiKey(user.api_key_ozon) : undefined,
+          ozonClientId: undefined, // TODO: добавить если есть
+        };
+
+        // Prepare messages for GPT with tools (включая историю!)
+        const messages: OpenAIMessage[] = [{ role: 'system', content: enhancedSystemPrompt }];
+
+        // Добавляем историю диалога (последние сообщения)
+        for (const histMsg of conversationHistory.slice(-10)) {
+          if (histMsg.role === 'user' || histMsg.role === 'assistant') {
+            messages.push({ role: histMsg.role as 'user' | 'assistant', content: histMsg.content });
+          }
+        }
+
+        // Добавляем текущее сообщение пользователя
+        messages.push({ role: 'user', content: message });
+
+        // Call OpenAI with Function Calling!
+        const gptResult = await callOpenAIWithTools(
+          messages,
+          userId,
+          toolsUserContext,
+          model,
+          isComplex ? 2000 : 1200
+        );
+
+        // Prepare response
+        const agentResponse: { content: string; actionRequired?: any; metadata?: any } = {
+          content: '',
+          metadata: {
+            executionTime: Date.now() - startTime,
+            model,
+            complexity: isComplex ? 'complex' : 'simple',
+            toolsUsed: gptResult.toolsUsed,
+            tokensUsed: gptResult.tokensUsed,
+          },
+        };
+
+        if (gptResult.success && gptResult.content) {
+          agentResponse.content = gptResult.content;
+
+          // Pass through action required from tools
+          if (gptResult.actionRequired) {
+            agentResponse.actionRequired = gptResult.actionRequired;
+          }
+
+          // СОХРАНЯЕМ ИСТОРИЮ в Vercel KV
+          if (kv) {
+            try {
+              // Добавляем новые сообщения в историю
+              conversationHistory.push({ role: 'user', content: message });
+              conversationHistory.push({ role: 'assistant', content: gptResult.content });
+
+              // Ограничиваем до 20 последних сообщений
+              if (conversationHistory.length > 20) {
+                conversationHistory = conversationHistory.slice(-20);
+              }
+
+              // Сохраняем с TTL 24 часа
+              await kv.set(historyKey, conversationHistory, { ex: 86400 });
+              console.log(`💾 Saved ${conversationHistory.length} messages to history`);
+            } catch (e) {
+              console.warn('⚠️ Failed to save chat history:', e);
+            }
+          }
+        } else {
+          // Fallback to static logic if OpenAI fails
+          console.warn('⚠️ OpenAI unavailable, using fallback logic');
+          agentResponse.metadata.toolsUsed = ['fallback_logic'];
+
+          if (
+            lowerMessage.includes('продаж') ||
+            lowerMessage.includes('выручк') ||
+            lowerMessage.includes('статистик')
+          ) {
+            const totalValue = products.reduce(
+              (sum: number, p: any) => sum + (p.current_price || 0),
+              0
+            );
+            agentResponse.content = `📊 **Статистика вашего магазина:**\n\n• Товаров в системе: **${products.length}**\n• Под защитой: **${protectedCount}** товаров\n• Общая стоимость: **${totalValue.toLocaleString('ru')} ₽**\n• Сработавших защит сегодня: **${user?.triggered_today || 0}**\n• Сохранено денег: **${Number(user?.saved_amount || 0).toLocaleString('ru')} ₽**\n\n💡 *Для полноценного AI-анализа добавьте OPENAI_API_KEY в настройках Vercel.*`;
+          } else if (
+            lowerMessage.includes('юнит') ||
+            lowerMessage.includes('прибыль') ||
+            lowerMessage.includes('маржа')
+          ) {
+            agentResponse.content = `🧮 **Юнит-экономика**\n\nДля расчёта реальной прибыли нужен OpenAI API.\n\n**Что я могу посчитать:**\n• Комиссию маркетплейса (WB: 15%, Ozon: 12%)\n• Логистику (WB: ~70₽, Ozon: ~60₽)\n• Хранение на складе\n• Налоги (УСН 6%)\n• Итоговую прибыль на единицу\n\n💡 Подключите API ключ WB/Ozon для получения реальных данных!`;
+          } else if (lowerMessage.includes('abc') || lowerMessage.includes('анализ')) {
+            agentResponse.content = `📊 **ABC-Анализ**\n\nРаспределение ваших ${products.length} товаров:\n• Группа A (80% выручки): топ товары\n• Группа B (15% выручки): средние\n• Группа C (5% выручки): кандидаты на удаление\n\n💡 *Для точного анализа нужны данные о продажах.*`;
+          } else if (lowerMessage.includes('защит') || lowerMessage.includes('stop-loss')) {
+            agentResponse.content = `🛡️ **Статус защиты:**\n\n✅ Защищено: **${protectedCount}**\n⚠️ Без защиты: **${unprotectedCount}**\n🚨 Сработало сегодня: **${user?.triggered_today || 0}**\n💰 Сохранено: **${Number(user?.saved_amount || 0).toLocaleString('ru')} ₽**`;
+
+            if (unprotectedCount > 0) {
+              agentResponse.content += `\n\n💡 Хотите защитить все товары? Скажите "защити все".`;
+            }
+          } else if (lowerMessage.includes('привет') || lowerMessage.includes('помог')) {
+            agentResponse.content = `👋 **Привет, ${user?.first_name || 'друг'}!**\n\nЯ — NeuroAgent, ваш AI-помощник для маркетплейсов.\n\n🚀 **Что я умею (БЕСПЛАТНО то, что WB продаёт за 25 000₽!):**\n• "Покажи юнит-экономику" — прибыль на товар\n• "ABC анализ" — какие товары важны\n• "Прогноз остатков" — когда закончится товар\n• "Статистика продаж" — выручка и заказы\n• "Защити все" — массовая защита Stop-Loss\n\n💡 *Подключите WB/Ozon API для реальных данных!*`;
+          } else {
+            agentResponse.content = `🤖 **NeuroAgent готов помочь!**\n\n**Попробуйте спросить:**\n• "Покажи статистику продаж за неделю"\n• "Рассчитай юнит-экономику"\n• "Сделай ABC анализ"\n• "Прогноз остатков"\n• "Защити все товары"`;
+          }
+        }
+
+        console.log(
+          `🤖 Agent: user=${userId}, tools=${gptResult.toolsUsed.join(',') || 'none'}, ` +
+            `tokens=${gptResult.tokensUsed}, time=${Date.now() - startTime}ms`
+        );
+
+        return res.json({ success: true, ...agentResponse });
       }
 
       // ========== AGENT CONFIRM ==========
@@ -3164,251 +4398,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
-      // ========== USER RULES: LIST ==========
-      case 'rules':
-      case 'rules-create':
-      case 'rules-update':
-      case 'rules-delete':
-      case 'rules-toggle':
-      case 'rules-templates':
-      case 'rules-logs': {
-        // TODO: Rules feature is in development
-        return res.json({
-          success: true,
-          message: 'Rules feature coming soon',
-          rules: [],
-          templates: [],
-          logs: [],
-        });
-      }
-
-      // ========== TASK QUEUE: LIST TASKS ==========
-      case 'tasks': {
-        const initData = sanitizeInput(
-          (req.headers['x-init-data'] as string) || req.body?.initData || ''
-        );
-        const validation = validateTelegramInitData(initData);
-        if (!validation.valid || !validation.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const tasks = await taskQueue.getUserTasks(validation.user.id, 20);
-        const stats = await taskQueue.getStats();
-
-        return res.json({
-          success: true,
-          tasks: tasks.map(t => ({
-            id: t.id,
-            type: t.type,
-            status: t.status,
-            priority: t.priority,
-            progress: t.progress,
-            createdAt: t.createdAt,
-            completedAt: t.completedAt,
-            lastError: t.lastError,
-          })),
-          stats,
-        });
-      }
-
-      // ========== TASK QUEUE: ENQUEUE TASK ==========
-      case 'task-enqueue': {
-        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
-        const initData = sanitizeInput(
-          (req.headers['x-init-data'] as string) || req.body?.initData || ''
-        );
-        const validation = validateTelegramInitData(initData);
-        if (!validation.valid || !validation.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const { taskType, payload, priority } = req.body;
-
-        if (!taskType || !payload) {
-          return res.status(400).json({ error: 'taskType and payload are required' });
-        }
-
-        // Validate task type
-        const validTypes = ['price_update', 'bulk_stop_loss', 'sync_products'];
-        if (!validTypes.includes(taskType)) {
-          return res.status(400).json({
-            error: 'Invalid task type',
-            validTypes,
-          });
-        }
-
-        const task = await taskQueue.enqueue(validation.user.id, taskType, payload, {
-          priority: priority || 'normal',
-        });
-
-        return res.json({
-          success: true,
-          message: 'Task enqueued',
-          task: {
-            id: task.id,
-            type: task.type,
-            status: task.status,
-          },
-        });
-      }
-
-      // ========== TASK QUEUE: CANCEL TASK ==========
-      case 'task-cancel': {
-        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
-        const initData = sanitizeInput(
-          (req.headers['x-init-data'] as string) || req.body?.initData || ''
-        );
-        const validation = validateTelegramInitData(initData);
-        if (!validation.valid || !validation.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const { taskId } = req.body;
-        if (!taskId) {
-          return res.status(400).json({ error: 'taskId is required' });
-        }
-
-        const cancelled = await taskQueue.cancel(taskId, validation.user.id);
-
-        return res.json({
-          success: cancelled,
-          message: cancelled ? 'Task cancelled' : 'Could not cancel task',
-        });
-      }
-
-      // ========== TASK QUEUE: PROCESS TASKS (CRON) ==========
-      case 'process-tasks': {
-        // Only allow from Cron or Admin
-        const authHeader = req.headers['authorization'];
-        const isCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
-        const isAdmin = req.headers['x-admin-key'] === ADMIN_API_KEY;
-
-        if (!isCron && !isAdmin && IS_PRODUCTION) {
-          return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        console.log('⚙️ Processing task queue...');
-        const result = await taskProcessor.processPendingTasks();
-
-        return res.json({
-          success: true,
-          message: 'Task processing complete',
-          ...result,
-        });
-      }
-
-      // ========== DAILY DIGEST (CRON) ==========
-      case 'daily-digest': {
-        // Only allow from Cron or Admin
-        const authHeader = req.headers['authorization'];
-        const isCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
-        const isAdmin = req.headers['x-admin-key'] === ADMIN_API_KEY;
-
-        if (!isCron && !isAdmin && IS_PRODUCTION) {
-          return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        console.log('📊 Starting daily digest...');
-
-        try {
-          // Get all users with active subscription
-          const usersResult = await sql`
-            SELECT id, first_name, subscription_plan, total_products, triggered_today, saved_amount
-            FROM users 
-            WHERE subscription_active = true 
-            AND (subscription_end IS NULL OR subscription_end > NOW())
-          `;
-
-          let sent = 0;
-          let errors = 0;
-
-          for (const user of usersResult.rows) {
-            try {
-              // Get yesterday's stats
-              const yesterday = new Date();
-              yesterday.setDate(yesterday.getDate() - 1);
-              const yesterdayStr = yesterday.toISOString().split('T')[0];
-
-              // Get sentinel events from yesterday
-              const sentinelResult = await sql`
-                SELECT COUNT(*) as triggers, COALESCE(SUM(saved_amount), 0) as saved
-                FROM sentinel_logs 
-                WHERE user_id = ${user.id}
-                AND created_at >= ${yesterdayStr}::date
-                AND created_at < (${yesterdayStr}::date + INTERVAL '1 day')
-              `;
-
-              // Get product stats
-              const productsResult = await sql`
-                SELECT 
-                  COUNT(*) as total,
-                  COUNT(CASE WHEN status = 'protected' THEN 1 END) as protected,
-                  COUNT(CASE WHEN status = 'triggered' THEN 1 END) as triggered
-                FROM products WHERE user_id = ${user.id}
-              `;
-
-              const stats = sentinelResult.rows[0] || { triggers: 0, saved: 0 };
-              const products = productsResult.rows[0] || { total: 0, protected: 0, triggered: 0 };
-
-              // Build digest message
-              const msg =
-                `☀️ <b>Доброе утро, ${user.first_name || 'Seller'}!</b>\n\n` +
-                `📊 <b>Ваш ежедневный дайджест NeuroGUARDIAN</b>\n\n` +
-                `📦 <b>Товары:</b>\n` +
-                `├ Всего: ${products.total}\n` +
-                `├ Защищено: ${products.protected}\n` +
-                `└ Сработало вчера: ${products.triggered}\n\n` +
-                `🛡️ <b>Защита маржи:</b>\n` +
-                `├ Срабатываний вчера: ${stats.triggers}\n` +
-                `└ Сохранено: ${stats.saved}₽\n\n` +
-                (parseInt(stats.saved) > 0
-                  ? `💰 <b>Отлично!</b> Sentinel спас вам ${stats.saved}₽ вчера.\n\n`
-                  : `✅ <b>Всё спокойно!</b> Демпинга не обнаружено.\n\n`) +
-                `🤖 <i>Напишите мне для аналитики или управления ценами!</i>`;
-
-              // Send via Telegram
-              if (process.env.TELEGRAM_BOT_TOKEN) {
-                await fetch(
-                  `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`,
-                  {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      chat_id: user.id,
-                      text: msg,
-                      parse_mode: 'HTML',
-                    }),
-                  }
-                );
-                sent++;
-              }
-
-              // Reset daily counters
-              await sql`
-                UPDATE users SET triggered_today = 0 WHERE id = ${user.id}
-              `;
-            } catch (userError) {
-              console.error(`Daily digest error for user ${user.id}:`, userError);
-              errors++;
-            }
-          }
-
-          console.log(`📊 Daily digest complete: sent=${sent}, errors=${errors}`);
-
-          return res.json({
-            success: true,
-            message: `Daily digest sent to ${sent} users`,
-            sent,
-            errors,
-          });
-        } catch (error) {
-          console.error('Daily digest error:', error);
-          return res.status(500).json({ error: 'Daily digest failed' });
-        }
-      }
-
       // ========== DEFAULT ==========
       default:
         return res.status(400).json({
@@ -3430,17 +4419,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             'agent',
             'agent-confirm',
             'agent-status',
-            'rules',
-            'rules-create',
-            'rules-update',
-            'rules-delete',
-            'rules-toggle',
-            'rules-templates',
-            'rules-logs',
-            'tasks',
-            'task-enqueue',
-            'task-cancel',
-            'process-tasks',
             'admin-activate-trial',
             'admin-check-user',
             'admin-list-users',
@@ -3449,7 +4427,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             'admin-clone-user',
             'admin-sentinel-logs',
             'send-reminders',
-            'daily-digest',
             'referral',
           ],
         });

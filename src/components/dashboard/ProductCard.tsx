@@ -67,7 +67,6 @@ export function ProductCard({ product }: ProductCardProps) {
 
       // IMPORTANT: Save to server!
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const tg = (window as any).Telegram?.WebApp;
         const initData = tg?.initData || 'demo';
 

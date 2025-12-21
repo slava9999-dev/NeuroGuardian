@@ -23,7 +23,7 @@ if (import.meta.env.DEV) {
     connectFirestoreEmulator(db, 'localhost', 8080);
     connectFunctionsEmulator(functions, 'localhost', 5001);
     console.log('🔧 Connected to Firebase emulators');
-  } catch {
+  } catch (e) {
     // Emulators already connected or not running
   }
 }

@@ -94,7 +94,6 @@ export const useAppStore = create<AppState>()(
         set({ protectionEnabled: enabled });
         // Sync with server
         try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const tg = (window as any).Telegram?.WebApp;
           const initData = tg?.initData || '';
           if (initData) {
@@ -118,7 +117,6 @@ export const useAppStore = create<AppState>()(
         set({ defenseMode: mode });
         // Sync with server
         try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const tg = (window as any).Telegram?.WebApp;
           const initData = tg?.initData || '';
           if (initData) {

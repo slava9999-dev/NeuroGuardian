@@ -6,7 +6,6 @@
 import { z } from 'zod';
 
 // Helper to handle Firestore Timestamps and ISO strings
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const zTimestamp = z.preprocess((val: any) => {
   if (val && typeof val === 'object' && '_seconds' in val) {
     return new Date(val._seconds * 1000);

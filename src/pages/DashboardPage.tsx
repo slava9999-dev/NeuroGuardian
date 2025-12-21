@@ -227,7 +227,6 @@ export function DashboardPage({ onGoToSettings, onGoToAgent }: DashboardPageProp
 
     // Run check immediately on mount
     const runCheck = async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const tg = (window as any).Telegram?.WebApp;
       const initData = tg?.initData;
       if (!initData) return;

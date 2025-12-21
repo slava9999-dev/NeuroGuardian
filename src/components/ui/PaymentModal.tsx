@@ -45,7 +45,6 @@ const FALLBACK_PLANS: SubscriptionPlan[] = [
 // Load YooKassa Widget script
 function loadYooKassaWidget(): Promise<void> {
   return new Promise((resolve, reject) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if ((window as any).YooMoneyCheckoutWidget) {
       resolve();
       return;
@@ -100,7 +99,7 @@ export function PaymentModal({
       if (response.success && response.plans.length > 0) {
         setPlans(response.plans);
       }
-    } catch {
+    } catch (err) {
       console.warn('Failed to load plans, using fallback');
     } finally {
       setIsLoadingPlans(false);
@@ -119,13 +118,11 @@ export function PaymentModal({
       try {
         await loadYooKassaWidget();
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const YooMoneyCheckoutWidget = (window as any).YooMoneyCheckoutWidget;
 
         const checkout = new YooMoneyCheckoutWidget({
           confirmation_token: token,
           return_url: window.location.origin + '?payment_complete=true',
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           error_callback: (error: any) => {
             console.error('YooKassa Widget error:', error);
             setError('Ошибка виджета оплаты');
@@ -177,7 +174,6 @@ export function PaymentModal({
       const result = (await paymentApi.createPayment({
         planId: selectedPlanId,
         savePaymentMethod: true,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       })) as any;
 
       if (!result.success) {
@@ -207,7 +203,6 @@ export function PaymentModal({
 
       // Fallback: redirect to YooKassa payment page
       if (result.confirmationUrl) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const tg = (window as any).Telegram?.WebApp;
         if (tg?.openLink) {
           tg.openLink(result.confirmationUrl);
@@ -220,7 +215,6 @@ export function PaymentModal({
       }
 
       throw new Error('Не получены данные для оплаты');
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       console.error('Payment error:', err);
       setError(err.message || 'Ошибка оплаты');
@@ -606,7 +600,6 @@ export function PaymentModal({
                         onClick={e => {
                           e.preventDefault();
                           // Open legal page in Telegram or new tab
-                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
                           const tg = (window as any).Telegram?.WebApp;
                           if (tg?.openLink) {
                             tg.openLink(window.location.origin + '/?page=legal');
@@ -623,7 +616,6 @@ export function PaymentModal({
                         href="#privacy"
                         onClick={e => {
                           e.preventDefault();
-                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
                           const tg = (window as any).Telegram?.WebApp;
                           if (tg?.openLink) {
                             tg.openLink(window.location.origin + '/?page=legal');

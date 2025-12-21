@@ -1,0 +1,821 @@
+Экспертная консультация: Архитектура NeuroAgent
+1. Рекомендуемая архитектура
+Общая схема системы
+┌─────────────────────────────────────────────────────────────────────┐
+│                         КЛИЕНТСКИЙ СЛОЙ                              │
+├─────────────────────────────────────────────────────────────────────┤
+│  Telegram Bot ◄──────► React WebApp (существующий NeuroGUARDIAN)    │
+└──────────────┬─────────────────────────────────────────┬────────────┘
+               │                                         │
+               ▼                                         ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                         API GATEWAY                                  │
+│              (Vercel Edge Functions / FastAPI)                       │
+│  • Аутентификация    • Rate Limiting    • Роутинг запросов          │
+└──────────────┬─────────────────────────────────────────┬────────────┘
+               │                                         │
+               ▼                                         ▼
+┌──────────────────────────────┐    ┌─────────────────────────────────┐
+│      AGENT ORCHESTRATOR      │    │       SYNC API (быстрые)        │
+│         (Python)             │    │    (Vercel Serverless)          │
+│  • LLM Router                │    │  • Получение данных             │
+│  • Tool Selection            │    │  • Статусы операций             │
+│  • Context Management        │    │  • Webhook handlers             │
+└──────────────┬───────────────┘    └─────────────────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                      TOOL EXECUTION LAYER                            │
+├─────────────────────────────────────────────────────────────────────┤
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌───────────────┐  │
+│  │ WB Tools    │ │ Ozon Tools  │ │ Analytics   │ │ Content Gen   │  │
+│  │ • Prices    │ │ • Prices    │ │ • Reports   │ │ • SEO         │  │
+│  │ • Stock     │ │ • Stock     │ │ • Trends    │ │ • Reviews     │  │
+│  │ • Cards     │ │ • Cards     │ │ • Alerts    │ │ • Descriptions│  │
+│  └─────────────┘ └─────────────┘ └─────────────┘ └───────────────┘  │
+└──────────────┬─────────────────────────────────────────┬────────────┘
+               │                                         │
+               ▼                                         ▼
+┌──────────────────────────────┐    ┌─────────────────────────────────┐
+│     BACKGROUND WORKERS       │    │         DATA LAYER              │
+│       (Bull/BullMQ)          │    ├─────────────────────────────────┤
+│  • Scheduled tasks           │    │  PostgreSQL    Redis   S3       │
+│  • Long-running operations   │    │  • Users       • Cache • Logs   │
+│  • Rule monitoring           │    │  • Operations  • Queue • Backup │
+│  • Retry logic               │    │  • API Keys    • Sessions       │
+└──────────────────────────────┘    └─────────────────────────────────┘
+
+Почему именно такая архитектура
+Гибридный подход (Python + Node.js) оптимален для вашего случая. Python берёт на себя AI-логику, где экосистема значительно богаче: LangChain, LlamaIndex, качественные SDK для всех LLM-провайдеров. Node.js остаётся для быстрых синхронных операций и Telegram-бота, где важна низкая latency. Это не усложнение ради усложнения — вы используете каждый язык там, где он силён.
+
+2. Конкретные библиотеки и инструменты
+Python-стек (Agent Core)
+pythonDownloadCopy code# requirements.txt
+fastapi==0.109.0           # API сервер
+uvicorn==0.27.0            # ASGI сервер
+langchain==0.1.0           # Оркестрация агента
+langchain-openai==0.0.5    # OpenAI интеграция
+langchain-anthropic==0.1.0 # Claude интеграция
+pydantic==2.5.0            # Валидация данных
+redis==5.0.0               # Кэш и очереди
+sqlalchemy==2.0.25         # ORM
+asyncpg==0.29.0            # Async PostgreSQL
+httpx==0.26.0              # Async HTTP клиент
+python-telegram-bot==20.7  # Telegram (альтернатива aiogram)
+Node.js стек (существующий + расширения)
+jsonDownloadCopy code{
+  "dependencies": {
+    "grammy": "^1.21.0",
+    "bullmq": "^5.1.0",
+    "ioredis": "^5.3.0",
+    "@vercel/ai": "^3.0.0",
+    "zod": "^3.22.0"
+  }
+}
+Инфраструктура
+КомпонентРекомендацияАльтернативаLLM APIOpenAI GPT-4o-mini + GPT-4oClaude 3.5 SonnetQueueBullMQ + RedisVercel KVCacheRedis (Upstash)Vercel KVDatabaseVercel PostgresSupabaseHosting AgentRailway / RenderModal.comMonitoringLangfuse (open-source)Langsmith
+
+3. Ответы на технические вопросы
+3.1 Выбор LLM и стратегия
+Рекомендую двухуровневую маршрутизацию:
+pythonDownloadCopy code# llm_router.py
+from enum import Enum
+from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
+
+class TaskComplexity(Enum):
+    SIMPLE = "simple"      # Запросы данных, простые операции
+    COMPLEX = "complex"    # Анализ, генерация контента, сложная логика
+
+class LLMRouter:
+    def __init__(self):
+        # Быстрая и дешёвая модель для 80% запросов
+        self.fast_model = ChatOpenAI(
+            model="gpt-4o-mini",
+            temperature=0.1,
+            max_tokens=1000
+        )
+        # Мощная модель для сложных задач
+        self.smart_model = ChatOpenAI(
+            model="gpt-4o",
+            temperature=0.3,
+            max_tokens=4000
+        )
+    
+    def classify_complexity(self, user_message: str) -> TaskComplexity:
+        """Классификация через быструю модель или правила."""
+        simple_patterns = [
+            "покажи", "сколько", "список", "статус",
+            "остатки", "цена на", "продажи за"
+        ]
+        complex_patterns = [
+            "оптимизируй", "проанализируй", "почему",
+            "стратегия", "рекомендации", "если.*то"
+        ]
+        
+        message_lower = user_message.lower()
+        
+        for pattern in complex_patterns:
+            if pattern in message_lower:
+                return TaskComplexity.COMPLEX
+        
+        return TaskComplexity.SIMPLE
+    
+    def get_model(self, complexity: TaskComplexity):
+        if complexity == TaskComplexity.SIMPLE:
+            return self.fast_model
+        return self.smart_model
+Стоимость при такой стратегии:
+
+* GPT-4o-mini: ~$0.15 / 1M input tokens (80% запросов)
+* GPT-4o: ~$2.50 / 1M input tokens (20% запросов)
+* Средняя стоимость на пользователя: $0.50–2.00/месяц при активном использовании
+
+3.2 Архитектура агента с function calling
+Рекомендую Tool-based подход (не ReAct) для вашего случая. ReAct хорош для исследовательских задач, но для чётких бизнес-операций Tool Calling даёт более предсказуемые результаты.
+pythonDownloadCopy code# agent/tools/wildberries.py
+from langchain.tools import tool
+from pydantic import BaseModel, Field
+from typing import Optional
+import httpx
+
+class PriceUpdateInput(BaseModel):
+    """Схема для валидации входных данных."""
+    nm_ids: list[int] = Field(description="Список артикулов WB (nmId)")
+    price_change: int = Field(description="Изменение цены в рублях (+ или -)")
+    
+class WildberriesTools:
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        self.base_url = "https://seller-api.wildberries.ru"
+    
+    @tool("wb_search_products")
+    async def search_products(
+        self, 
+        query: str, 
+        brand: Optional[str] = None,
+        category: Optional[str] = None
+    ) -> dict:
+        """
+        Поиск товаров продавца по названию, бренду или категории.
+        Используй для команд типа 'найди все кроссовки Nike'.
+        
+        Args:
+            query: Поисковый запрос (название товара)
+            brand: Фильтр по бренду (опционально)
+            category: Фильтр по категории (опционально)
+        """
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{self.base_url}/content/v2/get/cards/list",
+                headers={"Authorization": self.api_key},
+                params={"textSearch": query}
+            )
+            cards = response.json().get("cards", [])
+            
+            # Фильтрация
+            if brand:
+                cards = [c for c in cards if brand.lower() in c.get("brand", "").lower()]
+            
+            return {
+                "found_count": len(cards),
+                "products": [
+                    {
+                        "nm_id": c["nmID"],
+                        "name": c["title"],
+                        "brand": c["brand"],
+                        "price": c.get("price", 0)
+                    }
+                    for c in cards[:20]  # Лимит для контекста LLM
+                ]
+            }
+    
+    @tool("wb_update_prices")
+    async def update_prices(self, input_data: PriceUpdateInput) -> dict:
+        """
+        Изменение цен на указанные товары.
+        ВАЖНО: Требует подтверждения пользователя перед выполнением.
+        
+        Args:
+            input_data: nm_ids - список артикулов, price_change - изменение цены
+        """
+        # Этот метод НЕ выполняет операцию напрямую
+        # Он возвращает план для подтверждения
+        return {
+            "action": "REQUIRES_CONFIRMATION",
+            "operation": "price_update",
+            "details": {
+                "products_count": len(input_data.nm_ids),
+                "nm_ids": input_data.nm_ids,
+                "price_change": input_data.price_change
+            },
+            "confirmation_message": (
+                f"Изменить цену на {input_data.price_change:+d} ₽ "
+                f"для {len(input_data.nm_ids)} товаров?"
+            )
+        }
+
+    @tool("wb_get_sales")
+    async def get_sales(
+        self, 
+        date_from: str, 
+        date_to: str,
+        group_by: str = "day"
+    ) -> dict:
+        """
+        Получение статистики продаж за период.
+        
+        Args:
+            date_from: Начало периода (YYYY-MM-DD)
+            date_to: Конец периода (YYYY-MM-DD)  
+            group_by: Группировка (day/week/month)
+        """
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{self.base_url}/api/v1/supplier/sales",
+                headers={"Authorization": self.api_key},
+                params={"dateFrom": date_from, "dateTo": date_to}
+            )
+            sales = response.json()
+            
+            # Агрегация для LLM
+            total_revenue = sum(s.get("finishedPrice", 0) for s in sales)
+            total_orders = len(sales)
+            
+            return {
+                "period": f"{date_from} - {date_to}",
+                "total_orders": total_orders,
+                "total_revenue": total_revenue,
+                "average_order": total_revenue / total_orders if total_orders else 0,
+                "top_products": self._aggregate_top_products(sales)
+            }
+3.3 Оркестратор агента
+pythonDownloadCopy code# agent/orchestrator.py
+from langchain.agents import AgentExecutor, create_openai_tools_agent
+from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain.memory import ConversationBufferWindowMemory
+from typing import AsyncGenerator
+import json
+
+SYSTEM_PROMPT = """Ты — NeuroAgent, AI-ассистент для продавцов на маркетплейсах Wildberries и Ozon.
+
+ТВОИ ВОЗМОЖНОСТИ:
+- Поиск и анализ товаров продавца
+- Изменение цен и остатков
+- Получение статистики продаж
+- Работа с отзывами
+- Оптимизация карточек товаров
+
+ПРАВИЛА БЕЗОПАСНОСТИ:
+1. Операции изменения (цены, остатки, карточки) ВСЕГДА требуют подтверждения
+2. Никогда не выполняй массовые операции без явного согласия
+3. При неясных командах — уточни детали
+4. Показывай превью изменений перед применением
+
+ФОРМАТ ОТВЕТОВ:
+- Будь кратким и конкретным
+- Используй числа и факты
+- При ошибках API — объясни проблему простым языком
+
+Текущий пользователь: {user_name}
+Подключенные маркетплейсы: {connected_marketplaces}
+"""
+
+class NeuroAgentOrchestrator:
+    def __init__(
+        self, 
+        user_id: str,
+        wb_api_key: str | None = None,
+        ozon_api_key: str | None = None
+    ):
+        self.user_id = user_id
+        self.tools = self._initialize_tools(wb_api_key, ozon_api_key)
+        self.llm = LLMRouter()
+        self.memory = ConversationBufferWindowMemory(
+            k=10,  # Последние 10 сообщений
+            return_messages=True,
+            memory_key="chat_history"
+        )
+        self.pending_confirmations = {}
+    
+    def _initialize_tools(self, wb_key, ozon_key) -> list:
+        tools = []
+        if wb_key:
+            wb_tools = WildberriesTools(wb_key)
+            tools.extend([
+                wb_tools.search_products,
+                wb_tools.update_prices,
+                wb_tools.get_sales,
+            ])
+        if ozon_key:
+            # Аналогично для Ozon
+            pass
+        return tools
+    
+    async def process_message(
+        self, 
+        message: str,
+        user_context: dict
+    ) -> AsyncGenerator[dict, None]:
+        """
+        Обработка сообщения пользователя.
+        Возвращает генератор для стриминга ответа.
+        """
+        # Проверка на подтверждение ожидающей операции
+        if message.lower() in ["да", "подтверждаю", "выполни", "ок"]:
+            if self.user_id in self.pending_confirmations:
+                yield await self._execute_confirmed_operation()
+                return
+        
+        if message.lower() in ["нет", "отмена", "отменить"]:
+            if self.user_id in self.pending_confirmations:
+                del self.pending_confirmations[self.user_id]
+                yield {"type": "text", "content": "Операция отменена."}
+                return
+        
+        # Определение сложности и выбор модели
+        complexity = self.llm.classify_complexity(message)
+        model = self.llm.get_model(complexity)
+        
+        # Создание агента
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", SYSTEM_PROMPT),
+            MessagesPlaceholder(variable_name="chat_history"),
+            ("human", "{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),
+        ])
+        
+        agent = create_openai_tools_agent(model, self.tools, prompt)
+        executor = AgentExecutor(
+            agent=agent,
+            tools=self.tools,
+            memory=self.memory,
+            verbose=True,
+            max_iterations=5,
+            early_stopping_method="generate"
+        )
+        
+        # Выполнение с обработкой результатов
+        result = await executor.ainvoke({
+            "input": message,
+            "user_name": user_context.get("name", "Продавец"),
+            "connected_marketplaces": user_context.get("marketplaces", [])
+        })
+        
+        output = result["output"]
+        
+        # Проверка на запрос подтверждения
+        if isinstance(output, dict) and output.get("action") == "REQUIRES_CONFIRMATION":
+            self.pending_confirmations[self.user_id] = output
+            yield {
+                "type": "confirmation_request",
+                "content": output["confirmation_message"],
+                "details": output["details"]
+            }
+        else:
+            yield {"type": "text", "content": output}
+    
+    async def _execute_confirmed_operation(self) -> dict:
+        """Выполнение подтверждённой операции."""
+        operation = self.pending_confirmations.pop(self.user_id)
+        
+        # Здесь реальное выполнение через API
+        # + логирование в БД для возможности отката
+        
+        return {
+            "type": "text",
+            "content": f"✅ Операция выполнена: {operation['operation']}"
+        }
+3.4 Безопасность
+pythonDownloadCopy code# agent/safety.py
+from enum import Enum
+from pydantic import BaseModel
+import re
+
+class RiskLevel(Enum):
+    SAFE = "safe"                    # Только чтение
+    LOW = "low"                      # Изменение одного товара
+    MEDIUM = "medium"                # Изменение нескольких товаров
+    HIGH = "high"                    # Массовые операции
+    CRITICAL = "critical"            # Удаление, обнуление
+
+class OperationSafetyChecker:
+    """Проверка безопасности операций."""
+    
+    # Операции, требующие подтверждения
+    CONFIRMATION_REQUIRED = {
+        RiskLevel.MEDIUM,
+        RiskLevel.HIGH,
+        RiskLevel.CRITICAL
+    }
+    
+    # Паттерны потенциально опасных команд
+    DANGEROUS_PATTERNS = [
+        r"удали.*все",
+        r"обнули.*остатки",
+        r"цен[ау].*0",
+        r"скидк[ау].*100",
+    ]
+    
+    def assess_risk(
+        self, 
+        operation: str, 
+        affected_items: int,
+        change_magnitude: float
+    ) -> RiskLevel:
+        """Оценка риска операции."""
+        
+        # Критические паттерны
+        for pattern in self.DANGEROUS_PATTERNS:
+            if re.search(pattern, operation.lower()):
+                return RiskLevel.CRITICAL
+        
+        # По количеству затронутых товаров
+        if affected_items == 0:
+            return RiskLevel.SAFE
+        elif affected_items == 1:
+            return RiskLevel.LOW
+        elif affected_items <= 10:
+            return RiskLevel.MEDIUM
+        else:
+            return RiskLevel.HIGH
+    
+    def create_confirmation_message(
+        self,
+        operation_type: str,
+        details: dict,
+        risk_level: RiskLevel
+    ) -> str:
+        """Создание сообщения для подтверждения."""
+        
+        warnings = {
+            RiskLevel.MEDIUM: "⚠️",
+            RiskLevel.HIGH: "⚠️⚠️",
+            RiskLevel.CRITICAL: "🚨 ВНИМАНИЕ!"
+        }
+        
+        prefix = warnings.get(risk_level, "")
+        
+        return f"""{prefix}
+
+Операция: {operation_type}
+Затронуто товаров: {details.get('count', 'N/A')}
+Изменение: {details.get('change', 'N/A')}
+
+Подтвердить выполнение? (да/нет)"""
+
+class InputSanitizer:
+    """Защита от инъекций в промпт."""
+    
+    FORBIDDEN_PHRASES = [
+        "ignore previous",
+        "игнорируй предыдущ",
+        "забудь инструкции",
+        "новая роль",
+        "ты теперь",
+        "system:",
+        "assistant:",
+    ]
+    
+    def sanitize(self, user_input: str) -> tuple[str, bool]:
+        """
+        Возвращает (очищенный_текст, is_suspicious).
+        """
+        input_lower = user_input.lower()
+        
+        for phrase in self.FORBIDDEN_PHRASES:
+            if phrase in input_lower:
+                return "", True
+        
+        # Удаление потенциально опасных символов
+        sanitized = re.sub(r'[<>{}]', '', user_input)
+        
+        return sanitized, False
+3.5 Система логирования и отката
+pythonDownloadCopy code# database/operations_log.py
+from sqlalchemy import Column, Integer, String, JSON, DateTime, Enum
+from sqlalchemy.orm import declarative_base
+from datetime import datetime
+import enum
+
+Base = declarative_base()
+
+class OperationStatus(enum.Enum):
+    PENDING = "pending"
+    CONFIRMED = "confirmed"
+    EXECUTED = "executed"
+    ROLLED_BACK = "rolled_back"
+    FAILED = "failed"
+
+class OperationLog(Base):
+    """Лог всех операций для аудита и отката."""
+    
+    __tablename__ = "operation_logs"
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(String, index=True)
+    operation_type = Column(String)  # price_update, stock_update, etc.
+    marketplace = Column(String)     # wb, ozon
+    
+    # Что было ДО операции (для отката)
+    previous_state = Column(JSON)
+    
+    # Что стало ПОСЛЕ
+    new_state = Column(JSON)
+    
+    # Детали операции
+    affected_items = Column(JSON)  # Список nm_id / sku
+    
+    status = Column(Enum(OperationStatus), default=OperationStatus.PENDING)
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    executed_at = Column(DateTime, nullable=True)
+    
+    # Для отладки
+    llm_conversation_id = Column(String)
+    user_message = Column(String)
+
+
+class OperationManager:
+    """Управление операциями с возможностью отката."""
+    
+    def __init__(self, db_session):
+        self.db = db_session
+    
+    async def create_operation(
+        self,
+        user_id: str,
+        operation_type: str,
+        marketplace: str,
+        affected_items: list,
+        previous_state: dict,
+        new_state: dict,
+        conversation_id: str,
+        user_message: str
+    ) -> OperationLog:
+        """Создание записи об операции."""
+        
+        log = OperationLog(
+            user_id=user_id,
+            operation_type=operation_type,
+            marketplace=marketplace,
+            affected_items=affected_items,
+            previous_state=previous_state,
+            new_state=new_state,
+            llm_conversation_id=conversation_id,
+            user_message=user_message
+        )
+        
+        self.db.add(log)
+        await self.db.commit()
+        
+        return log
+    
+    async def rollback_operation(self, operation_id: int) -> bool:
+        """Откат операции к предыдущему состоянию."""
+        
+        log = await self.db.get(OperationLog, operation_id)
+        
+        if not log or log.status != OperationStatus.EXECUTED:
+            return False
+        
+        # Восстановление предыдущего состояния через API
+        # (зависит от типа операции)
+        
+        if log.operation_type == "price_update":
+            await self._rollback_prices(log)
+        elif log.operation_type == "stock_update":
+            await self._rollback_stock(log)
+        
+        log.status = OperationStatus.ROLLED_BACK
+        await self.db.commit()
+        
+        return True
+
+4. Telegram Bot интеграция
+pythonDownloadCopy code# bot/telegram_handler.py
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    Application, 
+    CommandHandler, 
+    MessageHandler, 
+    CallbackQueryHandler,
+    filters
+)
+
+class NeuroAgentBot:
+    def __init__(self, token: str, agent_orchestrator_factory):
+        self.app = Application.builder().token(token).build()
+        self.agent_factory = agent_orchestrator_factory
+        
+        # Регистрация хэндлеров
+        self.app.add_handler(CommandHandler("start", self.start))
+        self.app.add_handler(CommandHandler("help", self.help))
+        self.app.add_handler(CommandHandler("status", self.status))
+        self.app.add_handler(CommandHandler("history", self.history))
+        self.app.add_handler(MessageHandler(
+            filters.TEXT & ~filters.COMMAND, 
+            self.handle_message
+        ))
+        self.app.add_handler(CallbackQueryHandler(self.handle_callback))
+    
+    async def start(self, update: Update, context):
+        """Приветствие и онбординг."""
+        
+        keyboard = [
+            [InlineKeyboardButton(
+                "🔗 Подключить Wildberries", 
+                callback_data="connect_wb"
+            )],
+            [InlineKeyboardButton(
+                "🔗 Подключить Ozon", 
+                callback_data="connect_ozon"
+            )],
+            [InlineKeyboardButton(
+                "📖 Как пользоваться", 
+                callback_data="tutorial"
+            )]
+        ]
+        
+        await update.message.reply_text(
+            "👋 Привет! Я NeuroAgent — твой AI-помощник для маркетплейсов.\n\n"
+            "Я умею:\n"
+            "• Менять цены и остатки по команде\n"
+            "• Показывать статистику продаж\n"
+            "• Отвечать на отзывы\n"
+            "• Оптимизировать карточки товаров\n\n"
+            "Для начала подключи свой магазин:",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    
+    async def handle_message(self, update: Update, context):
+        """Обработка текстовых сообщений."""
+        
+        user_id = str(update.effective_user.id)
+        message = update.message.text
+        
+        # Показываем "печатает..."
+        await update.message.chat.send_action("typing")
+        
+        # Получаем агента для пользователя
+        agent = await self.agent_factory.get_or_create(user_id)
+        
+        # Получаем контекст пользователя из БД
+        user_context = await self._get_user_context(user_id)
+        
+        # Обрабатываем сообщение
+        async for response in agent.process_message(message, user_context):
+            if response["type"] == "text":
+                await update.message.reply_text(response["content"])
+            
+            elif response["type"] == "confirmation_request":
+                keyboard = [
+                    [
+                        InlineKeyboardButton("✅ Да", callback_data="confirm_yes"),
+                        InlineKeyboardButton("❌ Нет", callback_data="confirm_no")
+                    ]
+                ]
+                await update.message.reply_text(
+                    response["content"],
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+    
+    async def handle_callback(self, update: Update, context):
+        """Обработка нажатий на кнопки."""
+        
+        query = update.callback_query
+        await query.answer()
+        
+        if query.data == "confirm_yes":
+            user_id = str(update.effective_user.id)
+            agent = await self.agent_factory.get_or_create(user_id)
+            
+            async for response in agent.process_message("да", {}):
+                await query.edit_message_text(response["content"])
+        
+        elif query.data == "confirm_no":
+            user_id = str(update.effective_user.id)
+            agent = await self.agent_factory.get_or_create(user_id)
+            
+            async for response in agent.process_message("нет", {}):
+                await query.edit_message_text(response["content"])
+        
+        elif query.data == "connect_wb":
+            await query.edit_message_text(
+                "Для подключения Wildberries:\n\n"
+                "1. Откройте seller.wildberries.ru\n"
+                "2. Профиль → Доступ к API\n"
+                "3. Создайте токен с правами: Контент, Цены, Статистика\n"
+                "4. Отправьте мне токен в формате:\n\n"
+                "/connect_wb ваш_токен"
+            )
+
+5. Пошаговый план реализации MVP
+Фаза 1: Фундамент (2 недели)
+ДеньЗадачаРезультат1-2Настройка Python-окружения, FastAPI серверБазовый API на Railway/Render3-4Интеграция LangChain + OpenAIРаботающий LLM-вызов5-6Базовые tools для WB (read-only)search_products, get_sales7-8Telegram bot с простым диалогомБот отвечает на вопросы9-10Подключение PostgreSQL, модель UserСохранение API-ключей11-12Интеграция бота с агентомEnd-to-end запрос данных13-14Тестирование, исправление баговСтабильный read-only MVP
+Результат Фазы 1: Пользователь может спросить "покажи продажи за вчера" и получить ответ.
+Фаза 2: Операции изменения (2 недели)
+ДеньЗадачаРезультат15-16Tools для изменения ценupdate_prices с валидацией17-18Система подтвержденийЗапрос да/нет перед изменением19-20Логирование операцийТаблица operation_logs21-22Механизм откатаКнопка "отменить последнее"23-24Safety checkerБлокировка опасных команд25-26Tools для остатковupdate_stock27-28Тестирование на реальных данныхБезопасные изменения
+Результат Фазы 2: "Подними цену на кроссовки Nike на 500 рублей" работает безопасно.
+Фаза 3: Автономность и правила (2 недели)
+ДеньЗадачаРезультат29-30Модель Rules в БДХранение пользовательских правил31-32Background worker (BullMQ)Периодические проверки33-34Мониторинг цен конкурентовИнтеграция с парсером35-36Триггеры и уведомления"Конкурент снизил цену!"37-38Автоматические действияАвто-изменение по правилу39-40Интеграция с NeuroGUARDIANЗащита от акций41-42Дашборд в WebAppСписок правил, история
+Результат Фазы 3: "Если конкурент снизит цену ниже 8000, снизь мою до 7990" работает автономно.
+Фаза 4: Контент и масштабирование (2 недели)
+ДеньЗадачаРезультат43-44Tool для работы с отзывамиget_reviews, reply_review45-46Генерация ответов на отзывыШаблоны + персонализация47-48SEO-оптимизация карточекanalyze_card, optimize_card49-50Интеграция Ozon APIБазовые tools для Ozon51-52Кэширование (Redis)Снижение нагрузки на LLM53-54Rate limiting, очередиЗащита от перегрузки55-56Мониторинг (Langfuse)Отслеживание качества
+
+6. Монетизация
+Рекомендуемая модель: Гибридная подписка + usage
+┌─────────────────────────────────────────────────────────────┐
+│                    ТАРИФНЫЕ ПЛАНЫ                           │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  🆓 FREE           💼 PRO              🏢 BUSINESS          │
+│  0 ₽/мес           1 990 ₽/мес         4 990 ₽/мес          │
+│                                                             │
+│  • 50 запросов     • 500 запросов      • Безлимит           │
+│  • Только чтение   • Изменение цен     • Всё из PRO         │
+│  • 1 маркетплейс   • 2 маркетплейса    • Автоправила        │
+│  • —               • История 30 дней   • API доступ         │
+│  • —               • Откат операций    • Приоритет          │
+│                                                             │
+│  Дополнительно:                                             │
+│  • +100 запросов = 199 ₽                                    │
+│  • Автоправило = 299 ₽/мес за правило                       │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+
+Подсчёт использования
+pythonDownloadCopy code# billing/usage_tracker.py
+from enum import Enum
+from datetime import datetime, timedelta
+
+class RequestType(Enum):
+    SIMPLE_QUERY = 1      # "покажи продажи" — 1 единица
+    COMPLEX_QUERY = 3     # "проанализируй и порекомендуй" — 3 единицы
+    WRITE_OPERATION = 2   # изменение цены — 2 единицы
+    CONTENT_GEN = 5       # генерация описания — 5 единиц
+
+class UsageTracker:
+    def __init__(self, db, redis):
+        self.db = db
+        self.redis = redis
+    
+    async def track_request(
+        self, 
+        user_id: str, 
+        request_type: RequestType,
+        tokens_used: int
+    ):
+        """Учёт запроса."""
+        
+        # Дневной счётчик в Redis (быстро)
+        today = datetime.now().strftime("%Y-%m-%d")
+        key = f"usage:{user_id}:{today}"
+        
+        await self.redis.hincrby(key, "requests", request_type.value)
+        await self.redis.hincrby(key, "tokens", tokens_used)
+        await self.redis.expire(key, timedelta(days=35))
+        
+        # Проверка лимитов
+        return await self.check_limits(user_id)
+    
+    async def check_limits(self, user_id: str) -> dict:
+        """Проверка лимитов пользователя."""
+        
+        user = await self.db.get_user(user_id)
+        plan_limits = {
+            "free": 50,
+            "pro": 500,
+            "business": float("inf")
+        }
+        
+        # Подсчёт за текущий период
+        period_start = user.billing_period_start
+        usage = await self._get_period_usage(user_id, period_start)
+        
+        limit = plan_limits.get(user.plan, 50)
+        
+        return {
+            "used": usage,
+            "limit": limit,
+            "remaining": max(0, limit - usage),
+            "can_proceed": usage < limit
+        }
+
+7. Потенциальные проблемы и решения
+ПроблемаРешениеLLM галлюцинирует несуществующие товарыВсегда сначала делать search, потом операцию. Валидация nm_id через API перед изменениемПользователь случайно обнулил все ценыОбязательное подтверждение + автоматический бэкап состояния + откат одной кнопкойAPI маркетплейса недоступенRetry с exponential backoff + уведомление пользователя + сохранение операции в очередьСлишком дорогие LLM-запросыМаршрутизация по сложности + кэширование типовых запросов + лимитыJailbreak попыткиСанитизация ввода + мониторинг аномалий + логирование всех запросовКонкурент DDoS-ит ботаRate limiting per user + капча при подозрении + бан по IPTelegram блокирует ботаСоблюдение ToS + готовый WebApp как fallback
+
+8. Рекомендации по масштабированию
+До 100 пользователей: Vercel + один Python-сервер на Railway. Всё в одном, просто.
+100–1000 пользователей: Выделенный Redis (Upstash Pro), отдельные воркеры для background jobs, мониторинг через Langfuse.
+1000+ пользователей: Kubernetes/автоскейлинг на Railway, несколько инстансов агента, очередь задач с приоритетами, CDN для статики, read-реплики PostgreSQL.
+
+Итого: с чего начать завтра
+
+1. Создайте репозиторий neuroagent-core (Python)
+2. Настройте FastAPI + LangChain + один tool (wb_get_sales)
+3. Подключите к существующему Telegram боту
+4. Протестируйте на своём магазине
+5. Итерируйте
+
+Главное — не пытайтесь сделать всё сразу. Работающий read-only агент за 2 недели

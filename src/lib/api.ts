@@ -54,7 +54,7 @@ export const authApi = {
         success: true,
         user: userData,
       };
-    } catch {
+    } catch (error) {
       console.warn('Auth API failed, using demo mode');
       return {
         success: true,
@@ -231,99 +231,6 @@ export const syncApi = {
 
 export const productApi = {
   updateMinPrice: productsApi.updateMinPrice,
-};
-
-// ============================================
-// RULES SERVICE
-// ============================================
-
-export interface UserRuleData {
-  id: string;
-  name: string;
-  description?: string;
-  isActive: boolean;
-  priority: number;
-  triggerType: string;
-  actionType: string;
-  triggersToday: number;
-  maxTriggersPerDay: number;
-  createdAt: string;
-}
-
-export interface RuleTemplate {
-  id: string;
-  description: string;
-  condition: {
-    triggerType: string;
-    targetValue?: number;
-  };
-  action: {
-    actionType: string;
-    value?: number;
-    notifyMessage?: string;
-  };
-  maxTriggersPerDay?: number;
-  cooldownMinutes?: number;
-}
-
-export const rulesApi = {
-  getRules: async (): Promise<{ success: boolean; rules: UserRuleData[] }> => {
-    const initData = getInitData();
-    const response = await api.get('', {
-      params: { action: 'rules' },
-      headers: { 'X-Init-Data': initData || '' },
-    });
-    return response.data;
-  },
-
-  createRule: async (rule: {
-    name: string;
-    description?: string;
-    condition: { triggerType: string; targetValue?: number; competitorNmId?: number };
-    action: { actionType: string; value?: number; notifyMessage?: string; minPrice?: number };
-    priority?: number;
-    maxTriggersPerDay?: number;
-    cooldownMinutes?: number;
-  }): Promise<{ success: boolean; rule: UserRuleData }> => {
-    const initData = getInitData();
-    const response = await api.post('', {
-      action: 'rules-create',
-      initData,
-      name: rule.name,
-      description: rule.description,
-      condition: rule.condition,
-      ruleAction: rule.action,
-      priority: rule.priority,
-      maxTriggersPerDay: rule.maxTriggersPerDay,
-      cooldownMinutes: rule.cooldownMinutes,
-    });
-    return response.data;
-  },
-
-  toggleRule: async (ruleId: string): Promise<{ success: boolean; isActive: boolean }> => {
-    const initData = getInitData();
-    const response = await api.post('', {
-      action: 'rules-toggle',
-      initData,
-      ruleId,
-    });
-    return response.data;
-  },
-
-  deleteRule: async (ruleId: string): Promise<{ success: boolean }> => {
-    const initData = getInitData();
-    const response = await api.post('', {
-      action: 'rules-delete',
-      initData,
-      ruleId,
-    });
-    return response.data;
-  },
-
-  getTemplates: async (): Promise<{ success: boolean; templates: RuleTemplate[] }> => {
-    const response = await api.get('', { params: { action: 'rules-templates' } });
-    return response.data;
-  },
 };
 
 export default api;

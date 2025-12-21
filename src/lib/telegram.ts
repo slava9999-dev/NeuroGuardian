@@ -73,13 +73,11 @@ export function initTelegramWebApp(): void {
 
   // Set header color
   if ('setHeaderColor' in tg) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (tg as any).setHeaderColor('#0c0c0e');
   }
 
   // Set background color
   if ('setBackgroundColor' in tg) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (tg as any).setBackgroundColor('#0c0c0e');
   }
 

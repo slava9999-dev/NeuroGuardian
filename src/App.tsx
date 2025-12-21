@@ -8,7 +8,6 @@ import { motion } from 'framer-motion';
 import { AgentPage } from './pages/AgentPage';
 import { ProductsPage } from './pages/ProductsPage';
 import { SettingsPage } from './pages/SettingsPage';
-import { RulesPage } from './pages/RulesPage';
 import { LegalPage } from './pages/LegalPage';
 import { useAppStore, useProductsStore } from './stores';
 import { initTelegramWebApp, isTelegramWebApp, getInitData } from './lib/telegram';
@@ -75,7 +74,7 @@ const MOCK_USER = {
 };
 
 // Pages enum - Agent is first!
-type Page = 'agent' | 'products' | 'settings' | 'rules' | 'info';
+type Page = 'agent' | 'products' | 'settings' | 'info';
 
 function App() {
   const setUser = useAppStore(state => state.setUser);
@@ -124,7 +123,7 @@ function App() {
                 useProductsStore.getState().setProducts(products);
                 console.log('📦 Products loaded:', products.length);
               }
-            } catch {
+            } catch (_err) {
               console.log('📦 No products yet');
             }
           }
@@ -150,7 +149,6 @@ function App() {
   const goToAgent = () => setCurrentPage('agent');
   const goToProducts = () => setCurrentPage('products');
   const goToSettings = () => setCurrentPage('settings');
-  const goToRules = () => setCurrentPage('rules');
   const goToInfo = () => setCurrentPage('info');
 
   if (!isInitialized || isLoading) {
@@ -162,8 +160,7 @@ function App() {
       {/* Pages */}
       {currentPage === 'agent' && <AgentPage />}
       {currentPage === 'products' && <ProductsPage onBack={goToAgent} />}
-      {currentPage === 'settings' && <SettingsPage onBack={goToAgent} onShowRules={goToRules} />}
-      {currentPage === 'rules' && <RulesPage onBack={goToSettings} />}
+      {currentPage === 'settings' && <SettingsPage onBack={goToAgent} />}
       {currentPage === 'info' && <LegalPage onBack={goToAgent} />}
 
       {/* Bottom Tab Bar - Simplified */}

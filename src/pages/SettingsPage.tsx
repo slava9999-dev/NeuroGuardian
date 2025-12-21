@@ -11,13 +11,7 @@ import { settingsApi, productsApi } from '../lib/api';
 import { SecurityBadge } from '../components/ui/SecurityBadge';
 import type { DefenseMode } from '../types';
 
-export function SettingsPage({
-  onBack,
-  onShowRules,
-}: {
-  onBack: () => void;
-  onShowRules?: () => void;
-}) {
+export function SettingsPage({ onBack }: { onBack: () => void }) {
   const { user, defenseMode, setDefenseMode, setUser } = useAppStore();
   const { setProducts } = useProductsStore();
   const [isSaving, setIsSaving] = useState(false);
@@ -83,7 +77,6 @@ export function SettingsPage({
       // Reload products
       const productsResult = await productsApi.getProducts();
       if (productsResult.success) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         setProducts(productsResult.products as any);
       }
 
@@ -91,7 +84,6 @@ export function SettingsPage({
 
       // Clear status after 3 seconds
       setTimeout(() => setSyncStatus(null), 3000);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.error('Sync error:', error);
       setSyncStatus(`Ошибка: ${error.response?.data?.error || error.message}`);
@@ -151,48 +143,6 @@ export function SettingsPage({
           </div>
         </section>
       )}
-
-      {/* Automation Rules */}
-      <section className="mb-6">
-        <h3 className="text-sm font-medium text-stone-400 uppercase tracking-wider mb-3">
-          Автоматизация
-        </h3>
-        <button
-          onClick={() => onShowRules?.()}
-          className="w-full glass-panel p-4 flex items-center justify-between hover:border-amber-500/30 transition-colors"
-        >
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                className="text-amber-400"
-              >
-                <path d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 0 0 1.946-.806 3.42 3.42 0 0 1 4.438 0 3.42 3.42 0 0 0 1.946.806 3.42 3.42 0 0 1 3.138 3.138 3.42 3.42 0 0 0 .806 1.946 3.42 3.42 0 0 1 0 4.438 3.42 3.42 0 0 0-.806 1.946 3.42 3.42 0 0 1-3.138 3.138 3.42 3.42 0 0 0-1.946.806 3.42 3.42 0 0 1-4.438 0 3.42 3.42 0 0 0-1.946-.806 3.42 3.42 0 0 1-3.138-3.138 3.42 3.42 0 0 0-.806-1.946 3.42 3.42 0 0 1 0-4.438 3.42 3.42 0 0 0 .806-1.946 3.42 3.42 0 0 1 3.138-3.138z" />
-              </svg>
-            </div>
-            <div className="text-left">
-              <h4 className="font-medium text-white">Правила автоматизации</h4>
-              <p className="text-sm text-stone-400">Настройте автоматические действия</p>
-            </div>
-          </div>
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            className="text-stone-500"
-          >
-            <path d="M9 18l6-6-6-6" />
-          </svg>
-        </button>
-      </section>
 
       {/* Connected APIs */}
       <section className="mb-6">

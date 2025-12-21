@@ -41,7 +41,6 @@ export class ErrorBoundary extends Component<Props, State> {
 
   async reportError(error: Error, errorInfo: ErrorInfo) {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const tg = (window as any).Telegram?.WebApp;
       if (tg?.initData) {
         // Log error details for debugging
