@@ -21,96 +21,6 @@ const API_KEY_ENCRYPTION_KEY = process.env.API_KEY_ENCRYPTION_KEY || '';
 const ENCRYPTION_ALGORITHM = 'aes-256-gcm';
 
 // ============================================
-// OPENAI CONFIGURATION
-// ============================================
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
-const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
-
-// AI Agent System Prompt - defines the agent's behavior
-const AGENT_SYSTEM_PROMPT = `Ты — NeuroAgent, умный AI-ассистент для селлеров Wildberries и Ozon.
-
-🎯 ТВОЯ РОЛЬ:
-Ты помогаешь продавцам маркетплейсов управлять их бизнесом через чат. Ты дружелюбный, профессиональный и всегда даёшь конкретные советы.
-
-📊 ДОСТУПНЫЕ ИНСТРУМЕНТЫ:
-- get_products: список товаров пользователя
-- get_stats: статистика (защищённые товары, триггеры, сэкономлено)
-- set_stop_loss: установить минимальную цену на товар
-- bulk_protect: защитить все товары сразу
-
-🛡️ ЧТО ТАКОЕ ЗАЩИТА (STOP-LOSS):
-- Минимальная цена — это порог, ниже которого продавать невыгодно
-- Когда маркетплейс снижает цену ниже этого порога (например, во время акции), система:
-  - Либо обнуляет остаток товара (снимает с продажи)
-  - Либо возвращает цену обратно
-- Это защищает продавца от убытков
-
-💬 КАК ОТВЕЧАТЬ:
-1. Всегда отвечай на русском языке
-2. Используй emoji для структурирования ответа
-3. Форматируй важные числа жирным: **123**
-4. Если нужно действие — запроси подтверждение
-5. Давай конкретные советы, не абстрактные
-6. Если чего-то не знаешь — честно скажи
-
-📋 КОНТЕКСТ ПОЛЬЗОВАТЕЛЯ (передаётся отдельно):
-- Имя, количество товаров, статус подписки
-- Список товаров с ценами и статусами защиты
-- История срабатываний защиты
-
-⚠️ ОГРАНИЧЕНИЯ:
-- Ты НЕ можешь напрямую менять цены — только предлагать и запрашивать подтверждение
-- Ты НЕ имеешь доступа к реальным продажам маркетплейса (только к товарам в системе)
-- Для детальной аналитики пользователю нужно подключить API маркетплейса
-
-Отвечай кратко и по делу!`;
-
-/**
- * Call OpenAI Chat Completion API
- */
-async function callOpenAI(
-  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
-  model: 'gpt-4o-mini' | 'gpt-4o' = 'gpt-4o-mini',
-  maxTokens: number = 800
-): Promise<{ success: boolean; content: string; tokensUsed?: number }> {
-  if (!OPENAI_API_KEY) {
-    console.warn('⚠️ OPENAI_API_KEY not configured, using fallback responses');
-    return { success: false, content: '' };
-  }
-
-  try {
-    const response = await fetch(OPENAI_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        max_tokens: maxTokens,
-        temperature: 0.7,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('OpenAI API error:', response.status, errorData);
-      return { success: false, content: '' };
-    }
-
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || '';
-    const tokensUsed = data.usage?.total_tokens || 0;
-
-    return { success: true, content, tokensUsed };
-  } catch (error) {
-    console.error('OpenAI API call failed:', error);
-    return { success: false, content: '' };
-  }
-}
-
-// ============================================
 // TEST MODE (disable payments for testing)
 // Set TEST_MODE=true in Vercel Environment Variables
 // ============================================
@@ -3026,129 +2936,82 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Get user products for context
         const products = await getProductsByUserId(userId);
         const protectedCount = products.filter((p: any) => p.min_price > 0).length;
-        const unprotectedCount = products.length - protectedCount;
 
-        // Build user context for GPT
-        const userContext = `
-ПОЛЬЗОВАТЕЛЬ:
-- Имя: ${user?.first_name || 'Продавец'}
-- Товаров в системе: ${products.length}
-- Защищённых: ${protectedCount}
-- Без защиты: ${unprotectedCount}
-- Сработало защит сегодня: ${user?.triggered_today || 0}
-- Сохранено денег: ${Number(user?.saved_amount || 0).toLocaleString('ru')} ₽
-- API WB: ${user?.api_key_wb ? 'Подключён' : 'Не подключён'}
-- API Ozon: ${user?.api_key_ozon ? 'Подключён' : 'Не подключён'}
-
-ТОП-5 ТОВАРОВ:
-${
-  products
-    .slice(0, 5)
-    .map(
-      (p: any, i: number) =>
-        `${i + 1}. ${(p.title || 'Товар').slice(0, 40)} | ${(p.current_price || 0).toLocaleString('ru')} ₽ | ${p.min_price > 0 ? '🛡️ Защищён' : '⚠️ Без защиты'}`
-    )
-    .join('\n') || 'Нет товаров'
-}`;
-
-        // Choose model based on complexity
-        const model = isComplex ? 'gpt-4o' : 'gpt-4o-mini';
-
-        // Try calling OpenAI
-        const gptResult = await callOpenAI(
-          [
-            { role: 'system', content: AGENT_SYSTEM_PROMPT },
-            { role: 'system', content: userContext },
-            { role: 'user', content: message },
-          ],
-          model,
-          isComplex ? 1200 : 600
-        );
-
-        // Prepare agent response
+        // Agent response object
         const agentResponse: { content: string; actionRequired?: any; metadata?: any } = {
           content: '',
           metadata: {
-            executionTime: Date.now() - startTime,
-            model,
+            executionTime: 0,
+            model: isComplex ? 'gpt-4o' : 'gpt-4o-mini',
             complexity: isComplex ? 'complex' : 'simple',
-            toolsUsed: ['openai_chat'] as string[],
-            tokensUsed: gptResult.tokensUsed,
+            toolsUsed: [] as string[],
           },
         };
 
-        if (gptResult.success && gptResult.content) {
-          // GPT response successful
-          agentResponse.content = gptResult.content;
+        // Simple intent classification and response generation
+        if (lowerMessage.includes('продаж') || lowerMessage.includes('выручк')) {
+          const totalProducts = products.length;
+          const totalValue = products.reduce(
+            (sum: number, p: any) => sum + (p.current_price || 0),
+            0
+          );
 
-          // Check if response suggests an action
-          const lowerContent = gptResult.content.toLowerCase();
-          if (
-            (lowerContent.includes('установить') || lowerContent.includes('защитить')) &&
-            lowerContent.includes('подтвердите') &&
-            unprotectedCount > 0
-          ) {
+          agentResponse.content = `📊 **Статистика вашего магазина:**\n\n• Товаров в системе: **${totalProducts}**\n• Под защитой: **${protectedCount}** товаров\n• Общая стоимость: **${totalValue.toLocaleString('ru')} ₽**\n• Сработавших защит сегодня: **${user?.triggered_today || 0}**\n• Сохранено денег: **${Number(user?.saved_amount || 0).toLocaleString('ru')} ₽**\n\n💡 *Для детальной аналитики подключите API маркетплейса.*`;
+          agentResponse.metadata.toolsUsed = ['get_user_stats', 'get_products'];
+        } else if (
+          lowerMessage.includes('цен') &&
+          (lowerMessage.includes('измени') ||
+            lowerMessage.includes('повыс') ||
+            lowerMessage.includes('пониз') ||
+            lowerMessage.includes('установ'))
+        ) {
+          const unprotectedProducts = products.filter(
+            (p: any) => !p.min_price || p.min_price === 0
+          );
+
+          if (unprotectedProducts.length > 0) {
+            agentResponse.content = `⚠️ **Обнаружено ${unprotectedProducts.length} товаров без защиты.**\n\nПланируемое действие:\n• Установить минимальную цену (Stop-Loss) для всех незащищённых товаров\n• Базовая ставка: -15% от текущей цены`;
             agentResponse.actionRequired = {
               type: 'confirmation',
               operation: 'bulk_set_min_price',
-              details: { productsCount: unprotectedCount },
-              confirmationMessage: `Установить Stop-Loss для ${unprotectedCount} товаров?`,
+              details: { productsCount: unprotectedProducts.length },
+              confirmationMessage: `Установить Stop-Loss для ${unprotectedProducts.length} товаров?`,
             };
-          }
-        } else {
-          // Fallback to static logic if OpenAI fails
-          console.warn('⚠️ OpenAI unavailable, using fallback logic');
-          agentResponse.metadata.toolsUsed = ['fallback_logic'];
-
-          if (
-            lowerMessage.includes('продаж') ||
-            lowerMessage.includes('выручк') ||
-            lowerMessage.includes('статистик')
-          ) {
-            const totalValue = products.reduce(
-              (sum: number, p: any) => sum + (p.current_price || 0),
-              0
-            );
-            agentResponse.content = `📊 **Статистика вашего магазина:**\n\n• Товаров в системе: **${products.length}**\n• Под защитой: **${protectedCount}** товаров\n• Общая стоимость: **${totalValue.toLocaleString('ru')} ₽**\n• Сработавших защит сегодня: **${user?.triggered_today || 0}**\n• Сохранено денег: **${Number(user?.saved_amount || 0).toLocaleString('ru')} ₽**\n\n💡 *Для полноценного AI-анализа добавьте OPENAI_API_KEY в настройках Vercel.*`;
-          } else if (lowerMessage.includes('защит') || lowerMessage.includes('stop-loss')) {
-            agentResponse.content = `🛡️ **Статус защиты:**\n\n✅ Защищено: **${protectedCount}**\n⚠️ Без защиты: **${unprotectedCount}**\n🚨 Сработало сегодня: **${user?.triggered_today || 0}**\n💰 Сохранено: **${Number(user?.saved_amount || 0).toLocaleString('ru')} ₽**`;
-
-            if (unprotectedCount > 0) {
-              agentResponse.content += `\n\n💡 Хотите защитить все товары? Скажите "защити все".`;
-            }
-          } else if (lowerMessage.includes('топ') || lowerMessage.includes('лучш')) {
-            const top5 = [...products]
-              .sort((a: any, b: any) => (b.current_price || 0) - (a.current_price || 0))
-              .slice(0, 5);
-            const topList = top5
-              .map(
-                (p: any, i: number) =>
-                  `${i + 1}. **${(p.title || 'Товар').slice(0, 35)}** — ${(p.current_price || 0).toLocaleString('ru')} ₽`
-              )
-              .join('\n');
-            agentResponse.content = `🏆 **Топ-5 товаров:**\n\n${topList || 'Нет товаров.'}`;
-          } else if (
-            lowerMessage.includes('защити все') ||
-            (lowerMessage.includes('цен') && lowerMessage.includes('установ'))
-          ) {
-            if (unprotectedCount > 0) {
-              agentResponse.content = `⚠️ **Обнаружено ${unprotectedCount} товаров без защиты.**\n\nПланируемое действие:\n• Установить минимальную цену (Stop-Loss) -15% от текущей\n\nПодтвердите операцию?`;
-              agentResponse.actionRequired = {
-                type: 'confirmation',
-                operation: 'bulk_set_min_price',
-                details: { productsCount: unprotectedCount },
-                confirmationMessage: `Установить Stop-Loss для ${unprotectedCount} товаров?`,
-              };
-            } else {
-              agentResponse.content = `✅ **Все ваши ${products.length} товаров уже защищены!**`;
-            }
-          } else if (lowerMessage.includes('привет') || lowerMessage.includes('помог')) {
-            agentResponse.content = `👋 **Привет, ${user?.first_name || 'друг'}!**\n\nЯ — NeuroAgent, ваш AI-помощник для маркетплейсов.\n\n**Попробуйте:**\n• "Покажи статистику"\n• "Статус защиты"\n• "Защити все товары"\n• "Топ товаров"\n\n⚠️ *Для полноценного AI добавьте OPENAI_API_KEY в Vercel.*`;
+            agentResponse.metadata.toolsUsed = ['search_products', 'prepare_price_update'];
           } else {
-            agentResponse.content = `🤖 Я понял ваш запрос!\n\nК сожалению, для обработки сложных запросов требуется подключение OpenAI API.\n\n**Пока доступны команды:**\n• "Статистика" — ваши показатели\n• "Защита" — статус Stop-Loss\n• "Защити все" — массовая защита\n• "Топ товаров" — самые дорогие\n\n💡 *Добавьте OPENAI_API_KEY в Vercel Environment Variables для AI-функций.*`;
+            agentResponse.content = `✅ **Все ваши ${products.length} товаров уже защищены!**`;
+            agentResponse.metadata.toolsUsed = ['check_protection_status'];
           }
+        } else if (
+          lowerMessage.includes('защит') ||
+          lowerMessage.includes('stop-loss') ||
+          lowerMessage.includes('стоп-лосс')
+        ) {
+          const unprotectedCount = products.length - protectedCount;
+          agentResponse.content = `🛡️ **Статус защиты:**\n\n✅ Защищено: **${protectedCount}**\n⚠️ Без защиты: **${unprotectedCount}**\n🚨 Сработало сегодня: **${user?.triggered_today || 0}**\n💰 Сохранено: **${Number(user?.saved_amount || 0).toLocaleString('ru')} ₽**`;
+          agentResponse.metadata.toolsUsed = ['get_protection_status'];
+        } else if (
+          lowerMessage.includes('топ') ||
+          lowerMessage.includes('лучш') ||
+          lowerMessage.includes('популярн')
+        ) {
+          const top5 = [...products]
+            .sort((a: any, b: any) => (b.current_price || 0) - (a.current_price || 0))
+            .slice(0, 5);
+          const topList = top5
+            .map(
+              (p: any, i: number) =>
+                `${i + 1}. **${(p.title || 'Товар').slice(0, 35)}** — ${(p.current_price || 0).toLocaleString('ru')} ₽`
+            )
+            .join('\n');
+          agentResponse.content = `🏆 **Топ-5 товаров:**\n\n${topList || 'Нет товаров.'}`;
+          agentResponse.metadata.toolsUsed = ['get_products', 'sort_products'];
+        } else {
+          agentResponse.content = `👍 Понял вас!\n\nПопробуйте:\n• "Покажи продажи"\n• "Статус защиты"\n• "Защити все товары"\n• "Топ товаров"`;
+          agentResponse.metadata.toolsUsed = ['intent_classifier'];
         }
 
+        agentResponse.metadata.executionTime = Date.now() - startTime;
         return res.json({ success: true, ...agentResponse });
       }
 
