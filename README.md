@@ -1,8 +1,16 @@
 # 🛡️ NeuroGUARDIAN
 
+[![Version](https://img.shields.io/badge/version-2.3.0-blue.svg)](CHANGELOG.md)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue.svg)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-19-61dafb.svg)](https://react.dev/)
+[![Vercel](https://img.shields.io/badge/Deployed-Vercel-black.svg)](https://vercel.com/)
+[![License](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
+
 > **Автоматическая защита маржи для продавцов WB и Ozon**
 
 Система мониторинга и защиты цен от принудительных акций маркетплейсов. Когда маркетплейс снижает вашу цену ниже установленного минимума — NeuroGUARDIAN мгновенно реагирует!
+
+📚 **Документация:** [CHANGELOG](CHANGELOG.md) | [AUDIT](AUDIT_FINAL_2024-12-21.md) | [VSCode Setup](VSCODE_SETUP.md)
 
 ---
 
@@ -239,4 +247,4 @@ CRON_SECRET=your-cron-secret
 
 © 2024 ИП Дмитричев А.Г. Все права защищены.
 
-NeuroGUARDIAN v2.2.0 — Margin Defense System
+NeuroGUARDIAN v2.3.0 — Margin Defense System
