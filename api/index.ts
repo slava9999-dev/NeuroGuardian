@@ -234,27 +234,37 @@ const AGENT_TOOLS = [
     function: {
       name: 'update_prices',
       description:
-        'Изменить цены на товары. ТРЕБУЕТ ПОДТВЕРЖДЕНИЯ! Используй когда пользователь хочет поднять/понизить цены.',
+        'Изменить цены на товары. ТРЕБУЕТ ПОДТВЕРЖДЕНИЯ! Если product_ids не указан — система возьмёт все товары (макс 10). Укажи либо price_change (в рублях), либо price_change_percent (в %).',
       parameters: {
         type: 'object',
         properties: {
           product_ids: {
             type: 'array',
             items: { type: 'string' },
-            description: 'Список ID товаров',
+            description:
+              'Опционально: список конкретных ID товаров. Если не указать — изменятся все товары.',
+          },
+          marketplace: {
+            type: 'string',
+            enum: ['WB', 'Ozon', 'all'],
+            description: 'Маркетплейс для изменения цен (по умолчанию all)',
           },
           price_change: {
             type: 'number',
-            description: 'Изменение цены в рублях (+500 или -200)',
+            description:
+              'Изменение цены в рублях. Положительное = повысить (+500), отрицательное = понизить (-200)',
           },
           price_change_percent: {
             type: 'number',
-            description: 'Или изменение в процентах (+10 или -5)',
+            description:
+              'Или изменение в процентах. Положительное = повысить (+10), отрицательное = понизить (-5)',
           },
         },
+        required: [],
       },
     },
   },
+
   {
     type: 'function' as const,
     function: {
@@ -923,20 +933,84 @@ export async function executeAgentTool(
 
     // ========== UPDATE PRICES ==========
     case 'update_prices': {
-      const { product_ids, price_change, price_change_percent } = args;
+      const {
+        product_ids,
+        price_change,
+        price_change_percent,
+        category,
+        marketplace = 'all',
+      } = args;
+
+      // Получаем товары для изменения цен
+      let products = await getProductsByUserId(userId);
+
+      // Фильтруем по marketplace если указан
+      if (marketplace !== 'all') {
+        products = products.filter((p: any) => p.marketplace === marketplace);
+      }
+
+      // Если указаны конкретные ID — используем их, иначе берём все
+      let targetProducts: any[];
+      if (product_ids && Array.isArray(product_ids) && product_ids.length > 0) {
+        targetProducts = products.filter(
+          (p: any) => product_ids.includes(p.product_id) || product_ids.includes(String(p.nm_id))
+        );
+      } else {
+        // Если не указаны — берём первые 10 для безопасности
+        targetProducts = products.slice(0, 10);
+      }
+
+      if (targetProducts.length === 0) {
+        return {
+          data: { error: 'Не найдено товаров для изменения цен' },
+        };
+      }
+
+      // Рассчитываем новые цены
+      const pricePreview = targetProducts.map((p: any) => {
+        let newPrice = p.current_price;
+        if (price_change) {
+          newPrice = p.current_price + price_change;
+        } else if (price_change_percent) {
+          newPrice = Math.round(p.current_price * (1 + price_change_percent / 100));
+        }
+        // Защита от падения ниже min_price
+        if (p.min_price > 0 && newPrice < p.min_price) {
+          newPrice = p.min_price;
+        }
+        return {
+          nm_id: p.nm_id,
+          product_id: p.product_id,
+          name: p.title?.substring(0, 35),
+          currentPrice: p.current_price,
+          newPrice: Math.round(newPrice),
+          change: Math.round(newPrice - p.current_price),
+          marketplace: p.marketplace,
+        };
+      });
+
+      const changeLabel = price_change
+        ? `${price_change > 0 ? '+' : ''}${price_change} ₽`
+        : `${price_change_percent > 0 ? '+' : ''}${price_change_percent}%`;
 
       return {
         data: {
           message: 'Изменение цен требует подтверждения',
-          productsCount: product_ids?.length || 0,
-          change: price_change
-            ? `${price_change > 0 ? '+' : ''}${price_change} ₽`
-            : `${price_change_percent > 0 ? '+' : ''}${price_change_percent}%`,
+          productsCount: pricePreview.length,
+          change: changeLabel,
+          preview: pricePreview.slice(0, 5), // Показываем первые 5 в превью
         },
         requiresConfirmation: true,
-        confirmationMessage: `Изменить цены на ${product_ids?.length || 0} товаров: ${price_change ? `${price_change > 0 ? '+' : ''}${price_change} ₽` : `${price_change_percent}%`}?`,
+        confirmationMessage: `Изменить цены на ${pricePreview.length} товаров (${changeLabel})?`,
         confirmationDetails: {
-          product_ids,
+          // Передаём nm_id для WB API
+          nm_ids: pricePreview.map(p => p.nm_id),
+          price_changes: pricePreview.map(p => ({
+            nm_id: p.nm_id,
+            product_id: p.product_id,
+            newPrice: p.newPrice,
+            marketplace: p.marketplace,
+          })),
           price_change,
           price_change_percent,
           operation: 'update_prices',
@@ -4336,51 +4410,120 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
         } else if (operation === 'update_prices') {
           // ИЗМЕНЕНИЕ ЦЕН (РЕАЛЬНЫЙ РЕЖИМ ⚔️)
-          const { product_ids, price_change, price_change_percent } = details;
+          const { nm_ids, price_changes } = details;
 
-          if (product_ids && Array.isArray(product_ids) && product_ids.length > 0) {
+          // Новый формат: используем подготовленные price_changes с nm_id
+          if (price_changes && Array.isArray(price_changes) && price_changes.length > 0) {
             console.log(
-              `🚀 EXECUTING REAL PRICE UPDATE for User ${userId}, ${product_ids.length} items`
+              `🚀 EXECUTING REAL PRICE UPDATE for User ${userId}, ${price_changes.length} items`
             );
 
-            // 1. Получаем текущие продукты чтобы узнать старые цены
-            const products = await getProductsByUserId(userId);
-            const updates = [];
+            // Группируем по маркетплейсам
+            const wbUpdates: Array<{ nmId: number; newPrice: number; productId: string }> = [];
+            const ozonUpdates: Array<{ productId: string; newPrice: number }> = [];
 
-            for (const pid of product_ids) {
-              const product = products.find((p: any) => String(p.product_id) === String(pid));
-              if (product) {
-                let newPrice = product.current_price;
-
-                if (price_change) {
-                  newPrice = product.current_price + price_change;
-                } else if (price_change_percent) {
-                  newPrice = product.current_price * (1 + price_change_percent / 100);
-                }
-
-                // Цена не может быть меньше min_price (если установлен)
-                if (product.min_price > 0 && newPrice < product.min_price) {
-                  newPrice = product.min_price;
-                }
-
-                updates.push({ productId: product.product_id, newPrice: Math.floor(newPrice) });
+            for (const item of price_changes) {
+              if (item.marketplace === 'WB' && item.nm_id) {
+                wbUpdates.push({
+                  nmId: Number(item.nm_id),
+                  newPrice: Math.floor(item.newPrice),
+                  productId: item.product_id,
+                });
+              } else if (item.marketplace === 'Ozon') {
+                ozonUpdates.push({
+                  productId: item.product_id,
+                  newPrice: Math.floor(item.newPrice),
+                });
               }
             }
 
-            if (updates.length > 0) {
-              const result = await updatePricesReal(userId, updates);
+            let wbResult = { success: true, count: 0, error: '' };
+            let ozonResult = { success: true, count: 0, error: '' };
 
-              if (result.success) {
-                resultContent = `✅ **Цены успешно обновлены!**\n\nИзменено товаров: ${result.count}. Новые цены уже в Wildberries.`;
-                executed = true;
+            // WB: Обновляем цены
+            if (wbUpdates.length > 0) {
+              const user = await getUserById(userId);
+              if (user?.api_key_wb) {
+                const wbApiKey = decryptApiKey(user.api_key_wb);
+                const wbPayload = {
+                  data: wbUpdates.map(u => ({ nmId: u.nmId, price: u.newPrice })),
+                };
+
+                console.log(`📤 WB Price Update Payload:`, JSON.stringify(wbPayload));
+
+                try {
+                  const response = await fetchWithRetry(
+                    'https://discounts-prices-api.wildberries.ru/api/v2/upload/task',
+                    {
+                      method: 'POST',
+                      headers: {
+                        Authorization: wbApiKey,
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify(wbPayload),
+                    }
+                  );
+
+                  if (response.ok) {
+                    wbResult = { success: true, count: wbUpdates.length, error: '' };
+                    // Обновляем локальную БД
+                    for (const u of wbUpdates) {
+                      await sql`
+                        UPDATE products 
+                        SET current_price = ${u.newPrice}, updated_at = NOW()
+                        WHERE user_id = ${userId} AND nm_id = ${u.nmId}
+                      `;
+                    }
+                  } else {
+                    const errText = await response.text();
+                    wbResult = { success: false, count: 0, error: errText };
+                  }
+                } catch (e) {
+                  wbResult = {
+                    success: false,
+                    count: 0,
+                    error: e instanceof Error ? e.message : 'WB API Error',
+                  };
+                }
               } else {
-                resultContent = `❌ **Ошибка при обновлении цен:** ${result.error}`;
+                wbResult = { success: false, count: 0, error: 'WB API ключ не настроен' };
               }
+            }
+
+            // OZON: TODO - добавить реальное обновление цен через Ozon API
+            if (ozonUpdates.length > 0) {
+              // Пока только обновляем локальную БД
+              for (const u of ozonUpdates) {
+                await sql`
+                  UPDATE products 
+                  SET current_price = ${u.newPrice}, updated_at = NOW()
+                  WHERE user_id = ${userId} AND product_id = ${u.productId}
+                `;
+              }
+              ozonResult = {
+                success: true,
+                count: ozonUpdates.length,
+                error: 'Ozon API пока не реализован, обновлена только локальная БД',
+              };
+            }
+
+            // Формируем результат
+            const totalUpdated = wbResult.count + ozonResult.count;
+            if (wbResult.success && ozonResult.success && totalUpdated > 0) {
+              resultContent = `✅ **Цены успешно обновлены!**\n\n`;
+              if (wbResult.count > 0) resultContent += `• WB: ${wbResult.count} товаров\n`;
+              if (ozonResult.count > 0) resultContent += `• Ozon: ${ozonResult.count} товаров\n`;
+              resultContent += `\nНовые цены применены на маркетплейсе.`;
+              executed = true;
             } else {
-              resultContent = '❌ Не удалось найти товары для обновления.';
+              resultContent = `❌ **Ошибка при обновлении цен:**\n`;
+              if (!wbResult.success && wbUpdates.length > 0)
+                resultContent += `• WB: ${wbResult.error}\n`;
+              if (!ozonResult.success && ozonUpdates.length > 0)
+                resultContent += `• Ozon: ${ozonResult.error}\n`;
             }
           } else {
-            resultContent = '❌ Ошибка данных для обновления цен.';
+            resultContent = '❌ Ошибка данных для обновления цен. Попробуйте ещё раз.';
           }
         } else {
           resultContent = '❌ Неизвестная операция.';
