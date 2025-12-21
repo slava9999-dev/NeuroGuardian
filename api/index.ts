@@ -20,6 +20,15 @@ const YOOKASSA_API_URL = 'https://api.yookassa.ru/v3';
 const API_KEY_ENCRYPTION_KEY = process.env.API_KEY_ENCRYPTION_KEY || '';
 const ENCRYPTION_ALGORITHM = 'aes-256-gcm';
 
+// ============================================
+// TEST MODE (disable payments for testing)
+// Set TEST_MODE=true in Vercel Environment Variables
+// ============================================
+const TEST_MODE = process.env.TEST_MODE === 'true';
+if (TEST_MODE) {
+  console.log('🧪 TEST MODE ENABLED: All users get Pro subscription for free');
+}
+
 /**
  * Encrypt API key using AES-256-GCM
  * Format: iv:authTag:encryptedData (all hex)
@@ -417,8 +426,12 @@ function sanitizeApiKey(key: string): string {
 
 /**
  * Check if user has active subscription
+ * In TEST_MODE, always returns true (free Pro for everyone)
  */
 function isSubscriptionActive(user: any): boolean {
+  // TEST MODE: everyone gets free access
+  if (TEST_MODE) return true;
+
   if (!user?.subscription_end) return false;
   const endDate = new Date(user.subscription_end);
   return endDate > new Date();
@@ -426,8 +439,12 @@ function isSubscriptionActive(user: any): boolean {
 
 /**
  * Get product limit based on subscription plan
+ * In TEST_MODE, always returns Pro limit (500)
  */
 function getProductLimit(plan: string | null): number {
+  // TEST MODE: everyone gets Pro limits
+  if (TEST_MODE) return 500;
+
   switch (plan) {
     case 'pro':
     case 'yearly':
