@@ -7,16 +7,9 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql } from '@vercel/postgres';
 
 // Import from modular library
-import {
-  validateTelegramInitData,
-  sanitizeInput,
-  TEST_MODE,
-  SUBSCRIPTION_PLANS,
-  type TelegramUser,
-  type PlanId,
-} from '../../src/api-lib/lib/index.js';
+import { SUBSCRIPTION_PLANS } from '../../src/api-lib/lib/index.js';
 
-import { createOrUpdateUser, getUserById } from '../../src/api-lib/services/index.js';
+import { getUserById } from '../../src/api-lib/services/index.js';
 
 /**
  * Handle authentication action

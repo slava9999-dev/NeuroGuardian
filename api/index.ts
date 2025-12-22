@@ -4,8 +4,6 @@
 // ============================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { sql } from '@vercel/postgres';
-import { v4 as uuidv4 } from 'uuid';
 
 // ============================================
 // PHASE 2: MODULAR HANDLERS (gradual migration)
@@ -30,7 +28,6 @@ import {
   handleAdminCloneUser,
   handleSendReminders,
   handleReferral,
-  validateAdminAccess,
 } from './handlers/admin.js';
 
 import { handleAuth, handleSettings, handlePlans } from './handlers/auth.js';

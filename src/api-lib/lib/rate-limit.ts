@@ -30,7 +30,7 @@ function getKVClient(): VercelKV | null {
       });
       console.log('✅ KV client initialized');
       return kvClient;
-    } catch (error) {
+    } catch (_error) {
       console.warn('⚠️ Failed to create KV client, using in-memory fallback');
       return null;
     }

@@ -298,12 +298,19 @@ export async function logSentinelAction(
  * Get users with expiring subscriptions (for reminders)
  */
 export async function getUsersWithExpiringSubscriptions(daysUntilExpiry: number) {
+  // Calculate the expiry threshold date in JavaScript to avoid SQL injection
+  const expiryThreshold = new Date();
+  expiryThreshold.setDate(expiryThreshold.getDate() + daysUntilExpiry);
+
+  const oneDayAgo = new Date();
+  oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+
   const result = await sql`
     SELECT * FROM users 
     WHERE subscription_active = true 
       AND subscription_end IS NOT NULL
-      AND subscription_end < NOW() + INTERVAL '${daysUntilExpiry} days'
-      AND (last_reminder_sent IS NULL OR last_reminder_sent < NOW() - INTERVAL '1 day')
+      AND subscription_end < ${expiryThreshold.toISOString()}
+      AND (last_reminder_sent IS NULL OR last_reminder_sent < ${oneDayAgo.toISOString()})
   `;
   return result.rows;
 }
@@ -323,13 +330,27 @@ export async function markReminderSent(userId: number): Promise<void> {
  * Apply referral bonus to referrer
  */
 export async function applyReferralBonus(referrerId: number, days: number = 30): Promise<void> {
+  // Calculate new subscription end date in JavaScript to avoid SQL injection
+  const newEndFromNow = new Date();
+  newEndFromNow.setDate(newEndFromNow.getDate() + days);
+
+  // First, get current subscription_end
+  const currentUser = await sql`SELECT subscription_end FROM users WHERE id = ${referrerId}`;
+  const currentEnd = currentUser.rows[0]?.subscription_end;
+
+  let newEndDate: Date;
+  if (!currentEnd || new Date(currentEnd) < new Date()) {
+    // No subscription or expired — start from now
+    newEndDate = newEndFromNow;
+  } else {
+    // Active subscription — extend from current end
+    newEndDate = new Date(currentEnd);
+    newEndDate.setDate(newEndDate.getDate() + days);
+  }
+
   await sql`
     UPDATE users SET
-      subscription_end = CASE 
-        WHEN subscription_end IS NULL OR subscription_end < CURRENT_TIMESTAMP 
-        THEN CURRENT_TIMESTAMP + INTERVAL '${days} days'
-        ELSE subscription_end + INTERVAL '${days} days'
-      END,
+      subscription_end = ${newEndDate.toISOString()},
       subscription_active = true,
       updated_at = CURRENT_TIMESTAMP
     WHERE id = ${referrerId}

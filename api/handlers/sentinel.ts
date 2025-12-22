@@ -8,7 +8,6 @@ import { sql } from '@vercel/postgres';
 
 import {
   validateTelegramInitData,
-  sanitizeInput,
   decryptApiKey,
   fetchWithRetry,
 } from '../../src/api-lib/lib/index.js';

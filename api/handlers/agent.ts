@@ -838,7 +838,7 @@ export async function handleAgentConfirm(
               );
 
               if (ozonResponse.ok) {
-                const ozonData = await ozonResponse.json();
+                // Response OK — update local DB
                 // Update local DB
                 for (const u of ozonUpdates) {
                   await sql`

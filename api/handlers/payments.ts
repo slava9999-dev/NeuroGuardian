@@ -10,7 +10,6 @@ import { sql } from '@vercel/postgres';
 import { SUBSCRIPTION_PLANS, type PlanId } from '../../src/api-lib/lib/index.js';
 import {
   createYookassaPayment,
-  isValidYookassaIP,
   activateSubscription,
   updateTransactionStatus,
   getUserById,

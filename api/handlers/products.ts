@@ -10,7 +10,6 @@ import { sql } from '@vercel/postgres';
 import {
   decryptApiKey,
   sanitizeInput,
-  isValidPrice,
   isSubscriptionActive,
   getProductLimit,
 } from '../../src/api-lib/lib/index.js';
@@ -227,7 +226,7 @@ export async function handleSyncProducts(
               priceMap.set(good.nmID, Math.round(priceInKopecks / 100));
             }
           }
-        } catch (e) {
+        } catch (_e) {
           console.warn('Failed to fetch WB prices during sync');
         }
       }
