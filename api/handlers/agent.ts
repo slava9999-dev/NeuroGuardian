@@ -304,62 +304,89 @@ async function callOpenAIWithTools(
       // Simplified handling: We just mock execution for read-only tools or simple logic
       // For complex actions (update_prices), we return actionRequired
 
+      // Import tool executors dynamically to avoid circular dependencies
+      const {
+        executeGetProducts,
+        executeGetSalesStats,
+        executeGetOrders,
+        executeGetWarehouseStocks,
+        executeCalculateUnitEconomics,
+        executeGetAbcAnalysis,
+        executeGetStockForecast,
+        executeGetMarketplaceInfo,
+      } = await import('../../src/api-lib/agent/tool-executors.js');
+
       for (const toolCall of toolCalls) {
         const fnName = toolCall.function.name;
         const fnArgs = JSON.parse(toolCall.function.arguments);
         let result = '';
 
-        if (fnName === 'get_products') {
-          const products = await getProductsByUserId(userId);
-          result = JSON.stringify(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            products.slice(0, fnArgs.limit || 10).map((p: any) => ({
-              title: p.title,
-              price: p.current_price,
-              min_price: p.min_price,
-              stock: 0, // TODO: fetch real stocks if possible
-            }))
-          );
-        } else if (fnName === 'update_prices') {
-          // Return immediate action required
-          return {
-            success: true,
-            content: 'Требуется подтверждение для изменения цен.',
-            toolsUsed: [fnName],
-            tokensUsed: tokens,
-            actionRequired: {
-              type: 'update_prices',
-              details: fnArgs,
-            },
-          };
-        } else if (fnName === 'bulk_protect_products') {
-          return {
-            success: true,
-            content: 'Требуется подтверждение для массовой защиты.',
-            toolsUsed: [fnName],
-            tokensUsed: tokens,
-            actionRequired: {
-              type: 'bulk_set_min_price',
-              details: fnArgs,
-            },
-          };
-        } else if (fnName === 'set_stop_loss') {
-          // Auto-execute single stop-loss if simple
-          // We'll require confirmation for now to be safe, or just do it?
-          // Index.ts logic seemed to allow it or ask confirmation?
-          // Let's ask confirmation for safety.
-          return {
-            success: true,
-            content: `Требуется подтверждение для установки Stop-Loss на товар ${fnArgs.product_id}.`,
-            toolsUsed: [fnName],
-            tokensUsed: tokens,
-            actionRequired: {
-              type: 'set_stop_loss',
-              details: fnArgs,
-            },
-          };
-        } else {
-          result = JSON.stringify({ message: `Tool ${fnName} mock executing success` });
+        try {
+          // Execute real tool implementations
+          if (fnName === 'get_products') {
+            const toolResult = await executeGetProducts(userId, fnArgs);
+            result = JSON.stringify(toolResult.data || { error: toolResult.error });
+          } else if (fnName === 'get_sales_stats') {
+            const toolResult = await executeGetSalesStats(userId, fnArgs);
+            result = JSON.stringify(toolResult.data || { error: toolResult.error });
+          } else if (fnName === 'get_orders') {
+            const toolResult = await executeGetOrders(userId, fnArgs);
+            result = JSON.stringify(toolResult.data || { error: toolResult.error });
+          } else if (fnName === 'get_warehouse_stocks') {
+            const toolResult = await executeGetWarehouseStocks(userId, fnArgs);
+            result = JSON.stringify(toolResult.data || { error: toolResult.error });
+          } else if (fnName === 'calculate_unit_economics') {
+            const toolResult = await executeCalculateUnitEconomics(userId, fnArgs);
+            result = JSON.stringify(toolResult.data || { error: toolResult.error });
+          } else if (fnName === 'get_abc_analysis') {
+            const toolResult = await executeGetAbcAnalysis(userId, fnArgs);
+            result = JSON.stringify(toolResult.data || { error: toolResult.error });
+          } else if (fnName === 'get_stock_forecast') {
+            const toolResult = await executeGetStockForecast(userId, fnArgs);
+            result = JSON.stringify(toolResult.data || { error: toolResult.error });
+          } else if (fnName === 'get_marketplace_info') {
+            const toolResult = executeGetMarketplaceInfo(fnArgs);
+            result = JSON.stringify(toolResult.data || { error: toolResult.error });
+          } else if (fnName === 'update_prices') {
+            // Return immediate action required
+            return {
+              success: true,
+              content: 'Требуется подтверждение для изменения цен.',
+              toolsUsed: [fnName],
+              tokensUsed: tokens,
+              actionRequired: {
+                type: 'update_prices',
+                details: fnArgs,
+              },
+            };
+          } else if (fnName === 'bulk_protect_products') {
+            return {
+              success: true,
+              content: 'Требуется подтверждение для массовой защиты.',
+              toolsUsed: [fnName],
+              tokensUsed: tokens,
+              actionRequired: {
+                type: 'bulk_set_min_price',
+                details: fnArgs,
+              },
+            };
+          } else if (fnName === 'set_stop_loss') {
+            return {
+              success: true,
+              content: `Требуется подтверждение для установки Stop-Loss на товар ${fnArgs.product_id}.`,
+              toolsUsed: [fnName],
+              tokensUsed: tokens,
+              actionRequired: {
+                type: 'set_stop_loss',
+                details: fnArgs,
+              },
+            };
+          } else {
+            result = JSON.stringify({ message: `Tool ${fnName} not implemented yet` });
+          }
+        } catch (toolError) {
+          console.error(`Tool ${fnName} execution error:`, toolError);
+          result = JSON.stringify({ error: `Ошибка выполнения ${fnName}: ${toolError}` });
         }
 
         toolOutputs.push({
