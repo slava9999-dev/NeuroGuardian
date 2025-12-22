@@ -31,6 +31,18 @@ import {
   formatMetricsForLog,
 } from '../../src/api-lib/agent/metrics.js';
 
+// Tool Executors (Real WB/Ozon API implementations)
+import {
+  executeGetProducts,
+  executeGetSalesStats,
+  executeGetOrders,
+  executeGetWarehouseStocks,
+  executeCalculateUnitEconomics,
+  executeGetAbcAnalysis,
+  executeGetStockForecast,
+  executeGetMarketplaceInfo,
+} from '../../src/api-lib/agent/tool-executors.js';
+
 // Note: System prompt is now imported from system-prompt-v2.ts
 // Using Expert Persona (Виктор Маржин) + CoT + Few-Shot examples
 
@@ -304,17 +316,7 @@ async function callOpenAIWithTools(
       // Simplified handling: We just mock execution for read-only tools or simple logic
       // For complex actions (update_prices), we return actionRequired
 
-      // Import tool executors dynamically to avoid circular dependencies
-      const {
-        executeGetProducts,
-        executeGetSalesStats,
-        executeGetOrders,
-        executeGetWarehouseStocks,
-        executeCalculateUnitEconomics,
-        executeGetAbcAnalysis,
-        executeGetStockForecast,
-        executeGetMarketplaceInfo,
-      } = await import('../../src/api-lib/agent/tool-executors.js');
+      // Tool executors are now imported statically at the top of the file
 
       for (const toolCall of toolCalls) {
         const fnName = toolCall.function.name;
