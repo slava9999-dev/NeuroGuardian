@@ -206,7 +206,7 @@ export function AgentPage() {
   const hasMessages = messages.length > 0;
 
   return (
-    <div className="min-h-screen bg-stone-900 flex flex-col relative overflow-hidden">
+    <div className="h-[100dvh] bg-stone-900 flex flex-col relative overflow-hidden">
       {/* Background Gradient */}
       <div className="absolute inset-0 bg-gradient-to-b from-stone-900 via-stone-900 to-stone-800 pointer-events-none" />
 
@@ -217,7 +217,7 @@ export function AgentPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0, scale: 0.95, filter: 'blur(10px)' }}
-            className="flex-1 flex flex-col items-center justify-center px-6 relative z-10"
+            className="absolute inset-0 z-10 flex flex-col items-center justify-center px-6"
           >
             {/* Agent Avatar - Centerpiece */}
             <motion.div
@@ -274,73 +274,69 @@ export function AgentPage() {
         )}
       </AnimatePresence>
 
-      {/* Chat Interface - Shown when messages exist */}
-      {hasMessages && (
-        <>
-          {/* Minimalist Header */}
-          <header className="sticky top-0 z-20 bg-stone-900/80 backdrop-blur-xl border-b border-white/5 px-4 py-3">
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <img
-                  src="/agent-avatar.png"
-                  alt="NeuroAgent"
-                  className="w-8 h-8 rounded-full object-cover ring-2 ring-stone-800"
-                />
-                <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-stone-900" />
-              </div>
-              <div className="flex-1">
-                <h1 className="text-sm font-semibold text-white tracking-wide">NeuroAgent</h1>
-                <p className="text-[10px] text-stone-500 uppercase tracking-wider">
-                  {isProcessing ? 'Печатает...' : 'Online'}
-                </p>
-              </div>
-            </div>
-          </header>
+      {/* Messages Area - Always takes available space */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6 z-0 scroll-smooth">
+        {hasMessages && (
+          <AnimatePresence mode="popLayout">
+            {messages.map((message, index) => (
+              <motion.div
+                key={message.id}
+                initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} ${
+                  index === 0 ? 'mt-14' : ''
+                }`}
+              >
+                {message.isLoading ? (
+                  <LoadingBubble />
+                ) : (
+                  <MessageBubble
+                    message={message}
+                    onConfirm={
+                      message.actionRequired
+                        ? confirmed => handleConfirmation(message.id, confirmed)
+                        : undefined
+                    }
+                  />
+                )}
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        )}
+        <div ref={messagesEndRef} className="h-4" />
+      </div>
 
-          {/* Messages Area */}
-          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
-            <AnimatePresence mode="popLayout">
-              {messages.map(message => (
-                <motion.div
-                  key={message.id}
-                  initial={{ opacity: 0, y: 10, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  {message.isLoading ? (
-                    <LoadingBubble />
-                  ) : (
-                    <MessageBubble
-                      message={message}
-                      onConfirm={
-                        message.actionRequired
-                          ? confirmed => handleConfirmation(message.id, confirmed)
-                          : undefined
-                      }
-                    />
-                  )}
-                </motion.div>
-              ))}
-            </AnimatePresence>
-            <div ref={messagesEndRef} className="h-4" />
+      {/* Header - Absolute Overlay */}
+      {hasMessages && (
+        <header className="absolute top-0 left-0 right-0 z-20 bg-stone-900/80 backdrop-blur-xl border-b border-white/5 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <img
+                src="/agent-avatar.png"
+                alt="NeuroAgent"
+                className="w-8 h-8 rounded-full object-cover ring-2 ring-stone-800"
+              />
+              <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-stone-900" />
+            </div>
+            <div className="flex-1">
+              <h1 className="text-sm font-semibold text-white tracking-wide">NeuroAgent</h1>
+              <p className="text-[10px] text-stone-500 uppercase tracking-wider">
+                {isProcessing ? 'Печатает...' : 'Online'}
+              </p>
+            </div>
           </div>
-        </>
+        </header>
       )}
 
-      {/* Input Area - Cleaner, modern Design */}
-      <div
-        className={`
-        ${hasMessages ? 'sticky bottom-0 pb-6 pt-2' : 'fixed bottom-10 left-0 right-0'} 
-        px-4 z-30 transition-all duration-500
-      `}
-      >
-        <div className="max-w-xl mx-auto backdrop-blur-xl bg-stone-800/90 rounded-[2rem] border border-white/10 shadow-2xl p-1.5 flex items-end gap-2">
+      {/* Input Area - Fixed at bottom, high contrast */}
+      <div className="p-4 pb-24 z-30 bg-gradient-to-t from-stone-900 via-stone-900/90 to-transparent">
+        <div className="max-w-xl mx-auto bg-stone-800 rounded-[2rem] border border-white/10 shadow-2xl p-1.5 flex items-end gap-2 ring-1 ring-white/5">
           <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} />
 
           {/* File Attachment Button */}
           <button
-            className="p-3.5 rounded-full text-stone-400 hover:text-white hover:bg-white/10 transition-colors"
+            className="p-3.5 rounded-full text-stone-400 hover:text-white hover:bg-stone-700 transition-colors"
             onClick={handleFileClick}
           >
             <svg
@@ -366,7 +362,7 @@ export function AgentPage() {
             placeholder={isListening ? 'Слушаю...' : 'Сообщение...'}
             disabled={isProcessing}
             rows={1}
-            className="flex-1 bg-transparent text-white placeholder-stone-500 px-2 py-3.5 focus:outline-none resize-none max-h-32 min-h-[48px]"
+            className="flex-1 bg-transparent text-white placeholder-stone-400 px-2 py-3.5 focus:outline-none resize-none max-h-32 min-h-[48px] text-[16px]"
             style={{ height: 'auto' }}
           />
 
@@ -402,7 +398,7 @@ export function AgentPage() {
               className={`p-3.5 rounded-full transition-colors ${
                 isListening
                   ? 'bg-red-500/20 text-red-500 animate-pulse'
-                  : 'text-stone-400 hover:text-white hover:bg-white/10'
+                  : 'text-stone-400 hover:text-white hover:bg-stone-700'
               }`}
               whileTap={{ scale: 0.9 }}
             >

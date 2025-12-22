@@ -222,47 +222,87 @@ export function LegalPage({ onBack }: LegalPageProps) {
             </div>
           </details>
 
-          {/* Offer & Policies */}
-          <details className="group bg-stone-800/30 rounded-xl">
-            <summary className="p-4 cursor-pointer font-medium text-stone-400 group-open:text-white transition-colors flex justify-between items-center">
-              Условия использования
-              <svg
-                className="w-4 h-4 transform group-open:rotate-180 transition-transform"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path d="M19 9l-7 7-7-7" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-            </summary>
-            <div className="px-4 pb-4 text-xs text-stone-500 space-y-3">
-              <div>
-                <strong className="block text-stone-300 mb-1">Порядок предоставления услуг</strong>
-                Услуга предоставляется в виде предоставления неисключительной лицензии на
-                использование ПО NeuroAgent. Доступ к ПО предоставляется электронным способом сразу
-                после успешной оплаты.
-              </div>
-              <div>
-                <strong className="block text-stone-300 mb-1">Рекуррентные платежи</strong>
-                Соглашаясь с офертой, вы даете согласие на автоматическое списание средств за
-                продление подписки каждые 30 или 365 дней в зависимости от выбранного тарифа.
-                Отменить подписку можно в любой момент через службу поддержки.
-              </div>
-              <div>
-                <strong className="block text-stone-300 mb-1">Возврат</strong>
-                Возврат средств возможен в случае технической неработоспособности сервиса по вине
-                Исполнителя, если проблема не была устранена в течение 3 рабочих дней.
-              </div>
-              <div className="pt-2">
-                <a href="#" className="underline hover:text-white mr-4">
-                  Публичная оферта
-                </a>
-                <a href="#" className="underline hover:text-white">
-                  Политика конфиденциальности
-                </a>
-              </div>
+          {/* Offer & Policies - PROMINENT DISPLAY */}
+          <div className="bg-stone-800 rounded-xl p-1 overflow-hidden">
+            <div className="p-4 bg-stone-800/50 border-b border-stone-700">
+              <h3 className="font-bold text-white flex items-center gap-2">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="16" y1="13" x2="8" y2="13"></line>
+                  <line x1="16" y1="17" x2="8" y2="17"></line>
+                  <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+                Документы
+              </h3>
             </div>
-          </details>
+            <div>
+              <a
+                href="#"
+                className="flex items-center justify-between p-4 hover:bg-white/5 transition-colors border-b border-stone-700/50 group"
+              >
+                <div>
+                  <span className="block text-white font-medium">Публичная оферта</span>
+                  <span className="text-xs text-stone-500">Читать полный текст договора</span>
+                </div>
+                <svg
+                  className="w-5 h-5 text-stone-500 group-hover:text-white transition-colors"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    d="M9 18l6-6-6-6"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </a>
+              <a
+                href="#"
+                className="flex items-center justify-between p-4 hover:bg-white/5 transition-colors group"
+              >
+                <div>
+                  <span className="block text-white font-medium">Политика конфиденциальности</span>
+                  <span className="text-xs text-stone-500">Правила обработки данных</span>
+                </div>
+                <svg
+                  className="w-5 h-5 text-stone-500 group-hover:text-white transition-colors"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    d="M9 18l6-6-6-6"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </a>
+            </div>
+          </div>
+
+          <div className="px-4 py-2 text-xs text-stone-500 space-y-3 bg-stone-900/50 rounded-xl border border-white/5">
+            <p>
+              <strong className="text-stone-300">Суть услуги:</strong> Предоставление
+              неисключительной лицензии на использование ПО NeuroAgent. Доступ открывается
+              автоматически после оплаты.
+            </p>
+            <p>
+              <strong className="text-stone-300">Рекуррентные платежи:</strong> Оплата за продление
+              подписки списывается автоматически согласно выбранному тарифу. Отмена возможна в любой
+              момент.
+            </p>
+          </div>
         </section>
 
         <SecurityBadge />
