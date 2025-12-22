@@ -15,16 +15,23 @@ interface LegalPageProps {
 
 // План подписки
 type PlanId = 'pro' | 'yearly';
+type DocumentType = 'offer' | 'privacy' | null;
 
 export function LegalPage({ onBack }: LegalPageProps) {
   const user = useAppStore(state => state.user);
   const [showPayment, setShowPayment] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<PlanId>('pro');
+  const [activeDocument, setActiveDocument] = useState<DocumentType>(null);
 
   const handleSubscribe = (planId: PlanId) => {
     hapticFeedback('medium');
     setSelectedPlan(planId);
     setShowPayment(true);
+  };
+
+  const handleDocumentClick = (docType: DocumentType) => {
+    hapticFeedback('light');
+    setActiveDocument(docType);
   };
 
   // Проверяем тип подписки
@@ -244,9 +251,9 @@ export function LegalPage({ onBack }: LegalPageProps) {
               </h3>
             </div>
             <div>
-              <a
-                href="#"
-                className="flex items-center justify-between p-4 hover:bg-white/5 transition-colors border-b border-stone-700/50 group"
+              <button
+                onClick={() => handleDocumentClick('offer')}
+                className="w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors border-b border-stone-700/50 group text-left"
               >
                 <div>
                   <span className="block text-white font-medium">Публичная оферта</span>
@@ -265,10 +272,10 @@ export function LegalPage({ onBack }: LegalPageProps) {
                     strokeLinejoin="round"
                   />
                 </svg>
-              </a>
-              <a
-                href="#"
-                className="flex items-center justify-between p-4 hover:bg-white/5 transition-colors group"
+              </button>
+              <button
+                onClick={() => handleDocumentClick('privacy')}
+                className="w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors group text-left"
               >
                 <div>
                   <span className="block text-white font-medium">Политика конфиденциальности</span>
@@ -287,7 +294,7 @@ export function LegalPage({ onBack }: LegalPageProps) {
                     strokeLinejoin="round"
                   />
                 </svg>
-              </a>
+              </button>
             </div>
           </div>
 
@@ -308,7 +315,7 @@ export function LegalPage({ onBack }: LegalPageProps) {
         <SecurityBadge />
 
         <div className="text-center text-[10px] text-stone-600 pb-4">
-          NeuroGuardian © 2024. All rights reserved.Secure Payment by YooKassa.
+          NeuroGuardian © 2024. All rights reserved. Secure Payment by YooKassa.
         </div>
       </div>
 
@@ -317,6 +324,249 @@ export function LegalPage({ onBack }: LegalPageProps) {
         onClose={() => setShowPayment(false)}
         selectedPlan={selectedPlan}
       />
+
+      {/* Document Modal */}
+      {activeDocument && (
+        <DocumentModal type={activeDocument} onClose={() => setActiveDocument(null)} />
+      )}
     </div>
+  );
+}
+
+// Document Modal Component
+interface DocumentModalProps {
+  type: 'offer' | 'privacy';
+  onClose: () => void;
+}
+
+function DocumentModal({ type, onClose }: DocumentModalProps) {
+  const title = type === 'offer' ? 'Публичная оферта' : 'Политика конфиденциальности';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+
+      {/* Modal */}
+      <div className="relative w-full max-w-lg bg-stone-900 rounded-t-3xl max-h-[85vh] flex flex-col animate-slide-up">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-stone-800">
+          <h2 className="text-lg font-bold text-white">{title}</h2>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-full hover:bg-white/10 transition-colors text-stone-400"
+          >
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-4 text-sm text-stone-300 space-y-4">
+          {type === 'offer' ? <OfferContent /> : <PrivacyContent />}
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-stone-800">
+          <button
+            onClick={onClose}
+            className="w-full py-3 rounded-xl bg-violet-600 text-white font-bold hover:bg-violet-500 transition-colors"
+          >
+            Закрыть
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Offer Content
+function OfferContent() {
+  return (
+    <>
+      <h3 className="text-white font-bold text-base">ДОГОВОР ПУБЛИЧНОЙ ОФЕРТЫ</h3>
+      <p className="text-stone-400 text-xs">Редакция от 01.12.2024</p>
+
+      <div className="space-y-4">
+        <section>
+          <h4 className="font-semibold text-white mb-2">1. ОБЩИЕ ПОЛОЖЕНИЯ</h4>
+          <p>
+            1.1. Настоящий документ является официальным предложением (публичной офертой) ИП
+            Дмитричев Александр Геннадьевич (ИНН 520500573503) заключить договор на предоставление
+            права использования программного обеспечения NeuroAgent.
+          </p>
+          <p className="mt-2">
+            1.2. Акцептом оферты является оплата выбранного тарифа. Моментом заключения договора
+            считается момент зачисления денежных средств.
+          </p>
+        </section>
+
+        <section>
+          <h4 className="font-semibold text-white mb-2">2. ПРЕДМЕТ ДОГОВОРА</h4>
+          <p>
+            2.1. Исполнитель предоставляет Заказчику неисключительную лицензию на использование
+            программного обеспечения NeuroAgent для автоматизации управления товарами на
+            маркетплейсах Wildberries и Ozon.
+          </p>
+          <p className="mt-2">
+            2.2. Функциональные возможности включают: защиту маржи (Stop-Loss), AI-ассистент,
+            аналитику продаж, управление ценами.
+          </p>
+        </section>
+
+        <section>
+          <h4 className="font-semibold text-white mb-2">3. СТОИМОСТЬ И ПОРЯДОК ОПЛАТЫ</h4>
+          <p>3.1. Стоимость подписки:</p>
+          <ul className="list-disc list-inside ml-2 mt-1 space-y-1">
+            <li>Pro Monthly — 999 ₽/месяц</li>
+            <li>Pro Yearly — 9 990 ₽/год</li>
+          </ul>
+          <p className="mt-2">
+            3.2. Оплата производится через платёжную систему YooKassa. Рекуррентные платежи
+            списываются автоматически. Отмена подписки возможна в любой момент в личном кабинете.
+          </p>
+        </section>
+
+        <section>
+          <h4 className="font-semibold text-white mb-2">4. ПРАВА И ОБЯЗАННОСТИ СТОРОН</h4>
+          <p>
+            4.1. Исполнитель обязуется: обеспечить доступ к сервису 24/7 (кроме плановых работ),
+            сохранять конфиденциальность данных, оказывать техническую поддержку.
+          </p>
+          <p className="mt-2">
+            4.2. Заказчик обязуется: не передавать доступ третьим лицам, не использовать сервис для
+            нарушения правил маркетплейсов, своевременно оплачивать подписку.
+          </p>
+        </section>
+
+        <section>
+          <h4 className="font-semibold text-white mb-2">5. ОТВЕТСТВЕННОСТЬ</h4>
+          <p>
+            5.1. Исполнитель не несёт ответственности за: решения, принятые на основе рекомендаций
+            AI-ассистента; изменения в API маркетплейсов; блокировку аккаунтов Заказчика на
+            маркетплейсах.
+          </p>
+        </section>
+
+        <section>
+          <h4 className="font-semibold text-white mb-2">6. ВОЗВРАТ СРЕДСТВ</h4>
+          <p>
+            6.1. Возврат денежных средств не осуществляется после активации подписки, так как услуга
+            оказывается путём предоставления доступа к ПО немедленно после оплаты.
+          </p>
+        </section>
+
+        <section>
+          <h4 className="font-semibold text-white mb-2">7. РЕКВИЗИТЫ ИСПОЛНИТЕЛЯ</h4>
+          <p>ИП Дмитричев Александр Геннадьевич</p>
+          <p>ИНН: 520500573503</p>
+          <p>Адрес: 603093, Россия, Нижегородская обл., г. Бор, ул. Максима Горького</p>
+          <p>Email: support@neuroguardian.app</p>
+        </section>
+      </div>
+    </>
+  );
+}
+
+// Privacy Content
+function PrivacyContent() {
+  return (
+    <>
+      <h3 className="text-white font-bold text-base">ПОЛИТИКА КОНФИДЕНЦИАЛЬНОСТИ</h3>
+      <p className="text-stone-400 text-xs">Редакция от 01.12.2024</p>
+
+      <div className="space-y-4">
+        <section>
+          <h4 className="font-semibold text-white mb-2">1. ОБЩИЕ ПОЛОЖЕНИЯ</h4>
+          <p>
+            1.1. Настоящая Политика конфиденциальности устанавливает порядок обработки персональных
+            данных пользователей сервиса NeuroAgent.
+          </p>
+          <p className="mt-2">
+            1.2. Оператор персональных данных: ИП Дмитричев Александр Геннадьевич (ИНН
+            520500573503).
+          </p>
+        </section>
+
+        <section>
+          <h4 className="font-semibold text-white mb-2">2. СОБИРАЕМЫЕ ДАННЫЕ</h4>
+          <p>2.1. Мы собираем следующие данные:</p>
+          <ul className="list-disc list-inside ml-2 mt-1 space-y-1">
+            <li>Идентификатор и имя пользователя Telegram</li>
+            <li>API-ключи маркетплейсов (в зашифрованном виде)</li>
+            <li>Данные о товарах и продажах (получаемые через API маркетплейсов)</li>
+            <li>История взаимодействия с AI-ассистентом</li>
+            <li>Данные об оплате (обрабатываются YooKassa)</li>
+          </ul>
+        </section>
+
+        <section>
+          <h4 className="font-semibold text-white mb-2">3. ЦЕЛИ ОБРАБОТКИ</h4>
+          <p>3.1. Персональные данные обрабатываются для:</p>
+          <ul className="list-disc list-inside ml-2 mt-1 space-y-1">
+            <li>Предоставления доступа к сервису</li>
+            <li>Работы функций защиты маржи и аналитики</li>
+            <li>Обработки платежей</li>
+            <li>Технической поддержки</li>
+            <li>Улучшения качества сервиса</li>
+          </ul>
+        </section>
+
+        <section>
+          <h4 className="font-semibold text-white mb-2">4. ЗАЩИТА ДАННЫХ</h4>
+          <p>4.1. API-ключи маркетплейсов шифруются алгоритмом AES-256-GCM.</p>
+          <p className="mt-2">
+            4.2. Данные хранятся на серверах Vercel (США, Европа) с сертификацией SOC 2.
+          </p>
+          <p className="mt-2">4.3. Доступ к базе данных ограничен и защищён.</p>
+        </section>
+
+        <section>
+          <h4 className="font-semibold text-white mb-2">5. ПЕРЕДАЧА ТРЕТЬИМ ЛИЦАМ</h4>
+          <p>5.1. Мы не продаём и не передаём персональные данные третьим лицам, за исключением:</p>
+          <ul className="list-disc list-inside ml-2 mt-1 space-y-1">
+            <li>Платёжной системы YooKassa (для обработки платежей)</li>
+            <li>По требованию законодательства РФ</li>
+          </ul>
+        </section>
+
+        <section>
+          <h4 className="font-semibold text-white mb-2">6. ПРАВА ПОЛЬЗОВАТЕЛЯ</h4>
+          <p>6.1. Вы имеете право:</p>
+          <ul className="list-disc list-inside ml-2 mt-1 space-y-1">
+            <li>Запросить информацию о своих данных</li>
+            <li>Потребовать удаления данных</li>
+            <li>Отозвать согласие на обработку</li>
+          </ul>
+          <p className="mt-2">
+            6.2. Для реализации прав свяжитесь с нами: support@neuroguardian.app
+          </p>
+        </section>
+
+        <section>
+          <h4 className="font-semibold text-white mb-2">7. ФАЙЛЫ COOKIE</h4>
+          <p>
+            7.1. Сервис использует технические cookies для авторизации через Telegram. Рекламные
+            cookies не используются.
+          </p>
+        </section>
+
+        <section>
+          <h4 className="font-semibold text-white mb-2">8. КОНТАКТЫ</h4>
+          <p>По вопросам обработки персональных данных:</p>
+          <p>Email: support@neuroguardian.app</p>
+          <p>Telegram: @Vyacheslav_Neuro</p>
+        </section>
+      </div>
+    </>
   );
 }

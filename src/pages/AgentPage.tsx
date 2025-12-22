@@ -50,21 +50,76 @@ export function AgentPage() {
     }
   };
 
-  // Handle Voice Input (Simulation for demo)
+  // Handle Voice Input with Web Speech API
   const handleVoiceClick = () => {
     hapticFeedback('medium');
+
+    // Check if already listening
     if (isListening) {
       setIsListening(false);
+      // Stop any ongoing recognition
+      if (window.speechRecognition) {
+        window.speechRecognition.stop();
+      }
       return;
     }
 
-    setIsListening(true);
-    // Simulate listening delay and result
-    setTimeout(() => {
-      setIsListening(false);
-      setInputValue('Какие товары сейчас в просадке?');
+    // Check browser support
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      // Browser doesn't support Speech Recognition
+      hapticFeedback('error');
+      alert('Голосовой ввод не поддерживается вашим браузером. Используйте Chrome или Safari.');
+      return;
+    }
+
+    // Create and configure recognition
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'ru-RU';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.continuous = false;
+
+    // Store reference to stop later
+    window.speechRecognition = recognition;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+      hapticFeedback('light');
+    };
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      const transcript = event.results[0][0].transcript;
+      setInputValue(prev => (prev ? `${prev} ${transcript}` : transcript));
       hapticFeedback('success');
-    }, 2000);
+    };
+
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      console.error('Speech recognition error:', event.error);
+      setIsListening(false);
+
+      if (event.error === 'not-allowed') {
+        alert('Доступ к микрофону запрещён. Разрешите доступ в настройках браузера.');
+      } else if (event.error === 'no-speech') {
+        // User didn't say anything, just stop silently
+      } else {
+        hapticFeedback('error');
+      }
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      window.speechRecognition = undefined;
+    };
+
+    // Start listening
+    try {
+      recognition.start();
+    } catch (e) {
+      console.error('Failed to start speech recognition:', e);
+      setIsListening(false);
+      hapticFeedback('error');
+    }
   };
 
   // Send message to AI
