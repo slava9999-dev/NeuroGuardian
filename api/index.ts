@@ -3550,14 +3550,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     );
 
                     for (const good of pricesData.data?.listGoods || []) {
+                      // WB API returns prices in KOPECKS! Divide by 100 to get rubles
                       // salePrice is the actual selling price (after discount)
                       // price is the original price before discount
-                      const actualPrice = good.sizes?.[0]?.salePrice || good.sizes?.[0]?.price || 0;
-                      if (good.nmID && actualPrice > 0) {
-                        priceMap.set(good.nmID, actualPrice);
+                      const priceInKopecks =
+                        good.sizes?.[0]?.discountedPrice ||
+                        good.sizes?.[0]?.salePrice ||
+                        good.sizes?.[0]?.price ||
+                        0;
+                      const priceInRubles = Math.round(priceInKopecks / 100);
+                      if (good.nmID && priceInRubles > 0) {
+                        priceMap.set(good.nmID, priceInRubles);
                       }
                     }
                     console.log(`✅ Got prices for ${priceMap.size} products`);
+                    // Log first few prices for debugging
+                    const firstPrices = Array.from(priceMap.entries()).slice(0, 3);
+                    console.log('📊 Sample prices (rubles):', firstPrices);
                   } else {
                     const errText = await pricesResponse.text();
                     console.warn('⚠️ WB Prices API error:', pricesResponse.status, errText);
