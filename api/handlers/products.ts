@@ -7,33 +7,20 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql } from '@vercel/postgres';
 
 // Import from modular library
-import { decryptApiKey, sanitizeInput, isValidPrice } from '../../src/api-lib/lib/index.js';
+import {
+  decryptApiKey,
+  sanitizeInput,
+  isValidPrice,
+  isSubscriptionActive,
+  getProductLimit,
+} from '../../src/api-lib/lib/index.js';
 import {
   getUserById,
   getProductsByUserId,
   updateProductMinPrice,
 } from '../../src/api-lib/services/index.js';
 
-/**
- * Fetch with retry for marketplace APIs
- */
-async function fetchWithRetry(url: string, options: RequestInit, retries = 3): Promise<Response> {
-  let lastError: Error | null = null;
-
-  for (let i = 0; i < retries; i++) {
-    try {
-      const response = await fetch(url, options);
-      return response;
-    } catch (error) {
-      lastError = error as Error;
-      if (i < retries - 1) {
-        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
-      }
-    }
-  }
-
-  throw lastError || new Error('Fetch failed');
-}
+// fetchWithRetry moved to api-lib/lib/index.js
 
 /**
  * Handle products action (GET and POST)
@@ -99,188 +86,207 @@ export async function handleProducts(
  * Handle sync-products action — fetch products from WB/Ozon APIs
  */
 export async function handleSyncProducts(
-  _req: VercelRequest,
+  req: VercelRequest,
   res: VercelResponse,
   userId: number
 ): Promise<VercelResponse> {
-  const user = await getUserById(userId);
+  const { marketplace } = req.body || {};
+  const mp = marketplace || 'Ozon';
 
-  if (!user) {
-    return res.status(404).json({ error: 'User not found' });
+  // Get user's API key
+  const user = await getUserById(userId);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  // Check if user has active subscription
+  if (!isSubscriptionActive(user)) {
+    return res.status(403).json({
+      error: 'Для синхронизации товаров требуется активная подписка',
+      code: 'SUBSCRIPTION_REQUIRED',
+    });
   }
 
-  const results = {
-    wb: { synced: 0, error: null as string | null },
-    ozon: { synced: 0, error: null as string | null },
-  };
+  const encryptedApiKey = mp === 'WB' ? user.api_key_wb : user.api_key_ozon;
+  if (!encryptedApiKey) {
+    return res.status(400).json({ error: `${mp} API ключ не настроен` });
+  }
 
-  // Sync WB products
-  if (user.api_key_wb) {
-    try {
-      const apiKey = decryptApiKey(user.api_key_wb);
+  // Decrypt API key (ТЗ Security)
+  const apiKey = decryptApiKey(encryptedApiKey);
+  const productLimit = getProductLimit(user.subscription_plan);
 
-      // Get card list from WB
-      const cardsResponse = await fetchWithRetry(
+  try {
+    let products: any[] = [];
+
+    if (mp === 'Ozon') {
+      // Ozon API v3 integration
+      const clientId = apiKey.split(':')[0];
+      const apiToken = apiKey.includes(':') ? apiKey.split(':')[1] : apiKey;
+
+      const listResponse = await fetch('https://api-seller.ozon.ru/v3/product/list', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Client-Id': clientId,
+          'Api-Key': apiToken,
+        },
+        body: JSON.stringify({ filter: {}, last_id: '', limit: 100 }),
+      });
+
+      if (!listResponse.ok) {
+        const errorText = await listResponse.text();
+        return res
+          .status(400)
+          .json({ error: `Ozon API error: ${listResponse.status}`, details: errorText });
+      }
+
+      const listData = await listResponse.json();
+      const items = listData.result?.items || [];
+
+      if (items.length > 0) {
+        const productIds = items.map((item: any) => item.product_id);
+        const detailResponse = await fetch('https://api-seller.ozon.ru/v3/product/info/list', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Client-Id': clientId,
+            'Api-Key': apiToken,
+          },
+          body: JSON.stringify({ product_id: productIds }),
+        });
+
+        if (detailResponse.ok) {
+          const detailData = await detailResponse.json();
+          const detailItems = detailData.result?.items || detailData.items || [];
+
+          products = detailItems.map((item: any) => {
+            const totalStock =
+              item.stocks?.stocks?.reduce((acc: number, s: any) => acc + (s.present || 0), 0) || 0;
+            let price = 0;
+            if (typeof item.price === 'object' && item.price !== null) {
+              price = parseFloat(item.price.marketing_price || item.price.price || '0');
+            } else {
+              price = parseFloat(item.price || item.marketing_price || '0');
+            }
+
+            return {
+              product_id: `ozon-${item.id}`,
+              title: item.name || 'Без названия',
+              image_url:
+                (typeof item.primary_image === 'string'
+                  ? item.primary_image
+                  : item.primary_image?.[0]) ||
+                item.images?.[0] ||
+                null,
+              current_price: price,
+              current_stock: totalStock,
+              marketplace: 'Ozon',
+            };
+          });
+        }
+      }
+    } else if (mp === 'WB') {
+      // WB Content API v2
+      const wbResponse = await fetch(
         'https://content-api.wildberries.ru/content/v2/get/cards/list',
         {
           method: 'POST',
           headers: {
-            Authorization: apiKey,
             'Content-Type': 'application/json',
+            Authorization: apiKey,
           },
-          body: JSON.stringify({
-            settings: { cursor: { limit: 100 }, filter: { withPhoto: -1 } },
-          }),
+          body: JSON.stringify({ settings: { cursor: { limit: 100 }, filter: { withPhoto: -1 } } }),
         }
       );
 
-      if (!cardsResponse.ok) {
-        const errText = await cardsResponse.text();
-        results.wb.error = `WB API error: ${cardsResponse.status}`;
-        console.error('WB cards error:', errText);
-      } else {
-        const cardsData = await cardsResponse.json();
-        const cards = cardsData.cards || [];
+      if (!wbResponse.ok) {
+        return res.status(400).json({ error: `WB API error: ${wbResponse.status}` });
+      }
 
-        // Get prices
-        const nmIds = cards.map((c: { nmID: number }) => c.nmID);
+      const wbData = await wbResponse.json();
+      const cards = wbData.cards || [];
+      const nmIds = cards.map((card: any) => card.nmID);
 
-        let pricesMap: Map<number, number> = new Map();
-
-        if (nmIds.length > 0) {
-          const pricesResponse = await fetchWithRetry(
+      // Fetch REAL prices from WB Prices API
+      const priceMap: Map<number, number> = new Map();
+      if (nmIds.length > 0) {
+        try {
+          const pricesResponse = await fetch(
             'https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter',
             {
               method: 'POST',
-              headers: {
-                Authorization: apiKey,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ nmIDs: nmIds }),
+              headers: { 'Content-Type': 'application/json', Authorization: apiKey },
+              body: JSON.stringify({ limit: 1000, offset: 0, filterNmID: nmIds }),
             }
           );
 
           if (pricesResponse.ok) {
             const pricesData = await pricesResponse.json();
-            const goods = pricesData.data?.listGoods || [];
-            pricesMap = new Map(
-              goods.map((g: { nmID: number; sizes: Array<{ price: number }> }) => [
-                g.nmID,
-                g.sizes?.[0]?.price || 0,
-              ])
-            );
-          }
-        }
-
-        // Upsert products
-        for (const card of cards) {
-          const currentPrice = pricesMap.get(card.nmID) || 0;
-          const imageUrl = card.mediaFiles?.[0] || card.photos?.[0]?.big || '';
-
-          await sql`
-            INSERT INTO products (user_id, product_id, nm_id, title, image_url, current_price, marketplace)
-            VALUES (${userId}, ${String(card.nmID)}, ${card.nmID}, ${card.title || 'Без названия'}, ${imageUrl}, ${currentPrice}, 'WB')
-            ON CONFLICT (user_id, product_id) DO UPDATE SET
-              title = EXCLUDED.title,
-              image_url = EXCLUDED.image_url,
-              current_price = EXCLUDED.current_price,
-              updated_at = NOW()
-          `;
-          results.wb.synced++;
-        }
-      }
-    } catch (error) {
-      results.wb.error = error instanceof Error ? error.message : 'WB sync failed';
-      console.error('WB sync error:', error);
-    }
-  }
-
-  // Sync Ozon products
-  if (user.api_key_ozon && user.ozon_client_id) {
-    try {
-      const apiKey = decryptApiKey(user.api_key_ozon);
-      const clientId = user.ozon_client_id;
-
-      const productsResponse = await fetchWithRetry('https://api-seller.ozon.ru/v2/product/list', {
-        method: 'POST',
-        headers: {
-          'Client-Id': clientId,
-          'Api-Key': apiKey,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ filter: { visibility: 'ALL' }, limit: 100 }),
-      });
-
-      if (!productsResponse.ok) {
-        const errText = await productsResponse.text();
-        results.ozon.error = `Ozon API error: ${productsResponse.status}`;
-        console.error('Ozon products error:', errText);
-      } else {
-        const productsData = await productsResponse.json();
-        const items = productsData.result?.items || [];
-
-        if (items.length > 0) {
-          // Get detailed info
-          const productIds = items.map((i: { product_id: number }) => i.product_id);
-
-          const infoResponse = await fetchWithRetry(
-            'https://api-seller.ozon.ru/v2/product/info/list',
-            {
-              method: 'POST',
-              headers: {
-                'Client-Id': clientId,
-                'Api-Key': apiKey,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ product_id: productIds }),
-            }
-          );
-
-          if (infoResponse.ok) {
-            const infoData = await infoResponse.json();
-            const infoItems = infoData.result?.items || [];
-
-            for (const item of infoItems) {
-              const imageUrl = item.primary_image || item.images?.[0] || '';
-              const currentPrice = parseInt(item.price || item.marketing_price || '0', 10);
-
-              await sql`
-                INSERT INTO products (user_id, product_id, title, image_url, current_price, marketplace)
-                VALUES (${userId}, ${String(item.id)}, ${item.name || 'Без названия'}, ${imageUrl}, ${currentPrice}, 'Ozon')
-                ON CONFLICT (user_id, product_id) DO UPDATE SET
-                  title = EXCLUDED.title,
-                  image_url = EXCLUDED.image_url,
-                  current_price = EXCLUDED.current_price,
-                  updated_at = NOW()
-              `;
-              results.ozon.synced++;
+            for (const good of pricesData.data?.listGoods || []) {
+              const priceInKopecks =
+                good.sizes?.[0]?.discountedPrice || good.sizes?.[0]?.salePrice || 0;
+              priceMap.set(good.nmID, Math.round(priceInKopecks / 100));
             }
           }
+        } catch (e) {
+          console.warn('Failed to fetch WB prices during sync');
         }
       }
-    } catch (error) {
-      results.ozon.error = error instanceof Error ? error.message : 'Ozon sync failed';
-      console.error('Ozon sync error:', error);
+
+      products = cards.map((card: any) => ({
+        product_id: `wb-${card.nmID}`,
+        nm_id: card.nmID,
+        title: card.title || card.subjectName || 'Без названия',
+        image_url: card.photos?.[0]?.big || card.photos?.[0]?.c246x328 || null,
+        current_price: priceMap.get(card.nmID) || 0,
+        current_stock:
+          card.sizes?.reduce(
+            (sum: number, s: any) =>
+              sum + (s.stocks?.reduce((ss: number, st: any) => ss + st.qty, 0) || 0),
+            0
+          ) || 0,
+        marketplace: 'WB',
+      }));
     }
+
+    // Limit and Save
+    const productsToSave = products.slice(0, productLimit);
+    const limitReached = products.length > productLimit;
+
+    let savedCount = 0;
+    for (const p of productsToSave) {
+      try {
+        await sql`
+          INSERT INTO products (user_id, product_id, nm_id, title, image_url, current_price, current_stock, marketplace, status)
+          VALUES (${userId}, ${p.product_id}, ${p.nm_id || null}, ${p.title}, ${p.image_url}, ${Math.round(p.current_price)}, ${p.current_stock}, ${p.marketplace}, 'active')
+          ON CONFLICT (user_id, product_id) DO UPDATE SET
+            title = EXCLUDED.title,
+            image_url = EXCLUDED.image_url,
+            current_price = EXCLUDED.current_price,
+            current_stock = EXCLUDED.current_stock,
+            updated_at = CURRENT_TIMESTAMP
+        `;
+        savedCount++;
+      } catch (e) {
+        console.error('Error saving product in sync:', e);
+      }
+    }
+
+    // Update user total
+    await sql`UPDATE users SET total_products = (SELECT COUNT(*) FROM products WHERE user_id = ${userId}), updated_at = CURRENT_TIMESTAMP WHERE id = ${userId}`;
+
+    return res.json({
+      success: true,
+      message: `Синхронизировано ${savedCount} товаров из ${mp}`,
+      count: savedCount,
+      marketplace: mp,
+      warning: limitReached
+        ? `Достигнут лимит тарифа: сохранено ${savedCount} из ${products.length} товаров.`
+        : undefined,
+    });
+  } catch (error) {
+    console.error('Sync products error:', error);
+    return res.status(500).json({ error: 'Internal sync error' });
   }
-
-  // Update user total products
-  const totalResult = await sql`SELECT COUNT(*) as count FROM products WHERE user_id = ${userId}`;
-  const total = Number(totalResult.rows[0]?.count || 0);
-  await sql`UPDATE users SET total_products = ${total} WHERE id = ${userId}`;
-
-  return res.json({
-    success: true,
-    synced: {
-      wb: results.wb.synced,
-      ozon: results.ozon.synced,
-      total,
-    },
-    errors: {
-      wb: results.wb.error,
-      ozon: results.ozon.error,
-    },
-  });
 }
 
 /**

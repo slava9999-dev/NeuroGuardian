@@ -18,6 +18,7 @@ export {
   logSentinelAction,
   getUsersWithExpiringSubscriptions,
   markReminderSent,
+  applyReferralBonus,
 } from './database.js';
 
 // YooKassa

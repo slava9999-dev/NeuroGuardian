@@ -16,7 +16,7 @@ interface PaymentModalProps {
   selectedPlan?: string; // Pre-selected plan ID
 }
 
-// Fallback plans if API is not available
+// Fallback plans
 const FALLBACK_PLANS: SubscriptionPlan[] = [
   {
     id: 'pro',
@@ -67,12 +67,14 @@ export function PaymentModal({
   selectedPlan: initialPlan,
 }: PaymentModalProps) {
   const [plans, setPlans] = useState<SubscriptionPlan[]>(FALLBACK_PLANS);
-  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  // If initialPlan is provided, we start in "Confirmation" mode (selectedPlanId is set)
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(initialPlan || null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoadingPlans, setIsLoadingPlans] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showWidget, setShowWidget] = useState(false);
   const [confirmationToken, setConfirmationToken] = useState<string | null>(null);
+  const [fallbackUrl, setFallbackUrl] = useState<string | null>(null); // For manual link payment
 
   // SUCCESS STATE
   const [showSuccess, setShowSuccess] = useState(false);
@@ -87,8 +89,11 @@ export function PaymentModal({
       // Reset state when opening
       setShowSuccess(false);
       setActivatedPlan(null);
-      setSelectedPlanId(initialPlan || null);
+      setSelectedPlanId(initialPlan || null); // Reset to props
       setError(null);
+      setShowWidget(false);
+      setConfirmationToken(null);
+      setFallbackUrl(null);
     }
   }, [isOpen, initialPlan]);
 
@@ -125,8 +130,8 @@ export function PaymentModal({
           return_url: window.location.origin + '?payment_complete=true',
           error_callback: (error: any) => {
             console.error('YooKassa Widget error:', error);
-            setError('Ошибка виджета оплаты');
-            setShowWidget(false);
+            setError('Ошибка загрузки виджета. Используйте ссылку ниже.');
+            setShowWidget(false); // Hide widget container to show fallback link
             hapticFeedback('error');
           },
         });
@@ -140,7 +145,7 @@ export function PaymentModal({
 
         checkout.on('fail', () => {
           hapticFeedback('error');
-          setError('Платёж не прошёл');
+          setError('Платёж не прошёл или был отменен');
           setShowWidget(false);
         });
 
@@ -154,9 +159,12 @@ export function PaymentModal({
     [onSuccess, onClose]
   );
 
+  // Trigger widget init when token is available
   useEffect(() => {
     if (showWidget && confirmationToken) {
-      initWidget(confirmationToken);
+      // Small delay to ensure container exists
+      const timer = setTimeout(() => initWidget(confirmationToken), 100);
+      return () => clearTimeout(timer);
     }
   }, [showWidget, confirmationToken, initWidget]);
 
@@ -169,6 +177,7 @@ export function PaymentModal({
     hapticFeedback('medium');
     setIsProcessing(true);
     setError(null);
+    setFallbackUrl(null);
 
     try {
       const result = (await paymentApi.createPayment({
@@ -193,7 +202,12 @@ export function PaymentModal({
         return;
       }
 
-      // If we got confirmation token, show embedded widget
+      // Store fallback URL regardless if we use widget
+      if (result.confirmationUrl) {
+        setFallbackUrl(result.confirmationUrl);
+      }
+
+      // If we got confirmation token, use embedded widget
       if (result.confirmationToken) {
         setConfirmationToken(result.confirmationToken);
         setShowWidget(true);
@@ -201,23 +215,16 @@ export function PaymentModal({
         return;
       }
 
-      // Fallback: redirect to YooKassa payment page
+      // Fallback: If no token but URL exists, redirect or show link
       if (result.confirmationUrl) {
-        const tg = (window as any).Telegram?.WebApp;
-        if (tg?.openLink) {
-          tg.openLink(result.confirmationUrl);
-        } else {
-          window.open(result.confirmationUrl, '_blank');
-        }
-        setIsProcessing(false);
-        onClose();
+        window.location.href = result.confirmationUrl;
         return;
       }
 
       throw new Error('Не получены данные для оплаты');
     } catch (err: any) {
       console.error('Payment error:', err);
-      setError(err.message || 'Ошибка оплаты');
+      setError(err.message || 'Ошибка оплаты. Попробуйте позже.');
       hapticFeedback('error');
       setIsProcessing(false);
     }
@@ -233,15 +240,7 @@ export function PaymentModal({
     }
   };
 
-  const handleGoToSettings = () => {
-    handleClose();
-    if (onGoToSettings) {
-      onGoToSettings();
-    } else {
-      // Reload page to update user data
-      window.location.reload();
-    }
-  };
+  const selectedPlanDetails = plans.find(p => p.id === selectedPlanId);
 
   if (!isOpen) return null;
 
@@ -251,7 +250,7 @@ export function PaymentModal({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm"
+        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/90 backdrop-blur-md"
         onClick={handleClose}
       >
         <motion.div
@@ -259,18 +258,17 @@ export function PaymentModal({
           animate={{ y: 0 }}
           exit={{ y: '100%' }}
           transition={{ type: 'spring', damping: 25 }}
-          className="w-full max-w-lg bg-stone-900 rounded-t-3xl sm:rounded-2xl border-t sm:border border-stone-700 overflow-hidden max-h-[90vh] overflow-y-auto"
+          className="w-full max-w-lg bg-stone-900 rounded-t-3xl sm:rounded-2xl border-t sm:border border-stone-700 overflow-hidden max-h-[90vh] flex flex-col"
           onClick={e => e.stopPropagation()}
         >
           {/* SUCCESS SCREEN */}
           {showSuccess ? (
-            <div className="p-8 text-center">
-              {/* Success Icon */}
+            <div className="p-8 text-center flex flex-col items-center justify-center h-full min-h-[400px]">
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ type: 'spring', delay: 0.1 }}
-                className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center"
+                className="w-24 h-24 mb-6 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/30"
               >
                 <svg
                   width="48"
@@ -284,65 +282,35 @@ export function PaymentModal({
                   <path d="M20 6L9 17l-5-5" />
                 </svg>
               </motion.div>
-
-              {/* Title */}
-              <motion.h2
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="text-2xl font-bold text-white mb-2"
+              <h2 className="text-2xl font-bold text-white mb-2">Оплата прошла успешно!</h2>
+              <p className="text-stone-400 mb-8">
+                Тариф <span className="text-white font-bold">{activatedPlan?.name}</span>{' '}
+                активирован на {activatedPlan?.durationDays} дней.
+              </p>
+              <button
+                onClick={() => {
+                  if (onGoToSettings) onGoToSettings();
+                  else handleClose();
+                }}
+                className="w-full py-4 rounded-xl font-bold text-lg bg-emerald-500 text-white hover:bg-emerald-600 transition-all"
               >
-                🎉 Подписка активирована!
-              </motion.h2>
-
-              {/* Plan info */}
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.3 }}
-                className="text-stone-400 mb-8"
-              >
-                Тариф <span className="text-amber-400 font-medium">{activatedPlan?.name}</span>{' '}
-                активен на <span className="text-white">{activatedPlan?.durationDays} дней</span>
-              </motion.p>
-
-              {/* Action buttons */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-                className="space-y-3"
-              >
-                <button
-                  onClick={handleGoToSettings}
-                  className="w-full py-4 rounded-xl font-bold text-lg bg-gradient-to-r from-amber-500 to-amber-400 text-stone-900 hover:from-amber-400 hover:to-amber-300 transition-all flex items-center justify-center gap-2"
-                >
-                  ⚙️ Подключить API ключи
-                </button>
-
-                <button
-                  onClick={handleClose}
-                  className="w-full py-3 rounded-xl font-medium text-stone-400 hover:text-white hover:bg-stone-800 transition-all"
-                >
-                  Закрыть
-                </button>
-              </motion.div>
+                Отлично
+              </button>
             </div>
           ) : (
             <>
               {/* Header */}
-              <div className="sticky top-0 bg-stone-900 p-4 border-b border-stone-700 flex items-center justify-between z-10">
-                <h2 className="text-xl font-bold text-white">
-                  {showWidget ? 'Оплата' : 'Оформить подписку'}
+              <div className="flex-shrink-0 bg-stone-900 p-4 border-b border-stone-800 flex items-center justify-between z-10">
+                <h2 className="text-lg font-bold text-white">
+                  {showWidget ? 'Оплата картой' : 'Оформление подписки'}
                 </h2>
                 <button
                   onClick={handleClose}
-                  disabled={isProcessing}
-                  className="p-2 rounded-lg hover:bg-stone-800 transition-colors disabled:opacity-50"
+                  className="p-2 rounded-full hover:bg-stone-800 text-stone-400 hover:text-white transition-colors"
                 >
                   <svg
-                    width="20"
-                    height="20"
+                    width="24"
+                    height="24"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
@@ -353,287 +321,126 @@ export function PaymentModal({
                 </button>
               </div>
 
-              {/* YooKassa Widget Container */}
-              {showWidget ? (
-                <div className="p-4">
-                  <div id="yookassa-widget-container" className="min-h-[400px]" />
-                </div>
-              ) : (
-                <>
-                  {/* 🎁 FREE TRIAL BANNER */}
-                  <motion.div
-                    initial={{ opacity: 0, y: -20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mx-4 mt-4 relative overflow-hidden rounded-2xl"
-                  >
-                    {/* Animated gradient background */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 via-teal-500 to-cyan-500" />
-                    <motion.div
-                      className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                      animate={{ x: ['-100%', '100%'] }}
-                      transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+              {/* Content area */}
+              <div className="flex-1 overflow-y-auto p-4">
+                {/* 1. Payment Widget Container */}
+                {showWidget ? (
+                  <div className="min-h-[300px] flex flex-col">
+                    <div
+                      id="yookassa-widget-container"
+                      className="flex-1 rounded-xl overflow-hidden"
                     />
-
-                    {/* Confetti effect */}
-                    {[...Array(6)].map((_, i) => (
-                      <motion.div
-                        key={i}
-                        className="absolute w-2 h-2 rounded-full"
-                        style={{
-                          background: [
-                            '#FFD700',
-                            '#FF6B6B',
-                            '#4ECDC4',
-                            '#45B7D1',
-                            '#96E6A1',
-                            '#DDA0DD',
-                          ][i],
-                          left: `${15 + i * 15}%`,
-                          top: '20%',
-                        }}
-                        animate={{
-                          y: [0, -10, 0],
-                          opacity: [1, 0.5, 1],
-                          scale: [1, 1.2, 1],
-                        }}
-                        transition={{
-                          duration: 1.5,
-                          repeat: Infinity,
-                          delay: i * 0.2,
-                        }}
-                      />
-                    ))}
-
-                    <div className="relative p-4 flex items-center gap-4">
-                      {/* Gift icon */}
-                      <motion.div
-                        className="w-14 h-14 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0"
-                        animate={{
-                          rotate: [0, -10, 10, 0],
-                          scale: [1, 1.1, 1],
-                        }}
-                        transition={{ duration: 2, repeat: Infinity }}
-                      >
-                        <span className="text-3xl">🎁</span>
-                      </motion.div>
-
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="text-xl font-black text-white">3 ДНЯ БЕСПЛАТНО!</h3>
-                          <motion.span
-                            className="px-2 py-0.5 bg-amber-400 text-stone-900 text-xs font-bold rounded-full"
-                            animate={{ scale: [1, 1.1, 1] }}
-                            transition={{ duration: 1.5, repeat: Infinity }}
-                          >
-                            NEW
-                          </motion.span>
+                  </div>
+                ) : (
+                  /* 2. Plan Selection / Confirmation */
+                  <div className="space-y-4">
+                    {/* Show Summary Card instead of list IF plan is already selected */}
+                    {selectedPlanId && selectedPlanDetails ? (
+                      <div className="p-5 rounded-2xl bg-stone-800/50 border border-stone-700">
+                        <div className="flex justify-between items-start mb-4">
+                          <div>
+                            <p className="text-stone-400 text-sm mb-1">Выбранный тариф</p>
+                            <h3 className="text-xl font-bold text-white">
+                              {selectedPlanDetails.name}
+                            </h3>
+                          </div>
+                          <div className="text-right">
+                            <span className="block text-2xl font-bold text-amber-500">
+                              {selectedPlanDetails.price} ₽
+                            </span>
+                            <span className="text-xs text-stone-500">
+                              /{selectedPlanDetails.durationDays === 365 ? 'год' : 'мес'}
+                            </span>
+                          </div>
                         </div>
-                        <p className="text-sm text-white/80 mt-1">
-                          Полный доступ ко всем функциям защиты
-                        </p>
-                        <div className="flex items-center gap-2 mt-2 text-xs text-white/70">
-                          <span className="flex items-center gap-1">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                              <path d="M20 6L9 17l-5-5" />
-                            </svg>
-                            Без карты
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                              <path d="M20 6L9 17l-5-5" />
-                            </svg>
-                            Автоотключение
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
 
-                  {/* Plans */}
-                  <div className="p-4 space-y-4">
-                    {isLoadingPlans ? (
-                      <div className="flex items-center justify-center py-8">
-                        <motion.div
-                          className="w-8 h-8 border-3 border-amber-500 border-t-transparent rounded-full"
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                        />
+                        <div className="space-y-2 mb-4">
+                          {selectedPlanDetails.features.slice(0, 3).map((f, i) => (
+                            <div key={i} className="flex items-center gap-2 text-sm text-stone-300">
+                              <span className="text-emerald-500">✓</span> {f}
+                            </div>
+                          ))}
+                        </div>
+
+                        <button
+                          onClick={() => setSelectedPlanId(null)}
+                          className="text-sm text-stone-500 hover:text-white underline transition-colors"
+                        >
+                          Выбрать другой тариф
+                        </button>
                       </div>
                     ) : (
-                      plans.map(plan => (
-                        <button
-                          key={plan.id}
-                          onClick={() => handleSelectPlan(plan.id)}
-                          className={`
-                            w-full p-4 rounded-2xl border-2 transition-all text-left relative
-                            ${
-                              selectedPlanId === plan.id
-                                ? 'border-amber-500 bg-amber-500/10'
-                                : 'border-stone-700 bg-stone-800/50 hover:border-stone-600'
-                            }
-                          `}
-                        >
-                          {/* Popular badge */}
-                          {plan.isPopular && (
-                            <div className="absolute -top-3 left-4 px-3 py-1 bg-gradient-to-r from-amber-500 to-amber-400 text-stone-900 text-xs font-bold rounded-full">
-                              ПОПУЛЯРНЫЙ
-                            </div>
-                          )}
-
-                          {/* Best value badge */}
-                          {plan.isBestValue && (
-                            <div className="absolute -top-3 left-4 px-3 py-1 bg-gradient-to-r from-emerald-500 to-emerald-400 text-stone-900 text-xs font-bold rounded-full">
-                              ВЫГОДНО
-                            </div>
-                          )}
-
-                          <div className="flex items-center justify-between mb-3">
-                            <div>
-                              <h3 className="text-lg font-bold text-white">{plan.name}</h3>
-                              <div className="flex items-baseline gap-1">
-                                <span className="text-2xl font-bold text-amber-400">
-                                  {plan.price}₽
-                                </span>
-                                <span className="text-stone-400">
-                                  /{plan.durationDays === 365 ? 'год' : 'месяц'}
-                                </span>
-                              </div>
-                              {plan.durationDays === 365 && (
-                                <span className="text-xs text-emerald-400">
-                                  {plan.pricePerMonth}₽/месяц
-                                </span>
-                              )}
-                            </div>
-
-                            <div
-                              className={`
-                              w-6 h-6 rounded-full border-2 flex items-center justify-center
-                              ${selectedPlanId === plan.id ? 'border-amber-500 bg-amber-500' : 'border-stone-600'}
-                            `}
-                            >
-                              {selectedPlanId === plan.id && (
-                                <svg
-                                  width="14"
-                                  height="14"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="3"
-                                  className="text-stone-900"
-                                >
-                                  <path d="M20 6L9 17l-5-5" />
-                                </svg>
-                              )}
-                            </div>
+                      /* Plan List (Only if no plan selected) */
+                      <div className="space-y-3">
+                        {isLoadingPlans ? (
+                          <div className="py-10 text-center text-stone-500">
+                            Загрузка тарифов...
                           </div>
+                        ) : (
+                          plans.map(plan => (
+                            <button
+                              key={plan.id}
+                              onClick={() => handleSelectPlan(plan.id)}
+                              className="w-full p-4 rounded-xl bg-stone-800 border-2 border-transparent hover:border-stone-600 transition-all text-left flex justify-between items-center"
+                            >
+                              <div>
+                                <div className="font-bold text-white">{plan.name}</div>
+                                <div className="text-sm text-stone-400">{plan.price} ₽</div>
+                              </div>
+                              <div className="w-5 h-5 rounded-full border-2 border-stone-600" />
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
 
-                          <ul className="space-y-2">
-                            {plan.features.map((feature, i) => (
-                              <li
-                                key={i}
-                                className="flex items-center gap-2 text-sm text-stone-300"
-                              >
-                                <svg
-                                  width="16"
-                                  height="16"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  className="text-emerald-400 flex-shrink-0"
-                                >
-                                  <path d="M20 6L9 17l-5-5" />
-                                </svg>
-                                {feature}
-                              </li>
-                            ))}
-                          </ul>
-                        </button>
-                      ))
+                    {error && (
+                      <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm text-center">
+                        {error}
+                        {fallbackUrl && (
+                          <a
+                            href={fallbackUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block mt-2 font-bold underline"
+                          >
+                            Оплатить по прямой ссылке
+                          </a>
+                        )}
+                      </div>
                     )}
                   </div>
+                )}
+              </div>
 
-                  {/* Error */}
-                  {error && (
-                    <div className="mx-4 mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-xl text-red-400 text-sm">
-                      {error}
-                    </div>
-                  )}
+              {/* Footer Actions */}
+              {!showWidget && (
+                <div className="flex-shrink-0 p-4 bg-stone-900 border-t border-stone-800">
+                  <button
+                    onClick={handlePayment}
+                    disabled={!selectedPlanId || isProcessing}
+                    className={`
+                      w-full py-4 rounded-xl font-bold text-lg transition-all flex items-center justify-center gap-2
+                      ${
+                        selectedPlanId && !isProcessing
+                          ? 'bg-amber-500 text-stone-900 hover:bg-amber-400 shadow-lg shadow-amber-500/20'
+                          : 'bg-stone-800 text-stone-500 cursor-not-allowed'
+                      }
+                    `}
+                  >
+                    {isProcessing
+                      ? 'Обработка...'
+                      : `Оплатить ${selectedPlanDetails?.price || ''} ₽`}
+                  </button>
 
-                  {/* Footer */}
-                  <div className="sticky bottom-0 bg-stone-900 p-4 border-t border-stone-700">
-                    <button
-                      onClick={handlePayment}
-                      disabled={!selectedPlanId || isProcessing}
-                      className={`
-                        w-full py-4 rounded-xl font-bold text-lg transition-all flex items-center justify-center gap-2
-                        ${
-                          selectedPlanId
-                            ? 'bg-gradient-to-r from-amber-500 to-amber-400 text-stone-900 hover:from-amber-400 hover:to-amber-300'
-                            : 'bg-stone-700 text-stone-400 cursor-not-allowed'
-                        }
-                      `}
-                    >
-                      {isProcessing ? (
-                        <>
-                          <motion.div
-                            className="w-5 h-5 border-2 border-stone-900 border-t-transparent rounded-full"
-                            animate={{ rotate: 360 }}
-                            transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                          />
-                          Активация...
-                        </>
-                      ) : (
-                        <>
-                          💳 Оплатить
-                          {selectedPlanId && (
-                            <span>{plans.find(p => p.id === selectedPlanId)?.price}₽</span>
-                          )}
-                        </>
-                      )}
-                    </button>
-
-                    <p className="text-xs text-stone-500 text-center mt-3">
-                      Нажимая «Оплатить», вы принимаете{' '}
-                      <a
-                        href="#legal"
-                        onClick={e => {
-                          e.preventDefault();
-                          // Open legal page in Telegram or new tab
-                          const tg = (window as any).Telegram?.WebApp;
-                          if (tg?.openLink) {
-                            tg.openLink(window.location.origin + '/?page=legal');
-                          } else {
-                            window.open('/?page=legal', '_blank');
-                          }
-                        }}
-                        className="text-amber-400 hover:underline"
-                      >
-                        оферту
-                      </a>{' '}
-                      и{' '}
-                      <a
-                        href="#privacy"
-                        onClick={e => {
-                          e.preventDefault();
-                          const tg = (window as any).Telegram?.WebApp;
-                          if (tg?.openLink) {
-                            tg.openLink(window.location.origin + '/?page=legal');
-                          } else {
-                            window.open('/?page=legal', '_blank');
-                          }
-                        }}
-                        className="text-amber-400 hover:underline"
-                      >
-                        политику конфиденциальности
-                      </a>
-                      .
-                    </p>
-                    <p className="text-xs text-stone-500 text-center mt-1">
-                      ИП Дмитричев А.Г. • ИНН 520500573503
-                    </p>
-                  </div>
-                </>
+                  <p className="text-center text-[10px] text-stone-500 mt-3 px-4">
+                    Нажимая кнопку, вы соглашаетесь с условиями{' '}
+                    <a href="#" className="text-stone-400 hover:text-white">
+                      оферты
+                    </a>{' '}
+                    и рекуррентных платежей.
+                  </p>
+                </div>
               )}
             </>
           )}

@@ -318,3 +318,20 @@ export async function markReminderSent(userId: number): Promise<void> {
     WHERE id = ${userId}
   `;
 }
+
+/**
+ * Apply referral bonus to referrer
+ */
+export async function applyReferralBonus(referrerId: number, days: number = 30): Promise<void> {
+  await sql`
+    UPDATE users SET
+      subscription_end = CASE 
+        WHEN subscription_end IS NULL OR subscription_end < CURRENT_TIMESTAMP 
+        THEN CURRENT_TIMESTAMP + INTERVAL '${days} days'
+        ELSE subscription_end + INTERVAL '${days} days'
+      END,
+      subscription_active = true,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ${referrerId}
+  `;
+}

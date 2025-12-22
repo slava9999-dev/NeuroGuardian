@@ -1,10 +1,9 @@
 // ============================================
 // NeuroAgent — Legal Information & Pricing Page
-// Updated tariffs with payment buttons
+// Clean & Compliant Design
 // ============================================
 
 import { useState } from 'react';
-import { motion } from 'framer-motion';
 import { SecurityBadge } from '../components/ui/SecurityBadge';
 import { PaymentModal } from '../components/ui/PaymentModal';
 import { useAppStore } from '../stores';
@@ -34,13 +33,13 @@ export function LegalPage({ onBack }: LegalPageProps) {
   const daysLeft = user?.subscriptionDaysLeft ?? 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-stone-900 to-stone-800 px-4 py-6 pb-24">
+    <div className="min-h-screen bg-stone-900 px-4 py-6 pb-24 text-stone-200">
       {/* Header */}
-      {onBack && (
-        <header className="flex items-center gap-4 mb-6">
+      {onBack ? (
+        <header className="flex items-center gap-4 mb-8">
           <button
             onClick={onBack}
-            className="p-2 rounded-xl bg-stone-800 hover:bg-stone-700 transition-colors"
+            className="p-2 -ml-2 rounded-full hover:bg-white/5 transition-colors text-stone-400 hover:text-white"
           >
             <svg
               width="24"
@@ -50,386 +49,229 @@ export function LegalPage({ onBack }: LegalPageProps) {
               stroke="currentColor"
               strokeWidth="2"
             >
-              <path d="M19 12H5M12 19l-7-7 7-7" />
+              <path d="M15 18l-6-6 6-6" />
             </svg>
           </button>
-          <h1 className="text-xl font-bold text-white">Информация</h1>
+          <h1 className="text-lg font-semibold text-white">Тарифы и условия</h1>
         </header>
-      )}
-
-      {!onBack && (
-        <header className="mb-6">
-          <h1 className="text-2xl font-bold text-gradient-violet mb-2">NeuroAgent</h1>
-          <p className="text-stone-400">Информация и тарифы</p>
+      ) : (
+        <header className="mb-8">
+          <h1 className="text-2xl font-bold text-white mb-2">Информация</h1>
+          <p className="text-stone-500 text-sm">Управление подпиской и документы</p>
         </header>
       )}
 
       <div className="space-y-6">
-        {/* Security Badge */}
+        {/* Status Cards */}
+        {isPaidSubscription && (
+          <div className="p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex justify-between items-center">
+            <div>
+              <p className="text-xs font-semibold text-emerald-500 uppercase tracking-wider mb-1">
+                Активная подписка
+              </p>
+              <p className="text-lg font-bold text-white">
+                {user?.subscriptionPlan === 'yearly' ? 'Годовой PRO' : 'PRO'}
+              </p>
+            </div>
+            <div className="text-right">
+              <span className="text-2xl font-bold text-white">{daysLeft}</span>
+              <span className="text-sm text-stone-400 block">дней осталось</span>
+            </div>
+          </div>
+        )}
+
+        {isTrialActive && (
+          <div className="p-5 rounded-2xl bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20">
+            <div className="flex items-center gap-3 mb-2">
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500 text-stone-900 uppercase">
+                Trial
+              </span>
+              <span className="text-sm text-amber-500 font-medium">Тестовый период</span>
+            </div>
+            <p className="text-stone-300 text-sm mb-3">
+              Вам доступны все функции PRO бесплатно еще <b>{daysLeft} дня</b>.
+            </p>
+            <button
+              onClick={() => handleSubscribe('pro')}
+              className="text-sm font-semibold text-amber-400 hover:text-white transition-colors"
+            >
+              Продлить защиту →
+            </button>
+          </div>
+        )}
+
+        {/* Tariffs Section */}
+        <section className="space-y-4">
+          <h2 className="text-lg font-bold text-white mb-4">Выберите план</h2>
+
+          {/* PRO Card */}
+          <div className="relative group rounded-2xl bg-stone-800 border-2 border-transparent hover:border-violet-500/50 transition-all p-5 shadow-lg">
+            <div className="flex justify-between items-baseline mb-4">
+              <h3 className="text-xl font-bold text-white">Pro Monthly</h3>
+              <div className="text-right">
+                <span className="text-2xl font-bold text-violet-400">999 ₽</span>
+                <span className="text-stone-500 text-sm">/месяц</span>
+              </div>
+            </div>
+
+            <ul className="space-y-2 mb-6">
+              <li className="flex gap-3 text-sm text-stone-300">
+                <span className="text-violet-500">✓</span> Полная защита маржи (Stop-Loss)
+              </li>
+              <li className="flex gap-3 text-sm text-stone-300">
+                <span className="text-violet-500">✓</span> AI Агент 24/7
+              </li>
+              <li className="flex gap-3 text-sm text-stone-300">
+                <span className="text-violet-500">✓</span> Управление до 500 товаров
+              </li>
+            </ul>
+
+            <button
+              onClick={() => handleSubscribe('pro')}
+              className="w-full py-3 rounded-xl bg-violet-600 text-white font-bold hover:bg-violet-500 transition-colors shadow-lg shadow-violet-600/20"
+            >
+              Выбрать тариф
+            </button>
+          </div>
+
+          {/* YEARLY Card */}
+          <div className="relative rounded-2xl bg-gradient-to-br from-stone-800 to-stone-800 border-2 border-amber-500/30 p-5 shadow-lg">
+            <div className="absolute top-0 right-0 bg-amber-500 text-stone-900 text-xs font-bold px-3 py-1 rounded-bl-xl">
+              ВЫГОДА 20%
+            </div>
+
+            <div className="flex justify-between items-baseline mb-4">
+              <h3 className="text-xl font-bold text-white">Pro Yearly</h3>
+              <div className="text-right">
+                <span className="text-sm text-stone-500 line-through mr-2">11 988 ₽</span>
+                <span className="text-2xl font-bold text-amber-500">9 990 ₽</span>
+                <span className="text-stone-500 text-sm block">/год</span>
+              </div>
+            </div>
+
+            <ul className="space-y-2 mb-6">
+              <li className="flex gap-3 text-sm text-stone-300">
+                <span className="text-amber-500">✓</span> Все функции Pro
+              </li>
+              <li className="flex gap-3 text-sm text-stone-300">
+                <span className="text-amber-500">✓</span> <b>2 месяца</b> в подарок
+              </li>
+              <li className="flex gap-3 text-sm text-stone-300">
+                <span className="text-amber-500">✓</span> Приоритетная поддержка
+              </li>
+            </ul>
+
+            <button
+              onClick={() => handleSubscribe('yearly')}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-stone-900 font-bold hover:from-amber-400 hover:to-amber-500 transition-colors shadow-lg shadow-amber-500/20"
+            >
+              Оформить на год
+            </button>
+          </div>
+        </section>
+
+        {/* Info & Legal Section (Optimized for Compliance) */}
+        <section className="space-y-4 pt-4 border-t border-stone-800">
+          {/* Contacts */}
+          <div className="bg-stone-800/50 rounded-xl p-4">
+            <h3 className="text-sm font-bold text-white mb-3">Служба поддержки</h3>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-stone-500">Telegram</span>
+                <a
+                  href="https://t.me/Vyacheslav_Neuro"
+                  target="_blank"
+                  className="text-violet-400 hover:underline"
+                >
+                  @Vyacheslav_Neuro
+                </a>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-stone-500">Email</span>
+                <a
+                  href="mailto:support@neuroguardian.app"
+                  className="text-violet-400 hover:underline"
+                >
+                  support@neuroguardian.app
+                </a>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-stone-500">Время работы</span>
+                <span className="text-stone-300">Пн-Вс, 10:00 - 20:00 МСК</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Legal Details */}
+          <details className="group bg-stone-800/30 rounded-xl">
+            <summary className="p-4 cursor-pointer font-medium text-stone-400 group-open:text-white transition-colors flex justify-between items-center">
+              Юридическая информация
+              <svg
+                className="w-4 h-4 transform group-open:rotate-180 transition-transform"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path d="M19 9l-7 7-7-7" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </summary>
+            <div className="px-4 pb-4 text-xs text-stone-500 space-y-2">
+              <p>ИП Дмитричев Александр Геннадьевич</p>
+              <p>ИНН 520500573503</p>
+              <p>Адрес: 603093, Россия, Нижегородская обл., г. Бор, ул. Максима Горького</p>
+            </div>
+          </details>
+
+          {/* Offer & Policies */}
+          <details className="group bg-stone-800/30 rounded-xl">
+            <summary className="p-4 cursor-pointer font-medium text-stone-400 group-open:text-white transition-colors flex justify-between items-center">
+              Условия использования
+              <svg
+                className="w-4 h-4 transform group-open:rotate-180 transition-transform"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path d="M19 9l-7 7-7-7" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </summary>
+            <div className="px-4 pb-4 text-xs text-stone-500 space-y-3">
+              <div>
+                <strong className="block text-stone-300 mb-1">Порядок предоставления услуг</strong>
+                Услуга предоставляется в виде предоставления неисключительной лицензии на
+                использование ПО NeuroAgent. Доступ к ПО предоставляется электронным способом сразу
+                после успешной оплаты.
+              </div>
+              <div>
+                <strong className="block text-stone-300 mb-1">Рекуррентные платежи</strong>
+                Соглашаясь с офертой, вы даете согласие на автоматическое списание средств за
+                продление подписки каждые 30 или 365 дней в зависимости от выбранного тарифа.
+                Отменить подписку можно в любой момент через службу поддержки.
+              </div>
+              <div>
+                <strong className="block text-stone-300 mb-1">Возврат</strong>
+                Возврат средств возможен в случае технической неработоспособности сервиса по вине
+                Исполнителя, если проблема не была устранена в течение 3 рабочих дней.
+              </div>
+              <div className="pt-2">
+                <a href="#" className="underline hover:text-white mr-4">
+                  Публичная оферта
+                </a>
+                <a href="#" className="underline hover:text-white">
+                  Политика конфиденциальности
+                </a>
+              </div>
+            </div>
+          </details>
+        </section>
+
         <SecurityBadge />
 
-        {/* Subscription Status */}
-        {isPaidSubscription && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="p-4 rounded-xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/40"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-stone-400">Ваша подписка</p>
-                <p className="text-lg font-bold text-emerald-400">
-                  {user?.subscriptionPlan === 'yearly' ? 'Годовой Pro' : 'Pro'} — активна
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-2xl font-bold text-white">{daysLeft}</p>
-                <p className="text-xs text-stone-400">дней</p>
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Trial Status */}
-        {isTrialActive && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="p-4 rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/40"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-stone-400">Пробный период</p>
-                <p className="text-lg font-bold text-amber-400">🎁 Полный доступ бесплатно</p>
-              </div>
-              <div className="text-right">
-                <p className="text-2xl font-bold text-white">{daysLeft}</p>
-                <p className="text-xs text-stone-400">дней осталось</p>
-              </div>
-            </div>
-            <p className="text-xs text-amber-400/70 mt-2">
-              💡 Оформите подписку сейчас, чтобы не потерять защиту!
-            </p>
-          </motion.div>
-        )}
-
-        {/* Тарифы */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="space-y-4"
-        >
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <span className="text-violet-400">💎</span>
-            Тарифы
-          </h2>
-
-          {/* FREE TRIAL */}
-          <div className="p-4 bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 rounded-2xl border border-emerald-500/40 relative overflow-hidden">
-            <div className="absolute top-0 right-0 px-3 py-1 bg-emerald-500 text-white text-xs font-bold rounded-bl-xl">
-              🎁 БЕСПЛАТНО
-            </div>
-            <div className="flex justify-between items-center mb-3">
-              <span className="font-bold text-white text-lg">Пробный период</span>
-              <span className="text-emerald-400 font-bold text-xl">3 дня</span>
-            </div>
-            <ul className="text-sm text-stone-300 space-y-1.5">
-              <li className="flex items-center gap-2">
-                <span className="text-emerald-400">✓</span> Полный доступ ко всем функциям
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-emerald-400">✓</span> До 50 товаров
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-emerald-400">✓</span> Без привязки карты
-              </li>
-            </ul>
-            <p className="text-xs text-emerald-400/70 mt-3">
-              ✨ Активируется автоматически при первом входе
-            </p>
-          </div>
-
-          {/* PRO - Основной тариф */}
-          <motion.div
-            className="p-4 bg-gradient-to-r from-violet-500/20 to-purple-500/20 rounded-2xl border-2 border-violet-500/50 relative overflow-hidden"
-            whileHover={{ scale: 1.01 }}
-          >
-            <div className="absolute top-0 right-0 px-3 py-1 bg-violet-500 text-white text-xs font-bold rounded-bl-xl">
-              ⭐ ПОПУЛЯРНЫЙ
-            </div>
-            <div className="flex justify-between items-center mb-3">
-              <span className="font-bold text-white text-lg">Pro</span>
-              <div className="text-right">
-                <span className="text-violet-400 font-bold text-2xl">999 ₽</span>
-                <span className="text-stone-400 text-sm">/мес</span>
-              </div>
-            </div>
-            <ul className="text-sm text-stone-300 space-y-1.5 mb-4">
-              <li className="flex items-center gap-2">
-                <span className="text-violet-400">✓</span> До 500 товаров
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-violet-400">✓</span> Все режимы защиты (Zero Stock + Price
-                Correction)
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-violet-400">✓</span> AI-агент для управления
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-violet-400">✓</span> Telegram уведомления
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-violet-400">✓</span> Приоритетная поддержка
-              </li>
-            </ul>
-
-            {!isPaidSubscription ? (
-              <button
-                onClick={() => handleSubscribe('pro')}
-                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 text-white font-bold text-lg hover:from-violet-600 hover:to-purple-700 transition-all shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40"
-              >
-                {isTrialActive ? 'Оплатить 999 ₽/мес' : 'Оформить подписку'}
-              </button>
-            ) : (
-              <div className="w-full py-3 px-4 rounded-xl bg-stone-800 text-center text-stone-400 font-medium">
-                ✓ Подписка активна
-              </div>
-            )}
-          </motion.div>
-
-          {/* Yearly - со скидкой */}
-          <motion.div
-            className="p-4 bg-gradient-to-r from-amber-500/10 to-orange-500/10 rounded-2xl border border-amber-500/30 relative overflow-hidden"
-            whileHover={{ scale: 1.01 }}
-          >
-            <div className="absolute top-0 right-0 px-3 py-1 bg-amber-500 text-white text-xs font-bold rounded-bl-xl">
-              💰 ВЫГОДНО
-            </div>
-            <div className="flex justify-between items-center mb-3">
-              <span className="font-bold text-white text-lg">Годовой Pro</span>
-              <div className="text-right">
-                <span className="text-stone-500 line-through text-sm">11 988 ₽</span>
-                <div>
-                  <span className="text-amber-400 font-bold text-2xl">9 990 ₽</span>
-                  <span className="text-stone-400 text-sm">/год</span>
-                </div>
-              </div>
-            </div>
-            <ul className="text-sm text-stone-300 space-y-1.5 mb-4">
-              <li className="flex items-center gap-2">
-                <span className="text-amber-400">✓</span> Все из Pro
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-amber-400">✓</span> Экономия 2 000 ₽
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-amber-400">✓</span> 2 месяца бесплатно
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-amber-400">✓</span> Персональный менеджер
-              </li>
-            </ul>
-
-            {!isPaidSubscription || user?.subscriptionPlan !== 'yearly' ? (
-              <button
-                onClick={() => handleSubscribe('yearly')}
-                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-lg hover:from-amber-600 hover:to-orange-600 transition-all shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40"
-              >
-                Оформить на год
-              </button>
-            ) : (
-              <button
-                onClick={() => handleSubscribe('yearly')}
-                className="w-full py-3 px-4 rounded-xl bg-amber-500/20 border border-amber-500/50 text-amber-400 font-medium hover:bg-amber-500/30 transition-all"
-              >
-                Продлить на год со скидкой
-              </button>
-            )}
-          </motion.div>
-        </motion.section>
-
-        {/* Реквизиты */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="glass-panel p-6"
-        >
-          <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-            <span className="text-violet-400">📋</span>
-            Реквизиты
-          </h2>
-
-          <div className="space-y-3 text-stone-300">
-            <div className="flex justify-between items-start">
-              <span className="text-stone-400">Исполнитель:</span>
-              <span className="text-right font-medium">ИП Дмитричев Александр Геннадьевич</span>
-            </div>
-            <div className="flex justify-between items-start">
-              <span className="text-stone-400">ИНН:</span>
-              <span className="text-right font-mono">520500573503</span>
-            </div>
-            <div className="flex justify-between items-start">
-              <span className="text-stone-400">Регион:</span>
-              <span className="text-right">Нижегородская область</span>
-            </div>
-          </div>
-        </motion.section>
-
-        {/* Контакты */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          className="glass-panel p-6"
-        >
-          <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-            <span className="text-violet-400">📞</span>
-            Поддержка
-          </h2>
-
-          <div className="space-y-3 text-stone-300">
-            <div className="flex justify-between items-start">
-              <span className="text-stone-400">Телефон:</span>
-              <a href="tel:+79040476383" className="text-violet-400 hover:text-violet-300">
-                +7 (904) 047-63-83
-              </a>
-            </div>
-            <div className="flex justify-between items-start">
-              <span className="text-stone-400">Email:</span>
-              <a
-                href="mailto:support@neuroguardian.app"
-                className="text-violet-400 hover:text-violet-300"
-              >
-                support@neuroguardian.app
-              </a>
-            </div>
-          </div>
-
-          {/* Telegram Support Button */}
-          <a
-            href="https://t.me/Vyacheslav_Neuro"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-4 flex items-center justify-center gap-3 w-full py-4 px-6 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-xl text-white font-medium transition-all"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z" />
-            </svg>
-            Написать в Telegram
-          </a>
-        </motion.section>
-
-        {/* Способы оплаты */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="glass-panel p-6"
-        >
-          <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-            <span className="text-violet-400">💳</span>
-            Способы оплаты
-          </h2>
-
-          <p className="text-stone-300 mb-4 text-sm">Оплата через платёжную систему ЮKassa:</p>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex items-center gap-2 p-3 bg-stone-800/50 rounded-xl">
-              <span>💳</span>
-              <span className="text-sm text-stone-300">Карта</span>
-            </div>
-            <div className="flex items-center gap-2 p-3 bg-stone-800/50 rounded-xl">
-              <span>📱</span>
-              <span className="text-sm text-stone-300">СБП</span>
-            </div>
-            <div className="flex items-center gap-2 p-3 bg-stone-800/50 rounded-xl">
-              <span>🅿️</span>
-              <span className="text-sm text-stone-300">ЮMoney</span>
-            </div>
-            <div className="flex items-center gap-2 p-3 bg-stone-800/50 rounded-xl">
-              <span>🏦</span>
-              <span className="text-sm text-stone-300">SberPay</span>
-            </div>
-          </div>
-
-          <p className="text-xs text-stone-500 mt-4">
-            Данные карты передаются напрямую в ЮKassa и не хранятся на нашем сервере.
-          </p>
-        </motion.section>
-
-        {/* Оферта (сворачиваемая) */}
-        <motion.details
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.25 }}
-          className="glass-panel"
-        >
-          <summary className="p-6 cursor-pointer text-lg font-bold text-white flex items-center gap-2">
-            <span className="text-violet-400">📄</span>
-            Договор оферты
-          </summary>
-          <div className="px-6 pb-6">
-            <div className="text-sm text-stone-300 space-y-3 max-h-64 overflow-y-auto pr-2">
-              <p className="font-medium text-white">ПУБЛИЧНАЯ ОФЕРТА</p>
-              <p>
-                Настоящий документ является официальным предложением (публичной офертой) Исполнителя
-                — ИП Дмитричева Александра Геннадьевича (ИНН: 520500573503) заключить договор на
-                оказание услуг.
-              </p>
-              <p className="font-medium text-white mt-3">1. ПРЕДМЕТ ДОГОВОРА</p>
-              <p>
-                1.1. Исполнитель предоставляет доступ к сервису NeuroAgent для автоматического
-                мониторинга и защиты цен товаров на маркетплейсах WB и Ozon.
-              </p>
-              <p className="font-medium text-white mt-3">2. СТОИМОСТЬ УСЛУГ</p>
-              <p>2.1. Пробный период: 3 дня бесплатно.</p>
-              <p>2.2. Pro: 999 ₽/месяц</p>
-              <p>2.3. Годовой Pro: 9 990 ₽/год</p>
-              <p>2.4. Оплата через ЮKassa, 100% предоплата.</p>
-              <p className="font-medium text-white mt-3">3. ВОЗВРАТ</p>
-              <p>
-                3.1. Возврат возможен в течение 3 дней после оплаты при неиспользовании сервиса. Для
-                возврата: support@neuroguardian.app
-              </p>
-            </div>
-          </div>
-        </motion.details>
-
-        {/* Политика конфиденциальности (сворачиваемая) */}
-        <motion.details
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="glass-panel"
-        >
-          <summary className="p-6 cursor-pointer text-lg font-bold text-white flex items-center gap-2">
-            <span className="text-violet-400">🔒</span>
-            Политика конфиденциальности
-          </summary>
-          <div className="px-6 pb-6">
-            <div className="text-sm text-stone-300 space-y-3 max-h-64 overflow-y-auto pr-2">
-              <p>Мы собираем: Telegram ID, API ключи (шифруются AES-256-GCM), данные о товарах.</p>
-              <p>Данные используются для: предоставления сервиса, мониторинга цен, уведомлений.</p>
-              <p>Все данные передаются по HTTPS. API ключи не передаются третьим лицам.</p>
-              <p>Вы можете запросить удаление данных через support@neuroguardian.app</p>
-            </div>
-          </div>
-        </motion.details>
-
-        {/* Footer */}
-        <motion.section
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.35 }}
-          className="text-center text-stone-500 text-sm py-4"
-        >
-          <p>NeuroAgent v2.4.0</p>
-          <p>© 2024 ИП Дмитричев А.Г.</p>
-        </motion.section>
+        <div className="text-center text-[10px] text-stone-600 pb-4">
+          NeuroGuardian © 2024. All rights reserved.Secure Payment by YooKassa.
+        </div>
       </div>
 
-      {/* Payment Modal */}
       <PaymentModal
         isOpen={showPayment}
         onClose={() => setShowPayment(false)}

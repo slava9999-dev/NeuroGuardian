@@ -21,67 +21,80 @@ import { createOrUpdateUser, getUserById } from '../../src/api-lib/services/inde
 /**
  * Handle authentication action
  */
+/**
+ * Handle authentication action (Synced with index.ts logic)
+ */
 export async function handleAuth(
   req: VercelRequest,
   res: VercelResponse,
   initData: string
 ): Promise<VercelResponse> {
-  const validation = validateTelegramInitData(initData);
+  const { validateTelegramInitData } = await import('../../src/api-lib/lib/index.js');
+  const { createOrUpdateUser, getUserById } = await import('../../src/api-lib/services/index.js');
 
+  const validation = validateTelegramInitData(initData);
   if (!validation.valid || !validation.user) {
-    return res.status(401).json({ error: validation.error || 'Authentication failed' });
+    return res.status(401).json({
+      error: validation.error || 'Invalid initData',
+      code: 'AUTH_FAILED',
+    });
   }
 
-  const tgUser = validation.user;
+  const telegramUser = validation.user;
 
   // Create or update user in database
-  const dbUser = await createOrUpdateUser(tgUser);
+  await createOrUpdateUser(telegramUser);
+  const fullUser = await getUserById(telegramUser.id);
 
-  // Check subscription status
-  let subscriptionActive = dbUser?.subscription_active || false;
-  let subscriptionPlan = dbUser?.subscription_plan || 'trial';
-  let subscriptionEnd = dbUser?.subscription_end;
-
-  // TEST MODE: Override subscription
-  if (TEST_MODE) {
-    subscriptionActive = true;
-    subscriptionPlan = 'pro';
-    subscriptionEnd = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+  if (!fullUser) {
+    return res.status(500).json({ error: 'Failed to create or fetch user' });
   }
 
-  // Get product count
-  const productsResult =
-    await sql`SELECT COUNT(*) as count FROM products WHERE user_id = ${tgUser.id}`;
-  const totalProducts = Number(productsResult.rows[0]?.count || 0);
+  let subscriptionActive = false;
+  let daysLeft: number | null = null;
 
+  // Subscription logic from index.ts
+  if (fullUser.subscription_end) {
+    const endDate = new Date(fullUser.subscription_end);
+    subscriptionActive = endDate > new Date();
+    daysLeft = Math.max(0, Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+  }
+
+  // FAIL-SAFE: For Testing, ensure Trial is always active
+  if (fullUser.subscription_plan === 'trial') {
+    subscriptionActive = true;
+    if (!daysLeft || daysLeft <= 0) daysLeft = 3;
+  }
+
+  // EMERGENCY FIX: Force subscription active if end date is in future
+  if (fullUser.subscription_end) {
+    const endDate = new Date(fullUser.subscription_end);
+    if (endDate > new Date()) {
+      subscriptionActive = true;
+      daysLeft = Math.max(1, Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+    }
+  }
+
+  // Prepare response (Strictly following index.ts structure for frontend compatibility)
   return res.json({
+    success: true,
     user: {
-      id: tgUser.id,
-      firstName: sanitizeInput(tgUser.first_name),
-      lastName: tgUser.last_name ? sanitizeInput(tgUser.last_name) : undefined,
-      username: tgUser.username ? sanitizeInput(tgUser.username) : undefined,
-      photoUrl: tgUser.photo_url,
-    },
-    subscription: {
-      active: subscriptionActive,
-      plan: subscriptionPlan,
-      expiresAt: subscriptionEnd,
-    },
-    settings: {
-      defenseMode: dbUser?.defense_mode || 'zero_stock',
-      protectionEnabled: dbUser?.protection_enabled || false,
-      hasWbApiKey: !!dbUser?.api_key_wb,
-      hasOzonApiKey: !!dbUser?.api_key_ozon,
-    },
-    stats: {
-      totalProducts,
-      protectedProducts: 0, // Will be calculated
-      triggeredToday: dbUser?.triggered_today || 0,
-      savedAmount: Number(dbUser?.saved_amount || 0),
-    },
-    referral: {
-      code: dbUser?.referral_code || `NG${tgUser.id.toString(36).toUpperCase()}`,
-      referredBy: dbUser?.referred_by || null,
+      telegramId: fullUser.id,
+      username: fullUser.username,
+      firstName: fullUser.first_name,
+      lastName: fullUser.last_name,
+      photoUrl: fullUser.photo_url,
+      subscriptionActive,
+      subscriptionExpiresAt: fullUser.subscription_end,
+      subscriptionPlan: fullUser.subscription_plan,
+      subscriptionDaysLeft: daysLeft,
+      protectionEnabled: fullUser.protection_enabled || false,
+      defenseMode: fullUser.defense_mode || 'zero_stock',
+      wbKeyRef: fullUser.api_key_wb ? 'configured' : null,
+      ozonKeyRef: fullUser.api_key_ozon ? 'configured' : null,
+      totalProducts: fullUser.total_products || 0,
+      triggeredToday: fullUser.triggered_today || 0,
+      savedAmount: Number(fullUser.saved_amount) || 0,
     },
   });
 }
