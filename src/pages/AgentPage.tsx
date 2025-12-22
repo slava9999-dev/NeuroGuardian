@@ -71,10 +71,10 @@ export function AgentPage() {
     setProcessing(true);
 
     try {
-      // Call AI API
+      // Call AI API - send last 15 messages for context
       const history: AgentMessage[] = messages
         .filter(m => m.role !== 'system' && !m.isLoading)
-        .slice(-10)
+        .slice(-15)
         .map(m => ({
           role: m.role as 'user' | 'assistant',
           content: m.content,
