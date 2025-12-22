@@ -2,6 +2,34 @@
 
 All notable changes to NeuroGUARDIAN project.
 
+## [2.5.0] - 2024-12-22
+
+### 🧪 Testing Infrastructure
+
+- **Vitest Setup**: Added comprehensive test suite with Vitest
+- **36 Unit Tests**: Covering crypto, validation, auth, and agent tools
+- **Test Scripts**: `npm run test`, `npm run test:watch`, `npm run test:coverage`
+- **Test Categories**:
+  - `tests/utils/crypto.test.ts` — API key encryption/decryption (6 tests)
+  - `tests/utils/validation.test.ts` — Input sanitization and validation (12 tests)
+  - `tests/auth/telegram.test.ts` — Telegram WebApp authentication (9 tests)
+  - `tests/agent/tools.test.ts` — Agent tool definitions (9 tests)
+
+### 🗑️ Cleanup
+
+- **Removed**: `functions/` directory (legacy Firebase code)
+- **Removed**: `genkit-functions/` directory (unused)
+- **Removed**: `neuroagent-core/` directory (not integrated)
+- **Archived**: Old audit files moved to `docs/archive/`
+- **Consolidated**: Kept only 2 main audit files
+
+### 📦 Dependencies
+
+- Added `vitest@3.2.4`
+- Added `@vitest/coverage-v8@3.2.4`
+
+---
+
 ## [2.4.0] - 2024-12-21
 
 ### 🤖 NeuroAgent AI Assistant

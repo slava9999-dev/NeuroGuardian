@@ -1,1 +1,0 @@
-{"version":3,"file":"endpoints.d.ts","sourceRoot":"","sources":["../../../src/modules/payments/endpoints.ts"],"names":[],"mappings":"AAKA,OAAO,KAAK,SAAS,MAAM,oBAAoB,CAAC;AAUhD,eAAO,MAAM,qBAAqB,yBA+DhC,CAAC;AAMH,eAAO,MAAM,sBAAsB,yBAiCjC,CAAC;AAMH,eAAO,MAAM,gBAAgB,yBAkB3B,CAAC;AAMH,eAAO,MAAM,qBAAqB,yBA4EhC,CAAC;AAMH,eAAO,MAAM,cAAc,yBA+BzB,CAAC;AAMH,eAAO,MAAM,sBAAsB,yBA+BjC,CAAC"}
