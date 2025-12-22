@@ -2,6 +2,35 @@
 
 All notable changes to NeuroGUARDIAN project.
 
+## [2.6.0] - 2024-12-22
+
+### 🏗️ API Refactoring
+
+- **Modular Architecture**: Extracted monolithic `api/index.ts` into structured modules
+- **Created `api/lib/`**: Shared utilities (~400 lines)
+  - `types.ts` — TypeScript interfaces
+  - `constants.ts` — Plans, rate limits, environment config
+  - `crypto.ts` — AES-256-GCM encryption/decryption
+  - `validation.ts` — Input sanitization
+  - `telegram.ts` — HMAC-SHA256 auth
+  - `rate-limit.ts` — KV-backed rate limiting
+- **Created `api/agent/`**: AI agent components (~400 lines)
+  - `system-prompt.ts` — Expert marketplace knowledge
+  - `tools.ts` — OpenAI Function Calling definitions
+- **Created `api/services/`**: Business logic (~650 lines)
+  - `database.ts` — PostgreSQL operations
+  - `yookassa.ts` — Payment processing
+  - `notifications.ts` — Telegram notifications
+
+### 📊 Metrics
+
+- Modules created: 14
+- Code extracted: ~1,450 lines
+- All 36 tests passing ✅
+- Build verified ✅
+
+---
+
 ## [2.5.0] - 2024-12-22
 
 ### 🧪 Testing Infrastructure
