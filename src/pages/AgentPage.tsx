@@ -5,29 +5,9 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAppStore } from '../stores';
+import { useAppStore, useChatStore, type ChatMessage } from '../stores';
 import { hapticFeedback } from '../lib/telegram';
 import { agentApi, type AgentMessage, type AgentResponse } from '../lib/agentApi';
-
-// Message types
-interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  timestamp: Date;
-  isLoading?: boolean;
-  actionRequired?: {
-    type: 'confirmation';
-    operation: string;
-    details: Record<string, unknown>;
-    confirmationMessage: string;
-  };
-  metadata?: {
-    tokensUsed?: number;
-    executionTime?: number;
-    toolsUsed?: string[];
-  };
-}
 
 // Quick action suggestions
 const QUICK_ACTIONS = [
@@ -39,9 +19,15 @@ const QUICK_ACTIONS = [
 
 export function AgentPage() {
   const user = useAppStore(state => state.user);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+
+  // Use chat store for persistent messages
+  const messages = useChatStore(state => state.messages);
+  const addMessage = useChatStore(state => state.addMessage);
+  const removeLoadingMessages = useChatStore(state => state.removeLoadingMessages);
+  const isProcessing = useChatStore(state => state.isProcessing);
+  const setProcessing = useChatStore(state => state.setProcessing);
+
   const [inputValue, setInputValue] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -67,7 +53,7 @@ export function AgentPage() {
       id: `user-${Date.now()}`,
       role: 'user',
       content: text.trim(),
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
     };
 
     // Add loading message
@@ -75,13 +61,14 @@ export function AgentPage() {
       id: `loading-${Date.now()}`,
       role: 'assistant',
       content: '',
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
       isLoading: true,
     };
 
-    setMessages(prev => [...prev, userMessage, loadingMessage]);
+    addMessage(userMessage);
+    addMessage(loadingMessage);
     setInputValue('');
-    setIsProcessing(true);
+    setProcessing(true);
 
     try {
       // Call AI API
@@ -95,38 +82,34 @@ export function AgentPage() {
 
       const response: AgentResponse = await agentApi.sendMessage(text.trim(), history);
 
-      // Replace loading message with response
-      setMessages(prev => {
-        const withoutLoading = prev.filter(m => !m.isLoading);
-        const assistantMessage: ChatMessage = {
-          id: `assistant-${Date.now()}`,
-          role: 'assistant',
-          content: response.content,
-          timestamp: new Date(),
-          actionRequired: response.actionRequired,
-          metadata: response.metadata,
-        };
-        return [...withoutLoading, assistantMessage];
-      });
+      // Remove loading message and add response
+      removeLoadingMessages();
+      const assistantMessage: ChatMessage = {
+        id: `assistant-${Date.now()}`,
+        role: 'assistant',
+        content: response.content,
+        timestamp: new Date().toISOString(),
+        actionRequired: response.actionRequired,
+        metadata: response.metadata,
+      };
+      addMessage(assistantMessage);
 
       hapticFeedback('success');
     } catch (error) {
       console.error('Agent error:', error);
 
-      setMessages(prev => {
-        const withoutLoading = prev.filter(m => !m.isLoading);
-        const errorMessage: ChatMessage = {
-          id: `error-${Date.now()}`,
-          role: 'assistant',
-          content: '❌ Произошла ошибка. Попробуйте ещё раз.',
-          timestamp: new Date(),
-        };
-        return [...withoutLoading, errorMessage];
-      });
+      removeLoadingMessages();
+      const errorMessage: ChatMessage = {
+        id: `error-${Date.now()}`,
+        role: 'assistant',
+        content: '❌ Произошла ошибка. Попробуйте ещё раз.',
+        timestamp: new Date().toISOString(),
+      };
+      addMessage(errorMessage);
 
       hapticFeedback('error');
     } finally {
-      setIsProcessing(false);
+      setProcessing(false);
       inputRef.current?.focus();
     }
   };
@@ -142,19 +125,20 @@ export function AgentPage() {
       id: `confirm-${Date.now()}`,
       role: 'user',
       content: confirmed ? '✅ Да, подтверждаю' : '❌ Нет, отменить',
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
     };
 
     const loadingMessage: ChatMessage = {
       id: `loading-${Date.now()}`,
       role: 'assistant',
       content: '',
-      timestamp: new Date(),
+      timestamp: new Date().toISOString(),
       isLoading: true,
     };
 
-    setMessages(prev => [...prev, userResponse, loadingMessage]);
-    setIsProcessing(true);
+    addMessage(userResponse);
+    addMessage(loadingMessage);
+    setProcessing(true);
 
     try {
       const response = await agentApi.confirmAction(
@@ -163,31 +147,24 @@ export function AgentPage() {
         message.actionRequired.details
       );
 
-      setMessages(prev => {
-        const withoutLoading = prev.filter(m => !m.isLoading);
-        const resultMessage: ChatMessage = {
-          id: `result-${Date.now()}`,
-          role: 'assistant',
-          content: response.content,
-          timestamp: new Date(),
-        };
-        return [...withoutLoading, resultMessage];
-      });
+      removeLoadingMessages();
+      const resultMessage: ChatMessage = {
+        id: `result-${Date.now()}`,
+        role: 'assistant',
+        content: response.content,
+        timestamp: new Date().toISOString(),
+      };
+      addMessage(resultMessage);
     } catch {
-      setMessages(prev => {
-        const withoutLoading = prev.filter(m => !m.isLoading);
-        return [
-          ...withoutLoading,
-          {
-            id: `error-${Date.now()}`,
-            role: 'assistant' as const,
-            content: '❌ Не удалось выполнить операцию',
-            timestamp: new Date(),
-          },
-        ];
+      removeLoadingMessages();
+      addMessage({
+        id: `error-${Date.now()}`,
+        role: 'assistant',
+        content: '❌ Не удалось выполнить операцию',
+        timestamp: new Date().toISOString(),
       });
     } finally {
-      setIsProcessing(false);
+      setProcessing(false);
     }
   };
 
@@ -511,7 +488,10 @@ function MessageBubble({ message, onConfirm }: MessageBubbleProps) {
         )}
       </div>
       <span className="text-[10px] text-stone-600 self-end mt-1">
-        {message.timestamp.toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' })}
+        {new Date(message.timestamp).toLocaleTimeString('ru', {
+          hour: '2-digit',
+          minute: '2-digit',
+        })}
       </span>
     </div>
   );

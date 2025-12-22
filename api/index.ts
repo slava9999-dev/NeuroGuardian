@@ -3184,12 +3184,67 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               const wbData = await wbResponse.json();
               console.log('📦 WB API response cards count:', wbData.cards?.length || 0);
 
-              products = (wbData.cards || []).map((card: any) => ({
+              // Map cards initially with 0 price (Content API doesn't return prices!)
+              const cards = wbData.cards || [];
+              const nmIds = cards.map((card: any) => card.nmID);
+
+              // Fetch REAL prices from WB Prices API
+              const priceMap: Map<number, number> = new Map();
+              if (nmIds.length > 0) {
+                try {
+                  console.log('💰 Fetching prices from WB Prices API...');
+                  const pricesResponse = await fetch(
+                    'https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter',
+                    {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: apiKey,
+                      },
+                      body: JSON.stringify({
+                        limit: 1000,
+                        offset: 0,
+                        filterNmID: nmIds,
+                      }),
+                    }
+                  );
+
+                  if (pricesResponse.ok) {
+                    const pricesData = await pricesResponse.json();
+                    console.log(
+                      '💰 WB Prices API goods count:',
+                      pricesData.data?.listGoods?.length || 0
+                    );
+
+                    for (const good of pricesData.data?.listGoods || []) {
+                      // salePrice is the actual selling price (after discount)
+                      // price is the original price before discount
+                      const actualPrice = good.sizes?.[0]?.salePrice || good.sizes?.[0]?.price || 0;
+                      if (good.nmID && actualPrice > 0) {
+                        priceMap.set(good.nmID, actualPrice);
+                      }
+                    }
+                    console.log(`✅ Got prices for ${priceMap.size} products`);
+                  } else {
+                    const errText = await pricesResponse.text();
+                    console.warn('⚠️ WB Prices API error:', pricesResponse.status, errText);
+                  }
+                } catch (priceErr) {
+                  console.warn('⚠️ Failed to fetch WB prices:', priceErr);
+                }
+              }
+
+              products = cards.map((card: any) => ({
                 product_id: `wb-${card.nmID}`,
                 nm_id: card.nmID,
                 title: card.title || card.subjectName || 'Без названия',
                 image_url: card.photos?.[0]?.big || card.photos?.[0]?.c246x328 || null,
-                current_price: card.sizes?.[0]?.price?.total || card.sizes?.[0]?.price || 0,
+                // Use price from Prices API, fallback to card.sizes price (usually 0)
+                current_price:
+                  priceMap.get(card.nmID) ||
+                  card.sizes?.[0]?.price?.total ||
+                  card.sizes?.[0]?.price ||
+                  0,
                 current_stock:
                   card.sizes?.reduce(
                     (sum: number, s: any) =>
@@ -4490,21 +4545,81 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               }
             }
 
-            // OZON: TODO - добавить реальное обновление цен через Ozon API
+            // OZON: Обновление цен через Ozon Prices API
             if (ozonUpdates.length > 0) {
-              // Пока только обновляем локальную БД
-              for (const u of ozonUpdates) {
-                await sql`
-                  UPDATE products 
-                  SET current_price = ${u.newPrice}, updated_at = NOW()
-                  WHERE user_id = ${userId} AND product_id = ${u.productId}
-                `;
+              const user = await getUserById(userId);
+              if (user?.api_key_ozon) {
+                const decryptedOzonKey = decryptApiKey(user.api_key_ozon);
+                const [clientId, apiKey] = (decryptedOzonKey || '').split(':');
+
+                if (clientId && apiKey) {
+                  try {
+                    // Ozon Prices API: POST /v1/product/import/prices
+                    // up to 1000 items per request
+                    const ozonPayload = {
+                      prices: ozonUpdates.map(u => {
+                        // Extract numeric product_id from "ozon-12345"
+                        const productId = parseInt(u.productId.replace('ozon-', ''));
+                        return {
+                          product_id: productId,
+                          price: String(u.newPrice), // Ozon expects string
+                          old_price: String(Math.round(u.newPrice * 1.1)), // 10% выше для зачёркнутой цены
+                          currency_code: 'RUB',
+                        };
+                      }),
+                    };
+
+                    console.log(`📤 Ozon Price Update Payload:`, JSON.stringify(ozonPayload));
+
+                    const ozonResponse = await fetchWithRetry(
+                      'https://api-seller.ozon.ru/v1/product/import/prices',
+                      {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'Client-Id': clientId,
+                          'Api-Key': apiKey,
+                        },
+                        body: JSON.stringify(ozonPayload),
+                      }
+                    );
+
+                    if (ozonResponse.ok) {
+                      const ozonData = await ozonResponse.json();
+                      console.log(`✅ Ozon price update response:`, ozonData);
+
+                      // Обновляем локальную БД
+                      for (const u of ozonUpdates) {
+                        await sql`
+                          UPDATE products 
+                          SET current_price = ${u.newPrice}, updated_at = NOW()
+                          WHERE user_id = ${userId} AND product_id = ${u.productId}
+                        `;
+                      }
+                      ozonResult = { success: true, count: ozonUpdates.length, error: '' };
+                    } else {
+                      const errText = await ozonResponse.text();
+                      console.error('❌ Ozon Prices API error:', ozonResponse.status, errText);
+                      ozonResult = { success: false, count: 0, error: errText };
+                    }
+                  } catch (e) {
+                    console.error('❌ Ozon Prices API exception:', e);
+                    ozonResult = {
+                      success: false,
+                      count: 0,
+                      error: e instanceof Error ? e.message : 'Ozon API Error',
+                    };
+                  }
+                } else {
+                  ozonResult = {
+                    success: false,
+                    count: 0,
+                    error: 'Неверный формат Ozon API ключа',
+                  };
+                }
+              } else {
+                ozonResult = { success: false, count: 0, error: 'Ozon API ключ не настроен' };
               }
-              ozonResult = {
-                success: true,
-                count: ozonUpdates.length,
-                error: 'Ozon API пока не реализован, обновлена только локальная БД',
-              };
             }
 
             // Формируем результат
