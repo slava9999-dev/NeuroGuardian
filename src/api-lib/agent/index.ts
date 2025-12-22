@@ -15,3 +15,15 @@ export {
 
 // Tools
 export { AGENT_TOOLS, CONFIRMATION_REQUIRED_TOOLS, requiresConfirmation } from './tools.js';
+
+// Metrics & Analytics
+export {
+  type AgentMetrics,
+  type AgentAnalytics,
+  logAgentMetrics,
+  getDailyAnalytics,
+  createAgentMetrics,
+  formatMetricsForLog,
+  classifyComplexity,
+  estimateTokenCost,
+} from './metrics.js';

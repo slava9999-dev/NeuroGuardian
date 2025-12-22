@@ -1,34 +1,60 @@
 # 🔧 РЕФАКТОРИНГ 22 ДЕКАБРЯ 2024
 
-**Дата:** 22 декабря 2024, 21:04  
-**Версия:** 2.6.0 → 2.8.0  
-**Статус:** ✅ Phase 3 Complete — V2 MEGA-BRAIN Agent Prompt
+**Дата:** 22 декабря 2024, 21:13  
+**Версия:** 2.6.0 → 2.9.0  
+**Статус:** ✅ Phase 4 Complete — Fine-tuning + Metrics
 
 ---
 
-## 🧠 V2 MEGA-BRAIN AGENT (НОВОЕ!)
+## 📈 PHASE 4: FINE-TUNING + METRICS (НОВОЕ!)
 
-### Что реализовано:
+### Few-Shot Examples (8 штук):
 
-- ✅ **Expert Persona "Виктор Маржин"** — 8 лет опыта WB/Ozon, характер, история
-- ✅ **Chain-of-Thought (CoT)** — пошаговый reasoning framework
-- ✅ **Few-Shot Examples** — 3 примера идеальных диалогов
-- ✅ **Updated Domain Knowledge** — актуальные комиссии WB/Ozon декабрь 2024
-- ✅ **СПП (Скидка Постоянного Покупателя)** — главная боль селлеров 2024
-- ✅ **Guardrails** — чёткие ограничения и safety rules
-- ✅ **Proactive Behavior** — агент сам предлагает решения
+1. ✅ Вопрос о марже
+2. ✅ Защита от акции
+3. ✅ Простой вопрос о комиссиях
+4. ✅ **NEW:** Прогноз остатков
+5. ✅ **NEW:** Массовая защита товаров
+6. ✅ **NEW:** Падение продаж (диагностика)
+7. ✅ **NEW:** Новичок (onboarding)
+8. ✅ **NEW:** Подтверждение действия
+
+### Agent Metrics System:
+
+- ✅ `metrics.ts` — полная система аналитики
+- ✅ Token cost estimation (GPT-4o, GPT-4o-mini)
+- ✅ Complexity classification (simple/medium/complex)
+- ✅ KV-backed logging with daily aggregation
+- ✅ Response time tracking
+- ✅ Tool usage analytics
+- ✅ Error rate monitoring
 
 ### Новые файлы:
 
 ```
 src/api-lib/agent/
-├── system-prompt-v2.ts    # 🆕 V2 MEGA-BRAIN (~350 строк, ~4000 tokens)
-└── index.ts               # Обновлён: экспорты V2
+├── system-prompt-v2.ts    # V2 MEGA-BRAIN (~490 строк, ~5500 tokens)
+├── metrics.ts             # 🆕 Agent analytics (~320 строк)
+└── index.ts               # Обновлён: экспорты V2 + metrics
 ```
+
+---
+
+## 🧠 V2 MEGA-BRAIN AGENT (Phase 3)
+
+### Что реализовано:
+
+- ✅ **Expert Persona "Виктор Маржин"** — 8 лет опыта WB/Ozon, характер, история
+- ✅ **Chain-of-Thought (CoT)** — пошаговый reasoning framework
+- ✅ **Few-Shot Examples** — 8 примеров идеальных диалогов
+- ✅ **Updated Domain Knowledge** — актуальные комиссии WB/Ozon декабрь 2024
+- ✅ **СПП (Скидка Постоянного Покупателя)** — главная боль селлеров 2024
+- ✅ **Guardrails** — чёткие ограничения и safety rules
+- ✅ **Proactive Behavior** — агент сам предлагает решения
 
 ### Интеграция:
 
-- `api/handlers/agent.ts` — теперь использует `getEnhancedSystemPrompt()`
+- `api/handlers/agent.ts` — использует `getEnhancedSystemPrompt()` + metrics logging
 - Удалено 116 строк дублированного inline промта
 - Динамический контекст пользователя
 

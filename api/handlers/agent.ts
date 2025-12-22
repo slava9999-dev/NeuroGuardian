@@ -24,6 +24,13 @@ import {
 // V2 MEGA-BRAIN System Prompt (Expert Persona + CoT + Few-Shot)
 import { getEnhancedSystemPrompt } from '../../src/api-lib/agent/system-prompt-v2.js';
 
+// Metrics & Analytics
+import {
+  createAgentMetrics,
+  logAgentMetrics,
+  formatMetricsForLog,
+} from '../../src/api-lib/agent/metrics.js';
+
 // Note: System prompt is now imported from system-prompt-v2.ts
 // Using Expert Persona (Виктор Маржин) + CoT + Few-Shot examples
 
@@ -543,6 +550,27 @@ export async function handleAgent(
 
   if (gptResult.actionRequired) {
     agentResponse.actionRequired = gptResult.actionRequired;
+  }
+
+  // === METRICS LOGGING ===
+  const metrics = createAgentMetrics({
+    userId,
+    userMessage: message,
+    model,
+    tokensUsed: gptResult.tokensUsed,
+    responseTime: Date.now() - startTime,
+    toolsUsed: gptResult.toolsUsed,
+    hadError: !gptResult.success,
+    errorType: gptResult.success ? undefined : 'openai_error',
+    actionRequired: gptResult.actionRequired ? { type: gptResult.actionRequired.type } : undefined,
+  });
+
+  // Log metrics asynchronously (don't block response)
+  logAgentMetrics(metrics).catch(e => console.warn('Metrics logging failed:', e));
+
+  // Debug log in development
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(formatMetricsForLog(metrics));
   }
 
   // Save history
