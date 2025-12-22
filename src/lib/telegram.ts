@@ -73,12 +73,14 @@ export function initTelegramWebApp(): void {
 
   // Set header color
   if ('setHeaderColor' in tg) {
-    (tg as any).setHeaderColor('#0c0c0e');
+    (tg as TelegramWebApp & { setHeaderColor: (color: string) => void }).setHeaderColor('#0c0c0e');
   }
 
   // Set background color
   if ('setBackgroundColor' in tg) {
-    (tg as any).setBackgroundColor('#0c0c0e');
+    (tg as TelegramWebApp & { setBackgroundColor: (color: string) => void }).setBackgroundColor(
+      '#0c0c0e'
+    );
   }
 
   console.log('✅ Telegram WebApp initialized', {

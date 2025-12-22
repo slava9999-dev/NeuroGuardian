@@ -45,7 +45,7 @@ const FALLBACK_PLANS: SubscriptionPlan[] = [
 // Load YooKassa Widget script
 function loadYooKassaWidget(): Promise<void> {
   return new Promise((resolve, reject) => {
-    if ((window as any).YooMoneyCheckoutWidget) {
+    if ((window as Window & { YooMoneyCheckoutWidget?: unknown }).YooMoneyCheckoutWidget) {
       resolve();
       return;
     }
@@ -104,7 +104,7 @@ export function PaymentModal({
       if (response.success && response.plans.length > 0) {
         setPlans(response.plans);
       }
-    } catch (err) {
+    } catch (_err) {
       console.warn('Failed to load plans, using fallback');
     } finally {
       setIsLoadingPlans(false);
@@ -123,12 +123,14 @@ export function PaymentModal({
       try {
         await loadYooKassaWidget();
 
-        const YooMoneyCheckoutWidget = (window as any).YooMoneyCheckoutWidget;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const YooMoneyCheckoutWidget = (window as unknown as { YooMoneyCheckoutWidget: any })
+          .YooMoneyCheckoutWidget;
 
         const checkout = new YooMoneyCheckoutWidget({
           confirmation_token: token,
           return_url: window.location.origin + '?payment_complete=true',
-          error_callback: (error: any) => {
+          error_callback: (error: unknown) => {
             console.error('YooKassa Widget error:', error);
             setError('Ошибка загрузки виджета. Используйте ссылку ниже.');
             setShowWidget(false); // Hide widget container to show fallback link
@@ -180,10 +182,10 @@ export function PaymentModal({
     setFallbackUrl(null);
 
     try {
-      const result = (await paymentApi.createPayment({
+      const result = await paymentApi.createPayment({
         planId: selectedPlanId,
         savePaymentMethod: true,
-      })) as any;
+      });
 
       if (!result.success) {
         throw new Error(result.error || 'Ошибка создания платежа');
@@ -222,9 +224,10 @@ export function PaymentModal({
       }
 
       throw new Error('Не получены данные для оплаты');
-    } catch (err: any) {
+    } catch (err) {
       console.error('Payment error:', err);
-      setError(err.message || 'Ошибка оплаты. Попробуйте позже.');
+      const errorMessage = err instanceof Error ? err.message : 'Ошибка оплаты. Попробуйте позже.';
+      setError(errorMessage);
       hapticFeedback('error');
       setIsProcessing(false);
     }

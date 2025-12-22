@@ -54,7 +54,7 @@ export const authApi = {
         success: true,
         user: userData,
       };
-    } catch (error) {
+    } catch (_error) {
       console.warn('Auth API failed, using demo mode');
       return {
         success: true,
@@ -186,6 +186,8 @@ export interface CreatePaymentResult {
   confirmationToken?: string;
   confirmationUrl?: string;
   transactionId?: string;
+  testMode?: boolean;
+  message?: string;
   plan?: {
     id: string;
     name: string;
