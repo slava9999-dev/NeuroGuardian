@@ -3,7 +3,7 @@
 // Tests for AI agent tool definitions and execution
 // ============================================
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
 // Agent tools definitions (extracted from api/index.ts)
 const AGENT_TOOLS = [
@@ -108,14 +108,20 @@ describe('Agent Tools', () => {
 });
 
 describe('Tool Argument Validation', () => {
-  const validateGetProductsArgs = (args: any) => {
+  interface ProductsArgs {
+    marketplace?: string;
+    limit?: number | string;
+    sort_by?: string;
+  }
+
+  const validateGetProductsArgs = (args: ProductsArgs) => {
     const { marketplace = 'all', limit = 20, sort_by = 'price' } = args;
     const validMarketplaces = ['WB', 'Ozon', 'all'];
     const validSortBy = ['price', 'stock', 'name'];
 
     return {
       marketplace: validMarketplaces.includes(marketplace) ? marketplace : 'all',
-      limit: Math.min(Math.max(1, parseInt(limit) || 20), 100),
+      limit: Math.min(Math.max(1, parseInt(String(limit)) || 20), 100),
       sort_by: validSortBy.includes(sort_by) ? sort_by : 'price',
     };
   };

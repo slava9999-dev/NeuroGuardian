@@ -3,7 +3,7 @@
 // Tests for Telegram WebApp authentication
 // ============================================
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import crypto from 'crypto';
 
 // Mock Telegram user
@@ -19,7 +19,11 @@ function validateTelegramInitData(
   initData: string,
   botToken: string,
   isProduction: boolean = false
-): { valid: boolean; user: any; error?: string } {
+): {
+  valid: boolean;
+  user: { id: number; first_name: string; last_name?: string; username?: string } | null;
+  error?: string;
+} {
   // Empty initData handling
   if (!initData || initData === '') {
     if (isProduction) {
@@ -78,13 +82,17 @@ function validateTelegramInitData(
     }
 
     return { valid: true, user: JSON.parse(userJson) };
-  } catch (error) {
+  } catch (_error) {
     return { valid: false, user: null, error: 'Parse error' };
   }
 }
 
 // Helper to create valid initData
-function createValidInitData(user: any, botToken: string, authDate?: number): string {
+function createValidInitData(
+  user: { id: number; first_name: string; username?: string },
+  botToken: string,
+  authDate?: number
+): string {
   const params = new URLSearchParams();
   params.set('user', JSON.stringify(user));
   params.set('auth_date', String(authDate || Math.floor(Date.now() / 1000)));
@@ -141,7 +149,7 @@ describe('Telegram Auth', () => {
 
       const result = validateTelegramInitData(initData, TEST_BOT_TOKEN, true);
       expect(result.valid).toBe(true);
-      expect(result.user.id).toBe(12345);
+      expect(result.user?.id).toBe(12345);
     });
 
     it('should reject invalid signature', () => {
@@ -173,7 +181,7 @@ describe('Telegram Auth', () => {
 
       const result = validateTelegramInitData(params.toString(), '', false);
       expect(result.valid).toBe(true);
-      expect(result.user.id).toBe(999);
+      expect(result.user?.id).toBe(999);
     });
 
     it('should reject in production if no bot token', () => {
