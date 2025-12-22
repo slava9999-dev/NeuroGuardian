@@ -358,3 +358,141 @@ export async function handleAdminSetDefenseMode(
     defense_mode: result.rows[0]?.defense_mode,
   });
 }
+
+/**
+ * Handle admin-test-telegram action
+ */
+export async function handleAdminTestTelegram(
+  req: VercelRequest,
+  res: VercelResponse
+): Promise<VercelResponse> {
+  if (!validateAdminAccess(req)) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  const userId = req.query.userId || req.body?.userId;
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+
+  if (!token) {
+    return res.status(500).json({ error: 'ENV: TELEGRAM_BOT_TOKEN missing on server' });
+  }
+  if (!userId) {
+    return res.status(400).json({ error: 'userId required' });
+  }
+
+  try {
+    const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: userId,
+        text: '🔔 <b>ТЕСТОВАЯ ПРОВЕРКА СВЯЗИ</b>\n\nЕсли вы это читаете, значит бот настроен верно!',
+        parse_mode: 'HTML',
+      }),
+    });
+    const tgData = await tgRes.json();
+    return res.json({
+      success: tgRes.ok,
+      telegram_response: tgData,
+      token_masked: token.substring(0, 5) + '...',
+    });
+  } catch (e: any) {
+    return res.status(500).json({ error: 'Fetch Error', details: e.message });
+  }
+}
+
+/**
+ * Handle admin-test-ozon action
+ */
+export async function handleAdminTestOzon(
+  req: VercelRequest,
+  res: VercelResponse
+): Promise<VercelResponse> {
+  if (!validateAdminAccess(req)) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  const { clientId, apiKey } = req.body || {};
+  if (!clientId || !apiKey) {
+    return res.status(400).json({ error: 'clientId and apiKey required' });
+  }
+
+  try {
+    const response = await fetch('https://api-seller.ozon.ru/v3/product/list', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Client-Id': clientId,
+        'Api-Key': apiKey,
+      },
+      body: JSON.stringify({ filter: {}, last_id: '', limit: 5 }),
+    });
+
+    const data = await response.json();
+
+    return res.json({
+      status: response.status,
+      ok: response.ok,
+      itemsCount: data.result?.items?.length || 0,
+      total: data.result?.total || 0,
+      error: data.message || data.error || null,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+/**
+ * Handle admin-test-wb action
+ */
+export async function handleAdminTestWb(
+  req: VercelRequest,
+  res: VercelResponse
+): Promise<VercelResponse> {
+  if (!validateAdminAccess(req)) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  const { apiKey } = req.body || {};
+  if (!apiKey) {
+    return res.status(400).json({ error: 'apiKey required' });
+  }
+
+  console.log('🔍 Testing WB API with key length:', apiKey.length);
+
+  try {
+    const response = await fetch('https://content-api.wildberries.ru/content/v2/get/cards/list', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: apiKey,
+      },
+      body: JSON.stringify({
+        settings: { cursor: { limit: 5 }, filter: { withPhoto: -1 } },
+      }),
+    });
+
+    const responseText = await response.text();
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      data = { rawText: responseText.substring(0, 500) };
+    }
+
+    return res.json({
+      status: response.status,
+      ok: response.ok,
+      cardsCount: data.cards?.length || 0,
+      cursor: data.cursor || null,
+      error: data.message || data.error || null,
+      raw: data,
+      hint:
+        response.status === 401
+          ? 'Ключ отклонён. Убедитесь что токен имеет права на Content API. Создайте новый токен в ЛК WB → Настройки → API.'
+          : null,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message, type: 'fetch_error' });
+  }
+}

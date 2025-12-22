@@ -24,6 +24,9 @@ import {
   handleAdminSetProtection,
   handleAdminResetStatuses,
   handleAdminSetDefenseMode,
+  handleAdminTestTelegram,
+  handleAdminTestOzon,
+  handleAdminTestWb,
   validateAdminAccess,
 } from './handlers/admin.js';
 
@@ -2962,40 +2965,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return handleAdminSetProtection(req, res);
       }
 
-      // ========== ADMIN: TEST TELEGRAM ==========
+      // ========== ADMIN: TEST TELEGRAM (migrated to handler) ==========
       case 'admin-test-telegram': {
-        const adminKey = req.headers['x-admin-key'] || req.query.key;
-        const validKeys = [ADMIN_API_KEY].filter(Boolean); // Uses the same auth
-        if (!validKeys.includes(adminKey as string)) {
-          return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const userId = req.query.userId || req.body?.userId;
-        const token = process.env.TELEGRAM_BOT_TOKEN;
-
-        if (!token)
-          return res.status(500).json({ error: 'ENV: TELEGRAM_BOT_TOKEN missing on server' });
-        if (!userId) return res.status(400).json({ error: 'Missing userId' });
-
-        try {
-          const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              chat_id: userId,
-              text: '🔔 <b>ТЕСТОВАЯ ПРОВЕРКА СВЯЗИ</b>\n\nЕсли вы это читаете, значит бот настроен верно!',
-              parse_mode: 'HTML',
-            }),
-          });
-          const tgData = await tgRes.json();
-          return res.json({
-            success: tgRes.ok,
-            telegram_response: tgData,
-            token_masked: token.substring(0, 5) + '...',
-          });
-        } catch (e: any) {
-          return res.status(500).json({ error: 'Fetch Error', details: e.message });
-        }
+        return handleAdminTestTelegram(req, res);
       }
 
       // ========== ADMIN: RESET STATUSES (migrated to handler) ==========
@@ -3008,97 +2980,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return handleAdminSetDefenseMode(req, res);
       }
 
-      // ========== ADMIN: TEST OZON API ==========
+      // ========== ADMIN: TEST OZON API (migrated to handler) ==========
       case 'admin-test-ozon': {
-        const adminKey = req.headers['x-admin-key'] || req.query.key;
-        const validKeys = [ADMIN_API_KEY].filter(Boolean);
-        if (!validKeys.includes(adminKey as string)) {
-          return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const { clientId, apiKey } = req.body;
-        if (!clientId || !apiKey) {
-          return res.status(400).json({ error: 'Missing clientId or apiKey' });
-        }
-
-        try {
-          const response = await fetch('https://api-seller.ozon.ru/v3/product/list', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Client-Id': clientId,
-              'Api-Key': apiKey,
-            },
-            body: JSON.stringify({ filter: {}, last_id: '', limit: 5 }),
-          });
-
-          const data = await response.json();
-
-          return res.json({
-            status: response.status,
-            ok: response.ok,
-            itemsCount: data.result?.items?.length || 0,
-            total: data.result?.total || 0,
-            error: data.message || data.error || null,
-          });
-        } catch (err: any) {
-          return res.status(500).json({ error: err.message });
-        }
+        return handleAdminTestOzon(req, res);
       }
 
-      // ========== ADMIN: TEST WB API ==========
+      // ========== ADMIN: TEST WB API (migrated to handler) ==========
       case 'admin-test-wb': {
-        const adminKey = req.headers['x-admin-key'] || req.query.key;
-        const validKeys = [ADMIN_API_KEY].filter(Boolean);
-        if (!validKeys.includes(adminKey as string)) {
-          return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const { apiKey } = req.body;
-        if (!apiKey) {
-          return res.status(400).json({ error: 'Missing apiKey' });
-        }
-
-        console.log('🔍 Testing WB API with key length:', apiKey.length);
-
-        try {
-          const response = await fetch(
-            'https://content-api.wildberries.ru/content/v2/get/cards/list',
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: apiKey,
-              },
-              body: JSON.stringify({
-                settings: { cursor: { limit: 5 }, filter: { withPhoto: -1 } },
-              }),
-            }
-          );
-
-          const responseText = await response.text();
-          let data;
-          try {
-            data = JSON.parse(responseText);
-          } catch {
-            data = { rawText: responseText.substring(0, 500) };
-          }
-
-          return res.json({
-            status: response.status,
-            ok: response.ok,
-            cardsCount: data.cards?.length || 0,
-            cursor: data.cursor || null,
-            error: data.message || data.error || null,
-            raw: data,
-            hint:
-              response.status === 401
-                ? 'Ключ отклонён. Убедитесь что токен имеет права на Content API. Создайте новый токен в ЛК WB → Настройки → API.'
-                : null,
-          });
-        } catch (err: any) {
-          return res.status(500).json({ error: err.message, type: 'fetch_error' });
-        }
+        return handleAdminTestWb(req, res);
       }
 
       case 'sync-products': {
