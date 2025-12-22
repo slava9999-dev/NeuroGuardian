@@ -27,6 +27,7 @@ import {
   handleAdminTestTelegram,
   handleAdminTestOzon,
   handleAdminTestWb,
+  handleAdminCloneUser,
   validateAdminAccess,
 } from './handlers/admin.js';
 
@@ -3885,82 +3886,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
-      // ========== ADMIN: CLONE USER DATA ==========
+      // ========== ADMIN: CLONE USER DATA (migrated to handler) ==========
       case 'admin-clone-user': {
-        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
-        const adminKey = req.headers['x-admin-key'] || req.body?.adminKey;
-        if (!ADMIN_API_KEY || adminKey !== ADMIN_API_KEY) {
-          return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const {
-          fromUserId,
-          toUserId,
-          cloneProducts = true,
-          cloneApiKeys = true,
-          activateTrial = true,
-          trialDays = 3,
-        } = req.body;
-        if (!fromUserId || !toUserId) {
-          return res.status(400).json({ error: 'Missing fromUserId or toUserId' });
-        }
-
-        const results: string[] = [];
-
-        // Clone API keys
-        if (cloneApiKeys) {
-          await sql`
-            UPDATE users SET
-              api_key_wb = (SELECT api_key_wb FROM users WHERE id = ${fromUserId}),
-              api_key_ozon = (SELECT api_key_ozon FROM users WHERE id = ${fromUserId}),
-              updated_at = CURRENT_TIMESTAMP
-            WHERE id = ${toUserId}
-          `;
-          results.push('API keys cloned');
-        }
-
-        // Activate trial
-        if (activateTrial) {
-          const endDate = new Date();
-          endDate.setDate(endDate.getDate() + trialDays);
-          await sql`
-            UPDATE users SET
-              subscription_plan = 'trial',
-              subscription_end = ${endDate.toISOString()},
-              subscription_active = true,
-              updated_at = CURRENT_TIMESTAMP
-            WHERE id = ${toUserId}
-          `;
-          results.push(`Trial activated for ${trialDays} days`);
-        }
-
-        // Clone products
-        if (cloneProducts) {
-          // Delete existing products for target user
-          await sql`DELETE FROM products WHERE user_id = ${toUserId}`;
-
-          // Copy products from source user
-          await sql`
-            INSERT INTO products (user_id, product_id, nm_id, title, image_url, current_price, min_price, current_stock, marketplace, status, is_monitored)
-            SELECT ${toUserId}, product_id, nm_id, title, image_url, current_price, min_price, current_stock, marketplace, status, is_monitored
-            FROM products WHERE user_id = ${fromUserId}
-          `;
-
-          // Update product count
-          await sql`
-            UPDATE users SET 
-              total_products = (SELECT COUNT(*) FROM products WHERE user_id = ${toUserId})
-            WHERE id = ${toUserId}
-          `;
-          results.push('Products cloned');
-        }
-
-        return res.json({
-          success: true,
-          message: `Cloned data from ${fromUserId} to ${toUserId}`,
-          actions: results,
-        });
+        return handleAdminCloneUser(req, res);
       }
 
       // ========== SEND REMINDERS (CRON) ==========

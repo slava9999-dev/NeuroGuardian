@@ -496,3 +496,88 @@ export async function handleAdminTestWb(
     return res.status(500).json({ error: err.message, type: 'fetch_error' });
   }
 }
+
+/**
+ * Handle admin-clone-user action — clone data from one user to another
+ */
+export async function handleAdminCloneUser(
+  req: VercelRequest,
+  res: VercelResponse
+): Promise<VercelResponse> {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  if (!validateAdminAccess(req)) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  const {
+    fromUserId,
+    toUserId,
+    cloneProducts = true,
+    cloneApiKeys = true,
+    activateTrial = true,
+    trialDays = 3,
+  } = req.body || {};
+
+  if (!fromUserId || !toUserId) {
+    return res.status(400).json({ error: 'fromUserId and toUserId required' });
+  }
+
+  const results: string[] = [];
+
+  // Clone API keys
+  if (cloneApiKeys) {
+    await sql`
+      UPDATE users SET
+        api_key_wb = (SELECT api_key_wb FROM users WHERE id = ${Number(fromUserId)}),
+        api_key_ozon = (SELECT api_key_ozon FROM users WHERE id = ${Number(fromUserId)}),
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ${Number(toUserId)}
+    `;
+    results.push('API keys cloned');
+  }
+
+  // Activate trial
+  if (activateTrial) {
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + trialDays);
+    await sql`
+      UPDATE users SET
+        subscription_plan = 'trial',
+        subscription_end = ${endDate.toISOString()},
+        subscription_active = true,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ${Number(toUserId)}
+    `;
+    results.push(`Trial activated for ${trialDays} days`);
+  }
+
+  // Clone products
+  if (cloneProducts) {
+    // Delete existing products for target user
+    await sql`DELETE FROM products WHERE user_id = ${Number(toUserId)}`;
+
+    // Copy products from source user
+    await sql`
+      INSERT INTO products (user_id, product_id, nm_id, title, image_url, current_price, min_price, current_stock, marketplace, status, is_monitored)
+      SELECT ${Number(toUserId)}, product_id, nm_id, title, image_url, current_price, min_price, current_stock, marketplace, status, is_monitored
+      FROM products WHERE user_id = ${Number(fromUserId)}
+    `;
+
+    // Update product count
+    await sql`
+      UPDATE users SET 
+        total_products = (SELECT COUNT(*) FROM products WHERE user_id = ${Number(toUserId)})
+      WHERE id = ${Number(toUserId)}
+    `;
+    results.push('Products cloned');
+  }
+
+  return res.json({
+    success: true,
+    message: `Cloned data from ${fromUserId} to ${toUserId}`,
+    actions: results,
+  });
+}
