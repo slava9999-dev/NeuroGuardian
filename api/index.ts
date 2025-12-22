@@ -7,9 +7,28 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql } from '@vercel/postgres';
 import { v4 as uuidv4 } from 'uuid';
 
-// NOTE: Modular structure prepared in api/lib/, api/agent/, api/services/
-// TODO: Migrate to imports once all local definitions are removed
-// Currently using local definitions for production stability
+// ============================================
+// PHASE 2: MODULAR HANDLERS (gradual migration)
+// ============================================
+
+// Import modular handlers for gradual migration
+import {
+  handleHealth,
+  handleInitDb,
+  handleResetDb,
+  handleAdminActivateTrial,
+  handleAdminCheckUser,
+  handleAdminListUsers,
+  handleAdminListProducts,
+  handleSentinelLogs,
+  handleAdminSentinelLogs,
+  validateAdminAccess,
+} from './handlers/admin.js';
+
+// NOTE: More handlers will be imported as migration progresses
+// import { handleAuth, handleSettings, handlePlans } from './handlers/auth.js';
+// import { handleProducts, handleSyncProducts, handleBatchSetStopLoss } from './handlers/products.js';
+// import { handleCreatePayment, handlePaymentWebhook } from './handlers/payments.js';
 
 // ============================================
 // CONFIGURATION
@@ -2901,17 +2920,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.json({ success: true });
       }
 
-      // ========== INIT DB ==========
+      // ========== INIT DB (migrated to handler) ==========
       case 'init-db': {
-        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
-        const adminKey = req.headers['x-admin-key'] || req.body?.adminKey;
-        if (!ADMIN_API_KEY || adminKey !== ADMIN_API_KEY) {
-          return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        await initializeDatabase();
-        return res.json({ success: true, message: 'Database initialized' });
+        return handleInitDb(req, res);
       }
 
       // ========== RESET DB (Clean all data) ==========
@@ -2946,23 +2957,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
-      // ========== HEALTH ==========
+      // ========== HEALTH (migrated to handler) ==========
       case 'health': {
-        let dbOk = false;
-        try {
-          await sql`SELECT 1`;
-          dbOk = true;
-        } catch (_dbError) {
-          // Database check failed, dbOk remains false
-        }
-
-        return res.json({
-          status: dbOk ? 'healthy' : 'unhealthy',
-          version: '2.0.0',
-          database: dbOk,
-          hasPostgresUrl: !!process.env.POSTGRES_URL,
-          hasYookassaShopId: !!SHOP_ID,
-        });
+        return handleHealth(req, res);
       }
 
       // ========== ADMIN: ACTIVATE TRIAL ==========
