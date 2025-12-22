@@ -1,6 +1,6 @@
 # 🤖 NeuroAgent | WB & Ozon
 
-[![Version](https://img.shields.io/badge/version-2.4.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.6.0-blue.svg)](CHANGELOG.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue.svg)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19-61dafb.svg)](https://react.dev/)
 [![Vercel](https://img.shields.io/badge/Deployed-Vercel-black.svg)](https://vercel.com/)
