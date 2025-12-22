@@ -7,54 +7,27 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql } from '@vercel/postgres';
 import { v4 as uuidv4 } from 'uuid';
 
-// Import from modular structure
-import {
-  // Types
-  type TelegramUser,
-  type OpenAIMessage,
-  type ToolCall,
-  type AgentToolResult,
-  type PlanId,
-  // Constants
-  SUBSCRIPTION_PLANS,
-  OPENAI_API_KEY,
-  ALLOWED_ORIGINS,
-  IS_PRODUCTION,
-  TEST_MODE,
-  // Utilities
-  encryptApiKey,
-  decryptApiKey,
-  sanitizeInput,
-  validateTelegramInitData,
-  checkRateLimit,
-} from './lib';
-
-import { AGENT_SYSTEM_PROMPT, AGENT_TOOLS, requiresConfirmation } from './agent';
-
-import {
-  initializeDatabase,
-  createOrUpdateUser,
-  getUserById,
-  getProductsByUserId,
-  updateProductMinPrice,
-  activateSubscription,
-  createTransaction,
-  updateTransactionStatus,
-  isFirstPayment,
-  logSentinelAction,
-  createYookassaPayment,
-  sendTelegramNotification,
-  sendExpiryReminders,
-} from './services';
+// NOTE: Modular structure prepared in api/lib/, api/agent/, api/services/
+// TODO: Migrate to imports once all local definitions are removed
+// Currently using local definitions for production stability
 
 // ============================================
-// REMAINING CONFIGURATION (not yet modularized)
+// CONFIGURATION
 // ============================================
 
 const SHOP_ID = process.env.YOOKASSA_SHOP_ID || '';
 const SECRET_KEY = process.env.YOOKASSA_SECRET_KEY || '';
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 const YOOKASSA_API_URL = 'https://api.yookassa.ru/v3';
+
+// API Key Encryption (AES-256-GCM)
+const API_KEY_ENCRYPTION_KEY = process.env.API_KEY_ENCRYPTION_KEY || '';
+const ENCRYPTION_ALGORITHM = 'aes-256-gcm';
+
+// ============================================
+// OPENAI CONFIGURATION
+// ============================================
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
 // AI Agent System Prompt - defines the agent's behavior

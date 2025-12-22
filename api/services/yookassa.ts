@@ -4,7 +4,7 @@
 // ============================================
 
 import { v4 as uuidv4 } from 'uuid';
-import { SUBSCRIPTION_PLANS, type PlanId } from '../lib/constants';
+import { SUBSCRIPTION_PLANS, type PlanId } from '../lib';
 import { createTransaction } from './database';
 
 const YOOKASSA_API_URL = 'https://api.yookassa.ru/v3';
