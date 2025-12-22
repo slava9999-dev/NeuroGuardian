@@ -34,6 +34,7 @@ export async function handleCheckPrices(
     (querySecret && cronSecret && querySecret === cronSecret);
   const isAdmin = adminKey === process.env.ADMIN_API_KEY;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let targetUsers: any[] = [];
 
   // Scenario A: Auto/Admin Run (All Users)
@@ -68,18 +69,21 @@ export async function handleCheckPrices(
 
   // DEBUG MODE VARIABLES
   const isDebug = req.query.debug === 'true';
-  const debugInfo: any[] = [];
+
+  const debugInfo: unknown[] = [];
 
   // Capture Logs
   const log: string[] = [];
   const originalLog = console.log;
   const originalError = console.error;
-  const safeLog = (...args: any[]) => {
-    log.push(args.join(' '));
+
+  const safeLog = (...args: unknown[]) => {
+    log.push(args.map(String).join(' '));
     originalLog(...args);
   };
-  const safeError = (...args: any[]) => {
-    log.push('[ERROR] ' + args.join(' '));
+
+  const safeError = (...args: unknown[]) => {
+    log.push('[ERROR] ' + args.map(String).join(' '));
     originalError(...args);
   };
 
@@ -519,8 +523,17 @@ export async function handleCheckPrices(
   }
 }
 
+// Alert data interface
+interface SentinelAlertData {
+  title: string;
+  currentPrice: number;
+  minPrice: number;
+  defenseAction: string;
+  savedAmount: number;
+}
+
 // Helper for sending alerts
-async function sendSentinelAlert(userId: number, data: any) {
+async function sendSentinelAlert(userId: number, data: SentinelAlertData) {
   if (process.env.TELEGRAM_BOT_TOKEN) {
     const msg =
       `🛡️ <b>NeuroGUARDIAN SENTRY</b>\n\n` +

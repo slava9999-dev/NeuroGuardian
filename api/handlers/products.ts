@@ -114,6 +114,7 @@ export async function handleSyncProducts(
   const productLimit = getProductLimit(user.subscription_plan);
 
   try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let products: any[] = [];
 
     if (mp === 'Ozon') {
@@ -142,6 +143,7 @@ export async function handleSyncProducts(
       const items = listData.result?.items || [];
 
       if (items.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const productIds = items.map((item: any) => item.product_id);
         const detailResponse = await fetch('https://api-seller.ozon.ru/v3/product/info/list', {
           method: 'POST',
@@ -157,8 +159,10 @@ export async function handleSyncProducts(
           const detailData = await detailResponse.json();
           const detailItems = detailData.result?.items || detailData.items || [];
 
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           products = detailItems.map((item: any) => {
             const totalStock =
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               item.stocks?.stocks?.reduce((acc: number, s: any) => acc + (s.present || 0), 0) || 0;
             let price = 0;
             if (typeof item.price === 'object' && item.price !== null) {
@@ -203,6 +207,7 @@ export async function handleSyncProducts(
 
       const wbData = await wbResponse.json();
       const cards = wbData.cards || [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const nmIds = cards.map((card: any) => card.nmID);
 
       // Fetch REAL prices from WB Prices API
@@ -231,6 +236,7 @@ export async function handleSyncProducts(
         }
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       products = cards.map((card: any) => ({
         product_id: `wb-${card.nmID}`,
         nm_id: card.nmID,
@@ -239,7 +245,9 @@ export async function handleSyncProducts(
         current_price: priceMap.get(card.nmID) || 0,
         current_stock:
           card.sizes?.reduce(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (sum: number, s: any) =>
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               sum + (s.stocks?.reduce((ss: number, st: any) => ss + st.qty, 0) || 0),
             0
           ) || 0,

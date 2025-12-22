@@ -338,12 +338,14 @@ const AGENT_TOOLS = [
 type OpenAIMessage = {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content?: string | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tool_calls?: any[];
   name?: string;
   tool_call_id?: string;
 };
 
 // --- Check Subscription Helper (local) ---
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function isSubscriptionActiveLocal(user: any): boolean {
   if (process.env.TEST_MODE === 'true') return true;
   if (user.role === 'admin') return true;
@@ -358,6 +360,7 @@ function isSubscriptionActiveLocal(user: any): boolean {
 async function callOpenAIWithTools(
   messages: OpenAIMessage[],
   userId: number,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   userContext: any,
   model: string,
   maxTokens: number
@@ -366,6 +369,7 @@ async function callOpenAIWithTools(
   content: string;
   toolsUsed: string[];
   tokensUsed: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   actionRequired?: any;
 }> {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -400,6 +404,7 @@ async function callOpenAIWithTools(
     if (message.tool_calls) {
       // Handle tool calls
       const toolCalls = message.tool_calls;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const toolNames = toolCalls.map((tc: any) => tc.function.name);
 
       // Accumulate tool outputs
@@ -416,6 +421,7 @@ async function callOpenAIWithTools(
         if (fnName === 'get_products') {
           const products = await getProductsByUserId(userId);
           result = JSON.stringify(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             products.slice(0, fnArgs.limit || 10).map((p: any) => ({
               title: p.title,
               price: p.current_price,
@@ -582,6 +588,7 @@ export async function handleAgent(
 
   // Context
   const products = await getProductsByUserId(userId);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const protectedCount = products.filter((p: any) => p.min_price > 0).length;
   const unprotectedCount = products.length - protectedCount;
 
@@ -643,6 +650,7 @@ export async function handleAgent(
     isComplex ? 2000 : 1200
   );
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const agentResponse: { content: string; actionRequired?: any; metadata?: any } = {
     content: gptResult.content || '',
     metadata: {
@@ -703,7 +711,8 @@ export async function handleAgentConfirm(
     const percentage = details.percentage || 15;
     const products = await getProductsByUserId(userId);
     const filteredProducts = details.only_unprotected
-      ? products.filter((p: any) => !p.min_price || p.min_price === 0)
+      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        products.filter((p: any) => !p.min_price || p.min_price === 0)
       : products;
 
     let updated = 0;

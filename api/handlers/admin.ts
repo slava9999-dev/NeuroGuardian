@@ -248,6 +248,7 @@ export async function handleSentinelLogs(
         totalSaved: parseInt(summary.total_saved) || 0,
         uniqueProducts: parseInt(summary.unique_products) || 0,
       },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       logs: logsResult.rows.map((log: any) => ({
         id: log.id,
         productId: log.product_id,
@@ -260,7 +261,7 @@ export async function handleSentinelLogs(
         createdAt: log.created_at,
       })),
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Sentinel logs error:', error);
     return res.status(500).json({ error: 'Failed to fetch sentinel logs' });
   }
@@ -437,8 +438,9 @@ export async function handleAdminTestTelegram(
       telegram_response: tgData,
       token_masked: token.substring(0, 5) + '...',
     });
-  } catch (e: any) {
-    return res.status(500).json({ error: 'Fetch Error', details: e.message });
+  } catch (e) {
+    const errorMessage = e instanceof Error ? e.message : 'Unknown error';
+    return res.status(500).json({ error: 'Fetch Error', details: errorMessage });
   }
 }
 
@@ -478,8 +480,9 @@ export async function handleAdminTestOzon(
       total: data.result?.total || 0,
       error: data.message || data.error || null,
     });
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message });
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    return res.status(500).json({ error: errorMessage });
   }
 }
 
@@ -533,8 +536,9 @@ export async function handleAdminTestWb(
           ? 'Ключ отклонён. Убедитесь что токен имеет права на Content API. Создайте новый токен в ЛК WB → Настройки → API.'
           : null,
     });
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message, type: 'fetch_error' });
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    return res.status(500).json({ error: errorMessage, type: 'fetch_error' });
   }
 }
 
