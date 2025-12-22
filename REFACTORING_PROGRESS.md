@@ -1,132 +1,114 @@
 # 🔧 РЕФАКТОРИНГ 22 ДЕКАБРЯ 2024
 
-**Дата:** 22 декабря 2024, 14:47  
-**Версия:** 2.6.0 → 2.7.0 (в процессе)  
-**Статус:** 🔄 Phase 2 In Progress
+**Дата:** 22 декабря 2024, 20:11  
+**Версия:** 2.6.0 → 2.7.0  
+**Статус:** ✅ Phase 2 Complete — Critical Audit Passed
 
 ---
 
-## 📋 ЧТО СДЕЛАНО
+## 📋 КРИТИЧЕСКИЙ АУДИТ — ВЫПОЛНЕНО
 
-### 1. Создана модульная структура handlers
+### 🔒 Безопасность
 
-```
-api/handlers/
-├── index.ts      # Re-exports всех handlers
-├── auth.ts       # handleAuth, handleSettings, handlePlans (~160 строк)
-├── payments.ts   # handleCreatePayment, handlePaymentWebhook (~120 строк)
-├── products.ts   # handleProducts, handleSyncProducts, handleBatchSetStopLoss (~315 строк)
-└── admin.ts      # Admin операции, health, sentinel-logs (~230 строк)
-```
+- ✅ **SQL Injection Fix** — `database.ts`:
+  - `getUsersWithExpiringSubscriptions()` — даты вычисляются в JS
+  - `applyReferralBonus()` — даты вычисляются в JS (не через INTERVAL интерполяцию)
 
-**Итого:** ~825 строк вынесено в модули
+### 🧹 Очистка мёртвого кода
 
-### 2. Создан прототип нового index.ts
+- ✅ **Удалён `api/index.new.ts`** — прототип не использовался, 28 warnings удалено
+- ✅ **Очищены неиспользуемые импорты:**
+  - `api/index.ts`: `sql`, `uuidv4`, `validateAdminAccess`
+  - `api/handlers/auth.ts`: `validateTelegramInitData`, `sanitizeInput`, `TEST_MODE`, `TelegramUser`, `PlanId`, `createOrUpdateUser`
+  - `api/handlers/payments.ts`: `isValidYookassaIP`
+  - `api/handlers/sentinel.ts`: `sanitizeInput`
+  - `api/handlers/products.ts`: `isValidPrice`
+  - `api/handlers/agent.ts`: removed unused `ozonData` assignment
 
-**Файл:** `api/index.new.ts`
+### 📊 Результаты
 
-- Импортирует из `src/api-lib` (модули уже были готовы)
-- Чистая структура ~260 строк
-- Реализованы базовые actions: `auth`, `health`, `init-db`, `plans`, `agent-status`
-
-### 3. Исправлены ошибки
-
-- ✅ Версия в README: 2.4.0 → 2.6.0
-- ✅ TypeScript ошибки в products.ts (ANY[] и unknown types)
-- ✅ SQL query для массива productIds (Vercel Postgres limitation)
-
-### 4. Верификация
-
-```bash
-npm run build   ✅ Success (2.55s)
-npm run test    ✅ 36/36 tests passed (438ms)
-tsc --noEmit    ✅ handlers компилируются
-```
+| Метрика             | До        | После      | Изменение   |
+| ------------------- | --------- | ---------- | ----------- |
+| **ESLint Warnings** | 105       | 64         | **-39%** ✅ |
+| **api/index.ts**    | 375 строк | 372 строки | Чистый код  |
+| **Build**           | ✅        | ✅         | 2.21s       |
+| **Tests**           | 36/36     | 36/36      | ✅          |
 
 ---
 
-## 📁 СТРУКТУРА МОДУЛЕЙ (ГОТОВА)
+## 📁 СТРУКТУРА МОДУЛЕЙ (ЗАВЕРШЕНО)
 
 ```
+api/
+├── index.ts          # 372 строки — чистый роутер
+└── handlers/
+    ├── index.ts      # Re-exports
+    ├── admin.ts      # ~21KB — админ функции
+    ├── agent.ts      # ~34KB — AI агент с OpenAI
+    ├── auth.ts       # ~7KB — аутентификация
+    ├── payments.ts   # ~7KB — YooKassa
+    ├── products.ts   # ~13KB — товары
+    └── sentinel.ts   # ~22KB — защита маржи
+
 src/api-lib/
 ├── lib/
 │   ├── index.ts        # Re-exports
-│   ├── types.ts        # TelegramUser, OpenAIMessage, etc.
-│   ├── constants.ts    # SUBSCRIPTION_PLANS, RATE_LIMIT, etc.
-│   ├── crypto.ts       # encryptApiKey, decryptApiKey
-│   ├── validation.ts   # sanitizeInput, isValidPrice, etc.
-│   ├── telegram.ts     # validateTelegramInitData
-│   └── rate-limit.ts   # checkRateLimit
+│   ├── types.ts        # TypeScript интерфейсы
+│   ├── constants.ts    # Планы, лимиты, конфиг
+│   ├── crypto.ts       # AES-256-GCM шифрование
+│   ├── validation.ts   # Валидация и санитизация
+│   ├── telegram.ts     # HMAC-SHA256 auth
+│   ├── rate-limit.ts   # KV-backed rate limiting
+│   └── subscription.ts # Проверка подписки
 ├── services/
 │   ├── index.ts        # Re-exports
-│   ├── database.ts     # initializeDatabase, getUserById, etc.
-│   ├── yookassa.ts     # createYookassaPayment, isValidYookassaIP
-│   └── notifications.ts # sendTelegramNotification
+│   ├── database.ts     # PostgreSQL операции (исправлен SQL injection)
+│   ├── yookassa.ts     # Платёжная система
+│   └── notifications.ts # Telegram уведомления
 └── agent/
     ├── index.ts        # Re-exports
-    ├── system-prompt.ts # AGENT_SYSTEM_PROMPT
-    └── tools.ts        # AGENT_TOOLS, requiresConfirmation
+    ├── system-prompt.ts # Системный промпт агента
+    └── tools.ts        # OpenAI Function Calling tools
 ```
 
 ---
 
-## 🎯 СЛЕДУЮЩИЕ ШАГИ (Phase 2)
+## 🎯 СЛЕДУЮЩИЕ ШАГИ (P2 — рекомендации)
 
-### Опция A: Инкрементальная миграция
+### Качество кода
 
-1. В `api/index.ts` заменить локальные определения импортами из handlers
-2. Постепенно удалять дублирующийся код
-3. Тестировать каждый action отдельно
+1. ❌ **Типизация** — убрать ~45 `any` типов (создать интерфейсы)
+2. ❌ **Тесты** — добавить интеграционные тесты для payments, sentinel
 
-### Опция B: Полная замена
+### Производительность
 
-1. Дописать все actions в `api/index.new.ts`
-2. Переименовать: `index.ts` → `index.legacy.ts`
-3. Переименовать: `index.new.ts` → `index.ts`
-4. Deploy и тестирование
+3. ❌ **Code splitting** — lazy load страницы для уменьшения bundle
+4. ❌ **Bundle size** — 451KB → цель <300KB
 
-### Рекомендация
+### Документация
 
-**Опция A** безопаснее для production. Можно делать по 2-3 actions за сессию.
+5. ✅ **REFACTORING_PROGRESS.md** — обновлено
+6. ❌ **CHANGELOG.md** — обновить до 2.7.0
 
 ---
 
-## 🚀 PHASE 2 ПРОГРЕСС
+## 📊 ОСТАВШИЕСЯ WARNINGS (64)
 
-### Миграция actions в api/index.ts
+| Категория         | Количество | Файлы                   |
+| ----------------- | ---------- | ----------------------- |
+| `no-explicit-any` | ~50        | handlers, types, stores |
+| `no-unused-vars`  | ~14        | tests, App.tsx, api.ts  |
 
-| Action          | Статус      | Строк удалено |
-| --------------- | ----------- | ------------- |
-| `health`        | ✅ Migrated | ~15           |
-| `init-db`       | ✅ Migrated | ~10           |
-| `reset-db`      | ⏳ Pending  | -             |
-| `admin-*`       | ⏳ Pending  | -             |
-| `sentinel-logs` | ⏳ Pending  | -             |
-
-**Уменьшение api/index.ts:** 5050 → 5047 строк (-3 строки, -25 lines inline code)
+**Приоритет:** Оставшиеся warnings — это `any` типы в API responses и тестах. Не критично для production.
 
 ---
 
-## 📊 МЕТРИКИ ДО/ПОСЛЕ
+## ✅ COMMIT LOG
 
-| Метрика            | До         | После Phase 1 | Цель        |
-| ------------------ | ---------- | ------------- | ----------- |
-| api/index.ts       | 5050 строк | 5050 строк    | ~800 строк  |
-| Модульные handlers | 0          | 825 строк     | 4000+ строк |
-| Lint warnings      | 107        | 107           | 0           |
-| Test coverage      | ~15%       | ~15%          | 40%+        |
+```
+56fe94e fix: critical audit fixes - SQL injection, dead code cleanup
+```
 
 ---
 
-## 🔍 ФАЙЛЫ ДЛЯ УДАЛЕНИЯ (Legacy)
-
-После завершения миграции можно удалить:
-
-- `functions/` — Firebase legacy
-- `.firebase/` — Firebase config
-- `firebase.json`, `firestore.*` — не используются
-- Дублирующие MD файлы (8 версий аудитов)
-
----
-
-_Документ создан: 22 декабря 2024, 14:27_
+_Обновлено: 22 декабря 2024, 20:11_
