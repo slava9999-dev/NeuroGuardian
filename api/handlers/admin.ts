@@ -203,26 +203,67 @@ export async function handleAdminListProducts(
 }
 
 /**
- * Handle sentinel-logs action
+ * Handle sentinel-logs action (User-facing with summary)
  */
 export async function handleSentinelLogs(
   req: VercelRequest,
   res: VercelResponse,
   userId: number
 ): Promise<VercelResponse> {
-  const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+  const days = parseInt((req.query.days as string) || '7', 10);
+  const limit = Math.min(parseInt((req.query.limit as string) || '50', 10), 100);
 
-  const result = await sql`
-    SELECT * FROM sentinel_logs 
-    WHERE user_id = ${userId}
-    ORDER BY created_at DESC
-    LIMIT ${limit}
-  `;
+  try {
+    // Fetch logs
+    const logsResult = await sql`
+      SELECT * FROM sentinel_logs 
+      WHERE user_id = ${userId}
+      AND created_at > NOW() - INTERVAL '1 day' * ${days}
+      ORDER BY created_at DESC 
+      LIMIT ${limit}
+    `;
 
-  return res.json({
-    logs: result.rows,
-    total: result.rows.length,
-  });
+    // Calculate summary stats
+    const summaryResult = await sql`
+      SELECT 
+        COUNT(*) as total_triggers,
+        COALESCE(SUM(saved_amount), 0) as total_saved,
+        COUNT(DISTINCT product_id) as unique_products
+      FROM sentinel_logs 
+      WHERE user_id = ${userId}
+      AND created_at > NOW() - INTERVAL '1 day' * ${days}
+    `;
+
+    const summary = summaryResult.rows[0] || {
+      total_triggers: 0,
+      total_saved: 0,
+      unique_products: 0,
+    };
+
+    return res.json({
+      success: true,
+      period: `${days} days`,
+      summary: {
+        totalTriggers: parseInt(summary.total_triggers) || 0,
+        totalSaved: parseInt(summary.total_saved) || 0,
+        uniqueProducts: parseInt(summary.unique_products) || 0,
+      },
+      logs: logsResult.rows.map((log: any) => ({
+        id: log.id,
+        productId: log.product_id,
+        productTitle: log.product_title,
+        detectedPrice: log.detected_price,
+        minPrice: log.min_price,
+        defenseAction: log.defense_action,
+        savedAmount: log.saved_amount,
+        marketplace: log.marketplace,
+        createdAt: log.created_at,
+      })),
+    });
+  } catch (error: any) {
+    console.error('Sentinel logs error:', error);
+    return res.status(500).json({ error: 'Failed to fetch sentinel logs' });
+  }
 }
 
 /**

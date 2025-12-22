@@ -65,17 +65,34 @@ export async function handleProducts(
   // POST: Update product min price
   const { productId, minPrice } = req.body || {};
 
-  if (!productId) {
-    return res.status(400).json({ error: 'Product ID required' });
+  if (!productId || typeof minPrice !== 'number') {
+    return res.status(400).json({
+      error: 'Invalid parameters',
+      received: { productId, minPrice },
+    });
   }
 
-  if (minPrice !== undefined && !isValidPrice(minPrice)) {
-    return res.status(400).json({ error: 'Invalid price' });
+  try {
+    // SECURITY: Verify product ownership before update (IDOR protection)
+    const ownershipCheck = await sql`
+      SELECT id FROM products WHERE user_id = ${userId} AND product_id = ${productId}
+    `;
+
+    if (ownershipCheck.rows.length === 0) {
+      console.warn(`⚠️ IDOR attempt blocked: user=${userId} tried to update product=${productId}`);
+      return res.status(403).json({ error: 'Product not found or access denied' });
+    }
+
+    await updateProductMinPrice(userId, productId, minPrice);
+
+    console.log(
+      `✅ Stop-Loss updated (Modular): user=${userId}, product=${productId}, minPrice=${minPrice}`
+    );
+    return res.json({ success: true, productId, minPrice });
+  } catch (error) {
+    console.error('Update product error:', error);
+    return res.status(500).json({ error: 'Failed to update product' });
   }
-
-  await updateProductMinPrice(userId, productId, minPrice || 0);
-
-  return res.json({ success: true });
 }
 
 /**
@@ -274,44 +291,85 @@ export async function handleBatchSetStopLoss(
   res: VercelResponse,
   userId: number
 ): Promise<VercelResponse> {
-  const { percentage, productIds, marketplace } = req.body || {};
+  const { percentage, productIds } = req.body || {};
 
-  if (!percentage || percentage < 1 || percentage > 50) {
-    return res.status(400).json({ error: 'Percentage must be between 1 and 50' });
+  // Validate percentage (5-50% as per index.ts logic)
+  if (typeof percentage !== 'number' || percentage < 5 || percentage > 50) {
+    return res.status(400).json({
+      error: 'Invalid percentage',
+      message: 'Percentage must be between 5 and 50',
+      received: percentage,
+    });
   }
 
-  // Get products based on filters
-  let products: Record<string, unknown>[] = [];
-
-  if (productIds && Array.isArray(productIds) && productIds.length > 0) {
-    // For specific product IDs, query each one (Vercel Postgres limitation)
-    const allProducts = await sql`SELECT * FROM products WHERE user_id = ${userId}`;
-    products = allProducts.rows.filter(p => productIds.includes(String(p.product_id)));
-  } else if (marketplace && marketplace !== 'all') {
-    const result =
-      await sql`SELECT * FROM products WHERE user_id = ${userId} AND marketplace = ${marketplace}`;
-    products = result.rows;
-  } else {
-    const result = await sql`SELECT * FROM products WHERE user_id = ${userId}`;
-    products = result.rows;
+  // Validate productIds array (optional - if not provided, update all products without stop-loss)
+  let targetProductIds: string[] = [];
+  if (Array.isArray(productIds) && productIds.length > 0) {
+    targetProductIds = productIds.map(String);
   }
 
-  let updated = 0;
+  try {
+    let productsToUpdate;
 
-  for (const product of products) {
-    const currentPrice = Number(product.current_price || 0);
-    const productId = product.id as number;
-
-    if (currentPrice > 0) {
-      const minPrice = Math.round(currentPrice * (1 - percentage / 100));
-      await sql`UPDATE products SET min_price = ${minPrice} WHERE id = ${productId}`;
-      updated++;
+    if (targetProductIds.length > 0) {
+      // Update specific products
+      const allProducts = await sql`
+        SELECT product_id, current_price FROM products 
+        WHERE user_id = ${userId}
+      `;
+      productsToUpdate = {
+        rows: allProducts.rows.filter(p => targetProductIds.includes(p.product_id)),
+      };
+    } else {
+      // Update all products WITHOUT stop-loss (fail-safe logic from index.ts)
+      productsToUpdate = await sql`
+        SELECT product_id, current_price FROM products 
+        WHERE user_id = ${userId} 
+        AND (min_price = 0 OR min_price IS NULL)
+      `;
     }
-  }
 
-  return res.json({
-    success: true,
-    updated,
-    percentage,
-  });
+    let successCount = 0;
+    let failedCount = 0;
+
+    for (const product of productsToUpdate.rows) {
+      try {
+        const currentPrice = Number(product.current_price || 0);
+        if (currentPrice > 0) {
+          const newMinPrice = Math.floor(currentPrice * (1 - percentage / 100));
+
+          await sql`
+            UPDATE products SET 
+              min_price = ${newMinPrice},
+              status = 'protected',
+              updated_at = CURRENT_TIMESTAMP
+            WHERE user_id = ${userId} AND product_id = ${product.product_id}
+          `;
+
+          successCount++;
+        }
+      } catch (e) {
+        console.error(`Failed to update product ${product.product_id}:`, e);
+        failedCount++;
+      }
+    }
+
+    console.log(
+      `✅ Bulk Stop-Loss (Modular): user=${userId}, percentage=${percentage}%, updated=${successCount}, failed=${failedCount}`
+    );
+
+    return res.json({
+      success: true,
+      updated: successCount,
+      failed: failedCount,
+      percentage,
+      message: `Stop-Loss установлен для ${successCount} товаров на -${percentage}% от текущей цены`,
+    });
+  } catch (error) {
+    console.error('Batch stop-loss error:', error);
+    return res.status(500).json({
+      error: 'Failed to set bulk stop-loss',
+      details: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
 }

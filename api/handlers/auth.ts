@@ -126,6 +126,23 @@ export async function handleSettings(
 
   if (body.protectionEnabled !== undefined) {
     const enabled = body.protectionEnabled === true;
+
+    if (enabled) {
+      const user = await getUserById(userId);
+      // Check for active subscription or trial
+      const isTrial = user?.subscription_plan === 'trial';
+      const isSubActive = user?.subscription_end
+        ? new Date(user.subscription_end) > new Date()
+        : false;
+
+      if (!isSubActive && !isTrial) {
+        return res.status(403).json({
+          error: 'Для включения защиты требуется активная подписка',
+          code: 'SUBSCRIPTION_REQUIRED',
+        });
+      }
+    }
+
     await sql`UPDATE users SET protection_enabled = ${enabled} WHERE id = ${userId}`;
     updates.push('protectionEnabled');
   }
@@ -173,6 +190,9 @@ export async function handlePlans(
     durationDays: plan.durationDays,
     maxProducts: plan.maxProducts,
     features: plan.features,
+    pricePerMonth: plan.durationDays === 365 ? Math.round(plan.price / 12) : plan.price,
+    isPopular: id === 'pro',
+    isBestValue: id === 'yearly',
   }));
 
   return res.json({ plans });

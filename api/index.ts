@@ -33,9 +33,8 @@ import {
   validateAdminAccess,
 } from './handlers/admin.js';
 
-// NOTE: More handlers will be imported as migration progresses
-// import { handleAuth, handleSettings, handlePlans } from './handlers/auth.js';
-// import { handleProducts, handleSyncProducts, handleBatchSetStopLoss } from './handlers/products.js';
+import { handleAuth, handleSettings, handlePlans } from './handlers/auth.js';
+import { handleProducts, handleSyncProducts, handleBatchSetStopLoss } from './handlers/products.js';
 // import { handleCreatePayment, handlePaymentWebhook } from './handlers/payments.js';
 
 // ============================================
@@ -2608,7 +2607,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
-      // ========== PRODUCTS ==========
+      // ========== PRODUCTS (migrated to handler) ==========
       case 'products': {
         const initData = sanitizeInput(
           (req.headers['x-init-data'] as string) || req.body?.initData || ''
@@ -2617,145 +2616,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const adminUserId = req.body?.userId;
 
         // Admin bypass for testing
-        let user: any;
         if (adminKey === ADMIN_API_KEY && adminUserId) {
-          user = { id: parseInt(adminUserId) };
-          console.log(`🔧 Admin auth for products: user=${adminUserId}`);
-        } else {
-          const validation = validateTelegramInitData(initData);
-          if (!validation.valid || !validation.user) {
-            return res.status(401).json({ error: 'Unauthorized', code: 'AUTH_FAILED' });
-          }
-          user = validation.user;
+          return handleProducts(req, res, parseInt(adminUserId));
         }
-
-        if (req.method === 'GET') {
-          const products = await getProductsByUserId(user.id);
-          return res.json({
-            success: true,
-            products: products.map((p: any) => ({
-              id: p.id.toString(),
-              userId: p.user_id,
-              productId: p.product_id,
-              nmId: p.nm_id,
-              title: p.title,
-              imageUrl: p.image_url,
-              currentPrice: p.current_price,
-              minPrice: p.min_price,
-              stock: p.current_stock,
-              marketplace: p.marketplace,
-              status: p.status,
-              isMonitored: p.is_monitored,
-            })),
-          });
-        }
-
-        if (req.method === 'POST') {
-          const { productId, minPrice, userId: adminUserId } = req.body;
-          const adminKey = req.headers['x-admin-key'];
-
-          // Admin bypass for testing
-          let targetUserId = user.id;
-          if (adminKey === ADMIN_API_KEY && adminUserId) {
-            targetUserId = parseInt(adminUserId);
-            console.log(`🔧 Admin override: updating product for user ${targetUserId}`);
-          }
-
-          if (!productId || typeof minPrice !== 'number') {
-            return res
-              .status(400)
-              .json({ error: 'Invalid parameters', received: { productId, minPrice } });
-          }
-
-          // SECURITY: Verify product ownership before update (IDOR protection)
-          const ownershipCheck = await sql`
-            SELECT id FROM products WHERE user_id = ${targetUserId} AND product_id = ${productId}
-          `;
-          if (ownershipCheck.rows.length === 0) {
-            console.warn(
-              `⚠️ IDOR attempt: user=${targetUserId} tried to update product=${productId}`
-            );
-            return res.status(403).json({ error: 'Product not found or access denied' });
-          }
-
-          await updateProductMinPrice(targetUserId, productId, minPrice);
-          console.log(
-            `✅ Stop-Loss updated: user=${targetUserId}, product=${productId}, minPrice=${minPrice}`
-          );
-          return res.json({ success: true, productId, minPrice });
-        }
-
-        return res.status(405).json({ error: 'Method not allowed' });
-      }
-
-      // ========== SETTINGS ==========
-      case 'settings': {
-        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
-        const { protectionEnabled, defenseMode, marketplace } = req.body;
-        const initData = sanitizeInput(req.body?.initData || '');
-        const apiKey = sanitizeApiKey(req.body?.apiKey || '');
 
         const validation = validateTelegramInitData(initData);
         if (!validation.valid || !validation.user) {
           return res.status(401).json({ error: 'Unauthorized', code: 'AUTH_FAILED' });
         }
-        const user = validation.user;
-
-        if (marketplace && apiKey) {
-          // Encrypt API key before storing (ТЗ Security Requirement)
-          const encryptedKey = encryptApiKey(apiKey);
-          console.log(`🔐 Encrypting ${marketplace} API key for user ${user.id}`);
-
-          if (marketplace === 'WB') {
-            await sql`UPDATE users SET api_key_wb = ${encryptedKey}, updated_at = CURRENT_TIMESTAMP WHERE id = ${user.id}`;
-          } else {
-            await sql`UPDATE users SET api_key_ozon = ${encryptedKey}, updated_at = CURRENT_TIMESTAMP WHERE id = ${user.id}`;
-          }
-          return res.json({
-            success: true,
-            message: `${marketplace} API ключ сохранён и зашифрован`,
-          });
-        }
-
-        // Check subscription before enabling protection
-        if (protectionEnabled === true) {
-          const dbUser = await getUserById(user.id);
-          if (!dbUser || !isSubscriptionActive(dbUser)) {
-            return res.status(403).json({
-              error: 'Для включения защиты требуется активная подписка',
-              code: 'SUBSCRIPTION_REQUIRED',
-            });
-          }
-        }
-
-        if (protectionEnabled !== undefined) {
-          await sql`UPDATE users SET protection_enabled = ${protectionEnabled}, updated_at = CURRENT_TIMESTAMP WHERE id = ${user.id}`;
-        }
-        if (defenseMode) {
-          await sql`UPDATE users SET defense_mode = ${defenseMode}, updated_at = CURRENT_TIMESTAMP WHERE id = ${user.id}`;
-        }
-
-        return res.json({ success: true });
+        return handleProducts(req, res, validation.user.id);
       }
 
-      // ========== PLANS ==========
+      // ========== SETTINGS (migrated to handler) ==========
+      case 'settings': {
+        const initData = sanitizeInput(req.body?.initData || '');
+        const validation = validateTelegramInitData(initData);
+        if (!validation.valid || !validation.user) {
+          return res.status(401).json({ error: 'Unauthorized', code: 'AUTH_FAILED' });
+        }
+        return handleSettings(req, res, validation.user.id);
+      }
+
+      // ========== PLANS (migrated to handler) ==========
       case 'plans': {
-        if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+        const initData = sanitizeInput((req.query?.initData as string) || req.body?.initData || '');
+        const validation = validateTelegramInitData(initData);
 
-        const plans = Object.values(SUBSCRIPTION_PLANS).map(plan => ({
-          id: plan.id,
-          name: plan.name,
-          price: plan.price,
-          durationDays: plan.durationDays,
-          maxProducts: plan.maxProducts,
-          features: plan.features,
-          pricePerMonth: plan.durationDays === 365 ? Math.round(plan.price / 12) : plan.price,
-          isPopular: plan.id === 'pro',
-          isBestValue: plan.id === 'yearly',
-        }));
-
-        return res.json({ success: true, plans });
+        // Plans can be viewed without full auth in some cases, but handler needs a userId
+        const userId = validation.valid && validation.user ? validation.user.id : 0;
+        return handlePlans(req, res, userId);
       }
 
       // ========== CREATE PAYMENT ==========
@@ -3908,102 +3797,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return handleAdminSentinelLogs(req, res);
       }
 
-      // ========== BATCH SET STOP-LOSS ==========
+      // ========== BATCH SET STOP-LOSS (migrated to handler) ==========
       case 'batch-set-stop-loss': {
-        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
         const initData = sanitizeInput(
           (req.headers['x-init-data'] as string) || req.body?.initData || ''
         );
-
         const validation = validateTelegramInitData(initData);
         if (!validation.valid || !validation.user) {
           return res.status(401).json({ error: 'Unauthorized', code: 'AUTH_FAILED' });
         }
-        const user = validation.user;
-
-        const { percentage, productIds } = req.body;
-
-        // Validate percentage (5-50%)
-        if (typeof percentage !== 'number' || percentage < 5 || percentage > 50) {
-          return res.status(400).json({
-            error: 'Invalid percentage',
-            message: 'Percentage must be between 5 and 50',
-            received: percentage,
-          });
-        }
-
-        // Validate productIds array (optional - if not provided, update all products without stop-loss)
-        let targetProductIds: string[] = [];
-        if (Array.isArray(productIds) && productIds.length > 0) {
-          targetProductIds = productIds.map(String);
-        }
-
-        try {
-          let productsToUpdate;
-
-          if (targetProductIds.length > 0) {
-            // Update specific products - fetch all user products and filter in JS
-            // (Vercel Postgres sql template doesn't support array parameters well)
-            const allProducts = await sql`
-              SELECT product_id, current_price FROM products 
-              WHERE user_id = ${user.id}
-            `;
-            productsToUpdate = {
-              rows: allProducts.rows.filter(p => targetProductIds.includes(p.product_id)),
-            };
-          } else {
-            // Update all products without stop-loss
-            productsToUpdate = await sql`
-              SELECT product_id, current_price FROM products 
-              WHERE user_id = ${user.id} 
-              AND (min_price = 0 OR min_price IS NULL)
-            `;
-          }
-
-          let successCount = 0;
-          let failedCount = 0;
-
-          for (const product of productsToUpdate.rows) {
-            try {
-              const newMinPrice = Math.floor(product.current_price * (1 - percentage / 100));
-
-              await sql`
-                UPDATE products SET 
-                  min_price = ${newMinPrice},
-                  status = 'protected',
-                  updated_at = CURRENT_TIMESTAMP
-                WHERE user_id = ${user.id} AND product_id = ${product.product_id}
-              `;
-
-              successCount++;
-            } catch (e) {
-              console.error(`Failed to update product ${product.product_id}:`, e);
-              failedCount++;
-            }
-          }
-
-          console.log(
-            `✅ Bulk Stop-Loss: user=${user.id}, percentage=${percentage}%, updated=${successCount}, failed=${failedCount}`
-          );
-
-          return res.json({
-            success: true,
-            updated: successCount,
-            failed: failedCount,
-            percentage,
-            message: `Stop-Loss установлен для ${successCount} товаров на -${percentage}% от текущей цены`,
-          });
-        } catch (error) {
-          console.error('Batch stop-loss error:', error);
-          return res.status(500).json({
-            error: 'Failed to set bulk stop-loss',
-            details: error instanceof Error ? error.message : 'Unknown error',
-          });
-        }
+        return handleBatchSetStopLoss(req, res, validation.user.id);
       }
 
-      // ========== SENTINEL LOGS (User-facing) ==========
+      // ========== SENTINEL LOGS (migrated to handler) ==========
       case 'sentinel-logs': {
         const initData = sanitizeInput(
           (req.headers['x-init-data'] as string) || req.body?.initData || ''
@@ -4013,61 +3819,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!validation.valid || !validation.user) {
           return res.status(401).json({ error: 'Unauthorized', code: 'AUTH_FAILED' });
         }
-        const user = validation.user;
-
-        const days = parseInt((req.query.days as string) || '7', 10);
-        const limit = Math.min(parseInt((req.query.limit as string) || '50', 10), 100);
-
-        try {
-          const logsResult = await sql`
-            SELECT * FROM sentinel_logs 
-            WHERE user_id = ${user.id}
-            AND created_at > NOW() - INTERVAL '1 day' * ${days}
-            ORDER BY created_at DESC 
-            LIMIT ${limit}
-          `;
-
-          // Calculate summary stats
-          const summaryResult = await sql`
-            SELECT 
-              COUNT(*) as total_triggers,
-              COALESCE(SUM(saved_amount), 0) as total_saved,
-              COUNT(DISTINCT product_id) as unique_products
-            FROM sentinel_logs 
-            WHERE user_id = ${user.id}
-            AND created_at > NOW() - INTERVAL '1 day' * ${days}
-          `;
-
-          const summary = summaryResult.rows[0] || {
-            total_triggers: 0,
-            total_saved: 0,
-            unique_products: 0,
-          };
-
-          return res.json({
-            success: true,
-            period: `${days} days`,
-            summary: {
-              totalTriggers: parseInt(summary.total_triggers) || 0,
-              totalSaved: parseInt(summary.total_saved) || 0,
-              uniqueProducts: parseInt(summary.unique_products) || 0,
-            },
-            logs: logsResult.rows.map((log: any) => ({
-              id: log.id,
-              productId: log.product_id,
-              productTitle: log.product_title,
-              detectedPrice: log.detected_price,
-              minPrice: log.min_price,
-              defenseAction: log.defense_action,
-              savedAmount: log.saved_amount,
-              marketplace: log.marketplace,
-              createdAt: log.created_at,
-            })),
-          });
-        } catch (error) {
-          console.error('Sentinel logs error:', error);
-          return res.status(500).json({ error: 'Failed to fetch sentinel logs' });
-        }
+        return handleSentinelLogs(req, res, validation.user.id);
       }
 
       // ========== AI AGENT (с Function Calling!) ==========
