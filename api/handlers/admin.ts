@@ -279,3 +279,82 @@ export async function handleHealth(
     });
   }
 }
+
+/**
+ * Handle admin-set-protection action
+ */
+export async function handleAdminSetProtection(
+  req: VercelRequest,
+  res: VercelResponse
+): Promise<VercelResponse> {
+  if (!validateAdminAccess(req)) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  const userId = req.query.userId || req.body?.userId;
+  const enabled = req.query.enabled === 'true' || req.body?.enabled === true;
+
+  if (!userId) {
+    return res.status(400).json({ error: 'userId required' });
+  }
+
+  await sql`UPDATE users SET protection_enabled = ${enabled}, updated_at = CURRENT_TIMESTAMP WHERE id = ${Number(userId)}`;
+
+  const result = await sql`SELECT protection_enabled FROM users WHERE id = ${Number(userId)}`;
+
+  return res.json({
+    success: true,
+    userId: Number(userId),
+    protection_enabled: result.rows[0]?.protection_enabled,
+  });
+}
+
+/**
+ * Handle admin-reset-statuses action
+ */
+export async function handleAdminResetStatuses(
+  req: VercelRequest,
+  res: VercelResponse
+): Promise<VercelResponse> {
+  if (!validateAdminAccess(req)) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  const userId = req.query.userId || req.body?.userId;
+  if (!userId) {
+    return res.status(400).json({ error: 'userId required' });
+  }
+
+  await sql`UPDATE products SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE user_id = ${Number(userId)}`;
+
+  return res.json({ success: true, message: 'All products reset to ACTIVE status' });
+}
+
+/**
+ * Handle admin-set-defense-mode action
+ */
+export async function handleAdminSetDefenseMode(
+  req: VercelRequest,
+  res: VercelResponse
+): Promise<VercelResponse> {
+  if (!validateAdminAccess(req)) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  const userId = req.query.userId || req.body?.userId;
+  const mode = req.query.mode || req.body?.mode;
+
+  if (!userId || !mode) {
+    return res.status(400).json({ error: 'userId and mode required' });
+  }
+
+  await sql`UPDATE users SET defense_mode = ${mode as string}, updated_at = CURRENT_TIMESTAMP WHERE id = ${Number(userId)}`;
+
+  const result = await sql`SELECT defense_mode FROM users WHERE id = ${Number(userId)}`;
+
+  return res.json({
+    success: true,
+    userId: Number(userId),
+    defense_mode: result.rows[0]?.defense_mode,
+  });
+}

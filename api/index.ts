@@ -11,7 +11,6 @@ import { v4 as uuidv4 } from 'uuid';
 // PHASE 2: MODULAR HANDLERS (gradual migration)
 // ============================================
 
-// Import modular handlers for gradual migration
 import {
   handleHealth,
   handleInitDb,
@@ -22,6 +21,9 @@ import {
   handleAdminListProducts,
   handleSentinelLogs,
   handleAdminSentinelLogs,
+  handleAdminSetProtection,
+  handleAdminResetStatuses,
+  handleAdminSetDefenseMode,
   validateAdminAccess,
 } from './handlers/admin.js';
 
@@ -2925,36 +2927,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return handleInitDb(req, res);
       }
 
-      // ========== RESET DB (Clean all data) ==========
+      // ========== RESET DB (migrated to handler) ==========
       case 'reset-db': {
-        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
-        const adminKey = req.headers['x-admin-key'] || req.body?.adminKey;
-        if (!ADMIN_API_KEY || adminKey !== ADMIN_API_KEY) {
-          return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        // Get current counts before deletion
-        const userCountBefore = await sql`SELECT COUNT(*) as count FROM users`;
-        const productCountBefore = await sql`SELECT COUNT(*) as count FROM products`;
-
-        // Delete all data (order matters due to foreign keys)
-        await sql`DELETE FROM transactions`;
-        await sql`DELETE FROM products`;
-        await sql`DELETE FROM users`;
-
-        console.log(
-          `🗑️ Database reset: deleted ${userCountBefore.rows[0].count} users, ${productCountBefore.rows[0].count} products`
-        );
-
-        return res.json({
-          success: true,
-          message: 'Database reset complete',
-          deleted: {
-            users: parseInt(userCountBefore.rows[0].count),
-            products: parseInt(productCountBefore.rows[0].count),
-          },
-        });
+        return handleResetDb(req, res);
       }
 
       // ========== HEALTH (migrated to handler) ==========
@@ -2962,156 +2937,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return handleHealth(req, res);
       }
 
-      // ========== ADMIN: ACTIVATE TRIAL ==========
+      // ========== ADMIN: ACTIVATE TRIAL (migrated to handler) ==========
       case 'admin-activate-trial': {
-        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
-        const adminKey = req.headers['x-admin-key'] || req.body?.adminKey;
-        // EMERGENCY: Allow activation with emergency key
-        const validKeys = [ADMIN_API_KEY].filter(Boolean);
-        if (!validKeys.includes(adminKey as string)) {
-          return res.status(401).json({ error: 'Unauthorized', hint: 'Use X-Admin-Key header' });
-        }
-
-        const { userId, days } = req.body;
-        if (!userId) return res.status(400).json({ error: 'Missing userId' });
-
-        const durationDays = days || 30;
-        const endDate = new Date();
-        endDate.setDate(endDate.getDate() + durationDays);
-
-        await sql`
-          UPDATE users SET
-            subscription_plan = 'trial',
-            subscription_end = ${endDate.toISOString()},
-            subscription_active = true,
-            updated_at = CURRENT_TIMESTAMP
-          WHERE id = ${userId}
-        `;
-
-        return res.json({
-          success: true,
-          message: `Trial activated for user ${userId} until ${endDate.toISOString()}`,
-          userId,
-          expiresAt: endDate.toISOString(),
-        });
+        return handleAdminActivateTrial(req, res);
       }
 
-      // ========== ADMIN: CHECK USER (DEBUG) ==========
+      // ========== ADMIN: CHECK USER (migrated to handler) ==========
       case 'admin-check-user': {
-        const adminKey = req.headers['x-admin-key'] || req.query.key;
-        const validKeys = [ADMIN_API_KEY].filter(Boolean);
-        if (!validKeys.includes(adminKey as string)) {
-          return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const userId = req.query.userId || req.body?.userId;
-        if (!userId) return res.status(400).json({ error: 'Missing userId' });
-
-        const result = await sql`SELECT * FROM users WHERE id = ${userId}`;
-        const user = result.rows[0];
-
-        if (!user) {
-          return res.json({ found: false, userId });
-        }
-
-        const now = new Date();
-        const endDate = user.subscription_end ? new Date(user.subscription_end) : null;
-        const isActive = endDate ? endDate > now : false;
-
-        return res.json({
-          found: true,
-          userId: user.id,
-          subscription_plan: user.subscription_plan,
-          subscription_end: user.subscription_end,
-          subscription_active_db: user.subscription_active,
-          subscription_active_computed: isActive,
-          protection_enabled: user.protection_enabled,
-          defense_mode: user.defense_mode,
-          total_products: user.total_products,
-          has_ozon_key: !!user.api_key_ozon,
-          has_wb_key: !!user.api_key_wb,
-          now: now.toISOString(),
-          endDate: endDate?.toISOString() || null,
-          daysLeft: endDate
-            ? Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-            : null,
-        });
+        return handleAdminCheckUser(req, res);
       }
 
-      // ========== ADMIN: LIST ALL USERS ==========
+      // ========== ADMIN: LIST ALL USERS (migrated to handler) ==========
       case 'admin-list-users': {
-        const adminKey = req.headers['x-admin-key'] || req.query.key;
-        const validKeys = [ADMIN_API_KEY].filter(Boolean);
-        if (!validKeys.includes(adminKey as string)) {
-          return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const result =
-          await sql`SELECT id, username, first_name, subscription_plan, subscription_end, subscription_active, created_at FROM users ORDER BY created_at DESC LIMIT 50`;
-
-        return res.json({
-          count: result.rows.length,
-          users: result.rows.map(u => ({
-            id: u.id,
-            username: u.username,
-            firstName: u.first_name,
-            plan: u.subscription_plan,
-            endDate: u.subscription_end,
-            active: u.subscription_active,
-            created: u.created_at,
-          })),
-        });
+        return handleAdminListUsers(req, res);
       }
 
-      // ========== ADMIN: LIST PRODUCTS ==========
+      // ========== ADMIN: LIST PRODUCTS (migrated to handler) ==========
       case 'admin-list-products': {
-        const adminKey = req.headers['x-admin-key'] || req.query.key;
-        const validKeys = [ADMIN_API_KEY].filter(Boolean);
-        if (!validKeys.includes(adminKey as string)) {
-          return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const userId = req.query.userId || req.body?.userId;
-        if (!userId) return res.status(400).json({ error: 'Missing userId' });
-
-        const result =
-          await sql`SELECT product_id, title, current_price, min_price, status FROM products WHERE user_id = ${userId} ORDER BY created_at DESC LIMIT 50`;
-
-        return res.json({
-          count: result.rows.length,
-          products: result.rows.map(p => ({
-            productId: p.product_id,
-            title: p.title?.substring(0, 40) + '...',
-            currentPrice: p.current_price,
-            minPrice: p.min_price,
-            status: p.status,
-          })),
-        });
+        return handleAdminListProducts(req, res);
       }
 
-      // ========== ADMIN: SET PROTECTION ==========
+      // ========== ADMIN: SET PROTECTION (migrated to handler) ==========
       case 'admin-set-protection': {
-        const adminKey = req.headers['x-admin-key'] || req.query.key;
-        const validKeys = [ADMIN_API_KEY].filter(Boolean);
-        if (!validKeys.includes(adminKey as string)) {
-          return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const userId = req.query.userId || req.body?.userId;
-        const enabled = req.query.enabled === 'true' || req.body?.enabled === true;
-
-        if (!userId) return res.status(400).json({ error: 'Missing userId' });
-
-        await sql`UPDATE users SET protection_enabled = ${enabled}, updated_at = CURRENT_TIMESTAMP WHERE id = ${userId}`;
-
-        const result = await sql`SELECT protection_enabled FROM users WHERE id = ${userId}`;
-
-        return res.json({
-          success: true,
-          userId,
-          protection_enabled: result.rows[0]?.protection_enabled,
-        });
+        return handleAdminSetProtection(req, res);
       }
 
       // ========== ADMIN: TEST TELEGRAM ==========
@@ -3150,44 +2998,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
-      // ========== ADMIN: RESET STATUSES ==========
+      // ========== ADMIN: RESET STATUSES (migrated to handler) ==========
       case 'admin-reset-statuses': {
-        const adminKey = req.headers['x-admin-key'] || req.query.key;
-        const validKeys = [ADMIN_API_KEY].filter(Boolean);
-        if (!validKeys.includes(adminKey as string)) {
-          return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const userId = req.query.userId || req.body?.userId;
-        if (!userId) return res.status(400).json({ error: 'Missing userId' });
-
-        await sql`UPDATE products SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE user_id = ${userId}`;
-
-        return res.json({ success: true, message: 'All products reset to ACTIVE status' });
+        return handleAdminResetStatuses(req, res);
       }
 
-      // ========== ADMIN: SET DEFENSE MODE ==========
+      // ========== ADMIN: SET DEFENSE MODE (migrated to handler) ==========
       case 'admin-set-defense-mode': {
-        const adminKey = req.headers['x-admin-key'] || req.query.key;
-        const validKeys = [ADMIN_API_KEY].filter(Boolean);
-        if (!validKeys.includes(adminKey as string)) {
-          return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const userId = req.query.userId || req.body?.userId;
-        const mode = req.query.mode || req.body?.mode; // 'zero_stock' | 'price_correction'
-
-        if (!userId || !mode) return res.status(400).json({ error: 'Missing userId or mode' });
-
-        await sql`UPDATE users SET defense_mode = ${mode}, updated_at = CURRENT_TIMESTAMP WHERE id = ${userId}`;
-
-        const result = await sql`SELECT defense_mode FROM users WHERE id = ${userId}`;
-
-        return res.json({
-          success: true,
-          userId,
-          defense_mode: result.rows[0]?.defense_mode,
-        });
+        return handleAdminSetDefenseMode(req, res);
       }
 
       // ========== ADMIN: TEST OZON API ==========
@@ -4319,49 +4137,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
-      // ========== ADMIN: SENTINEL LOGS ==========
+      // ========== ADMIN: SENTINEL LOGS (migrated to handler) ==========
       case 'admin-sentinel-logs': {
-        const adminKey = req.headers['x-admin-key'] || req.query.key;
-        const validKeys = [ADMIN_API_KEY].filter(Boolean);
-        if (!validKeys.includes(adminKey as string)) {
-          return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const userId = req.query.userId || req.body?.userId;
-        const limit = parseInt((req.query.limit as string) || '50', 10);
-
-        let logsResult;
-        if (userId) {
-          logsResult = await sql`
-            SELECT * FROM sentinel_logs 
-            WHERE user_id = ${userId}
-            ORDER BY created_at DESC 
-            LIMIT ${limit}
-          `;
-        } else {
-          logsResult = await sql`
-            SELECT * FROM sentinel_logs 
-            ORDER BY created_at DESC 
-            LIMIT ${limit}
-          `;
-        }
-
-        return res.json({
-          success: true,
-          count: logsResult.rows.length,
-          logs: logsResult.rows.map(log => ({
-            id: log.id,
-            userId: log.user_id,
-            productId: log.product_id,
-            productTitle: log.product_title?.substring(0, 50),
-            detectedPrice: log.detected_price,
-            minPrice: log.min_price,
-            defenseAction: log.defense_action,
-            savedAmount: log.saved_amount,
-            marketplace: log.marketplace,
-            createdAt: log.created_at,
-          })),
-        });
+        return handleAdminSentinelLogs(req, res);
       }
 
       // ========== BATCH SET STOP-LOSS ==========
