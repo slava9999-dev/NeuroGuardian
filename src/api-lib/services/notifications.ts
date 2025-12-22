@@ -3,8 +3,8 @@
 // Telegram notifications and reminders
 // ============================================
 
-import { TELEGRAM_BOT_TOKEN } from '../lib/constants';
-import { getUsersWithExpiringSubscriptions, markReminderSent } from './database';
+import { TELEGRAM_BOT_TOKEN } from '../lib/constants.js';
+import { getUsersWithExpiringSubscriptions, markReminderSent } from './database.js';
 
 const TELEGRAM_API = 'https://api.telegram.org';
 

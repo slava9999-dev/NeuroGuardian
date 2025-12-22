@@ -4,8 +4,8 @@
 // ============================================
 
 import { v4 as uuidv4 } from 'uuid';
-import { SUBSCRIPTION_PLANS, type PlanId } from '../lib';
-import { createTransaction } from './database';
+import { SUBSCRIPTION_PLANS, type PlanId } from '../lib/index.js';
+import { createTransaction } from './database.js';
 
 const YOOKASSA_API_URL = 'https://api.yookassa.ru/v3';
 const SHOP_ID = process.env.YOOKASSA_SHOP_ID || '';

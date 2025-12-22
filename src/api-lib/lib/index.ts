@@ -4,13 +4,13 @@
 // ============================================
 
 // Types
-export * from './types';
+export * from './types.js';
 
 // Constants
-export * from './constants';
+export * from './constants.js';
 
 // Utilities
-export { encryptApiKey, decryptApiKey } from './crypto';
+export { encryptApiKey, decryptApiKey } from './crypto.js';
 export {
   sanitizeInput,
   sanitizeApiKey,
@@ -19,6 +19,6 @@ export {
   isValidPercentage,
   isValidEmail,
   parsePeriod,
-} from './validation';
-export { validateTelegramInitData, extractTelegramUser } from './telegram';
-export { checkRateLimit, cleanupExpiredEntries, resetRateLimit } from './rate-limit';
+} from './validation.js';
+export { validateTelegramInitData, extractTelegramUser } from './telegram.js';
+export { checkRateLimit, cleanupExpiredEntries, resetRateLimit } from './rate-limit.js';

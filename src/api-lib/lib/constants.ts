@@ -3,7 +3,7 @@
 // Shared configuration values
 // ============================================
 
-import type { SubscriptionPlan, PlanId } from './types';
+import type { SubscriptionPlan, PlanId } from './types.js';
 
 // ============================================
 // SUBSCRIPTION PLANS

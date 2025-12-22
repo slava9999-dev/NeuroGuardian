@@ -18,7 +18,7 @@ export {
   logSentinelAction,
   getUsersWithExpiringSubscriptions,
   markReminderSent,
-} from './database';
+} from './database.js';
 
 // YooKassa
 export {
@@ -26,11 +26,11 @@ export {
   getPaymentStatus,
   isValidYookassaIP,
   type PaymentResult,
-} from './yookassa';
+} from './yookassa.js';
 
 // Notifications
 export {
   sendTelegramNotification,
   sendExpiryReminders,
   sendProtectionAlert,
-} from './notifications';
+} from './notifications.js';

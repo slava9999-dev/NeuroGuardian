@@ -4,8 +4,7 @@
 // ============================================
 
 import { sql } from '@vercel/postgres';
-import type { TelegramUser } from '../lib/types';
-import { decryptApiKey } from '../lib/crypto';
+import type { TelegramUser } from '../lib/types.js';
 
 /**
  * Initialize database schema

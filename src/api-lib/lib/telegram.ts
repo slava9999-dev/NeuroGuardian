@@ -4,8 +4,8 @@
 // ============================================
 
 import * as crypto from 'crypto';
-import type { TelegramUser, InitDataValidationResult } from './types';
-import { TELEGRAM_BOT_TOKEN, IS_PRODUCTION, DEMO_USER } from './constants';
+import type { TelegramUser, InitDataValidationResult } from './types.js';
+import { TELEGRAM_BOT_TOKEN, IS_PRODUCTION, DEMO_USER } from './constants.js';
 
 /**
  * Validates Telegram WebApp initData using HMAC-SHA256

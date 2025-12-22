@@ -4,7 +4,7 @@
 // ============================================
 
 import * as crypto from 'crypto';
-import { API_KEY_ENCRYPTION_KEY } from './constants';
+import { API_KEY_ENCRYPTION_KEY } from './constants.js';
 
 const ENCRYPTION_ALGORITHM = 'aes-256-gcm';
 

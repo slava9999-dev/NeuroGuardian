@@ -4,8 +4,8 @@
 // ============================================
 
 import { createClient, type VercelKV } from '@vercel/kv';
-import type { RateLimitResult } from './types';
-import { RATE_LIMIT, RATE_LIMIT_STRICT, RATE_WINDOW } from './constants';
+import type { RateLimitResult } from './types.js';
+import { RATE_LIMIT, RATE_LIMIT_STRICT, RATE_WINDOW } from './constants.js';
 
 // In-memory fallback store
 const inMemoryRateLimit = new Map<string, { count: number; resetAt: number }>();
