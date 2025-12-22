@@ -6,9 +6,9 @@
 import { z } from 'zod';
 
 // Helper to handle Firestore Timestamps and ISO strings
-const zTimestamp = z.preprocess((val: any) => {
+const zTimestamp = z.preprocess((val: unknown) => {
   if (val && typeof val === 'object' && '_seconds' in val) {
-    return new Date(val._seconds * 1000);
+    return new Date((val as { _seconds: number })._seconds * 1000);
   }
   return val;
 }, z.coerce.date());

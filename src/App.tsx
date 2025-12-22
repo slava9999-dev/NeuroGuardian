@@ -3,16 +3,22 @@
 // Agent-first interface for WB & Ozon sellers
 // ============================================
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, lazy, Suspense } from 'react';
 import { motion } from 'framer-motion';
-import { AgentPage } from './pages/AgentPage';
-import { ProductsPage } from './pages/ProductsPage';
-import { SettingsPage } from './pages/SettingsPage';
-import { LegalPage } from './pages/LegalPage';
 import { useAppStore, useProductsStore } from './stores';
 import { initTelegramWebApp, isTelegramWebApp, getInitData } from './lib/telegram';
 import { authApi, productsApi } from './lib/api';
 import './index.css';
+
+// Lazy load pages for better initial bundle size
+const AgentPage = lazy(() => import('./pages/AgentPage').then(m => ({ default: m.AgentPage })));
+const ProductsPage = lazy(() =>
+  import('./pages/ProductsPage').then(m => ({ default: m.ProductsPage }))
+);
+const SettingsPage = lazy(() =>
+  import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage }))
+);
+const LegalPage = lazy(() => import('./pages/LegalPage').then(m => ({ default: m.LegalPage })));
 
 // Loading screen with agent branding
 function LoadingScreen() {
@@ -157,11 +163,13 @@ function App() {
 
   return (
     <>
-      {/* Pages */}
-      {currentPage === 'agent' && <AgentPage />}
-      {currentPage === 'products' && <ProductsPage onBack={goToAgent} />}
-      {currentPage === 'settings' && <SettingsPage onBack={goToAgent} />}
-      {currentPage === 'info' && <LegalPage onBack={goToAgent} />}
+      {/* Pages - wrapped in Suspense for lazy loading */}
+      <Suspense fallback={<LoadingScreen />}>
+        {currentPage === 'agent' && <AgentPage />}
+        {currentPage === 'products' && <ProductsPage onBack={goToAgent} />}
+        {currentPage === 'settings' && <SettingsPage onBack={goToAgent} />}
+        {currentPage === 'info' && <LegalPage onBack={goToAgent} />}
+      </Suspense>
 
       {/* Bottom Tab Bar - Simplified */}
       <nav className="fixed bottom-0 left-0 right-0 bg-stone-900/95 backdrop-blur-md border-t border-stone-800 safe-area-inset-bottom z-40">

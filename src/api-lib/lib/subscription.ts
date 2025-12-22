@@ -5,11 +5,17 @@
 
 import { TEST_MODE } from './constants.js';
 
+// User type with subscription fields
+interface SubscribableUser {
+  subscription_end?: string | Date | null;
+  subscription_active?: boolean;
+}
+
 /**
  * Check if user has active subscription
  * In TEST_MODE, always returns true (free Pro for everyone)
  */
-export function isSubscriptionActive(user: any): boolean {
+export function isSubscriptionActive(user: SubscribableUser | null | undefined): boolean {
   // TEST MODE: everyone gets free access
   if (TEST_MODE) return true;
 

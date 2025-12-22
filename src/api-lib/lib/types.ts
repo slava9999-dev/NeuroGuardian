@@ -34,10 +34,10 @@ export interface OpenAIMessage {
 }
 
 export interface AgentToolResult {
-  data: any;
+  data: Record<string, unknown>;
   requiresConfirmation?: boolean;
   confirmationMessage?: string;
-  confirmationDetails?: any;
+  confirmationDetails?: Record<string, unknown>;
 }
 
 export interface AgentResponse {
@@ -48,7 +48,7 @@ export interface AgentResponse {
   actionRequired?: {
     type: string;
     operation: string;
-    details: any;
+    details: Record<string, unknown>;
     confirmationMessage: string;
   };
 }
