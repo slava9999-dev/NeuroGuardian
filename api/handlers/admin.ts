@@ -581,3 +581,133 @@ export async function handleAdminCloneUser(
     actions: results,
   });
 }
+
+/**
+ * Handle send-reminders action (cron job)
+ */
+export async function handleSendReminders(
+  req: VercelRequest,
+  res: VercelResponse
+): Promise<VercelResponse> {
+  // Allow Vercel Cron or manual Admin trigger
+  const authHeader = req.headers['authorization'];
+  const isCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+  const isAdmin = validateAdminAccess(req);
+  const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
+  if (!isCron && !isAdmin && IS_PRODUCTION) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  console.log('📧 Starting subscription expiry reminders...');
+
+  // Get users with expiring subscriptions (3 days, 1 day, expired)
+  const expiringUsers = await sql`
+    SELECT id, first_name, subscription_end, subscription_plan
+    FROM users
+    WHERE subscription_end IS NOT NULL
+    AND subscription_end > NOW() - INTERVAL '1 day'
+    AND subscription_end < NOW() + INTERVAL '4 days'
+  `;
+
+  let sent = 0;
+  let errors = 0;
+
+  for (const user of expiringUsers.rows) {
+    try {
+      const endDate = new Date(user.subscription_end);
+      const now = new Date();
+      const daysLeft = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+      let message = '';
+      if (daysLeft <= 0) {
+        message = `⚠️ <b>Подписка закончилась</b>\n\nВаша подписка ${user.subscription_plan} истекла.\nПродлите подписку, чтобы защитить товары!`;
+      } else if (daysLeft === 1) {
+        message = `⏰ <b>Подписка заканчивается завтра!</b>\n\nОсталось менее 24 часов.\nПродлите сейчас, чтобы не потерять защиту.`;
+      } else {
+        message = `📅 <b>Напоминание</b>\n\nВаша подписка истекает через ${daysLeft} дня.\nНе забудьте продлить!`;
+      }
+
+      const token = process.env.TELEGRAM_BOT_TOKEN;
+      if (token) {
+        await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: user.id,
+            text: message,
+            parse_mode: 'HTML',
+          }),
+        });
+        sent++;
+      }
+    } catch (e) {
+      console.error(`Failed to send reminder to user ${user.id}:`, e);
+      errors++;
+    }
+  }
+
+  console.log(`📧 Reminders complete: sent=${sent}, errors=${errors}`);
+
+  return res.json({
+    success: true,
+    message: `Reminders sent: ${sent}, errors: ${errors}`,
+    sent,
+    errors,
+  });
+}
+
+/**
+ * Handle referral action — get user's referral info
+ */
+export async function handleReferral(
+  req: VercelRequest,
+  res: VercelResponse
+): Promise<VercelResponse> {
+  if (req.method !== 'GET' && req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  // Import validation
+  const { validateTelegramInitData, sanitizeInput } =
+    await import('../../src/api-lib/lib/index.js');
+  const { getUserById } = await import('../../src/api-lib/services/index.js');
+
+  const initData = sanitizeInput(
+    (req.headers['x-init-data'] as string) || req.body?.initData || ''
+  );
+  const validation = validateTelegramInitData(initData);
+
+  if (!validation.valid || !validation.user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const dbUser = await getUserById(validation.user.id);
+  if (!dbUser) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  // Count successful referrals
+  const referralsResult = await sql`
+    SELECT COUNT(*) as count FROM users 
+    WHERE referred_by = ${dbUser.referral_code}
+  `;
+  const referralCount = parseInt(referralsResult.rows[0]?.count || '0', 10);
+
+  // Generate referral link
+  const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'NeuroGuardianBot';
+  const referralLink = `https://t.me/${botUsername}?start=ref_${dbUser.referral_code}`;
+
+  // Referral bonus config
+  const REFERRAL_BONUS_DAYS = 7;
+  const REFERRAL_DISCOUNT_PERCENT = 10;
+
+  return res.json({
+    success: true,
+    referralCode: dbUser.referral_code,
+    referralLink,
+    referralCount,
+    bonusDays: REFERRAL_BONUS_DAYS,
+    discountPercent: REFERRAL_DISCOUNT_PERCENT,
+  });
+}

@@ -28,6 +28,8 @@ import {
   handleAdminTestOzon,
   handleAdminTestWb,
   handleAdminCloneUser,
+  handleSendReminders,
+  handleReferral,
   validateAdminAccess,
 } from './handlers/admin.js';
 
@@ -3891,67 +3893,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return handleAdminCloneUser(req, res);
       }
 
-      // ========== SEND REMINDERS (CRON) ==========
+      // ========== SEND REMINDERS (migrated to handler) ==========
       case 'send-reminders': {
-        // Allow Vercel Cron or manual Admin trigger
-        const authHeader = req.headers['authorization'];
-        const isCron = authHeader === `Bearer ${process.env.CRON_SECRET}`;
-        const isAdmin = req.headers['x-admin-key'] === ADMIN_API_KEY;
-
-        if (!isCron && !isAdmin && IS_PRODUCTION) {
-          return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        console.log('📧 Starting subscription expiry reminders...');
-        const result = await sendExpiryReminders();
-
-        console.log(`📧 Reminders complete: sent=${result.sent}, errors=${result.errors}`);
-
-        return res.json({
-          success: true,
-          message: `Reminders sent: ${result.sent}, errors: ${result.errors}`,
-          ...result,
-        });
+        return handleSendReminders(req, res);
       }
 
-      // ========== GET REFERRAL INFO ==========
+      // ========== GET REFERRAL INFO (migrated to handler) ==========
       case 'referral': {
-        if (req.method !== 'GET' && req.method !== 'POST') {
-          return res.status(405).json({ error: 'Method not allowed' });
-        }
-
-        const initData = sanitizeInput(
-          (req.headers['x-init-data'] as string) || req.body?.initData || ''
-        );
-        const validation = validateTelegramInitData(initData);
-        if (!validation.valid || !validation.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const dbUser = await getUserById(validation.user.id);
-        if (!dbUser) {
-          return res.status(404).json({ error: 'User not found' });
-        }
-
-        // Count successful referrals
-        const referralsResult = await sql`
-          SELECT COUNT(*) as count FROM users 
-          WHERE referred_by = ${dbUser.referral_code}
-        `;
-        const referralCount = parseInt(referralsResult.rows[0]?.count || '0', 10);
-
-        // Generate referral link
-        const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'NeuroGuardianBot';
-        const referralLink = `https://t.me/${botUsername}?start=ref_${dbUser.referral_code}`;
-
-        return res.json({
-          success: true,
-          referralCode: dbUser.referral_code,
-          referralLink,
-          referralCount,
-          bonusDays: REFERRAL_BONUS_DAYS,
-          discountPercent: REFERRAL_DISCOUNT_PERCENT,
-        });
+        return handleReferral(req, res);
       }
 
       // ========== ADMIN: SENTINEL LOGS (migrated to handler) ==========
