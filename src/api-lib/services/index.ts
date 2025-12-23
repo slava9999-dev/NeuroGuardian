@@ -21,6 +21,14 @@ export {
   getUsersWithExpiringSubscriptions,
   markReminderSent,
   applyReferralBonus,
+  // Pending price tracking (Dec 2024)
+  setPendingPrice,
+  clearPendingPrice,
+  confirmPendingPrice,
+  batchSetPendingPrices,
+  getProductsWithPendingPrices,
+  batchConfirmPendingByTaskId,
+  migrateAddPendingColumns,
 } from './database.js';
 
 // YooKassa

@@ -106,3 +106,40 @@ export interface Product {
   protected: boolean;
   created_at: Date;
 }
+
+// ============================================
+// PENDING PRICE TRACKING TYPES
+// For WB async task status verification
+// ============================================
+
+export type PendingPriceStatus = 'pending' | 'processing' | 'completed' | 'failed';
+
+export interface DBProduct {
+  id: number;
+  user_id: number;
+  product_id: string;
+  nm_id: number | null;
+  title: string;
+  image_url: string | null;
+  current_price: number;
+  min_price: number;
+  current_stock: number;
+  marketplace: 'WB' | 'Ozon';
+  status: string;
+  is_monitored: boolean;
+  // Pending price tracking fields
+  pending_price: number | null;
+  pending_task_id: number | null;
+  pending_status: PendingPriceStatus | null;
+  pending_since: Date | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface PendingPriceUpdate {
+  productId: string;
+  nmId?: number;
+  pendingPrice: number;
+  taskId: number;
+  marketplace: 'WB' | 'Ozon';
+}

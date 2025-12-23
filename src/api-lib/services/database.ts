@@ -52,6 +52,11 @@ export async function initializeDatabase(): Promise<void> {
       marketplace VARCHAR(10) NOT NULL,
       status VARCHAR(50) DEFAULT 'active',
       is_monitored BOOLEAN DEFAULT true,
+      -- Pending price tracking (Dec 2024 Audit)
+      pending_price INTEGER,
+      pending_task_id BIGINT,
+      pending_status VARCHAR(20),
+      pending_since TIMESTAMP,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       UNIQUE(user_id, product_id)
@@ -176,13 +181,13 @@ export async function getProductsByUserId(userId: number) {
  */
 export async function updateProductMinPrice(
   userId: number,
-  productId: number,
+  productId: string | number,
   minPrice: number
 ): Promise<void> {
   await sql`
     UPDATE products
     SET min_price = ${minPrice}, updated_at = NOW()
-    WHERE user_id = ${userId} AND product_id = ${productId}
+    WHERE user_id = ${userId} AND product_id = ${String(productId)}
   `;
   console.log(`✅ Set min_price=${minPrice} for product ${productId} (User ${userId})`);
 }
@@ -429,4 +434,170 @@ export async function applyReferralBonus(referrerId: number, days: number = 30):
       updated_at = CURRENT_TIMESTAMP
     WHERE id = ${referrerId}
   `;
+}
+
+// ============================================
+// PENDING PRICE TRACKING (Dec 2024 Audit)
+// Track async WB price update tasks
+// ============================================
+
+/**
+ * Set pending price for a product
+ * Called when WB task is created but not yet confirmed
+ */
+export async function setPendingPrice(
+  userId: number,
+  productId: string,
+  pendingPrice: number,
+  taskId: number
+): Promise<void> {
+  await sql`
+    UPDATE products SET
+      pending_price = ${pendingPrice},
+      pending_task_id = ${taskId},
+      pending_status = 'pending',
+      pending_since = NOW(),
+      updated_at = NOW()
+    WHERE user_id = ${userId} AND product_id = ${productId}
+  `;
+  console.log(`📋 Set pending price ${pendingPrice} for ${productId} (task: ${taskId})`);
+}
+
+/**
+ * Clear pending price (on failure or timeout)
+ */
+export async function clearPendingPrice(
+  userId: number,
+  productId: string,
+  status: 'failed' | 'timeout' = 'failed'
+): Promise<void> {
+  await sql`
+    UPDATE products SET
+      pending_price = NULL,
+      pending_task_id = NULL,
+      pending_status = ${status},
+      updated_at = NOW()
+    WHERE user_id = ${userId} AND product_id = ${productId}
+  `;
+  console.log(`❌ Cleared pending price for ${productId} (status: ${status})`);
+}
+
+/**
+ * Confirm pending price (on successful task completion)
+ * Moves pending_price to current_price
+ */
+export async function confirmPendingPrice(
+  userId: number,
+  productId: string
+): Promise<{ confirmed: boolean; newPrice: number | null }> {
+  const result = await sql`
+    UPDATE products SET
+      current_price = pending_price,
+      pending_price = NULL,
+      pending_task_id = NULL,
+      pending_status = 'completed',
+      pending_since = NULL,
+      updated_at = NOW()
+    WHERE user_id = ${userId} 
+      AND product_id = ${productId}
+      AND pending_price IS NOT NULL
+    RETURNING current_price
+  `;
+
+  if (result.rowCount && result.rowCount > 0) {
+    const newPrice = result.rows[0]?.current_price;
+    console.log(`✅ Confirmed pending price ${newPrice} for ${productId}`);
+    return { confirmed: true, newPrice };
+  }
+
+  return { confirmed: false, newPrice: null };
+}
+
+/**
+ * Batch set pending prices for WB updates
+ */
+export async function batchSetPendingPrices(
+  userId: number,
+  updates: Array<{ nmId: number; pendingPrice: number; taskId: number }>
+): Promise<{ updated: number }> {
+  let updated = 0;
+
+  for (const u of updates) {
+    const result = await sql`
+      UPDATE products SET
+        pending_price = ${u.pendingPrice},
+        pending_task_id = ${u.taskId},
+        pending_status = 'pending',
+        pending_since = NOW(),
+        updated_at = NOW()
+      WHERE user_id = ${userId} AND nm_id = ${u.nmId}
+    `;
+    if (result.rowCount && result.rowCount > 0) {
+      updated++;
+    }
+  }
+
+  console.log(`📋 Batch set ${updated} pending prices for user ${userId}`);
+  return { updated };
+}
+
+/**
+ * Get products with pending prices (for cron verification)
+ */
+export async function getProductsWithPendingPrices() {
+  const result = await sql`
+    SELECT 
+      p.*,
+      u.api_key_wb
+    FROM products p
+    JOIN users u ON p.user_id = u.id
+    WHERE p.pending_status = 'pending'
+      AND p.pending_task_id IS NOT NULL
+      AND p.pending_since < NOW() - INTERVAL '30 seconds'
+    ORDER BY p.pending_since ASC
+    LIMIT 50
+  `;
+  return result.rows;
+}
+
+/**
+ * Batch confirm pending prices by task ID
+ */
+export async function batchConfirmPendingByTaskId(taskId: number): Promise<{ confirmed: number }> {
+  const result = await sql`
+    UPDATE products SET
+      current_price = pending_price,
+      pending_price = NULL,
+      pending_task_id = NULL,
+      pending_status = 'completed',
+      pending_since = NULL,
+      updated_at = NOW()
+    WHERE pending_task_id = ${taskId}
+      AND pending_price IS NOT NULL
+  `;
+
+  const confirmed = result.rowCount || 0;
+  console.log(`✅ Batch confirmed ${confirmed} products for task ${taskId}`);
+  return { confirmed };
+}
+
+/**
+ * Migration: Add pending price columns to existing DB
+ * Run once during deployment
+ */
+export async function migrateAddPendingColumns(): Promise<void> {
+  try {
+    // Add columns if they don't exist (PostgreSQL safe)
+    await sql`
+      ALTER TABLE products 
+      ADD COLUMN IF NOT EXISTS pending_price INTEGER,
+      ADD COLUMN IF NOT EXISTS pending_task_id BIGINT,
+      ADD COLUMN IF NOT EXISTS pending_status VARCHAR(20),
+      ADD COLUMN IF NOT EXISTS pending_since TIMESTAMP
+    `;
+    console.log('✅ Migration: pending price columns added');
+  } catch (e) {
+    // Columns may already exist
+    console.log('ℹ️ Migration: pending columns already exist or error:', e);
+  }
 }

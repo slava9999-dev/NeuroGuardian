@@ -19,6 +19,8 @@ import {
   updateProductMinPrice,
   batchUpdateWbPrices,
   batchUpdateOzonPrices,
+  batchSetPendingPrices,
+  batchConfirmPendingByTaskId,
 } from '../../src/api-lib/services/index.js';
 
 // Marketplace API operations (centralized WB/Ozon logic)
@@ -52,6 +54,71 @@ import {
 
 // Note: System prompt is now imported from system-prompt-v2.ts
 // Using Expert Persona (Виктор Маржин) + CoT + Few-Shot examples
+
+// ============================================
+// TYPE DEFINITIONS (Dec 2024 Audit: Replace any)
+// ============================================
+
+/** Database user record */
+interface DBUserRecord {
+  id: number;
+  username?: string;
+  first_name: string;
+  last_name?: string;
+  photo_url?: string;
+  role?: string;
+  api_key_wb?: string;
+  api_key_ozon?: string;
+  ozon_client_id?: string;
+  protection_enabled: boolean;
+  defense_mode: 'zero_stock' | 'price_correction';
+  subscription_plan: string;
+  subscription_end?: string;
+  subscription_end_date?: string;
+  subscription_active: boolean;
+  triggered_today: number;
+  saved_amount: number;
+}
+
+/** Database product record */
+interface DBProductRecord {
+  id: number;
+  user_id: number;
+  product_id: string;
+  nm_id: number | null;
+  title: string;
+  image_url: string | null;
+  current_price: number;
+  min_price: number;
+  current_stock: number;
+  marketplace: 'WB' | 'Ozon';
+  vendor_code?: string;
+  status: string;
+  is_monitored: boolean;
+}
+
+/** OpenAI tool call item */
+interface ToolCallItem {
+  id: string;
+  type: 'function';
+  function: {
+    name: string;
+    arguments: string;
+  };
+}
+
+/** Action requiring user confirmation */
+interface ActionRequired {
+  operation: string;
+  confirmationMessage: string;
+  details: Record<string, unknown>;
+}
+
+/** User API context for tools */
+interface UserApiContext {
+  wbApiKey?: string;
+  ozonApiKey?: string;
+}
 
 // Helper to get KV client
 function getKVClient() {
@@ -303,15 +370,14 @@ const AGENT_TOOLS = [
 type OpenAIMessage = {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content?: string | null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  tool_calls?: any[];
+  tool_calls?: ToolCallItem[];
   name?: string;
   tool_call_id?: string;
 };
 
 // --- Check Subscription Helper (local) ---
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function isSubscriptionActiveLocal(user: any): boolean {
+function isSubscriptionActiveLocal(user: DBUserRecord | null): boolean {
+  if (!user) return false;
   if (process.env.TEST_MODE === 'true') return true;
   if (user.role === 'admin') return true;
   if (!user.subscription_active) return false;
@@ -325,8 +391,7 @@ function isSubscriptionActiveLocal(user: any): boolean {
 async function callOpenAIWithTools(
   messages: OpenAIMessage[],
   userId: number,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  userContext: any,
+  userContext: UserApiContext,
   model: string,
   maxTokens: number
 ): Promise<{
@@ -334,8 +399,7 @@ async function callOpenAIWithTools(
   content: string;
   toolsUsed: string[];
   tokensUsed: number;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  actionRequired?: any;
+  actionRequired?: ActionRequired;
 }> {
   // LLM Provider: OpenAI (recommended) > Groq > AgentRouter
   const openaiKey = process.env.OPENAI_API_KEY;
@@ -456,11 +520,11 @@ async function callOpenAIWithTools(
             console.log(`🔍 Marketplace filter: ${requestedMarketplace || 'all'}`);
 
             // Filter products by marketplace if specified
-
-            let filteredProducts = products;
+            const typedProducts = products as DBProductRecord[];
+            let filteredProducts: DBProductRecord[] = typedProducts;
             if (requestedMarketplace && requestedMarketplace !== 'ALL') {
-              filteredProducts = products.filter(
-                (p: any) => p.marketplace?.toUpperCase() === requestedMarketplace
+              filteredProducts = typedProducts.filter(
+                p => p.marketplace?.toUpperCase() === requestedMarketplace
               );
               console.log(
                 `🔍 Filtered to ${filteredProducts.length} ${requestedMarketplace} products`
@@ -479,8 +543,7 @@ async function callOpenAIWithTools(
               console.log(`🔍 Looking for product: "${reqId}" with new price: ${reqPrice}`);
 
               // Find matching product in filtered list with improved fuzzy matching
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const dbProduct = filteredProducts.find((p: any) => {
+              const dbProduct = filteredProducts.find((p: DBProductRecord) => {
                 const pId = String(p.product_id || '').toLowerCase();
                 const pTitle = String(p.title || '').toLowerCase();
                 const pNmId = String(p.nm_id || '');
@@ -535,7 +598,7 @@ async function callOpenAIWithTools(
                 // Log available products for debugging
                 console.log(
                   `📦 Available products:`,
-                  products.slice(0, 5).map((p: any) => p.title)
+                  (products as DBProductRecord[]).slice(0, 5).map(p => p.title)
                 );
               }
             }
@@ -618,9 +681,9 @@ async function callOpenAIWithTools(
               });
             } else {
               // Filter products by marketplace
-
-              const filteredProducts = products.filter(
-                (p: any) => p.marketplace?.toUpperCase() === requestedMarketplace
+              const stockProducts = products as DBProductRecord[];
+              const filteredProducts = stockProducts.filter(
+                p => p.marketplace?.toUpperCase() === requestedMarketplace
               );
               console.log(
                 `🔍 Filtered to ${filteredProducts.length} ${requestedMarketplace} products`
@@ -638,8 +701,7 @@ async function callOpenAIWithTools(
                 console.log(`🔍 Looking for product: "${reqId}" with new stock: ${reqStock}`);
 
                 // Find matching product
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const dbProduct = filteredProducts.find((p: any) => {
+                const dbProduct = filteredProducts.find((p: DBProductRecord) => {
                   const pTitle = String(p.title || '').toLowerCase();
                   return (
                     pTitle.includes(reqId) ||
@@ -772,7 +834,7 @@ export async function handleAgent(
     userId = validation.user.id;
   }
 
-  const user = await getUserById(userId);
+  const user = (await getUserById(userId)) as DBUserRecord | null;
 
   // Check subscription
   if (!isSubscriptionActiveLocal(user)) {
@@ -825,9 +887,9 @@ export async function handleAgent(
 
   // Context
   const products = await getProductsByUserId(userId);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const protectedCount = products.filter((p: any) => p.min_price > 0).length;
-  const unprotectedCount = products.length - protectedCount;
+  const typedProducts = products as DBProductRecord[];
+  const protectedCount = typedProducts.filter(p => p.min_price > 0).length;
+  const unprotectedCount = typedProducts.length - protectedCount;
 
   // Complexity
   const lowerMessage = message.toLowerCase();
@@ -883,8 +945,18 @@ export async function handleAgent(
     isComplex ? 2000 : 1200
   );
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const agentResponse: { content: string; actionRequired?: any; metadata?: any } = {
+  interface AgentResponseType {
+    content: string;
+    actionRequired?: ActionRequired;
+    metadata?: {
+      executionTime: number;
+      model: string;
+      toolsUsed: string[];
+      tokensUsed: number;
+    };
+  }
+
+  const agentResponse: AgentResponseType = {
     content: gptResult.content || '',
     metadata: {
       executionTime: Date.now() - startTime,
@@ -908,7 +980,9 @@ export async function handleAgent(
     toolsUsed: gptResult.toolsUsed,
     hadError: !gptResult.success,
     errorType: gptResult.success ? undefined : 'openai_error',
-    actionRequired: gptResult.actionRequired ? { type: gptResult.actionRequired.type } : undefined,
+    actionRequired: gptResult.actionRequired
+      ? { type: gptResult.actionRequired.operation }
+      : undefined,
   });
 
   // Log metrics asynchronously (don't block response)
@@ -979,10 +1053,9 @@ export async function handleAgentConfirm(
   // Logic for executions...
   if (operation === 'bulk_set_min_price') {
     const percentage = details.percentage || 15;
-    const products = await getProductsByUserId(userId);
+    const products = (await getProductsByUserId(userId)) as DBProductRecord[];
     const filteredProducts = details.only_unprotected
-      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        products.filter((p: any) => !p.min_price || p.min_price === 0)
+      ? products.filter(p => !p.min_price || p.min_price === 0)
       : products;
 
     let updated = 0;
@@ -1070,21 +1143,38 @@ export async function handleAgentConfirm(
           if (result.success && result.taskId) {
             console.log(`📋 WB Task ID: ${result.taskId} - Task is QUEUED (not yet completed)`);
 
-            // CRITICAL (Dec 2024 Audit): Verify task status before updating DB
-            // Wait 2 seconds for WB to process the task
+            // IMPROVED (Dec 2024 Audit): Use pending price tracking
+            // Step 1: Save pending prices to DB (optimistic tracking)
+            await batchSetPendingPrices(
+              userId,
+              wbUpdates.map(u => ({
+                nmId: u.nmId,
+                pendingPrice: u.newPrice,
+                taskId: result.taskId!,
+              }))
+            );
+
+            // Step 2: Wait for WB to process the task
             await new Promise(resolve => setTimeout(resolve, 2000));
 
+            // Step 3: Check task status
             const taskStatus = await checkWbTaskStatus(wbApiKey, result.taskId);
 
             if (taskStatus.hasErrors) {
               console.error(`❌ WB Task ${result.taskId} failed:`, taskStatus.errors);
+              // Pending prices will be cleaned up by cron job or stay as 'pending'
               wbResult = {
                 success: false,
                 count: 0,
                 error: taskStatus.errors?.join('; ') || 'Задача WB завершилась с ошибкой',
               };
+            } else if (taskStatus.completed) {
+              // Task completed successfully - confirm pending prices
+              await batchConfirmPendingByTaskId(result.taskId);
+              console.log(`✅ WB Task ${result.taskId} completed - prices confirmed`);
             } else {
-              // Task is either completed or still processing - update DB
+              // Task still processing - also update DB (optimistic approach)
+              // Pending prices will be confirmed by cron job later
               const dbResult = await batchUpdateWbPrices(
                 userId,
                 wbUpdates.map(u => ({ nmId: u.nmId, newPrice: u.newPrice }))
@@ -1198,7 +1288,13 @@ export async function handleAgentConfirm(
               `📦 Using WB warehouse: ${warehousesResult.warehouses[0].name} (${warehouseId})`
             );
 
-            const updates = stock_changes.map((item: any) => ({
+            interface StockChangeItem {
+              vendor_code?: string;
+              nm_id?: number;
+              product_id?: string;
+              newStock: number;
+            }
+            const updates = (stock_changes as StockChangeItem[]).map(item => ({
               sku: item.vendor_code || String(item.nm_id),
               amount: item.newStock,
             }));
@@ -1219,7 +1315,12 @@ export async function handleAgentConfirm(
             const { updateOzonStockFbs } =
               await import('../../src/api-lib/services/marketplace.js');
 
-            const updates = stock_changes.map((item: any) => ({
+            interface OzonStockChangeItem {
+              product_id: string;
+              vendor_code?: string;
+              newStock: number;
+            }
+            const updates = (stock_changes as OzonStockChangeItem[]).map(item => ({
               productId: parseInt(item.product_id.replace('ozon-', '')),
               offerId: item.vendor_code || String(item.product_id),
               stock: item.newStock,

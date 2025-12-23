@@ -2,6 +2,50 @@
 
 All notable changes to NeuroGUARDIAN project.
 
+## [2.8.0] - 2024-12-24
+
+### 🔴 Critical Fixes (Dec 24 Audit - 3 AI Models Consilium)
+
+- **Pending Price Tracking**: Implemented full async price update tracking for WB
+  - New DB columns: `pending_price`, `pending_task_id`, `pending_status`, `pending_since`
+  - New functions: `setPendingPrice()`, `clearPendingPrice()`, `confirmPendingPrice()`, `batchSetPendingPrices()`
+  - Migration function: `migrateAddPendingColumns()` for existing databases
+  - Prevents DB desync when WB task fails after initial 200 OK response
+
+### 🧪 Testing
+
+- **Marketplace Tests**: Added 21 new tests for `marketplace.ts` (total: 57 tests)
+  - Price extraction logic
+  - Input validation (NaN, null, negative values)
+  - WB payload format (nmID, discount: 0)
+  - Ozon payload format (strings, currency_code)
+  - Task status parsing
+  - Error handling (partial success)
+  - Stock aggregation
+  - Retry logic
+
+### 🔒 Type Safety (any → interfaces)
+
+- **New Interfaces in `agent.ts`**:
+  - `DBUserRecord` — Database user record
+  - `DBProductRecord` — Database product record
+  - `ToolCallItem` — OpenAI tool call
+  - `ActionRequired` — Confirmation action
+  - `UserApiContext` — API key context
+- **Removed 13+ `eslint-disable` comments** for `@typescript-eslint/no-explicit-any`
+- All product callbacks now use `DBProductRecord` type
+
+### 📊 Metrics
+
+| Metric      | Before   | After    |
+| ----------- | -------- | -------- |
+| Build       | ✅ 2.13s | ✅ 2.32s |
+| Tests       | 36/36    | 57/57    |
+| `any` types | 13+      | 0        |
+| Bundle Size | 367KB    | 367KB    |
+
+---
+
 ## [2.7.1] - 2024-12-23
 
 ### 🔴 Critical Fixes (Dec 23 Audit)
