@@ -382,17 +382,74 @@ async function callOpenAIWithTools(
             const toolResult = executeGetMarketplaceInfo(fnArgs);
             result = JSON.stringify(toolResult.data || { error: toolResult.error });
           } else if (fnName === 'update_prices') {
-            // Return immediate action required
-            return {
-              success: true,
-              content: 'Требуется подтверждение для изменения цен.',
-              toolsUsed: [fnName],
-              tokensUsed: tokens,
-              actionRequired: {
-                type: 'update_prices',
-                details: fnArgs,
-              },
-            };
+            // Fetch product details to build proper price_changes array
+            const products = await getProductsByUserId(userId);
+            const priceChanges = [];
+
+            // Parse products from fnArgs
+            const requestedProducts = fnArgs.products || [];
+            for (const req of requestedProducts) {
+              // Find matching product in DB (by product_id, title match, or nm_id)
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const dbProduct = products.find((p: any) => {
+                const reqId = String(req.product_id || '').toLowerCase();
+                const pId = String(p.product_id || '').toLowerCase();
+                const pTitle = String(p.title || '').toLowerCase();
+                const pNmId = String(p.nm_id || '');
+
+                return (
+                  pId === reqId ||
+                  pId.includes(reqId) ||
+                  reqId.includes(pNmId) ||
+                  pTitle.includes(reqId) ||
+                  reqId.includes(pTitle.substring(0, 20))
+                );
+              });
+
+              if (dbProduct) {
+                priceChanges.push({
+                  product_id: dbProduct.product_id,
+                  nm_id: dbProduct.nm_id,
+                  title: dbProduct.title,
+                  marketplace: dbProduct.marketplace,
+                  currentPrice: dbProduct.current_price,
+                  newPrice: req.new_price,
+                });
+              }
+            }
+
+            // If no specific products, check if change_value is set (percentage change)
+            if (priceChanges.length === 0 && fnArgs.change_value) {
+              // Apply percentage to all products
+              for (const p of products.slice(0, 10)) {
+                // Limit to 10 for safety
+                const newPrice = Math.round(p.current_price * (1 + fnArgs.change_value / 100));
+                priceChanges.push({
+                  product_id: p.product_id,
+                  nm_id: p.nm_id,
+                  title: p.title,
+                  marketplace: p.marketplace,
+                  currentPrice: p.current_price,
+                  newPrice,
+                });
+              }
+            }
+
+            if (priceChanges.length === 0) {
+              result = JSON.stringify({ error: 'Не найдены товары для изменения цен' });
+            } else {
+              return {
+                success: true,
+                content: `Требуется подтверждение для изменения цен на ${priceChanges.length} товар(ов).`,
+                toolsUsed: [fnName],
+                tokensUsed: tokens,
+                actionRequired: {
+                  operation: 'update_prices',
+                  confirmationMessage: `Изменить цены на ${priceChanges.length} товар(ов)?`,
+                  details: { price_changes: priceChanges },
+                },
+              };
+            }
           } else if (fnName === 'bulk_protect_products') {
             return {
               success: true,
@@ -400,7 +457,8 @@ async function callOpenAIWithTools(
               toolsUsed: [fnName],
               tokensUsed: tokens,
               actionRequired: {
-                type: 'bulk_set_min_price',
+                operation: 'bulk_set_min_price',
+                confirmationMessage: 'Установить Stop-Loss для всех товаров?',
                 details: fnArgs,
               },
             };
@@ -411,7 +469,8 @@ async function callOpenAIWithTools(
               toolsUsed: [fnName],
               tokensUsed: tokens,
               actionRequired: {
-                type: 'set_stop_loss',
+                operation: 'set_stop_loss',
+                confirmationMessage: `Установить Stop-Loss ${fnArgs.min_price}₽ для товара?`,
                 details: fnArgs,
               },
             };
