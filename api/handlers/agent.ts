@@ -256,6 +256,44 @@ const AGENT_TOOLS = [
       },
     },
   },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'update_stocks',
+      description:
+        'Изменить остатки товаров на складе. ВАЖНО: Работает ТОЛЬКО для FBS (товары на СВОЁМ складе продавца). Для FBO (товары на складе маркетплейса) изменить остатки НЕЛЬЗЯ — они зависят от поставок. ТРЕБУЕТ ПОДТВЕРЖДЕНИЯ!',
+      parameters: {
+        type: 'object',
+        properties: {
+          products: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                product_id: {
+                  type: 'string',
+                  description: 'Название товара или его ID',
+                },
+                new_stock: {
+                  type: 'number',
+                  description: 'Новое количество остатка (целое число >= 0)',
+                },
+              },
+              required: ['product_id', 'new_stock'],
+            },
+            description: 'Список товаров для изменения остатков',
+          },
+          marketplace: {
+            type: 'string',
+            enum: ['WB', 'Ozon'],
+            description:
+              'Маркетплейс для изменения остатков. Обязательно указывай: "Wildberries" → WB, "Ozon" → Ozon',
+          },
+        },
+        required: ['products', 'marketplace'],
+      },
+    },
+  },
 ];
 
 type OpenAIMessage = {
@@ -417,7 +455,6 @@ async function callOpenAIWithTools(
 
             let filteredProducts = products;
             if (requestedMarketplace && requestedMarketplace !== 'ALL') {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               filteredProducts = products.filter(
                 (p: any) => p.marketplace?.toUpperCase() === requestedMarketplace
               );
@@ -561,6 +598,87 @@ async function callOpenAIWithTools(
                 details: fnArgs,
               },
             };
+          } else if (fnName === 'update_stocks') {
+            // Fetch product details to build proper stock_changes array
+            const products = await getProductsByUserId(userId);
+            const stockChanges = [];
+
+            console.log(`🔍 update_stocks: User ${userId} has ${products.length} products`);
+            console.log(`🔍 update_stocks fnArgs:`, JSON.stringify(fnArgs));
+
+            // Parse marketplace filter from fnArgs (required for stocks)
+            const requestedMarketplace = fnArgs.marketplace?.toUpperCase();
+            if (!requestedMarketplace || !['WB', 'OZON'].includes(requestedMarketplace)) {
+              result = JSON.stringify({
+                error: 'Не указан маркетплейс. Укажите WB или Ozon.',
+              });
+            } else {
+              // Filter products by marketplace
+
+              const filteredProducts = products.filter(
+                (p: any) => p.marketplace?.toUpperCase() === requestedMarketplace
+              );
+              console.log(
+                `🔍 Filtered to ${filteredProducts.length} ${requestedMarketplace} products`
+              );
+
+              // Parse products from fnArgs
+              const requestedProducts = fnArgs.products || [];
+
+              for (const req of requestedProducts) {
+                const reqId = String(req.product_id || req.name || req.title || '')
+                  .toLowerCase()
+                  .trim();
+                const reqStock = req.new_stock ?? req.stock ?? req.amount;
+
+                console.log(`🔍 Looking for product: "${reqId}" with new stock: ${reqStock}`);
+
+                // Find matching product
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const dbProduct = filteredProducts.find((p: any) => {
+                  const pTitle = String(p.title || '').toLowerCase();
+                  return (
+                    pTitle.includes(reqId) ||
+                    reqId.split(/\s+/).some(w => w.length > 3 && pTitle.includes(w))
+                  );
+                });
+
+                if (dbProduct && Number.isFinite(reqStock) && reqStock >= 0) {
+                  console.log(`✅ Matched: "${reqId}" -> ${dbProduct.title}`);
+                  stockChanges.push({
+                    product_id: dbProduct.product_id,
+                    nm_id: dbProduct.nm_id,
+                    vendor_code: dbProduct.vendor_code || String(dbProduct.nm_id),
+                    title: dbProduct.title,
+                    marketplace: dbProduct.marketplace,
+                    currentStock: dbProduct.current_stock || 0,
+                    newStock: Math.floor(reqStock),
+                  });
+                } else {
+                  console.log(`❌ No match found for: "${reqId}"`);
+                }
+              }
+
+              if (stockChanges.length === 0) {
+                result = JSON.stringify({
+                  error: 'Не найдены товары для изменения остатков',
+                  note: 'Остатки можно менять только для FBS (товары на своём складе). Для FBO это невозможно.',
+                });
+              } else {
+                console.log(`✅ Prepared ${stockChanges.length} stock changes`);
+                return {
+                  success: true,
+                  content: `Требуется подтверждение для изменения остатков на ${stockChanges.length} товар(ов). (Только FBS!)`,
+                  toolsUsed: [fnName],
+                  tokensUsed: tokens,
+                  actionRequired: {
+                    operation: 'update_stocks',
+                    confirmationMessage: `Изменить остатки на ${stockChanges.length} товар(ов)?`,
+                    details: { stock_changes: stockChanges, marketplace: requestedMarketplace },
+                  },
+                };
+              }
+            }
           } else {
             result = JSON.stringify({ message: `Tool ${fnName} not implemented yet` });
           }
@@ -1013,6 +1131,89 @@ export async function handleAgentConfirm(
       }
     } else {
       resultContent = '❌ Ошибка данных для обновления цен.';
+    }
+  } else if (operation === 'update_stocks') {
+    // Handle stock updates for FBS
+    const { stock_changes, marketplace } = details;
+
+    if (stock_changes && Array.isArray(stock_changes) && stock_changes.length > 0) {
+      console.log(
+        `🚀 EXECUTING REAL STOCK UPDATE for User ${userId}, ${stock_changes.length} items on ${marketplace}`
+      );
+
+      const user = await getUserById(userId);
+      let stockResult = { success: false, count: 0, error: '' };
+
+      if (marketplace === 'WB') {
+        // WB Stock Update (FBS)
+        if (user?.api_key_wb) {
+          const wbApiKey = decryptApiKey(user.api_key_wb);
+
+          // First, get the FBS warehouse
+          const { updateWbStockFbs, getWbFbsWarehouses } =
+            await import('../../src/api-lib/services/marketplace.js');
+
+          const warehousesResult = await getWbFbsWarehouses(wbApiKey);
+
+          if (warehousesResult.warehouses.length === 0) {
+            stockResult = {
+              success: false,
+              count: 0,
+              error:
+                'Не найдены FBS склады. Возможно, вы работаете по FBO — остатки управляются Wildberries.',
+            };
+          } else {
+            // Use first warehouse (most common case)
+            const warehouseId = warehousesResult.warehouses[0].id;
+            console.log(
+              `📦 Using WB warehouse: ${warehousesResult.warehouses[0].name} (${warehouseId})`
+            );
+
+            const updates = stock_changes.map((item: any) => ({
+              sku: item.vendor_code || String(item.nm_id),
+              amount: item.newStock,
+            }));
+
+            const result = await updateWbStockFbs(wbApiKey, warehouseId, updates);
+            stockResult = { ...result, error: result.error || '' };
+          }
+        } else {
+          stockResult = { success: false, count: 0, error: 'WB API ключ не настроен' };
+        }
+      } else if (marketplace === 'OZON') {
+        // Ozon Stock Update (FBS)
+        if (user?.api_key_ozon) {
+          const decryptedOzonKey = decryptApiKey(user.api_key_ozon);
+          const [clientId, apiKey] = (decryptedOzonKey || '').split(':');
+
+          if (clientId && apiKey) {
+            const { updateOzonStockFbs } =
+              await import('../../src/api-lib/services/marketplace.js');
+
+            const updates = stock_changes.map((item: any) => ({
+              productId: parseInt(item.product_id.replace('ozon-', '')),
+              offerId: item.vendor_code || String(item.product_id),
+              stock: item.newStock,
+            }));
+
+            const result = await updateOzonStockFbs(clientId, apiKey, updates);
+            stockResult = { ...result, error: result.error || '' };
+          } else {
+            stockResult = { success: false, count: 0, error: 'Неверный формат Ozon API ключа' };
+          }
+        } else {
+          stockResult = { success: false, count: 0, error: 'Ozon API ключ не настроен' };
+        }
+      }
+
+      if (stockResult.success && stockResult.count > 0) {
+        resultContent = `✅ **Остатки успешно обновлены!**\n\n• ${marketplace}: ${stockResult.count} товаров\n\n⚠️ Изменения применятся в течение нескольких минут.`;
+        executed = true;
+      } else {
+        resultContent = `❌ **Ошибка при обновлении остатков:**\n\n${stockResult.error || 'Неизвестная ошибка'}\n\n💡 Остатки можно менять только для FBS (товары на своём складе). Для FBO это невозможно.`;
+      }
+    } else {
+      resultContent = '❌ Ошибка данных для обновления остатков.';
     }
   } else {
     resultContent = '❌ Неизвестная операция.';

@@ -554,7 +554,7 @@ export async function updateOzonPrices(
       // Check for per-item errors (Ozon can return 200 OK with errors in result)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const successfulUpdates = results.filter((r: any) => r.updated === true);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const failedUpdates = results.filter(
         (r: any) => r.updated === false || (r.errors && r.errors.length > 0)
       );
@@ -562,7 +562,7 @@ export async function updateOzonPrices(
       if (failedUpdates.length > 0) {
         // Extract error messages
         const errorMessages = failedUpdates
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
           .flatMap(
             (f: any) =>
               f.errors?.map((e: any) => `product_id ${f.product_id}: ${e.message || e.code}`) || [
@@ -986,5 +986,235 @@ export async function setWbDefensePrice(
     }
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
+  }
+}
+
+// ============================================
+// STOCK MANAGEMENT (FBS ONLY)
+// ============================================
+
+/**
+ * Update WB stock for FBS products
+ * NOTE: Only works for FBS (seller's warehouse), not FBO (WB's warehouse)
+ *
+ * WB API: POST /api/v3/stocks/{warehouseId}
+ * Requires: warehouseId (supplier's warehouse ID)
+ */
+export async function updateWbStockFbs(
+  apiKey: string,
+  warehouseId: number,
+  updates: Array<{ sku: string; amount: number }>
+): Promise<{ success: boolean; count: number; error?: string }> {
+  if (updates.length === 0) {
+    return { success: true, count: 0 };
+  }
+
+  // Validate inputs
+  const validUpdates = updates.filter(u => {
+    const isValid = u.sku && Number.isFinite(u.amount) && u.amount >= 0;
+    if (!isValid) {
+      console.warn(`⚠️ WB Stock: Skipping invalid update - sku: ${u.sku}, amount: ${u.amount}`);
+    }
+    return isValid;
+  });
+
+  if (validUpdates.length === 0) {
+    return { success: false, count: 0, error: 'Нет валидных данных для обновления' };
+  }
+
+  try {
+    const payload = {
+      stocks: validUpdates.map(u => ({
+        sku: u.sku,
+        amount: u.amount,
+      })),
+    };
+
+    console.log(
+      `📦 WB Stock Update (FBS): ${validUpdates.length} items for warehouse ${warehouseId}`
+    );
+
+    const response = await fetchWithRetry(
+      `https://marketplace-api.wildberries.ru/api/v3/stocks/${warehouseId}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: apiKey,
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    if (response.ok) {
+      console.log(`✅ WB Stock: Updated ${validUpdates.length} FBS items`);
+      return { success: true, count: validUpdates.length };
+    } else {
+      const errorData = await response.json().catch(() => ({}));
+      const errorText = errorData.message || errorData.error || `HTTP ${response.status}`;
+      console.error(`❌ WB Stock Update Failed: ${errorText}`);
+      return { success: false, count: 0, error: errorText };
+    }
+  } catch (e) {
+    const error = e instanceof Error ? e.message : 'Unknown error';
+    console.error(`❌ WB Stock Update Exception:`, error);
+    return { success: false, count: 0, error };
+  }
+}
+
+/**
+ * Get WB FBS warehouses (supplier's warehouses)
+ * Returns list of warehouses where seller can manage stock
+ */
+export async function getWbFbsWarehouses(
+  apiKey: string
+): Promise<{ warehouses: Array<{ id: number; name: string }>; error?: string }> {
+  try {
+    const response = await fetchWithRetry(
+      'https://marketplace-api.wildberries.ru/api/v3/warehouses',
+      {
+        method: 'GET',
+        headers: { Authorization: apiKey },
+      }
+    );
+
+    if (response.ok) {
+      const data = await response.json();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const warehouses = (data || []).map((w: any) => ({
+        id: w.id,
+        name: w.name || `Склад ${w.id}`,
+      }));
+      console.log(`📦 WB: Found ${warehouses.length} FBS warehouses`);
+      return { warehouses };
+    } else {
+      const errorText = await response.text();
+      return { warehouses: [], error: errorText };
+    }
+  } catch (e) {
+    return { warehouses: [], error: e instanceof Error ? e.message : 'Unknown error' };
+  }
+}
+
+/**
+ * Update Ozon stock for FBS products
+ * NOTE: Only works for FBS scheme, not FBO (Ozon's warehouse)
+ *
+ * Ozon API: POST /v2/products/stocks
+ */
+export async function updateOzonStockFbs(
+  clientId: string,
+  apiKey: string,
+  updates: Array<{ productId: number; offerId: string; stock: number; warehouseId?: number }>
+): Promise<{ success: boolean; count: number; error?: string }> {
+  if (updates.length === 0) {
+    return { success: true, count: 0 };
+  }
+
+  // Validate inputs
+  const validUpdates = updates.filter(u => {
+    const isValid = u.productId > 0 && Number.isFinite(u.stock) && u.stock >= 0;
+    if (!isValid) {
+      console.warn(
+        `⚠️ Ozon Stock: Skipping invalid update - productId: ${u.productId}, stock: ${u.stock}`
+      );
+    }
+    return isValid;
+  });
+
+  if (validUpdates.length === 0) {
+    return { success: false, count: 0, error: 'Нет валидных данных для обновления' };
+  }
+
+  try {
+    const payload = {
+      stocks: validUpdates.map(u => ({
+        offer_id: u.offerId,
+        product_id: u.productId,
+        stock: u.stock,
+        ...(u.warehouseId && { warehouse_id: u.warehouseId }),
+      })),
+    };
+
+    console.log(`📦 Ozon Stock Update (FBS): ${validUpdates.length} items`);
+
+    const response = await fetchWithRetry('https://api-seller.ozon.ru/v2/products/stocks', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Client-Id': clientId,
+        'Api-Key': apiKey,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (response.ok) {
+      const responseData = await response.json();
+      const results = responseData.result || [];
+
+      // Check for per-item errors
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const failedItems = results.filter((r: any) => r.updated === false || r.errors?.length > 0);
+
+      if (failedItems.length > 0) {
+        console.warn(`⚠️ Ozon Stock: ${failedItems.length} items failed`);
+        if (failedItems.length === validUpdates.length) {
+          return { success: false, count: 0, error: 'Все обновления не удались' };
+        }
+        return {
+          success: true,
+          count: validUpdates.length - failedItems.length,
+          error: `Частично: ${failedItems.length} ошибок`,
+        };
+      }
+
+      console.log(`✅ Ozon Stock: Updated ${validUpdates.length} FBS items`);
+      return { success: true, count: validUpdates.length };
+    } else {
+      const errorData = await response.json().catch(() => ({}));
+      const errorText = errorData.message || `HTTP ${response.status}`;
+      console.error(`❌ Ozon Stock Update Failed: ${errorText}`);
+      return { success: false, count: 0, error: errorText };
+    }
+  } catch (e) {
+    const error = e instanceof Error ? e.message : 'Unknown error';
+    console.error(`❌ Ozon Stock Update Exception:`, error);
+    return { success: false, count: 0, error };
+  }
+}
+
+/**
+ * Get Ozon FBS warehouses
+ */
+export async function getOzonFbsWarehouses(
+  clientId: string,
+  apiKey: string
+): Promise<{ warehouses: Array<{ id: number; name: string }>; error?: string }> {
+  try {
+    const response = await fetchWithRetry('https://api-seller.ozon.ru/v1/warehouse/list', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Client-Id': clientId,
+        'Api-Key': apiKey,
+      },
+      body: JSON.stringify({}),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const warehouses = (data.result || []).map((w: any) => ({
+        id: w.warehouse_id,
+        name: w.name || `Склад ${w.warehouse_id}`,
+      }));
+      console.log(`📦 Ozon: Found ${warehouses.length} warehouses`);
+      return { warehouses };
+    } else {
+      const errorText = await response.text();
+      return { warehouses: [], error: errorText };
+    }
+  } catch (e) {
+    return { warehouses: [], error: e instanceof Error ? e.message : 'Unknown error' };
   }
 }

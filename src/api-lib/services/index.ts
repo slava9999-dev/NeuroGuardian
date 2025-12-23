@@ -55,6 +55,11 @@ export {
   setOzonDefensePrice,
   setWbZeroStock,
   setWbDefensePrice,
+  // FBS Stock management
+  updateWbStockFbs,
+  getWbFbsWarehouses,
+  updateOzonStockFbs,
+  getOzonFbsWarehouses,
   type MarketplaceProduct,
   type MarketplacePriceUpdate,
   type MarketplaceSalesStats,
