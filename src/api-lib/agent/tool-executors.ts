@@ -575,6 +575,7 @@ export async function executeCalculateUnitEconomics(
 
 /**
  * GET_ABC_ANALYSIS — ABC analysis of products
+ * Improved: Now shows top products from each category
  */
 export async function executeGetAbcAnalysis(
   userId: number,
@@ -604,32 +605,66 @@ export async function executeGetAbcAnalysis(
     else category = 'C';
 
     return {
-      product: p.title.substring(0, 35),
+      product: p.title.substring(0, 40),
       price: p.current_price,
+      marketplace: p.marketplace || 'WB',
       category,
       recommendation:
         category === 'A'
           ? 'Ключевой товар — следить за остатками!'
           : category === 'B'
-            ? 'Стабильный товар'
-            : 'Рассмотреть вывод или распродажу',
+            ? 'Оптимизируй: реклама, описание'
+            : 'Распродай или убери из ассортимента',
     };
   });
 
-  const aCount = analyzed.filter(p => p.category === 'A').length;
-  const bCount = analyzed.filter(p => p.category === 'B').length;
-  const cCount = analyzed.filter(p => p.category === 'C').length;
+  // Get top products from each category
+  const aProducts = analyzed.filter(p => p.category === 'A');
+  const bProducts = analyzed.filter(p => p.category === 'B');
+  const cProducts = analyzed.filter(p => p.category === 'C');
+
+  // Calculate revenue share for each category
+  const aRevenue = aProducts.reduce((sum, p) => sum + (p.price || 0), 0);
+  const bRevenue = bProducts.reduce((sum, p) => sum + (p.price || 0), 0);
+  const cRevenue = cProducts.reduce((sum, p) => sum + (p.price || 0), 0);
 
   return {
     success: true,
     data: {
       summary: {
-        A: { count: aCount, description: '80% выручки' },
-        B: { count: bCount, description: '15% выручки' },
-        C: { count: cCount, description: '5% выручки' },
+        A: {
+          count: aProducts.length,
+          revenue: aRevenue,
+          share: totalValue > 0 ? `${Math.round((aRevenue / totalValue) * 100)}%` : '0%',
+          description: 'Ключевые товары — приносят 80% выручки',
+        },
+        B: {
+          count: bProducts.length,
+          revenue: bRevenue,
+          share: totalValue > 0 ? `${Math.round((bRevenue / totalValue) * 100)}%` : '0%',
+          description: 'Стабильные товары — требуют оптимизации',
+        },
+        C: {
+          count: cProducts.length,
+          revenue: cRevenue,
+          share: totalValue > 0 ? `${Math.round((cRevenue / totalValue) * 100)}%` : '0%',
+          description: 'Аутсайдеры — распродавай или убирай',
+        },
       },
-      note: 'Анализ основан на текущих ценах товаров. Для точного анализа нужны данные о продажах.',
-      products: analyzed.slice(0, 15),
+      topA: aProducts.slice(0, 3).map(p => ({
+        title: p.product,
+        price: p.price,
+        marketplace: p.marketplace,
+      })),
+      topC: cProducts.slice(0, 3).map(p => ({
+        title: p.product,
+        price: p.price,
+        marketplace: p.marketplace,
+        action: 'Рассмотри снижение цены или вывод из ассортимента',
+      })),
+      totalProducts: products.length,
+      totalValue,
+      note: 'Анализ основан на ценах товаров. Для точного анализа подключите статистику продаж.',
     },
   };
 }
