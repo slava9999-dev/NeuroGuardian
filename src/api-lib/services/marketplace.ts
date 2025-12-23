@@ -6,6 +6,16 @@
 
 import { decryptApiKey, fetchWithRetry } from '../lib/index.js';
 import { getUserById } from './database.js';
+import type {
+  WbCard,
+  WbGoodsItem,
+  WbTaskHistoryItem,
+  WbTaskDetail,
+  OzonProductInfo,
+  OzonStockItem,
+  OzonPriceUpdateResult,
+  OzonError,
+} from '../lib/marketplace-types.js';
 
 // ============================================
 // TYPES
@@ -175,9 +185,8 @@ export async function fetchWbProducts(apiKey: string, limit = 100): Promise<Mark
 
   const cardsData = await cardsResponse.json();
 
-  const cards = cardsData.cards || [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const nmIds = cards.map((card: any) => card.nmID);
+  const cards: WbCard[] = cardsData.cards || [];
+  const nmIds = cards.map(card => card.nmID);
 
   // Step 2: Fetch REAL prices from Prices API
   const { priceMap } = await fetchWbPrices(apiKey, nmIds);
@@ -186,8 +195,7 @@ export async function fetchWbProducts(apiKey: string, limit = 100): Promise<Mark
   const stockMap = await fetchWbStocks(apiKey, nmIds);
 
   // Step 4: Map to unified format
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return cards.map((card: any) => ({
+  return cards.map(card => ({
     product_id: `wb-${card.nmID}`,
     nm_id: card.nmID,
     title: card.title || card.subjectName || 'Без названия',
@@ -275,7 +283,7 @@ export async function fetchWbPrices(
  * Extract price from WB goods item
  * Priority: discountedPrice > clubDiscountedPrice > salePrice > price
  */
-function extractWbPrice(good: any): number {
+function extractWbPrice(good: WbGoodsItem): number {
   const size = good.sizes?.[0];
   let price = 0;
 
@@ -424,8 +432,8 @@ export async function checkWbTaskStatus(
     }
 
     const data = await response.json();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const task = data.data?.find((t: any) => t.id === taskId);
+    const tasks: WbTaskHistoryItem[] = data.data || [];
+    const task = tasks.find(t => t.id === taskId);
 
     if (!task) {
       console.log(`⏳ WB Task ${taskId} not found yet (may be processing)`);
@@ -433,11 +441,10 @@ export async function checkWbTaskStatus(
     }
 
     // Check for per-item errors in task details
+    const details: WbTaskDetail[] = task.details || [];
+    const failedItems = details.filter(d => d.status === 'rejected' || d.errorText);
 
-    const failedItems =
-      task.details?.filter((d: any) => d.status === 'rejected' || d.errorText) || [];
-
-    const errors = failedItems.map((e: any) => `nmID ${e.nmID}: ${e.errorText || 'rejected'}`);
+    const errors = failedItems.map(e => `nmID ${e.nmID}: ${e.errorText || 'rejected'}`);
 
     const isCompleted = task.status === 'completed' || task.status === 'done';
     const hasErrors = failedItems.length > 0;
@@ -512,18 +519,17 @@ export async function fetchOzonProducts(
   }
 
   const detailData = await detailResponse.json();
-  const detailItems = detailData.result?.items || detailData.items || [];
+  const detailItems: OzonProductInfo[] = detailData.result?.items || detailData.items || [];
 
   // Step 3: Map to unified format
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return detailItems.map((item: any) => {
-    const totalStock =
-      item.stocks?.stocks?.reduce((acc: number, s: any) => acc + (s.present || 0), 0) || 0;
+  return detailItems.map(item => {
+    const stocks: OzonStockItem[] = item.stocks?.stocks || [];
+    const totalStock = stocks.reduce((acc, s) => acc + (s.present || 0), 0);
 
     let price = 0;
     if (typeof item.price === 'object' && item.price !== null) {
       price = parseFloat(item.price.marketing_price || item.price.price || '0');
-    } else {
+    } else if (typeof item.price === 'string') {
       price = parseFloat(item.price || item.marketing_price || '0');
     }
 
@@ -531,7 +537,9 @@ export async function fetchOzonProducts(
       product_id: `ozon-${item.id}`,
       title: item.name || 'Без названия',
       image_url:
-        (typeof item.primary_image === 'string' ? item.primary_image : item.primary_image?.[0]) ||
+        (typeof item.primary_image === 'string'
+          ? item.primary_image
+          : (item.primary_image as string[])?.[0]) ||
         item.images?.[0] ||
         null,
       current_price: Math.round(price),
@@ -597,25 +605,23 @@ export async function updateOzonPrices(
 
     if (response.ok) {
       const responseData = await response.json();
-      const results = responseData.result || [];
+      const results: OzonPriceUpdateResult[] = responseData.result || [];
 
       // Check for per-item errors (Ozon can return 200 OK with errors in result)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const successfulUpdates = results.filter((r: any) => r.updated === true);
+      const successfulUpdates = results.filter(r => r.updated === true);
 
       const failedUpdates = results.filter(
-        (r: any) => r.updated === false || (r.errors && r.errors.length > 0)
+        r => r.updated === false || (r.errors && r.errors.length > 0)
       );
 
       if (failedUpdates.length > 0) {
         // Extract error messages
         const errorMessages = failedUpdates
-
           .flatMap(
-            (f: any) =>
-              f.errors?.map((e: any) => `product_id ${f.product_id}: ${e.message || e.code}`) || [
-                `product_id ${f.product_id}: update failed`,
-              ]
+            f =>
+              f.errors?.map(
+                (e: OzonError) => `product_id ${f.product_id}: ${e.message || e.code}`
+              ) || [`product_id ${f.product_id}: update failed`]
           )
           .slice(0, 5); // Limit to first 5 errors
 

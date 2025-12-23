@@ -129,7 +129,7 @@ function App() {
                 useProductsStore.getState().setProducts(products);
                 console.log('📦 Products loaded:', products.length);
               }
-            } catch (_err) {
+            } catch {
               console.log('📦 No products yet');
             }
           }

@@ -2,6 +2,37 @@
 
 All notable changes to NeuroGUARDIAN project.
 
+## [2.7.1] - 2024-12-23
+
+### 🔴 Critical Fixes (Dec 23 Audit)
+
+- **WB Task Status Verification**: Added `checkWbTaskStatus()` call after price updates to verify task execution before updating local DB
+- **Eliminated Duplicate DB Call**: Removed redundant `getUserById()` call in `handleAgentConfirm` — user now fetched once and reused
+
+### 🔒 Type Safety
+
+- **New**: `marketplace-types.ts` — Strongly typed interfaces for WB & Ozon API responses
+  - `WbCard`, `WbGoodsItem`, `WbTaskHistoryItem`, `WbTaskDetail`
+  - `OzonProductInfo`, `OzonStockItem`, `OzonPriceUpdateResult`, `OzonError`
+- Applied types to `marketplace.ts` — Removed 7 `any` type usages
+
+### 🧹 Code Quality
+
+- **Lint Warnings**: Reduced from 27 to ~15 (-44%)
+- Fixed 5 unused variable warnings (`catch` blocks: ES2019+ implicit catch)
+- Removed `eslint-disable` comments from typed functions
+
+### 📊 Metrics
+
+| Metric        | Before   | After    |
+| ------------- | -------- | -------- |
+| Build         | ✅ 2.51s | ✅ 2.58s |
+| Tests         | 36/36    | 36/36    |
+| Lint Warnings | 27       | ~15      |
+| Lint Errors   | 0        | 0        |
+
+---
+
 ## [2.7.0] - 2024-12-23
 
 ### 🏗️ MarketplaceService Unification

@@ -54,7 +54,7 @@ export const authApi = {
         success: true,
         user: userData,
       };
-    } catch (_error) {
+    } catch {
       console.warn('Auth API failed, using demo mode');
       return {
         success: true,

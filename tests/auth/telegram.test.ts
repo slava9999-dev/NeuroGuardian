@@ -82,7 +82,7 @@ function validateTelegramInitData(
     }
 
     return { valid: true, user: JSON.parse(userJson) };
-  } catch (_error) {
+  } catch {
     return { valid: false, user: null, error: 'Parse error' };
   }
 }

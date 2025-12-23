@@ -104,7 +104,7 @@ export function PaymentModal({
       if (response.success && response.plans.length > 0) {
         setPlans(response.plans);
       }
-    } catch (_err) {
+    } catch {
       console.warn('Failed to load plans, using fallback');
     } finally {
       setIsLoadingPlans(false);

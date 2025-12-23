@@ -22,7 +22,11 @@ import {
 } from '../../src/api-lib/services/index.js';
 
 // Marketplace API operations (centralized WB/Ozon logic)
-import { updateWbPrices, updateOzonPrices } from '../../src/api-lib/services/marketplace.js';
+import {
+  updateWbPrices,
+  updateOzonPrices,
+  checkWbTaskStatus,
+} from '../../src/api-lib/services/marketplace.js';
 
 // V2 MEGA-BRAIN System Prompt (Expert Persona + CoT + Few-Shot)
 import { getEnhancedSystemPrompt } from '../../src/api-lib/agent/system-prompt-v2.js';
@@ -1008,6 +1012,16 @@ export async function handleAgentConfirm(
         `🚀 EXECUTING REAL PRICE UPDATE for User ${userId}, ${price_changes.length} items`
       );
 
+      // Get user ONCE at the beginning (per audit: avoid duplicate getUserById calls)
+      const user = await getUserById(userId);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          error: 'User not found',
+          content: '❌ Пользователь не найден.',
+        });
+      }
+
       // Group by marketplace
       const wbUpdates: Array<{ nmId: number; newPrice: number; productId: string }> = [];
       const ozonUpdates: Array<{ productId: string; newPrice: number }> = [];
@@ -1032,8 +1046,7 @@ export async function handleAgentConfirm(
 
       // --- WB UPDATE (using centralized marketplace service) ---
       if (wbUpdates.length > 0) {
-        const user = await getUserById(userId);
-        if (user?.api_key_wb) {
+        if (user.api_key_wb) {
           const wbApiKey = decryptApiKey(user.api_key_wb);
 
           console.log(`📤 WB Price Update via marketplace service: ${wbUpdates.length} items`);
@@ -1057,12 +1070,29 @@ export async function handleAgentConfirm(
           if (result.success && result.taskId) {
             console.log(`📋 WB Task ID: ${result.taskId} - Task is QUEUED (not yet completed)`);
 
-            // Update local DB using batch function (per audit: atomic update instead of loop)
-            const dbResult = await batchUpdateWbPrices(
-              userId,
-              wbUpdates.map(u => ({ nmId: u.nmId, newPrice: u.newPrice }))
-            );
-            console.log(`📦 DB updated: ${dbResult.updated}/${wbUpdates.length} WB prices`);
+            // CRITICAL (Dec 2024 Audit): Verify task status before updating DB
+            // Wait 2 seconds for WB to process the task
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            const taskStatus = await checkWbTaskStatus(wbApiKey, result.taskId);
+
+            if (taskStatus.hasErrors) {
+              console.error(`❌ WB Task ${result.taskId} failed:`, taskStatus.errors);
+              wbResult = {
+                success: false,
+                count: 0,
+                error: taskStatus.errors?.join('; ') || 'Задача WB завершилась с ошибкой',
+              };
+            } else {
+              // Task is either completed or still processing - update DB
+              const dbResult = await batchUpdateWbPrices(
+                userId,
+                wbUpdates.map(u => ({ nmId: u.nmId, newPrice: u.newPrice }))
+              );
+              console.log(
+                `📦 DB updated: ${dbResult.updated}/${wbUpdates.length} WB prices (task status: ${taskStatus.status || 'processing'})`
+              );
+            }
           }
         } else {
           wbResult = { success: false, count: 0, error: 'WB API ключ не настроен' };
@@ -1071,8 +1101,7 @@ export async function handleAgentConfirm(
 
       // --- OZON UPDATE (using centralized marketplace service) ---
       if (ozonUpdates.length > 0) {
-        const user = await getUserById(userId);
-        if (user?.api_key_ozon) {
+        if (user.api_key_ozon) {
           const decryptedOzonKey = decryptApiKey(user.api_key_ozon);
           const [clientId, apiKey] = (decryptedOzonKey || '').split(':');
 
