@@ -116,6 +116,7 @@ export async function executeGetProducts(
 
 /**
  * GET_SALES_STATS — Get sales statistics from WB/Ozon API
+ * Enhanced with trend analysis and recommendations
  */
 export async function executeGetSalesStats(
   userId: number,
@@ -134,44 +135,141 @@ export async function executeGetSalesStats(
     };
   }
 
-  // Calculate date range
+  // Calculate date range for current and previous period
   const now = new Date();
-  let dateFrom: Date;
+  let daysBack: number;
 
   switch (args.period) {
     case 'today':
-      dateFrom = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      daysBack = 1;
       break;
     case 'yesterday':
-      dateFrom = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+      daysBack = 1;
       break;
     case 'week':
-      dateFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      daysBack = 7;
       break;
     case 'month':
-      dateFrom = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      daysBack = 30;
       break;
     case '3months':
-      dateFrom = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+      daysBack = 90;
       break;
     default:
-      dateFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      daysBack = 7;
   }
+
+  const dateFrom = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
+  const datePrevFrom = new Date(dateFrom.getTime() - daysBack * 24 * 60 * 60 * 1000);
 
   const stats = {
     period: args.period,
     dateFrom: dateFrom.toISOString().split('T')[0],
     dateTo: now.toISOString().split('T')[0],
-    ozon: null as { orders: number; revenue: number; returns: number } | null,
-    wb: null as { orders: number; revenue: number; returns: number } | null,
-    total: { orders: 0, revenue: 0, returns: 0 },
+    ozon: null as { orders: number; revenue: number; returns: number; avgOrder: number } | null,
+    wb: null as { orders: number; revenue: number; returns: number; avgOrder: number } | null,
+    total: { orders: 0, revenue: 0, returns: 0, avgOrder: 0 },
+    // Trend analysis
+    trend: {
+      ordersChange: 0,
+      revenueChange: 0,
+      direction: 'stable' as 'up' | 'down' | 'stable',
+    },
+    recommendations: [] as string[],
   };
 
-  // Fetch Ozon stats
+  // Helper to fetch stats for a period
+  async function fetchPeriodStats(from: Date, to: Date) {
+    let periodOrders = 0;
+    let periodRevenue = 0;
+    let periodReturns = 0;
+
+    // Fetch Ozon stats
+    if (
+      keys.ozon &&
+      (!args.marketplace || args.marketplace === 'Ozon' || args.marketplace === 'all')
+    ) {
+      try {
+        const ozonRes = await fetchWithRetry('https://api-seller.ozon.ru/v1/analytics/data', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Client-Id': keys.ozon.clientId,
+            'Api-Key': keys.ozon.apiKey,
+          },
+          body: JSON.stringify({
+            date_from: from.toISOString().split('T')[0],
+            date_to: to.toISOString().split('T')[0],
+            metrics: ['revenue', 'ordered_units', 'returns'],
+            dimension: ['day'],
+            limit: 1000,
+          }),
+        });
+
+        if (ozonRes.ok) {
+          const ozonData = await ozonRes.json();
+          const result = ozonData.result?.data || [];
+
+          for (const row of result) {
+            periodRevenue += row.metrics?.[0] || 0;
+            periodOrders += row.metrics?.[1] || 0;
+            periodReturns += row.metrics?.[2] || 0;
+          }
+        }
+      } catch (e) {
+        console.error('Ozon stats error:', e);
+      }
+    }
+
+    // Fetch WB stats
+    if (keys.wb && (!args.marketplace || args.marketplace === 'WB' || args.marketplace === 'all')) {
+      try {
+        const wbRes = await fetchWithRetry(
+          `https://statistics-api.wildberries.ru/api/v1/supplier/sales?dateFrom=${from.toISOString().split('T')[0]}`,
+          {
+            method: 'GET',
+            headers: {
+              Authorization: keys.wb,
+            },
+          }
+        );
+
+        if (wbRes.ok) {
+          const wbData = await wbRes.json();
+          const sales = (wbData || []).filter((s: { date: string }) => {
+            const saleDate = new Date(s.date);
+            return saleDate >= from && saleDate <= to;
+          });
+
+          for (const sale of sales) {
+            if (sale.saleID && !sale.saleID.startsWith('R')) {
+              periodOrders++;
+              periodRevenue += sale.finishedPrice || sale.priceWithDisc || 0;
+            } else if (sale.saleID?.startsWith('R')) {
+              periodReturns++;
+            }
+          }
+        }
+      } catch (e) {
+        console.error('WB stats error:', e);
+      }
+    }
+
+    return { orders: periodOrders, revenue: Math.round(periodRevenue), returns: periodReturns };
+  }
+
+  // Fetch current period
+  const currentStats = await fetchPeriodStats(dateFrom, now);
+
+  // Fetch previous period for comparison
+  const prevStats = await fetchPeriodStats(datePrevFrom, dateFrom);
+
+  // Populate stats
   if (
     keys.ozon &&
     (!args.marketplace || args.marketplace === 'Ozon' || args.marketplace === 'all')
   ) {
+    // Re-fetch Ozon separately for breakdown
     try {
       const ozonRes = await fetchWithRetry('https://api-seller.ozon.ru/v1/analytics/data', {
         method: 'POST',
@@ -202,7 +300,8 @@ export async function executeGetSalesStats(
           returns += row.metrics?.[2] || 0;
         }
 
-        stats.ozon = { orders, revenue: Math.round(revenue), returns };
+        const avgOrder = orders > 0 ? Math.round(revenue / orders) : 0;
+        stats.ozon = { orders, revenue: Math.round(revenue), returns, avgOrder };
         stats.total.orders += orders;
         stats.total.revenue += Math.round(revenue);
         stats.total.returns += returns;
@@ -212,10 +311,8 @@ export async function executeGetSalesStats(
     }
   }
 
-  // Fetch WB stats
   if (keys.wb && (!args.marketplace || args.marketplace === 'WB' || args.marketplace === 'all')) {
     try {
-      // WB Statistics API
       const wbRes = await fetchWithRetry(
         `https://statistics-api.wildberries.ru/api/v1/supplier/sales?dateFrom=${dateFrom.toISOString().split('T')[0]}`,
         {
@@ -242,7 +339,8 @@ export async function executeGetSalesStats(
           }
         }
 
-        stats.wb = { orders, revenue: Math.round(revenue), returns };
+        const avgOrder = orders > 0 ? Math.round(revenue / orders) : 0;
+        stats.wb = { orders, revenue: Math.round(revenue), returns, avgOrder };
         stats.total.orders += orders;
         stats.total.revenue += Math.round(revenue);
         stats.total.returns += returns;
@@ -250,6 +348,58 @@ export async function executeGetSalesStats(
     } catch (e) {
       console.error('WB stats error:', e);
     }
+  }
+
+  // Calculate average order value
+  stats.total.avgOrder =
+    stats.total.orders > 0 ? Math.round(stats.total.revenue / stats.total.orders) : 0;
+
+  // Calculate trend
+  if (prevStats.orders > 0) {
+    stats.trend.ordersChange = Math.round(
+      ((currentStats.orders - prevStats.orders) / prevStats.orders) * 100
+    );
+  }
+  if (prevStats.revenue > 0) {
+    stats.trend.revenueChange = Math.round(
+      ((currentStats.revenue - prevStats.revenue) / prevStats.revenue) * 100
+    );
+  }
+
+  // Determine trend direction
+  if (stats.trend.revenueChange > 10) {
+    stats.trend.direction = 'up';
+  } else if (stats.trend.revenueChange < -10) {
+    stats.trend.direction = 'down';
+  } else {
+    stats.trend.direction = 'stable';
+  }
+
+  // Generate recommendations
+  if (stats.trend.direction === 'down') {
+    stats.recommendations.push(
+      `📉 Продажи упали на ${Math.abs(stats.trend.revenueChange)}%. Проверь: 1) Позиции в поиске 2) Конкуренты снизили цены? 3) Кончились акции?`
+    );
+  }
+  if (stats.trend.direction === 'up') {
+    stats.recommendations.push(
+      `📈 Рост ${stats.trend.revenueChange}%! Отлично! Рекомендую: 1) Пополнить остатки 2) Проверить маржу — можно чуть поднять цены`
+    );
+  }
+  if (stats.total.returns > stats.total.orders * 0.1) {
+    stats.recommendations.push(
+      `⚠️ Высокий процент возвратов (${Math.round((stats.total.returns / stats.total.orders) * 100)}%). Проверь: качество товара, описание, фото`
+    );
+  }
+  if (stats.total.orders === 0) {
+    stats.recommendations.push(
+      `🔴 Нет продаж за период. Проверь: 1) Есть ли остатки? 2) Карточки в индексе? 3) Цены конкурентные?`
+    );
+  }
+  if (stats.total.avgOrder > 0 && stats.total.avgOrder < 500) {
+    stats.recommendations.push(
+      `💡 Низкий средний чек (${stats.total.avgOrder}₽). Попробуй комплекты или апсейл`
+    );
   }
 
   if (!stats.ozon && !stats.wb) {
