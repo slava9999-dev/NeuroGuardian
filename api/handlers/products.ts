@@ -298,7 +298,7 @@ export async function handleSyncProducts(
             `🔍 WB SYNC: Calling fetchWbStocks for ${nmIds.length} products [v2.7.1-fix]`
           );
           stockMap = await fetchWbStocks(apiKey, nmIds);
-          console.log(`📦 WB: Got stocks for ${stockMap.size} products`);
+          console.log(`📦 WB: Got stocks for ${stockMap.size} products [v2.7.2]`);
         } catch (_e) {
           console.warn('Failed to fetch WB stocks during sync:', _e);
         }
