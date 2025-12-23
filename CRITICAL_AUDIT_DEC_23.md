@@ -1,260 +1,135 @@
-# 🛑 CRITICAL AUDIT REPORT: NeuroGUARDIAN (December 23, 2024)
+# 🔧 CRITICAL AUDIT DEC 23 — Agent Price Updates Fix
 
-**Status:** 🟢 **PRODUCTION READY** (Phase 4 Complete)  
-**Version:** 2.6.0  
-**Auditor:** Principal Engineer / System Architect  
-**Previous Audit:** December 22, 2024
+## Дата: 2024-12-23
 
----
-
-## 📊 Executive Summary
-
-| Metric              | Dec 22     | Dec 23     | Change                  |
-| ------------------- | ---------- | ---------- | ----------------------- |
-| **Build Status**    | ✅ Passing | ✅ Passing | Stable                  |
-| **Tests**           | 36/36      | 36/36      | ✅ Stable               |
-| **ESLint Errors**   | 0          | 0          | ✅ Stable               |
-| **ESLint Warnings** | 64         | **15**     | **-76%** 🎉             |
-| **Build Time**      | 2.17s      | 2.23s      | Stable                  |
-| **Bundle Size**     | 367KB      | 367KB      | Stable (Target: <300KB) |
-| **api/index.ts**    | 372 lines  | 372 lines  | ✅ Clean Router         |
-| **agent.ts**        | 803 lines  | 905 lines  | ⚠️ +102 lines           |
-
-**Overall Assessment:** The project has made **significant progress** since Dec 22. The MarketplaceService now exists, ESLint warnings dropped by 76%, and the codebase is production-ready with documented technical debt.
+## Источник: Консилиум AI-моделей (4 нейросети)
 
 ---
 
-## ✅ ISSUES RESOLVED SINCE LAST AUDIT
+## ✅ ВЫПОЛНЕННЫЕ ИСПРАВЛЕНИЯ
 
-### 1. ✅ MarketplaceService Created
+### 1. `nmId` → `nmID` (CRITICAL)
 
-**Previous Issue:** "There is NO MarketplaceService"
+**Файл:** `src/api-lib/services/marketplace.ts` → `updateWbPrices()`
 
-**Current Status:** `src/api-lib/services/marketplace.ts` now exists (470 lines, ~13KB) with:
+- **Проблема:** WB API ожидает `nmID` (с заглавными ID), код отправлял `nmId`
+- **Следствие:** API принимал задачу (200 OK), но элементы не обрабатывались
+- **Статус:** ✅ ИСПРАВЛЕНО
 
-- ✅ `getMarketplaceKeys(userId)` — Unified API key retrieval
-- ✅ `fetchWbProducts()` / `fetchOzonProducts()` — Product fetching
-- ✅ `fetchWbPrices()` — Price retrieval with proper typing
-- ✅ `updateWbPrices()` / `updateOzonPrices()` — Price updates
-- ✅ `fetchWbSalesStats()` / `fetchOzonSalesStats()` — Sales analytics
-- ✅ Proper TypeScript interfaces: `MarketplaceProduct`, `MarketplacePriceUpdate`, `MarketplaceSalesStats`
+### 2. Добавлен `discount: 0` (CRITICAL)
 
-### 2. ✅ ESLint Warnings Reduced
+**Файл:** `src/api-lib/services/marketplace.ts` → `updateWbPrices()`
 
-- **Before:** 64 warnings
-- **After:** 15 warnings (-76%)
-- **Remaining:** Mostly `no-explicit-any` in edge cases and `_error` unused vars
+- **Проблема:** Без поля `discount` задача могла не выполниться
+- **Следствие:** WB создавал задачу, но игнорировал изменения
+- **Статус:** ✅ ИСПРАВЛЕНО
 
-### 3. ✅ SQL Injection Protection
+### 3. Устранено дублирование логики WB update (CRITICAL)
 
-- `getUsersWithExpiringSubscriptions()` — Dates computed in JavaScript
-- `applyReferralBonus()` — Safe date arithmetic in JavaScript
-- All SQL uses parameterized queries via `@vercel/postgres`
+**Файл:** `api/handlers/agent.ts` → `handleAgentConfirm()`
 
-### 4. ✅ Database Schema
+- **Проблема:** Inline fetch вместо использования `updateWbPrices()`
+- **Следствие:** Исправления нужно было делать в 2 местах
+- **Статус:** ✅ РЕФАКТОРИНГ ВЫПОЛНЕН — теперь используется централизованная функция
 
-- ✅ Proper indexes: `idx_products_user_id`, `idx_transactions_user_id`, `idx_users_protection`, `idx_products_monitoring`, `idx_sentinel_logs_user`
-- ✅ Cascade deletes on user deletion
-- ✅ Referral system with unique codes
+### 4. Устранено дублирование логики Ozon update
 
----
+**Файл:** `api/handlers/agent.ts` → `handleAgentConfirm()`
 
-## 🔴 CRITICAL ISSUES (P0)
+- **Проблема:** Inline fetch вместо использования `updateOzonPrices()`
+- **Статус:** ✅ РЕФАКТОРИНГ ВЫПОЛНЕН
 
-### None Identified
+### 5. Валидация входных данных
 
-All P0 issues from Dec 22 have been addressed or mitigated.
+**Файл:** `src/api-lib/services/marketplace.ts` → `updateWbPrices()`
 
----
+- **Добавлено:** Проверка `Number.isFinite()` для nmId и price
+- **Предотвращает:** NaN/null попадание в API запрос
+- **Статус:** ✅ РЕАЛИЗОВАНО
 
-## 🟡 HIGH PRIORITY ISSUES (P1)
+### 6. Лимит 200 товаров в батче
 
-### 1. ⚠️ Logic Duplication Still Exists
+**Файл:** `src/api-lib/services/marketplace.ts` → `updateWbPrices()`
 
-Despite MarketplaceService existing, it is **NOT being used consistently**:
+- **Добавлено:** Автоматическое обрезание до 200 элементов
+- **Предотвращает:** Ошибки WB API при большом количестве товаров
+- **Статус:** ✅ РЕАЛИЗОВАНО
 
-| Operation         | Location Using MarketplaceService | Location with Inline Implementation    |
-| ----------------- | --------------------------------- | -------------------------------------- |
-| `decryptApiKey()` | ✅ marketplace.ts (lines 59, 66)  | ❌ sentinel.ts (lines 115, 330)        |
-| `decryptApiKey()` | ✅ marketplace.ts                 | ❌ agent.ts (lines 594, 595, 757, 805) |
-| `decryptApiKey()` | ✅ marketplace.ts                 | ❌ products.ts (line 113)              |
-| WB Fetch Products | ✅ marketplace.ts                 | ❌ tool-executors.ts (inline fetch)    |
-| WB Fetch Prices   | ✅ marketplace.ts                 | ❌ sentinel.ts (inline fetch)          |
-| WB Update Prices  | ✅ marketplace.ts                 | ❌ agent.ts handleAgentConfirm         |
+### 7. Возврат taskId для отслеживания
 
-**Impact:**
+**Файл:** `src/api-lib/services/marketplace.ts` → `updateWbPrices()`
 
-- If WB/Ozon API changes, updates required in 4+ files
-- Risk of inconsistent behavior between Agent, Sentinel, and Manual operations
+- **Добавлено:** Функция теперь возвращает `taskId` в ответе
+- **Позволяет:** Проверять реальный статус выполнения задачи
+- **Статус:** ✅ РЕАЛИЗОВАНО
 
-**Recommendation:** Refactor handlers to import from `marketplace.ts` instead of inline implementations.
+### 8. Функция проверки статуса задачи WB
 
-### 2. ⚠️ `agent.ts` Growing (905 lines)
+**Файл:** `src/api-lib/services/marketplace.ts` → `checkWbTaskStatus()`
 
-- **Dec 22:** 803 lines
-- **Dec 23:** 905 lines (+102 lines, +12.7%)
+- **Новая функция:** Проверяет реальный статус выполнения задачи
+- **Важно:** 200 OK от WB означает только "задача в очереди", не "выполнено"
+- **Статус:** ✅ РЕАЛИЗОВАНО (готово к использованию)
 
-Contains:
+### 9. Safe JSON.parse для details
 
-- `AGENT_TOOLS` definition (~180 lines)
-- `callOpenAIWithTools()` (~216 lines)
-- `handleAgent()` (~190 lines)
-- `handleAgentConfirm()` (~220 lines)
+**Файл:** `api/handlers/agent.ts` → `handleAgentConfirm()`
 
-**Recommendation:** Extract `AGENT_TOOLS` to `src/api-lib/agent/tools-definition.ts`
-
-### 3. ⚠️ Potential WB Price Unit Bug in Sentinel
-
-```typescript
-// sentinel.ts lines 362-389 — Comment indicates confusion:
-// "If min_price is in RUB and currentPrice is in KOPECKS..."
-const currentPrice = wbItem.sizes?.[0]?.discountedPrice || wbItem.sizes?.[0]?.price || 0;
-```
-
-In `products.ts` sync logic:
-
-```typescript
-const priceInRubles = Math.round(priceInKopecks / 100);
-```
-
-**Risk:** Unit mismatch between stored min_price (RUB) and fetched price (may be kopecks).
-
-**Recommendation:**
-
-1. Add explicit unit conversion comment
-2. Add debug logging to verify units during Sentinel runs
-3. Test with real WB account
-
-### 4. ⚠️ CHANGELOG Not Updated
-
-- **CHANGELOG.md:** Shows version 2.6.0 as latest
-- **REFACTORING_PROGRESS.md:** References 2.9.0
-- **package.json:** Shows 2.6.0
-
-**Recommendation:** Sync version numbers and update CHANGELOG with Phase 3/4 changes.
+- **Добавлено:** try/catch вокруг JSON.parse
+- **Предотвращает:** Падение функции при невалидном JSON
+- **Статус:** ✅ РЕАЛИЗОВАНО
 
 ---
 
-## 🟢 LOW PRIORITY ISSUES (P2)
+## 📋 ОСТАВШИЕСЯ РЕКОМЕНДАЦИИ (LOW/MEDIUM priority)
 
-### 1. Remaining ESLint Warnings (15)
+### A. Pending Price Tracking (MEDIUM)
 
-| Category                          | Count | Files                          |
-| --------------------------------- | ----- | ------------------------------ |
-| `no-explicit-any`                 | 9     | marketplace, components, pages |
-| `no-unused-vars` (`_error` style) | 6     | App.tsx, rate-limit.ts, api.ts |
+- Хранить `pending_price` и `pending_task_id` в БД
+- Обновлять `current_price` только после подтверждения WB
+- **Статус:** TODO (требует миграции БД)
 
-**Recommendation:** Create interfaces for remaining `any` types.
+### B. Проверка Ozon result.errors (MEDIUM)
 
-### 2. Bundle Size
+- Ozon может вернуть 200 OK с ошибками в result
+- **Статус:** TODO
 
-- Current: 367KB (gzip: 121KB)
-- Target: <300KB
+### C. Улучшение fetchWbPrices для >1 nmId (LOW)
 
-**Recommendation:**
+- Текущая логика не фильтрует при множественных ID
+- **Статус:** TODO
 
-- Implement route-based code splitting
-- Lazy load pages with `React.lazy()`
+### D. Выбор формата цены WB (CLARIFICATION NEEDED)
 
-### 3. Test Coverage
-
-- Current: 36 tests covering utilities
-- Missing: Integration tests for handlers
-
-**Recommendation:** Add tests for `handleSyncProducts`, `handleCheckPrices`
+- Консилиум не единогласен: 2 указали "копейки", 2 указали "рубли"
+- По документации WB 2024 — рубли (целое число)
+- **Статус:** Оставлено в рублях (текущая логика корректна)
 
 ---
 
-## 🔒 Security Assessment
+## 🧪 ТЕСТИРОВАНИЕ
 
-| Check                  | Status | Notes                                   |
-| ---------------------- | ------ | --------------------------------------- |
-| API Key Encryption     | ✅     | AES-256-GCM via crypto module           |
-| Telegram Auth          | ✅     | HMAC-SHA256 validation                  |
-| SQL Injection          | ✅     | Parameterized queries throughout        |
-| Rate Limiting          | ✅     | KV-backed, persists across cold starts  |
-| CORS                   | ✅     | Dynamic origin checking in production   |
-| Admin Endpoints        | ✅     | Protected by ADMIN_API_KEY              |
-| Cron Endpoints         | ✅     | Protected by CRON_SECRET bearer token   |
-| Input Sanitization     | ✅     | `sanitizeInput()` on all user input     |
-| XSS Protection Headers | ✅     | X-Content-Type-Options, X-Frame-Options |
-| Error Handling         | ✅     | Generic errors returned to client       |
+После применения исправлений необходимо:
+
+1. ✅ Убедиться что сборка проходит (`npm run build`)
+2. 🔲 Протестировать изменение цены через агента в Telegram
+3. 🔲 Проверить логи на наличие taskId
+4. 🔲 Убедиться что цена изменилась на WB
 
 ---
 
-## 📁 Current Architecture
+## 📁 ИЗМЕНЁННЫЕ ФАЙЛЫ
 
-```
-api/
-├── index.ts (372 lines) — Clean router, delegates to handlers
-└── handlers/
-    ├── admin.ts (22KB) — Admin/debug functions
-    ├── agent.ts (31KB) — AI agent ⚠️ LARGE
-    ├── auth.ts (7KB) — Authentication
-    ├── payments.ts (7KB) — YooKassa
-    ├── products.ts (15KB) — Product CRUD + sync
-    └── sentinel.ts (22KB) — Price protection
-
-src/api-lib/
-├── lib/ — Shared utilities (8 files)
-├── services/
-│   ├── database.ts (11KB)
-│   ├── marketplace.ts (13KB) ✅ NEW
-│   ├── notifications.ts (4KB)
-│   └── yookassa.ts (5KB)
-└── agent/
-    ├── system-prompt-v2.ts (33KB) — V2 MEGA-BRAIN
-    ├── metrics.ts (10KB) — Agent analytics
-    ├── tool-executors.ts (25KB) — Tool implementations
-    └── tools.ts (11KB) — Tool definitions
-```
+| Файл                                  | Тип изменения                                                 |
+| ------------------------------------- | ------------------------------------------------------------- |
+| `src/api-lib/services/marketplace.ts` | `updateWbPrices()` переписан + добавлен `checkWbTaskStatus()` |
+| `api/handlers/agent.ts`               | Рефакторинг WB/Ozon update + safe JSON.parse                  |
 
 ---
 
-## 🎯 Recommended Action Plan
+## 🔗 ИСТОЧНИКИ
 
-### Immediate (This Session)
-
-1. ~~Create this audit report~~ ✅
-2. ⬜ Sync version numbers across files
-
-### Short-Term (Next Session)
-
-1. ⬜ Refactor `sentinel.ts` to use `MarketplaceService`
-2. ⬜ Refactor `agent.ts` `handleAgentConfirm` to use `MarketplaceService`
-3. ⬜ Extract `AGENT_TOOLS` from `agent.ts`
-4. ⬜ Verify WB price units with real account
-
-### Medium-Term
-
-1. ⬜ Add integration tests for handlers
-2. ⬜ Implement lazy loading for pages
-3. ⬜ Reduce bundle size to <300KB
-4. ⬜ Create remaining TypeScript interfaces
-
----
-
-## 📈 Progress Tracking
-
-| Phase | Description                     | Status         |
-| ----- | ------------------------------- | -------------- |
-| 1     | Module extraction from index.ts | ✅ Done        |
-| 2     | Critical audit fixes            | ✅ Done        |
-| 3     | V2 MEGA-BRAIN Agent             | ✅ Done        |
-| 4     | Fine-tuning + Metrics           | ✅ Done        |
-| 5     | Service unification             | 🔄 In Progress |
-| 6     | Performance optimization        | ⬜ Planned     |
-
----
-
-## 🏁 Conclusion
-
-NeuroGUARDIAN is **production-ready** with known, documented technical debt. The system is functional, secure, and monitored. The main remaining work is **code consolidation** (eliminating duplicate API call implementations) rather than critical fixes.
-
-**Deployment Status:** ✅ SAFE TO DEPLOY  
-**Next Priority:** Unify marketplace API calls through `MarketplaceService`
-
----
-
-_Generated: December 23, 2024, 09:06 MSK_  
-_Build: ✅ | Tests: 36/36 ✅ | Lint: 15 warnings_
+- `a Аудит кода NeuroAgent Критические п.txt` (DeepSeek V3.2)
+- `б ТЕХНИЧЕСКИЙ АУДИТ КОДА.txt` (Qwen3 32B)
+- `с Отчет по аудиту NeuroAgent (Wildber.txt` (Unknown model)
+- `д Ниже — аудит по вашим двум файлам с.txt` (Senior backend-интегратор)

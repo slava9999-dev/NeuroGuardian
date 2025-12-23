@@ -11,7 +11,6 @@ import {
   validateTelegramInitData,
   sanitizeInput,
   decryptApiKey,
-  fetchWithRetry,
   checkRateLimit,
 } from '../../src/api-lib/lib/index.js';
 
@@ -20,6 +19,9 @@ import {
   getProductsByUserId,
   updateProductMinPrice,
 } from '../../src/api-lib/services/index.js';
+
+// Marketplace API operations (centralized WB/Ozon logic)
+import { updateWbPrices, updateOzonPrices } from '../../src/api-lib/services/marketplace.js';
 
 // V2 MEGA-BRAIN System Prompt (Expert Persona + CoT + Few-Shot)
 import { getEnhancedSystemPrompt } from '../../src/api-lib/agent/system-prompt-v2.js';
@@ -810,7 +812,20 @@ export async function handleAgentConfirm(
 
   let resultContent = '';
   let executed = false;
-  const details = typeof _details === 'string' ? JSON.parse(_details) : _details || {};
+
+  // Safe parse of details (per audit recommendation - handle invalid JSON)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let details: any = {};
+  try {
+    details = typeof _details === 'string' ? JSON.parse(_details) : _details || {};
+  } catch (e) {
+    console.error('❌ Failed to parse details:', e, _details);
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid details format',
+      content: '❌ Ошибка формата данных. Попробуйте снова.',
+    });
+  }
 
   console.log(`🔧 handleAgentConfirm: operation=${operation}, userId=${userId}`);
   console.log(`🔧 handleAgentConfirm details:`, JSON.stringify(details).substring(0, 500));
@@ -873,67 +888,49 @@ export async function handleAgentConfirm(
       let wbResult = { success: true, count: 0, error: '' };
       let ozonResult = { success: true, count: 0, error: '' };
 
-      // --- WB UPDATE ---
+      // --- WB UPDATE (using centralized marketplace service) ---
       if (wbUpdates.length > 0) {
         const user = await getUserById(userId);
         if (user?.api_key_wb) {
           const wbApiKey = decryptApiKey(user.api_key_wb);
-          const wbPayload = {
-            data: wbUpdates.map(u => ({ nmId: u.nmId, price: u.newPrice })),
+
+          console.log(`📤 WB Price Update via marketplace service: ${wbUpdates.length} items`);
+
+          // Use centralized function with all fixes:
+          // - nmID format (not nmId)
+          // - discount: 0 included
+          // - Input validation
+          // - Batch limit (200 items)
+          const result = await updateWbPrices(
+            wbApiKey,
+            wbUpdates.map(u => ({ nmId: u.nmId, price: u.newPrice }))
+          );
+
+          wbResult = {
+            success: result.success,
+            count: result.count,
+            error: result.error || '',
           };
 
-          console.log(`📤 WB Price Update Payload:`, JSON.stringify(wbPayload));
+          if (result.success && result.taskId) {
+            console.log(`📋 WB Task ID: ${result.taskId} - Task is QUEUED (not yet completed)`);
 
-          try {
-            const response = await fetchWithRetry(
-              'https://discounts-prices-api.wildberries.ru/api/v2/upload/task',
-              {
-                method: 'POST',
-                headers: {
-                  Authorization: wbApiKey,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(wbPayload),
-              }
-            );
-
-            if (response.ok) {
-              const responseData = await response.json();
-              if (responseData.error) {
-                console.error(`❌ WB Update Logic Error:`, responseData);
-                wbResult = {
-                  success: false,
-                  count: 0,
-                  error: responseData.errorText || 'WB API Error',
-                };
-              } else {
-                wbResult = { success: true, count: wbUpdates.length, error: '' };
-                // Update local DB
-                for (const u of wbUpdates) {
-                  await sql`
-                            UPDATE products 
-                            SET current_price = ${u.newPrice}, updated_at = NOW()
-                            WHERE user_id = ${userId} AND nm_id = ${u.nmId}
-                          `;
-                }
-              }
-            } else {
-              const errText = await response.text();
-              wbResult = { success: false, count: 0, error: errText };
+            // Update local DB (optimistic - will be verified on next sync)
+            // TODO: Consider implementing pending_price tracking per audit recommendations
+            for (const u of wbUpdates) {
+              await sql`
+                UPDATE products 
+                SET current_price = ${u.newPrice}, updated_at = NOW()
+                WHERE user_id = ${userId} AND nm_id = ${u.nmId}
+              `;
             }
-          } catch (e) {
-            wbResult = {
-              success: false,
-              count: 0,
-              error: e instanceof Error ? e.message : 'WB API Error',
-            };
           }
         } else {
           wbResult = { success: false, count: 0, error: 'WB API ключ не настроен' };
         }
       }
 
-      // --- OZON UPDATE ---
+      // --- OZON UPDATE (using centralized marketplace service) ---
       if (ozonUpdates.length > 0) {
         const user = await getUserById(userId);
         if (user?.api_key_ozon) {
@@ -941,53 +938,34 @@ export async function handleAgentConfirm(
           const [clientId, apiKey] = (decryptedOzonKey || '').split(':');
 
           if (clientId && apiKey) {
-            try {
-              const ozonPayload = {
-                prices: ozonUpdates.map(u => {
-                  const productId = parseInt(u.productId.replace('ozon-', ''));
-                  return {
-                    product_id: productId,
-                    price: String(u.newPrice),
-                    old_price: String(Math.round(u.newPrice * 1.1)),
-                    currency_code: 'RUB',
-                  };
-                }),
-              };
+            console.log(
+              `📤 Ozon Price Update via marketplace service: ${ozonUpdates.length} items`
+            );
 
-              const ozonResponse = await fetchWithRetry(
-                'https://api-seller.ozon.ru/v1/product/import/prices',
-                {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Client-Id': clientId,
-                    'Api-Key': apiKey,
-                  },
-                  body: JSON.stringify(ozonPayload),
-                }
-              );
+            // Parse Ozon product IDs (remove 'ozon-' prefix)
+            const ozonPayload = ozonUpdates.map(u => ({
+              productId: parseInt(u.productId.replace('ozon-', '')),
+              price: u.newPrice,
+            }));
 
-              if (ozonResponse.ok) {
-                // Response OK — update local DB
-                // Update local DB
-                for (const u of ozonUpdates) {
-                  await sql`
-                           UPDATE products 
-                           SET current_price = ${u.newPrice}, updated_at = NOW()
-                           WHERE user_id = ${userId} AND product_id = ${u.productId}
-                         `;
-                }
-                ozonResult = { success: true, count: ozonUpdates.length, error: '' };
-              } else {
-                const errText = await ozonResponse.text();
-                ozonResult = { success: false, count: 0, error: errText };
+            // Use centralized function
+            const result = await updateOzonPrices(clientId, apiKey, ozonPayload);
+
+            ozonResult = {
+              success: result.success,
+              count: result.count,
+              error: result.error || '',
+            };
+
+            if (result.success) {
+              // Update local DB
+              for (const u of ozonUpdates) {
+                await sql`
+                  UPDATE products 
+                  SET current_price = ${u.newPrice}, updated_at = NOW()
+                  WHERE user_id = ${userId} AND product_id = ${u.productId}
+                `;
               }
-            } catch (e) {
-              ozonResult = {
-                success: false,
-                count: 0,
-                error: e instanceof Error ? e.message : 'Ozon API Error',
-              };
             }
           } else {
             ozonResult = {

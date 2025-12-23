@@ -208,18 +208,56 @@ export async function fetchWbPrices(apiKey: string, nmIds: number[]): Promise<Ma
 /**
  * Update prices on WB
  */
+/**
+ * Update prices on WB
+ * CRITICAL FIX (Dec 2024 Audit):
+ * - nmId → nmID (WB API requires uppercase ID)
+ * - Added discount: 0 (required for task to execute)
+ * - Returns taskId for status tracking
+ * - Input validation for NaN/null prices
+ */
 export async function updateWbPrices(
   apiKey: string,
   updates: Array<{ nmId: number; price: number }>
-): Promise<{ success: boolean; count: number; error?: string }> {
+): Promise<{ success: boolean; count: number; error?: string; taskId?: number }> {
   if (updates.length === 0) {
     return { success: true, count: 0 };
   }
 
+  // Validate inputs - prevent NaN/null being sent to WB API
+  const validUpdates = updates.filter(u => {
+    const isValid =
+      Number.isFinite(u.nmId) && u.nmId > 0 && Number.isFinite(u.price) && u.price > 0;
+    if (!isValid) {
+      console.warn(`⚠️ WB: Skipping invalid update - nmId: ${u.nmId}, price: ${u.price}`);
+    }
+    return isValid;
+  });
+
+  if (validUpdates.length === 0) {
+    return { success: false, count: 0, error: 'Нет валидных товаров для обновления' };
+  }
+
+  // Batch limit: WB allows max 200 items per request
+  if (validUpdates.length > 200) {
+    console.warn(`⚠️ WB: Truncating batch from ${validUpdates.length} to 200 items`);
+  }
+  const batchedUpdates = validUpdates.slice(0, 200);
+
   try {
+    // CRITICAL FIX: nmID (not nmId) + discount: 0
     const payload = {
-      data: updates.map(u => ({ nmId: u.nmId, price: u.price })),
+      data: batchedUpdates.map(u => ({
+        nmID: u.nmId, // WB API requires uppercase ID
+        price: u.price,
+        discount: 0, // Required for proper execution
+      })),
     };
+
+    console.log(
+      `📤 WB Price Update: ${batchedUpdates.length} items, payload sample:`,
+      JSON.stringify(payload.data.slice(0, 2))
+    );
 
     const response = await fetchWithRetry(
       'https://discounts-prices-api.wildberries.ru/api/v2/upload/task',
@@ -244,8 +282,12 @@ export async function updateWbPrices(
         return { success: false, count: 0, error: responseBody.errorText };
       }
 
-      console.log(`✅ WB: Updated ${updates.length} prices. Task ID: ${responseBody.data?.id}`);
-      return { success: true, count: updates.length };
+      const taskId = responseBody.data?.id;
+      console.log(`📋 WB: Task created with ID: ${taskId} for ${batchedUpdates.length} items`);
+
+      // Note: 200 OK means task is QUEUED, not completed!
+      // Use checkWbTaskStatus() to verify actual execution
+      return { success: true, count: batchedUpdates.length, taskId };
     } else {
       const errorText = await response.text();
       console.error(`❌ WB Price Update Failed: ${errorText}`);
@@ -254,6 +296,74 @@ export async function updateWbPrices(
   } catch (e) {
     const error = e instanceof Error ? e.message : 'Unknown error';
     return { success: false, count: 0, error };
+  }
+}
+
+/**
+ * Check WB price update task status
+ * CRITICAL: WB API is asynchronous - 200 OK only means task is queued!
+ * This function verifies actual execution status.
+ *
+ * Per Dec 2024 Audit recommendations from AI consilium.
+ */
+export async function checkWbTaskStatus(
+  apiKey: string,
+  taskId: number
+): Promise<{
+  completed: boolean;
+  hasErrors: boolean;
+  errors?: string[];
+  status?: string;
+}> {
+  try {
+    // WB provides task history endpoint
+    const response = await fetchWithRetry(
+      `https://discounts-prices-api.wildberries.ru/api/v2/history/tasks`,
+      {
+        method: 'GET',
+        headers: { Authorization: apiKey },
+      }
+    );
+
+    if (!response.ok) {
+      console.error(`❌ WB Task Status check failed: ${response.status}`);
+      return { completed: false, hasErrors: true, errors: ['Failed to fetch task status'] };
+    }
+
+    const data = await response.json();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const task = data.data?.find((t: any) => t.id === taskId);
+
+    if (!task) {
+      console.log(`⏳ WB Task ${taskId} not found yet (may be processing)`);
+      return { completed: false, hasErrors: false, status: 'processing' };
+    }
+
+    // Check for per-item errors in task details
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const failedItems =
+      task.details?.filter((d: any) => d.status === 'rejected' || d.errorText) || [];
+
+    const errors = failedItems.map((e: any) => `nmID ${e.nmID}: ${e.errorText || 'rejected'}`);
+
+    const isCompleted = task.status === 'completed' || task.status === 'done';
+    const hasErrors = failedItems.length > 0;
+
+    console.log(`📋 WB Task ${taskId}: status=${task.status}, errors=${failedItems.length}`);
+
+    return {
+      completed: isCompleted,
+      hasErrors,
+      errors: hasErrors ? errors : undefined,
+      status: task.status,
+    };
+  } catch (e) {
+    console.error('❌ WB Task Status check error:', e);
+    return {
+      completed: false,
+      hasErrors: true,
+      errors: [e instanceof Error ? e.message : 'Unknown error'],
+    };
   }
 }
 
