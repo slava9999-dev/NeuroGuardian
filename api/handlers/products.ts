@@ -217,26 +217,30 @@ export async function handleSyncProducts(
           console.log(`🔍 WB: Fetching prices for ${nmIds.length} products...`);
 
           // Try POST method first
-          let pricesResponse = await fetch(
-            'https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter',
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', Authorization: apiKey },
-              body: JSON.stringify({ limit: 1000, offset: 0, filterNmID: nmIds }),
-            }
-          );
+          // WB API uses GET with query parameters
+          // If we have nmIds, we assume we want all of them.
+          // WB API might require paginated requests or filterNmID if list is huge,
+          // but for sync we usually want all. filterNmID works for specific subsets.
+          // Since we might have > 1 product, and filterNmID accepts only one in some contexts (or array?),
+          // Let's use the general list endpoint without filterNmID to get all prices,
+          // OR if the list is small enough and API supports array, pass it.
+          // Based on marketplace.ts investigation: GET is correct.
 
-          // If POST fails with 400, try GET method
-          if (pricesResponse.status === 400) {
-            console.warn('⚠️ WB POST failed, trying GET method...');
-            pricesResponse = await fetch(
-              `https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter?limit=1000&offset=0`,
-              {
-                method: 'GET',
-                headers: { Authorization: apiKey },
-              }
-            );
-          }
+          const url = new URL(
+            'https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter'
+          );
+          url.searchParams.set('limit', '1000');
+          url.searchParams.set('offset', '0');
+
+          // NOTE: WB API documentation says filterNmID is integer, but for GET it usually supports one value.
+          // For bulk sync, we generally want ALL prices. So no filterNmID.
+
+          console.log(`🔍 WB: Fetching prices via GET ${url.toString()}`);
+
+          const pricesResponse = await fetch(url.toString(), {
+            method: 'GET',
+            headers: { Authorization: apiKey },
+          });
 
           if (pricesResponse.ok) {
             const pricesData = await pricesResponse.json();
