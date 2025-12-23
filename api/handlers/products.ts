@@ -214,7 +214,10 @@ export async function handleSyncProducts(
       const priceMap: Map<number, number> = new Map();
       if (nmIds.length > 0) {
         try {
-          const pricesResponse = await fetch(
+          console.log(`🔍 WB: Fetching prices for ${nmIds.length} products...`);
+
+          // Try POST method first
+          let pricesResponse = await fetch(
             'https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter',
             {
               method: 'POST',
@@ -222,6 +225,18 @@ export async function handleSyncProducts(
               body: JSON.stringify({ limit: 1000, offset: 0, filterNmID: nmIds }),
             }
           );
+
+          // If POST fails with 400, try GET method
+          if (pricesResponse.status === 400) {
+            console.warn('⚠️ WB POST failed, trying GET method...');
+            pricesResponse = await fetch(
+              `https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter?limit=1000&offset=0`,
+              {
+                method: 'GET',
+                headers: { Authorization: apiKey },
+              }
+            );
+          }
 
           if (pricesResponse.ok) {
             const pricesData = await pricesResponse.json();
@@ -261,7 +276,8 @@ export async function handleSyncProducts(
 
             console.log(`💰 WB: Extracted prices for ${priceMap.size}/${goods.length} goods`);
           } else {
-            console.error(`❌ WB Prices API error: ${pricesResponse.status}`);
+            const errorBody = await pricesResponse.text();
+            console.error(`❌ WB Prices API error: ${pricesResponse.status}`, errorBody);
           }
         } catch (_e) {
           console.warn('Failed to fetch WB prices during sync:', _e);
