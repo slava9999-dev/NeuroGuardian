@@ -148,11 +148,15 @@ const AGENT_TOOLS = [
     type: 'function' as const,
     function: {
       name: 'set_stop_loss',
-      description: 'Установить минимальную цену (Stop-Loss) для защиты от демпинга',
+      description:
+        'Установить минимальную цену (Stop-Loss) для ОДНОГО конкретного товара. Используй когда пользователь просит защитить конкретный товар или установить минимальную цену.',
       parameters: {
         type: 'object',
         properties: {
-          product_id: { type: 'string', description: 'ID товара' },
+          product_id: {
+            type: 'string',
+            description: 'ID или название товара',
+          },
           min_price: { type: 'number', description: 'Минимальная цена (в рублях)' },
         },
         required: ['product_id', 'min_price'],
@@ -163,7 +167,8 @@ const AGENT_TOOLS = [
     type: 'function' as const,
     function: {
       name: 'bulk_protect_products',
-      description: 'Массово установить Stop-Loss для товаров',
+      description:
+        'Массовая защита ВСЕХ товаров Stop-Loss. Используй ТОЛЬКО когда пользователь просит "защитить ВСЕ товары" или "установить защиту на все". НЕ используй для изменения цены на конкретный товар!',
       parameters: {
         type: 'object',
         properties: {
@@ -173,7 +178,7 @@ const AGENT_TOOLS = [
           },
           only_unprotected: {
             type: 'boolean',
-            description: 'Только незащищённые товары',
+            description: 'Только незащищённые товары (по умолчанию true)',
           },
         },
         required: ['percentage'],
@@ -184,7 +189,8 @@ const AGENT_TOOLS = [
     type: 'function' as const,
     function: {
       name: 'update_prices',
-      description: 'Изменить цены на товары. ТРЕБУЕТ ПОДТВЕРЖДЕНИЯ.',
+      description:
+        'ОБЯЗАТЕЛЬНО вызывай эту функцию когда пользователь просит: изменить цену, поставить цену, установить цену, сделать цену, поднять/понизить цену на конкретный товар. Пример: "сделай цену 7500 на панно" → вызови update_prices. Функция запросит подтверждение автоматически.',
       parameters: {
         type: 'object',
         properties: {
@@ -193,16 +199,21 @@ const AGENT_TOOLS = [
             items: {
               type: 'object',
               properties: {
-                product_id: { type: 'string', description: 'ID товара (артикул или internal ID)' },
-                new_price: { type: 'number', description: 'Новая цена' },
+                product_id: {
+                  type: 'string',
+                  description:
+                    'Название товара или его ID. Можно передать часть названия, например: "зимние горы", "панно", "кабель"',
+                },
+                new_price: { type: 'number', description: 'Новая цена в рублях' },
               },
+              required: ['product_id', 'new_price'],
             },
             description: 'Список товаров для изменения цен',
           },
           change_value: {
             type: 'number',
             description:
-              'Или изменение в процентах. Положительное = повысить (+10), отрицательное = понизить (-5)',
+              'Процентное изменение цены для ВСЕХ товаров. +10 = повысить на 10%, -5 = понизить на 5%',
           },
         },
         required: [],
