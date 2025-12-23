@@ -99,6 +99,8 @@ export async function fetchWbStocks(apiKey: string, nmIds: number[]): Promise<Ma
 
   if (nmIds.length === 0) return stockMap;
 
+  console.log(`🚀 WB STOCKS START: Fetching for ${nmIds.length} products, first nmId=${nmIds[0]}`);
+
   try {
     // Step 1: Try FBS warehouses first
     console.log(`🔍 WB FBS: Fetching warehouses...`);
