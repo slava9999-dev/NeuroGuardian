@@ -80,10 +80,81 @@ export async function getMarketplaceKeys(userId: number): Promise<MarketplaceApi
 // ============================================
 
 /**
- * Fetch products from WB Content API
+ * Fetch WB stocks from Warehouse Stocks API
+ * Returns a map of nmId -> total stock across all warehouses
+ */
+export async function fetchWbStocks(apiKey: string, nmIds: number[]): Promise<Map<number, number>> {
+  const stockMap = new Map<number, number>();
+
+  if (nmIds.length === 0) return stockMap;
+
+  try {
+    // First, get list of warehouses
+    const warehousesRes = await fetch('https://marketplace-api.wildberries.ru/api/v3/warehouses', {
+      method: 'GET',
+      headers: { Authorization: apiKey },
+    });
+
+    if (!warehousesRes.ok) {
+      console.warn(`⚠️ WB Warehouses API error: ${warehousesRes.status}`);
+      return stockMap;
+    }
+
+    const warehouses = await warehousesRes.json();
+
+    if (!Array.isArray(warehouses) || warehouses.length === 0) {
+      console.log(`📦 WB: No FBS warehouses found (likely FBO-only seller)`);
+      return stockMap;
+    }
+
+    // For each warehouse, get stocks
+    for (const wh of warehouses) {
+      try {
+        const stocksRes = await fetch(
+          `https://marketplace-api.wildberries.ru/api/v3/stocks/${wh.id}`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: apiKey,
+            },
+            body: JSON.stringify({ skus: [] }), // Empty = all SKUs
+          }
+        );
+
+        if (stocksRes.ok) {
+          const stocksData = await stocksRes.json();
+          const stocks = stocksData.stocks || [];
+
+          for (const stock of stocks) {
+            // WB uses SKU which is usually nmID as string
+            const nmId = parseInt(stock.sku);
+            if (!isNaN(nmId)) {
+              const current = stockMap.get(nmId) || 0;
+              stockMap.set(nmId, current + (stock.amount || 0));
+            }
+          }
+        }
+      } catch (e) {
+        console.warn(`⚠️ WB Stocks error for warehouse ${wh.id}:`, e);
+      }
+    }
+
+    console.log(
+      `📦 WB Stocks: Found stocks for ${stockMap.size} products across ${warehouses.length} warehouses`
+    );
+  } catch (e) {
+    console.error('❌ WB Stocks API error:', e);
+  }
+
+  return stockMap;
+}
+
+/**
+ * Fetch products from WB Content API with REAL stocks
  */
 export async function fetchWbProducts(apiKey: string, limit = 100): Promise<MarketplaceProduct[]> {
-  // Step 1: Get product cards
+  // Step 1: Get product cards from Content API
   const cardsResponse = await fetch(
     'https://content-api.wildberries.ru/content/v2/get/cards/list',
     {
@@ -108,10 +179,13 @@ export async function fetchWbProducts(apiKey: string, limit = 100): Promise<Mark
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const nmIds = cards.map((card: any) => card.nmID);
 
-  // Step 2: Fetch prices
+  // Step 2: Fetch REAL prices from Prices API
   const { priceMap } = await fetchWbPrices(apiKey, nmIds);
 
-  // Step 3: Map to unified format
+  // Step 3: Fetch REAL stocks from Warehouse Stocks API
+  const stockMap = await fetchWbStocks(apiKey, nmIds);
+
+  // Step 4: Map to unified format
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return cards.map((card: any) => ({
     product_id: `wb-${card.nmID}`,
@@ -119,14 +193,7 @@ export async function fetchWbProducts(apiKey: string, limit = 100): Promise<Mark
     title: card.title || card.subjectName || 'Без названия',
     image_url: card.photos?.[0]?.big || card.photos?.[0]?.c246x328 || null,
     current_price: priceMap.get(card.nmID) || 0,
-    current_stock:
-      card.sizes?.reduce(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (sum: number, s: any) =>
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          sum + (s.stocks?.reduce((ss: number, st: any) => ss + st.qty, 0) || 0),
-        0
-      ) || 0,
+    current_stock: stockMap.get(card.nmID) || 0,
     marketplace: 'WB' as const,
   }));
 }

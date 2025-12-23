@@ -43,6 +43,7 @@ export {
   getMarketplaceKeys,
   fetchWbProducts,
   fetchWbPrices,
+  fetchWbStocks,
   updateWbPrices,
   fetchOzonProducts,
   updateOzonPrices,

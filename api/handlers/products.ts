@@ -17,6 +17,7 @@ import {
   getUserById,
   getProductsByUserId,
   updateProductMinPrice,
+  fetchWbStocks,
 } from '../../src/api-lib/services/index.js';
 
 // fetchWithRetry moved to api-lib/lib/index.js
@@ -288,6 +289,18 @@ export async function handleSyncProducts(
         }
       }
 
+      // Fetch REAL stocks from Warehouse Stocks API
+      let stockMap = new Map<number, number>();
+      if (nmIds.length > 0) {
+        try {
+          console.log(`🔍 WB: Fetching stocks for ${nmIds.length} products...`);
+          stockMap = await fetchWbStocks(apiKey, nmIds);
+          console.log(`📦 WB: Got stocks for ${stockMap.size} products`);
+        } catch (_e) {
+          console.warn('Failed to fetch WB stocks during sync:', _e);
+        }
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       products = cards.map((card: any) => ({
         product_id: `wb-${card.nmID}`,
@@ -295,14 +308,7 @@ export async function handleSyncProducts(
         title: card.title || card.subjectName || 'Без названия',
         image_url: card.photos?.[0]?.big || card.photos?.[0]?.c246x328 || null,
         current_price: priceMap.get(card.nmID) || 0,
-        current_stock:
-          card.sizes?.reduce(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (sum: number, s: any) =>
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              sum + (s.stocks?.reduce((ss: number, st: any) => ss + st.qty, 0) || 0),
-            0
-          ) || 0,
+        current_stock: stockMap.get(card.nmID) || 0,
         marketplace: 'WB',
       }));
     }
