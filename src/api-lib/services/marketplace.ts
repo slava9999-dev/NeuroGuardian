@@ -200,6 +200,8 @@ export async function fetchWbStocks(apiKey: string, nmIds: number[]): Promise<Ma
       }
     );
 
+    console.log(`📡 WB FBO Statistics API: status=${fboRes.status}`);
+
     if (fboRes.ok) {
       const fboStocks = await fboRes.json();
       console.log(
