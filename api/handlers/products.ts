@@ -292,21 +292,12 @@ export async function handleSyncProducts(
 
       // Fetch REAL stocks from Warehouse Stocks API
       let stockMap = new Map<number, number>();
-      let debugWhStatus = 0;
       if (nmIds.length > 0) {
         try {
-          // DEBUG: Direct WB API call to diagnose
-          const debugWh = await fetch('https://marketplace-api.wildberries.ru/api/v3/warehouses', {
-            headers: { Authorization: apiKey },
-          });
-          debugWhStatus = debugWh.status;
-
           stockMap = await fetchWbStocks(apiKey, nmIds);
-          console.log(
-            `📦 WB [v2.7.5]: nmIds=${nmIds.length}, stocks=${stockMap.size}, whStatus=${debugWhStatus}`
-          );
+          console.log(`📦 WB Stocks: ${stockMap.size}/${nmIds.length} products have stock data`);
         } catch (e) {
-          console.warn(`❌ WB stocks error (whStatus=${debugWhStatus}):`, e);
+          console.warn('Failed to fetch WB stocks during sync:', e);
         }
       }
 
