@@ -276,7 +276,16 @@ async function callOpenAIWithTools(
   actionRequired?: any;
 }> {
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return { success: false, content: '', toolsUsed: [], tokensUsed: 0 };
+  if (!apiKey) {
+    console.error('❌ OPENAI_API_KEY not configured!');
+    return {
+      success: false,
+      content:
+        '⚠️ **AI-агент временно недоступен.**\n\nПожалуйста, попробуйте позже или обратитесь в поддержку.',
+      toolsUsed: [],
+      tokensUsed: 0,
+    };
+  }
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -433,7 +442,13 @@ async function callOpenAIWithTools(
     };
   } catch (e) {
     console.error('OpenAI Call Failed:', e);
-    return { success: false, content: '', toolsUsed: [], tokensUsed: 0 };
+    return {
+      success: false,
+      content:
+        '❌ **Произошла ошибка при обращении к AI.**\n\nПопробуйте ещё раз или переформулируйте вопрос.',
+      toolsUsed: [],
+      tokensUsed: 0,
+    };
   }
 }
 
