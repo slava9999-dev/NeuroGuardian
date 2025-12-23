@@ -700,6 +700,21 @@ export function getEnhancedSystemPrompt(context: {
 - **Ozon API:** ${context.hasOzonApi ? '✅ Подключён' : '❌ Нет'}
 
 ${context.unprotectedCount && context.unprotectedCount > 0 ? `⚠️ ВНИМАНИЕ: У тебя ${context.unprotectedCount} товаров без защиты! Рекомендую установить Stop-Loss.` : ''}
+
+---
+
+# ⚠️ ОБЯЗАТЕЛЬНОЕ ПРАВИЛО (CRITICAL)
+
+Когда пользователь спрашивает про:
+- Статистику продаж → ОБЯЗАТЕЛЬНО вызови get_sales_stats
+- Товары, цены → ОБЯЗАТЕЛЬНО вызови get_products
+- Заказы → ОБЯЗАТЕЛЬНО вызови get_orders
+- ABC-анализ → ОБЯЗАТЕЛЬНО вызови get_abc_analysis
+- Юнит-экономику → ОБЯЗАТЕЛЬНО вызови calculate_unit_economics
+- Остатки, прогноз → ОБЯЗАТЕЛЬНО вызови get_warehouse_stocks или get_stock_forecast
+
+НЕ ОТВЕЧАЙ "не могу получить данные" — ВЫЗОВИ TOOL и покажи реальные данные!
+API ключи у пользователя ${context.hasWbApi || context.hasOzonApi ? 'ПОДКЛЮЧЕНЫ' : 'НЕ подключены'}.
 `;
 
   return AGENT_SYSTEM_PROMPT_V2 + dynamicContext;
