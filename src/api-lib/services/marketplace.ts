@@ -200,9 +200,8 @@ export async function fetchWbProducts(apiKey: string, limit = 100): Promise<Mark
 
 /**
  * Fetch prices from WB Prices API
- * IMPROVED (Dec 2024 Audit):
- * - For >1 nmId, fetches individually to ensure accurate results
- * - Better error handling and logging
+ * FIXED (Dec 2024): Always use bulk fetch to avoid rate limiting (429)
+ * Previous implementation fetched individually causing 429 errors
  */
 export async function fetchWbPrices(
   apiKey: string,
@@ -213,104 +212,63 @@ export async function fetchWbPrices(
   if (nmIds.length === 0) return { priceMap };
 
   try {
-    // For small number of specific nmIds, fetch individually for accuracy
-    // This prevents the issue where nmIds might not be in first 1000 results
-    if (nmIds.length > 0 && nmIds.length <= 20) {
-      console.log(`📡 WB Prices API: fetching ${nmIds.length} individual prices`);
-
-      for (const nmId of nmIds) {
-        const url = new URL('https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter');
-        url.searchParams.set('limit', '10');
-        url.searchParams.set('offset', '0');
-        url.searchParams.set('filterNmID', String(nmId));
-
-        const response = await fetch(url.toString(), {
-          method: 'GET',
-          headers: { Authorization: apiKey },
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          const goods = data.data?.listGoods || [];
-
-          if (goods.length === 0) {
-            console.warn(
-              `⚠️ WB API: No goods returned for nmID=${nmId} (product may be inactive or archived)`
-            );
-            continue;
-          }
-
-          let found = false;
-          for (const good of goods) {
-            if (good.nmID === nmId) {
-              const price = extractWbPrice(good);
-              if (price > 0) {
-                priceMap.set(nmId, price);
-                found = true;
-              } else {
-                console.warn(
-                  `⚠️ WB API: nmID=${nmId} has zero/invalid price (discount/editPrice missing)`
-                );
-              }
-            }
-          }
-
-          if (!found) {
-            console.warn(
-              `⚠️ WB API: nmID=${nmId} not in response (got ${goods.length} other goods)`
-            );
-          }
-        } else {
-          console.error(
-            `❌ WB Prices API error for nmID=${nmId}: ${response.status} ${response.statusText}`
-          );
-        }
-      }
-
-      console.log(`💰 WB: Extracted ${priceMap.size}/${nmIds.length} prices`);
-      return { priceMap };
-    }
-
-    // For bulk fetch (all products or many nmIds), use pagination
-    console.log(`📡 WB Prices API: bulk fetch mode`);
+    // ALWAYS use bulk fetch mode to avoid rate limiting
+    // WB API limits individual requests heavily
+    console.log(`📡 WB Prices API: bulk fetch for ${nmIds.length} products`);
 
     const url = new URL('https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter');
     url.searchParams.set('limit', '1000');
     url.searchParams.set('offset', '0');
 
-    const pricesResponse = await fetch(url.toString(), {
+    const response = await fetch(url.toString(), {
       method: 'GET',
       headers: { Authorization: apiKey },
     });
 
-    if (pricesResponse.ok) {
-      const pricesData = await pricesResponse.json();
-      const goods = pricesData.data?.listGoods || [];
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ WB Prices API error: ${response.status} ${response.statusText}`, errorText);
+      return { priceMap, error: `WB API error: ${response.status}` };
+    }
 
-      console.log(`📦 WB Prices API: received ${goods.length} goods`);
+    const data = await response.json();
+    const goods = data.data?.listGoods || [];
 
-      for (const good of goods) {
+    console.log(`📦 WB Prices API: received ${goods.length} goods`);
+
+    // Create a Set of requested nmIds for faster lookup
+    const requestedNmIds = new Set(nmIds);
+
+    for (const good of goods) {
+      // Only process if this nmId was requested (or we're fetching all)
+      if (nmIds.length === 0 || requestedNmIds.has(good.nmID)) {
         const price = extractWbPrice(good);
         if (price > 0) {
           priceMap.set(good.nmID, price);
-        } else {
-          console.warn(`⚠️ WB: Zero price for nmID=${good.nmID}`);
         }
       }
-
-      console.log(`💰 WB: Extracted prices for ${priceMap.size}/${goods.length} goods`);
-    } else {
-      const errorBody = await pricesResponse.text();
-      console.error(`❌ WB Prices API error: ${pricesResponse.status}`, errorBody);
-      return { priceMap, error: `WB API error: ${pricesResponse.status}` };
     }
+
+    // Log missing prices
+    const foundCount = priceMap.size;
+    const requestedCount = nmIds.length || goods.length;
+
+    if (foundCount < requestedCount && nmIds.length > 0) {
+      const missing = nmIds.filter(id => !priceMap.has(id));
+      if (missing.length <= 5) {
+        console.warn(`⚠️ WB: Missing prices for nmIDs: ${missing.join(', ')}`);
+      } else {
+        console.warn(`⚠️ WB: Missing prices for ${missing.length} products`);
+      }
+    }
+
+    console.log(`💰 WB: Extracted ${foundCount}/${requestedCount} prices`);
+    return { priceMap };
   } catch (e) {
     const error = e instanceof Error ? e.message : 'Unknown error';
     console.warn('Failed to fetch WB prices:', e);
     return { priceMap, error };
   }
-
-  return { priceMap };
 }
 
 /**
