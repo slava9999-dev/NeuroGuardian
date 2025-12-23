@@ -898,14 +898,24 @@ export async function handleAgentConfirm(
             );
 
             if (response.ok) {
-              wbResult = { success: true, count: wbUpdates.length, error: '' };
-              // Update local DB
-              for (const u of wbUpdates) {
-                await sql`
-                         UPDATE products 
-                         SET current_price = ${u.newPrice}, updated_at = NOW()
-                         WHERE user_id = ${userId} AND nm_id = ${u.nmId}
-                       `;
+              const responseData = await response.json();
+              if (responseData.error) {
+                console.error(`❌ WB Update Logic Error:`, responseData);
+                wbResult = {
+                  success: false,
+                  count: 0,
+                  error: responseData.errorText || 'WB API Error',
+                };
+              } else {
+                wbResult = { success: true, count: wbUpdates.length, error: '' };
+                // Update local DB
+                for (const u of wbUpdates) {
+                  await sql`
+                            UPDATE products 
+                            SET current_price = ${u.newPrice}, updated_at = NOW()
+                            WHERE user_id = ${userId} AND nm_id = ${u.nmId}
+                          `;
+                }
               }
             } else {
               const errText = await response.text();

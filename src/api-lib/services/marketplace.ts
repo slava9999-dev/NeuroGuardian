@@ -234,7 +234,17 @@ export async function updateWbPrices(
     );
 
     if (response.ok) {
-      console.log(`✅ WB: Updated ${updates.length} prices`);
+      const responseBody = await response.json();
+
+      if (responseBody.error) {
+        console.error(
+          `❌ WB API Logical Error: ${responseBody.errorText}`,
+          JSON.stringify(responseBody)
+        );
+        return { success: false, count: 0, error: responseBody.errorText };
+      }
+
+      console.log(`✅ WB: Updated ${updates.length} prices. Task ID: ${responseBody.data?.id}`);
       return { success: true, count: updates.length };
     } else {
       const errorText = await response.text();
