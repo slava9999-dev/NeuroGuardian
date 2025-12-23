@@ -386,43 +386,86 @@ async function callOpenAIWithTools(
             const products = await getProductsByUserId(userId);
             const priceChanges = [];
 
+            console.log(`🔍 update_prices: User ${userId} has ${products.length} products`);
+            console.log(`🔍 update_prices fnArgs:`, JSON.stringify(fnArgs));
+
             // Parse products from fnArgs
             const requestedProducts = fnArgs.products || [];
+
             for (const req of requestedProducts) {
-              // Find matching product in DB (by product_id, title match, or nm_id)
+              const reqId = String(req.product_id || req.name || req.title || '')
+                .toLowerCase()
+                .trim();
+              const reqPrice = req.new_price || req.price || req.newPrice;
+
+              console.log(`🔍 Looking for product: "${reqId}" with new price: ${reqPrice}`);
+
+              // Find matching product in DB with improved fuzzy matching
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const dbProduct = products.find((p: any) => {
-                const reqId = String(req.product_id || '').toLowerCase();
                 const pId = String(p.product_id || '').toLowerCase();
                 const pTitle = String(p.title || '').toLowerCase();
                 const pNmId = String(p.nm_id || '');
 
-                return (
-                  pId === reqId ||
-                  pId.includes(reqId) ||
-                  reqId.includes(pNmId) ||
-                  pTitle.includes(reqId) ||
-                  reqId.includes(pTitle.substring(0, 20))
-                );
+                // Exact matches
+                if (pId === reqId) return true;
+                if (pNmId === reqId) return true;
+
+                // Partial ID matches
+                if (pId.includes(reqId) || reqId.includes(pId)) return true;
+                if (reqId.includes(pNmId) && pNmId.length > 3) return true;
+
+                // Title fuzzy match - check if request contains significant part of title
+                const titleWords = pTitle.split(/\s+/).filter(w => w.length > 3);
+                const reqWords = reqId.split(/\s+/).filter(w => w.length > 2);
+
+                // If at least 2 significant words match, it's likely the same product
+                let matchCount = 0;
+                for (const rw of reqWords) {
+                  if (
+                    pTitle.includes(rw) ||
+                    titleWords.some(tw => tw.includes(rw) || rw.includes(tw))
+                  ) {
+                    matchCount++;
+                  }
+                }
+                if (
+                  matchCount >= 2 ||
+                  (reqWords.length === 1 && matchCount === 1 && pTitle.includes(reqId))
+                ) {
+                  console.log(`✅ Fuzzy match found: "${reqId}" -> "${p.title}"`);
+                  return true;
+                }
+
+                return false;
               });
 
               if (dbProduct) {
+                console.log(
+                  `✅ Matched: "${reqId}" -> ${dbProduct.title} (${dbProduct.marketplace})`
+                );
                 priceChanges.push({
                   product_id: dbProduct.product_id,
                   nm_id: dbProduct.nm_id,
                   title: dbProduct.title,
                   marketplace: dbProduct.marketplace,
                   currentPrice: dbProduct.current_price,
-                  newPrice: req.new_price,
+                  newPrice: reqPrice,
                 });
+              } else {
+                console.log(`❌ No match found for: "${reqId}"`);
+                // Log available products for debugging
+                console.log(
+                  `📦 Available products:`,
+                  products.slice(0, 5).map((p: any) => p.title)
+                );
               }
             }
 
             // If no specific products, check if change_value is set (percentage change)
             if (priceChanges.length === 0 && fnArgs.change_value) {
-              // Apply percentage to all products
+              console.log(`📊 Applying percentage change: ${fnArgs.change_value}%`);
               for (const p of products.slice(0, 10)) {
-                // Limit to 10 for safety
                 const newPrice = Math.round(p.current_price * (1 + fnArgs.change_value / 100));
                 priceChanges.push({
                   product_id: p.product_id,
@@ -436,8 +479,15 @@ async function callOpenAIWithTools(
             }
 
             if (priceChanges.length === 0) {
-              result = JSON.stringify({ error: 'Не найдены товары для изменения цен' });
+              console.log(`❌ No products matched for price update`);
+              result = JSON.stringify({
+                error: 'Не найдены товары для изменения цен',
+                availableProducts: products
+                  .slice(0, 5)
+                  .map((p: any) => ({ title: p.title, id: p.product_id })),
+              });
             } else {
+              console.log(`✅ Prepared ${priceChanges.length} price changes`);
               return {
                 success: true,
                 content: `Требуется подтверждение для изменения цен на ${priceChanges.length} товар(ов).`,
@@ -751,6 +801,9 @@ export async function handleAgentConfirm(
   let executed = false;
   const details = typeof _details === 'string' ? JSON.parse(_details) : _details || {};
 
+  console.log(`🔧 handleAgentConfirm: operation=${operation}, userId=${userId}`);
+  console.log(`🔧 handleAgentConfirm details:`, JSON.stringify(details).substring(0, 500));
+
   // Logic for executions...
   if (operation === 'bulk_set_min_price') {
     const percentage = details.percentage || 15;
@@ -817,6 +870,8 @@ export async function handleAgentConfirm(
           const wbPayload = {
             data: wbUpdates.map(u => ({ nmId: u.nmId, price: u.newPrice })),
           };
+
+          console.log(`📤 WB Price Update Payload:`, JSON.stringify(wbPayload));
 
           try {
             const response = await fetchWithRetry(

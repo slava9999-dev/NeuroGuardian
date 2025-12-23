@@ -140,14 +140,24 @@ export async function fetchWbPrices(apiKey: string, nmIds: number[]): Promise<Ma
   if (nmIds.length === 0) return priceMap;
 
   try {
-    const pricesResponse = await fetch(
-      'https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: apiKey },
-        body: JSON.stringify({ limit: 1000, offset: 0, filterNmID: nmIds }),
-      }
-    );
+    // WB API uses GET with query parameters for filtering
+    // For single nmID filter, use filterNmID parameter
+    // For listing all goods, omit the filter
+    const url = new URL('https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter');
+    url.searchParams.set('limit', '1000');
+    url.searchParams.set('offset', '0');
+
+    // If filtering by specific nmIds, add them
+    if (nmIds.length === 1) {
+      url.searchParams.set('filterNmID', String(nmIds[0]));
+    }
+
+    console.log(`📡 WB Prices API: fetching from ${url.toString()}`);
+
+    const pricesResponse = await fetch(url.toString(), {
+      method: 'GET',
+      headers: { Authorization: apiKey },
+    });
 
     if (pricesResponse.ok) {
       const pricesData = await pricesResponse.json();
@@ -185,7 +195,8 @@ export async function fetchWbPrices(apiKey: string, nmIds: number[]): Promise<Ma
 
       console.log(`💰 WB: Extracted prices for ${priceMap.size}/${goods.length} goods`);
     } else {
-      console.error(`❌ WB Prices API error: ${pricesResponse.status}`);
+      const errorBody = await pricesResponse.text();
+      console.error(`❌ WB Prices API error: ${pricesResponse.status}`, errorBody);
     }
   } catch (e) {
     console.warn('Failed to fetch WB prices:', e);
