@@ -294,13 +294,12 @@ export async function handleSyncProducts(
       let stockMap = new Map<number, number>();
       if (nmIds.length > 0) {
         try {
-          console.log(
-            `🔍 WB SYNC: Calling fetchWbStocks for ${nmIds.length} products [v2.7.1-fix]`
-          );
           stockMap = await fetchWbStocks(apiKey, nmIds);
-          console.log(`📦 WB: Got stocks for ${stockMap.size} products [v2.7.2]`);
-        } catch (_e) {
-          console.warn('Failed to fetch WB stocks during sync:', _e);
+          console.log(
+            `📦 WB STOCKS [v2.7.3]: Called for ${nmIds.length} nmIds, got ${stockMap.size} stocks`
+          );
+        } catch (e) {
+          console.warn('Failed to fetch WB stocks during sync:', e);
         }
       }
 
