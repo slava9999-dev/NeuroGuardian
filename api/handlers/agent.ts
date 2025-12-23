@@ -275,15 +275,16 @@ async function callOpenAIWithTools(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   actionRequired?: any;
 }> {
-  // Try Groq first (faster and free tier), fallback to OpenAI
-  const groqKey = process.env.GROQ_API_KEY;
+  // LLM Provider: OpenAI (recommended) > Groq > AgentRouter
   const openaiKey = process.env.OPENAI_API_KEY;
+  const groqKey = process.env.GROQ_API_KEY;
+  const agentRouterKey = process.env.AGENTROUTER_API_KEY;
 
-  const apiKey = groqKey || openaiKey;
-  const isGroq = !!groqKey;
+  const apiKey = openaiKey || groqKey || agentRouterKey;
+  const provider = openaiKey ? 'OpenAI' : groqKey ? 'Groq' : 'AgentRouter';
 
   if (!apiKey) {
-    console.error('❌ No LLM API key configured! Set GROQ_API_KEY or OPENAI_API_KEY');
+    console.error('❌ No LLM API key configured! Set OPENAI_API_KEY');
     return {
       success: false,
       content:
@@ -293,15 +294,18 @@ async function callOpenAIWithTools(
     };
   }
 
-  // Groq models mapping
-  // Note: llama-3.3-70b-versatile has very low TPM limits (12k), using 8b for all requests
-  const groqModel = 'llama-3.1-8b-instant'; // Fast model with higher limits
-  const finalModel = isGroq ? groqModel : model;
-  const apiUrl = isGroq
-    ? 'https://api.groq.com/openai/v1/chat/completions'
-    : 'https://api.openai.com/v1/chat/completions';
+  // Model and URL selection
+  let finalModel = model; // gpt-4o-mini or gpt-4o
+  let apiUrl = 'https://api.openai.com/v1/chat/completions';
 
-  console.log(`🤖 Using ${isGroq ? 'Groq' : 'OpenAI'} with model: ${finalModel}`);
+  if (groqKey && !openaiKey) {
+    apiUrl = 'https://api.groq.com/openai/v1/chat/completions';
+    finalModel = 'llama-3.1-8b-instant';
+  } else if (agentRouterKey && !openaiKey && !groqKey) {
+    apiUrl = 'https://agentrouter.org/v1/chat/completions';
+  }
+
+  console.log(`🤖 Using ${provider} with model: ${finalModel}`);
 
   try {
     const response = await fetch(apiUrl, {
@@ -322,7 +326,7 @@ async function callOpenAIWithTools(
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`${isGroq ? 'Groq' : 'OpenAI'} API Error: ${response.status} - ${errorText}`);
+      throw new Error(`${provider} API Error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
