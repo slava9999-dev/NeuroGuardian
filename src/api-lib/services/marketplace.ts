@@ -109,7 +109,7 @@ export async function fetchWbProducts(apiKey: string, limit = 100): Promise<Mark
   const nmIds = cards.map((card: any) => card.nmID);
 
   // Step 2: Fetch prices
-  const priceMap = await fetchWbPrices(apiKey, nmIds);
+  const { priceMap } = await fetchWbPrices(apiKey, nmIds);
 
   // Step 3: Map to unified format
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -133,26 +133,60 @@ export async function fetchWbProducts(apiKey: string, limit = 100): Promise<Mark
 
 /**
  * Fetch prices from WB Prices API
+ * IMPROVED (Dec 2024 Audit):
+ * - For >1 nmId, fetches individually to ensure accurate results
+ * - Better error handling and logging
  */
-export async function fetchWbPrices(apiKey: string, nmIds: number[]): Promise<Map<number, number>> {
+export async function fetchWbPrices(
+  apiKey: string,
+  nmIds: number[]
+): Promise<{ priceMap: Map<number, number>; error?: string }> {
   const priceMap = new Map<number, number>();
 
-  if (nmIds.length === 0) return priceMap;
+  if (nmIds.length === 0) return { priceMap };
 
   try {
-    // WB API uses GET with query parameters for filtering
-    // For single nmID filter, use filterNmID parameter
-    // For listing all goods, omit the filter
+    // For small number of specific nmIds, fetch individually for accuracy
+    // This prevents the issue where nmIds might not be in first 1000 results
+    if (nmIds.length > 0 && nmIds.length <= 20) {
+      console.log(`📡 WB Prices API: fetching ${nmIds.length} individual prices`);
+
+      for (const nmId of nmIds) {
+        const url = new URL('https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter');
+        url.searchParams.set('limit', '10');
+        url.searchParams.set('offset', '0');
+        url.searchParams.set('filterNmID', String(nmId));
+
+        const response = await fetch(url.toString(), {
+          method: 'GET',
+          headers: { Authorization: apiKey },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const goods = data.data?.listGoods || [];
+
+          for (const good of goods) {
+            if (good.nmID === nmId) {
+              const price = extractWbPrice(good);
+              if (price > 0) {
+                priceMap.set(nmId, price);
+              }
+            }
+          }
+        }
+      }
+
+      console.log(`💰 WB: Extracted ${priceMap.size}/${nmIds.length} prices`);
+      return { priceMap };
+    }
+
+    // For bulk fetch (all products or many nmIds), use pagination
+    console.log(`📡 WB Prices API: bulk fetch mode`);
+
     const url = new URL('https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter');
     url.searchParams.set('limit', '1000');
     url.searchParams.set('offset', '0');
-
-    // If filtering by specific nmIds, add them
-    if (nmIds.length === 1) {
-      url.searchParams.set('filterNmID', String(nmIds[0]));
-    }
-
-    console.log(`📡 WB Prices API: fetching from ${url.toString()}`);
 
     const pricesResponse = await fetch(url.toString(), {
       method: 'GET',
@@ -166,28 +200,9 @@ export async function fetchWbPrices(apiKey: string, nmIds: number[]): Promise<Ma
       console.log(`📦 WB Prices API: received ${goods.length} goods`);
 
       for (const good of goods) {
-        const size = good.sizes?.[0];
-        let price = 0;
-
-        if (size) {
-          // Priority: discountedPrice > clubDiscountedPrice > salePrice > price
-          // WB API 2024: prices are in RUBLES (not kopecks!)
-          price =
-            size.discountedPrice ||
-            size.clubDiscountedPrice ||
-            size.salePrice ||
-            size.price ||
-            good.price ||
-            0;
-
-          // Safety check: if price looks like kopecks, convert
-          if (price > 100000) {
-            price = Math.round(price / 100);
-          }
-        }
-
+        const price = extractWbPrice(good);
         if (price > 0) {
-          priceMap.set(good.nmID, Math.round(price));
+          priceMap.set(good.nmID, price);
         } else {
           console.warn(`⚠️ WB: Zero price for nmID=${good.nmID}`);
         }
@@ -197,12 +212,42 @@ export async function fetchWbPrices(apiKey: string, nmIds: number[]): Promise<Ma
     } else {
       const errorBody = await pricesResponse.text();
       console.error(`❌ WB Prices API error: ${pricesResponse.status}`, errorBody);
+      return { priceMap, error: `WB API error: ${pricesResponse.status}` };
     }
   } catch (e) {
+    const error = e instanceof Error ? e.message : 'Unknown error';
     console.warn('Failed to fetch WB prices:', e);
+    return { priceMap, error };
   }
 
-  return priceMap;
+  return { priceMap };
+}
+
+/**
+ * Extract price from WB goods item
+ * Priority: discountedPrice > clubDiscountedPrice > salePrice > price
+ */
+function extractWbPrice(good: any): number {
+  const size = good.sizes?.[0];
+  let price = 0;
+
+  if (size) {
+    // WB API 2024: prices are in RUBLES (not kopecks!)
+    price =
+      size.discountedPrice ||
+      size.clubDiscountedPrice ||
+      size.salePrice ||
+      size.price ||
+      good.price ||
+      0;
+
+    // Safety check: if price looks like kopecks (very high value), convert
+    if (price > 100000) {
+      price = Math.round(price / 100);
+    }
+  }
+
+  return Math.round(price);
 }
 
 /**
@@ -340,7 +385,7 @@ export async function checkWbTaskStatus(
     }
 
     // Check for per-item errors in task details
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const failedItems =
       task.details?.filter((d: any) => d.status === 'rejected' || d.errorText) || [];
 
@@ -450,25 +495,47 @@ export async function fetchOzonProducts(
 
 /**
  * Update prices on Ozon
+ * IMPROVED (Dec 2024 Audit):
+ * - Added result.errors checking (Ozon can return 200 OK with per-item errors)
+ * - Added input validation
+ * - Returns partial success info
  */
 export async function updateOzonPrices(
   clientId: string,
   apiKey: string,
   updates: Array<{ productId: number; price: number }>
-): Promise<{ success: boolean; count: number; error?: string }> {
+): Promise<{ success: boolean; count: number; error?: string; partialErrors?: string[] }> {
   if (updates.length === 0) {
     return { success: true, count: 0 };
   }
 
+  // Validate inputs
+  const validUpdates = updates.filter(u => {
+    const isValid =
+      Number.isFinite(u.productId) && u.productId > 0 && Number.isFinite(u.price) && u.price > 0;
+    if (!isValid) {
+      console.warn(
+        `⚠️ Ozon: Skipping invalid update - productId: ${u.productId}, price: ${u.price}`
+      );
+    }
+    return isValid;
+  });
+
+  if (validUpdates.length === 0) {
+    return { success: false, count: 0, error: 'Нет валидных товаров для обновления' };
+  }
+
   try {
     const payload = {
-      prices: updates.map(u => ({
+      prices: validUpdates.map(u => ({
         product_id: u.productId,
         price: String(u.price),
         old_price: String(Math.round(u.price * 1.1)),
         currency_code: 'RUB',
       })),
     };
+
+    console.log(`📤 Ozon Price Update: ${validUpdates.length} items`);
 
     const response = await fetchWithRetry('https://api-seller.ozon.ru/v1/product/import/prices', {
       method: 'POST',
@@ -481,8 +548,54 @@ export async function updateOzonPrices(
     });
 
     if (response.ok) {
-      console.log(`✅ Ozon: Updated ${updates.length} prices`);
-      return { success: true, count: updates.length };
+      const responseData = await response.json();
+      const results = responseData.result || [];
+
+      // Check for per-item errors (Ozon can return 200 OK with errors in result)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const successfulUpdates = results.filter((r: any) => r.updated === true);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const failedUpdates = results.filter(
+        (r: any) => r.updated === false || (r.errors && r.errors.length > 0)
+      );
+
+      if (failedUpdates.length > 0) {
+        // Extract error messages
+        const errorMessages = failedUpdates
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .flatMap(
+            (f: any) =>
+              f.errors?.map((e: any) => `product_id ${f.product_id}: ${e.message || e.code}`) || [
+                `product_id ${f.product_id}: update failed`,
+              ]
+          )
+          .slice(0, 5); // Limit to first 5 errors
+
+        console.warn(
+          `⚠️ Ozon partial failure: ${failedUpdates.length} items failed`,
+          errorMessages
+        );
+
+        // Partial success - some items updated, some failed
+        if (successfulUpdates.length > 0) {
+          return {
+            success: true, // Partial success
+            count: successfulUpdates.length,
+            error: `${failedUpdates.length} товаров не обновлено`,
+            partialErrors: errorMessages,
+          };
+        } else {
+          return {
+            success: false,
+            count: 0,
+            error: `Все ${failedUpdates.length} товаров не обновлены: ${errorMessages.join('; ')}`,
+            partialErrors: errorMessages,
+          };
+        }
+      }
+
+      console.log(`✅ Ozon: Updated ${validUpdates.length} prices`);
+      return { success: true, count: validUpdates.length };
     } else {
       const errorText = await response.text();
       console.error(`❌ Ozon Price Update Failed: ${errorText}`);

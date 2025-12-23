@@ -330,7 +330,7 @@ async function processWbDefense(
   if (nmIds.length === 0) return;
 
   // Fetch current prices via MarketplaceService
-  const priceMap = await fetchWbPrices(wbApiKey, nmIds);
+  const { priceMap } = await fetchWbPrices(wbApiKey, nmIds);
 
   // Check for violations
   for (const dbProduct of monitoredProducts) {
