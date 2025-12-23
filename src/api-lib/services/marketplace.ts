@@ -166,14 +166,37 @@ export async function fetchWbPrices(
           const data = await response.json();
           const goods = data.data?.listGoods || [];
 
+          if (goods.length === 0) {
+            console.warn(
+              `⚠️ WB API: No goods returned for nmID=${nmId} (product may be inactive or archived)`
+            );
+            continue;
+          }
+
+          let found = false;
           for (const good of goods) {
             if (good.nmID === nmId) {
               const price = extractWbPrice(good);
               if (price > 0) {
                 priceMap.set(nmId, price);
+                found = true;
+              } else {
+                console.warn(
+                  `⚠️ WB API: nmID=${nmId} has zero/invalid price (discount/editPrice missing)`
+                );
               }
             }
           }
+
+          if (!found) {
+            console.warn(
+              `⚠️ WB API: nmID=${nmId} not in response (got ${goods.length} other goods)`
+            );
+          }
+        } else {
+          console.error(
+            `❌ WB Prices API error for nmID=${nmId}: ${response.status} ${response.statusText}`
+          );
         }
       }
 
