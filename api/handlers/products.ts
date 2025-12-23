@@ -225,14 +225,46 @@ export async function handleSyncProducts(
 
           if (pricesResponse.ok) {
             const pricesData = await pricesResponse.json();
-            for (const good of pricesData.data?.listGoods || []) {
-              const priceInKopecks =
-                good.sizes?.[0]?.discountedPrice || good.sizes?.[0]?.salePrice || 0;
-              priceMap.set(good.nmID, Math.round(priceInKopecks / 100));
+            const goods = pricesData.data?.listGoods || [];
+
+            console.log(`📦 WB Prices API: received ${goods.length} goods`);
+
+            for (const good of goods) {
+              // Try multiple price fields (WB API changes frequently)
+              const size = good.sizes?.[0];
+              let price = 0;
+
+              if (size) {
+                // Priority: discountedPrice > clubDiscountedPrice > salePrice > price
+                // WB API 2024: prices are in RUBLES (not kopecks!)
+                price =
+                  size.discountedPrice ||
+                  size.clubDiscountedPrice ||
+                  size.salePrice ||
+                  size.price ||
+                  good.price ||
+                  0;
+
+                // If price looks like kopecks (>10000 for cheap items), convert
+                // But WB now uses rubles, so this is just a safety check
+                if (price > 100000) {
+                  price = Math.round(price / 100);
+                }
+              }
+
+              if (price > 0) {
+                priceMap.set(good.nmID, Math.round(price));
+              } else {
+                console.warn(`⚠️ WB: Zero price for nmID=${good.nmID}`, JSON.stringify(size));
+              }
             }
+
+            console.log(`💰 WB: Extracted prices for ${priceMap.size}/${goods.length} goods`);
+          } else {
+            console.error(`❌ WB Prices API error: ${pricesResponse.status}`);
           }
         } catch (_e) {
-          console.warn('Failed to fetch WB prices during sync');
+          console.warn('Failed to fetch WB prices during sync:', _e);
         }
       }
 
