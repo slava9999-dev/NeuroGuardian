@@ -689,7 +689,17 @@ export function getEnhancedSystemPrompt(context: {
   hasWbApi?: boolean;
   hasOzonApi?: boolean;
 }): string {
+  // Get current date in Russian format
+  const now = new Date();
+  const currentDate = now.toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+
   const dynamicContext = `
+# 📅 ТЕКУЩАЯ ДАТА: ${currentDate}
+
 # 📊 ТЕКУЩИЙ КОНТЕКСТ ПОЛЬЗОВАТЕЛЯ
 
 - **Имя:** ${context.userName || 'Продавец'}
