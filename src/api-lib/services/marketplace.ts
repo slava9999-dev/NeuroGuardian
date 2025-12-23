@@ -101,18 +101,32 @@ export async function fetchWbStocks(apiKey: string, nmIds: number[]): Promise<Ma
 
   try {
     // Step 1: Try FBS warehouses first
+    console.log(`🔍 WB FBS: Fetching warehouses...`);
     const warehousesRes = await fetch('https://marketplace-api.wildberries.ru/api/v3/warehouses', {
       method: 'GET',
       headers: { Authorization: apiKey },
     });
 
+    console.log(`📡 WB Warehouses API: status=${warehousesRes.status}`);
+
     if (warehousesRes.ok) {
       const warehouses = await warehousesRes.json();
+      console.log(
+        `📦 WB FBS: Found ${Array.isArray(warehouses) ? warehouses.length : 0} warehouses`
+      );
 
       if (Array.isArray(warehouses) && warehouses.length > 0) {
+        // Log warehouse names
+        console.log(
+          `📦 WB Warehouses: ${warehouses.map((w: { id: number; name?: string }) => `${w.name || w.id}`).join(', ')}`
+        );
+
         // FBS mode - get stocks from seller's warehouses
         for (const wh of warehouses) {
           try {
+            console.log(
+              `🔍 WB: Fetching stocks for warehouse ${wh.id} (${wh.name || 'unnamed'})...`
+            );
             const stocksRes = await fetch(
               `https://marketplace-api.wildberries.ru/api/v3/stocks/${wh.id}`,
               {
@@ -125,9 +139,12 @@ export async function fetchWbStocks(apiKey: string, nmIds: number[]): Promise<Ma
               }
             );
 
+            console.log(`📡 WB Stocks API (wh ${wh.id}): status=${stocksRes.status}`);
+
             if (stocksRes.ok) {
               const stocksData = await stocksRes.json();
               const stocks = stocksData.stocks || [];
+              console.log(`📦 WB Warehouse ${wh.id}: ${stocks.length} stock items`);
 
               for (const stock of stocks) {
                 const nmId = parseInt(stock.sku);
@@ -136,6 +153,12 @@ export async function fetchWbStocks(apiKey: string, nmIds: number[]): Promise<Ma
                   stockMap.set(nmId, current + (stock.amount || 0));
                 }
               }
+            } else {
+              const errorText = await stocksRes.text();
+              console.warn(
+                `⚠️ WB Stocks API error for wh ${wh.id}: ${stocksRes.status}`,
+                errorText
+              );
             }
           } catch (e) {
             console.warn(`⚠️ WB Stocks error for warehouse ${wh.id}:`, e);
@@ -147,8 +170,13 @@ export async function fetchWbStocks(apiKey: string, nmIds: number[]): Promise<Ma
             `📦 WB FBS Stocks: Found stocks for ${stockMap.size} products across ${warehouses.length} warehouses`
           );
           return stockMap;
+        } else {
+          console.log(`📦 WB FBS: Warehouses exist but no stocks found`);
         }
       }
+    } else {
+      const errorText = await warehousesRes.text();
+      console.warn(`⚠️ WB Warehouses API error: ${warehousesRes.status}`, errorText);
     }
 
     // Step 2: FBO fallback - use Statistics API for WB warehouse stocks
