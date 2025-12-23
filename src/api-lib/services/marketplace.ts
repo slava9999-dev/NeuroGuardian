@@ -1035,7 +1035,7 @@ export async function setWbZeroStock(
   try {
     // First get warehouse IDs
     const warehousesRes = await fetchWithRetry(
-      'https://suppliers-api.wildberries.ru/api/v3/warehouses',
+      'https://marketplace-api.wildberries.ru/api/v3/warehouses',
       {
         method: 'GET',
         headers: { Authorization: apiKey },
@@ -1050,7 +1050,7 @@ export async function setWbZeroStock(
 
     // Zero stock on all warehouses for these SKUs
     for (const wh of warehouses || []) {
-      await fetchWithRetry(`https://suppliers-api.wildberries.ru/api/v3/stocks/${wh.id}`, {
+      await fetchWithRetry(`https://marketplace-api.wildberries.ru/api/v3/stocks/${wh.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

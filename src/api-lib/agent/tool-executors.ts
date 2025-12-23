@@ -447,17 +447,20 @@ export async function executeGetWarehouseStocks(
   if (keys.wb && (!args.marketplace || args.marketplace === 'WB')) {
     try {
       // First get warehouses
-      const whRes = await fetchWithRetry('https://suppliers-api.wildberries.ru/api/v3/warehouses', {
-        method: 'GET',
-        headers: { Authorization: keys.wb },
-      });
+      const whRes = await fetchWithRetry(
+        'https://marketplace-api.wildberries.ru/api/v3/warehouses',
+        {
+          method: 'GET',
+          headers: { Authorization: keys.wb },
+        }
+      );
 
       if (whRes.ok) {
         const warehouses = await whRes.json();
 
         for (const wh of warehouses || []) {
           const stockRes = await fetchWithRetry(
-            `https://suppliers-api.wildberries.ru/api/v3/stocks/${wh.id}`,
+            `https://marketplace-api.wildberries.ru/api/v3/stocks/${wh.id}`,
             {
               method: 'POST',
               headers: {
