@@ -92,6 +92,7 @@ export async function getMarketplaceKeys(userId: number): Promise<MarketplaceApi
 /**
  * Fetch WB stocks from Warehouse Stocks API
  * Returns a map of nmId -> total stock across all warehouses
+ * IMPROVED (Dec 2024): Added FBO fallback via Statistics API
  */
 export async function fetchWbStocks(apiKey: string, nmIds: number[]): Promise<Map<number, number>> {
   const stockMap = new Map<number, number>();
@@ -99,60 +100,93 @@ export async function fetchWbStocks(apiKey: string, nmIds: number[]): Promise<Ma
   if (nmIds.length === 0) return stockMap;
 
   try {
-    // First, get list of warehouses
+    // Step 1: Try FBS warehouses first
     const warehousesRes = await fetch('https://marketplace-api.wildberries.ru/api/v3/warehouses', {
       method: 'GET',
       headers: { Authorization: apiKey },
     });
 
-    if (!warehousesRes.ok) {
-      console.warn(`⚠️ WB Warehouses API error: ${warehousesRes.status}`);
-      return stockMap;
-    }
+    if (warehousesRes.ok) {
+      const warehouses = await warehousesRes.json();
 
-    const warehouses = await warehousesRes.json();
+      if (Array.isArray(warehouses) && warehouses.length > 0) {
+        // FBS mode - get stocks from seller's warehouses
+        for (const wh of warehouses) {
+          try {
+            const stocksRes = await fetch(
+              `https://marketplace-api.wildberries.ru/api/v3/stocks/${wh.id}`,
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: apiKey,
+                },
+                body: JSON.stringify({ skus: [] }), // Empty = all SKUs
+              }
+            );
 
-    if (!Array.isArray(warehouses) || warehouses.length === 0) {
-      console.log(`📦 WB: No FBS warehouses found (likely FBO-only seller)`);
-      return stockMap;
-    }
+            if (stocksRes.ok) {
+              const stocksData = await stocksRes.json();
+              const stocks = stocksData.stocks || [];
 
-    // For each warehouse, get stocks
-    for (const wh of warehouses) {
-      try {
-        const stocksRes = await fetch(
-          `https://marketplace-api.wildberries.ru/api/v3/stocks/${wh.id}`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: apiKey,
-            },
-            body: JSON.stringify({ skus: [] }), // Empty = all SKUs
-          }
-        );
-
-        if (stocksRes.ok) {
-          const stocksData = await stocksRes.json();
-          const stocks = stocksData.stocks || [];
-
-          for (const stock of stocks) {
-            // WB uses SKU which is usually nmID as string
-            const nmId = parseInt(stock.sku);
-            if (!isNaN(nmId)) {
-              const current = stockMap.get(nmId) || 0;
-              stockMap.set(nmId, current + (stock.amount || 0));
+              for (const stock of stocks) {
+                const nmId = parseInt(stock.sku);
+                if (!isNaN(nmId)) {
+                  const current = stockMap.get(nmId) || 0;
+                  stockMap.set(nmId, current + (stock.amount || 0));
+                }
+              }
             }
+          } catch (e) {
+            console.warn(`⚠️ WB Stocks error for warehouse ${wh.id}:`, e);
           }
         }
-      } catch (e) {
-        console.warn(`⚠️ WB Stocks error for warehouse ${wh.id}:`, e);
+
+        if (stockMap.size > 0) {
+          console.log(
+            `📦 WB FBS Stocks: Found stocks for ${stockMap.size} products across ${warehouses.length} warehouses`
+          );
+          return stockMap;
+        }
       }
     }
 
-    console.log(
-      `📦 WB Stocks: Found stocks for ${stockMap.size} products across ${warehouses.length} warehouses`
+    // Step 2: FBO fallback - use Statistics API for WB warehouse stocks
+    console.log(`📦 WB: No FBS stocks, trying FBO via Statistics API...`);
+
+    const today = new Date();
+    const dateFrom = new Date(today);
+    dateFrom.setDate(today.getDate() - 1); // Yesterday
+
+    const fboRes = await fetch(
+      `https://statistics-api.wildberries.ru/api/v1/supplier/stocks?dateFrom=${dateFrom.toISOString().split('T')[0]}`,
+      {
+        method: 'GET',
+        headers: { Authorization: apiKey },
+      }
     );
+
+    if (fboRes.ok) {
+      const fboStocks = await fboRes.json();
+
+      if (Array.isArray(fboStocks)) {
+        // Group by nmId and sum quantities
+        for (const item of fboStocks) {
+          const nmId = item.nmId;
+          if (nmId && nmIds.includes(nmId)) {
+            const current = stockMap.get(nmId) || 0;
+            // quantityFull = total on WB warehouses
+            stockMap.set(nmId, current + (item.quantityFull || item.quantity || 0));
+          }
+        }
+
+        console.log(
+          `📦 WB FBO Stocks: Found stocks for ${stockMap.size} products from Statistics API`
+        );
+      }
+    } else {
+      console.warn(`⚠️ WB Statistics API error: ${fboRes.status}`);
+    }
   } catch (e) {
     console.error('❌ WB Stocks API error:', e);
   }
@@ -220,8 +254,7 @@ export async function fetchWbPrices(
   if (nmIds.length === 0) return { priceMap };
 
   try {
-    // ALWAYS use bulk fetch mode to avoid rate limiting
-    // WB API limits individual requests heavily
+    // Step 1: Try Prices API first
     console.log(`📡 WB Prices API: bulk fetch for ${nmIds.length} products`);
 
     const url = new URL('https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter');
@@ -233,44 +266,83 @@ export async function fetchWbPrices(
       headers: { Authorization: apiKey },
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`❌ WB Prices API error: ${response.status} ${response.statusText}`, errorText);
-      return { priceMap, error: `WB API error: ${response.status}` };
-    }
+    if (response.ok) {
+      const data = await response.json();
+      const goods = data.data?.listGoods || [];
 
-    const data = await response.json();
-    const goods = data.data?.listGoods || [];
+      console.log(`📦 WB Prices API: received ${goods.length} goods`);
 
-    console.log(`📦 WB Prices API: received ${goods.length} goods`);
+      const requestedNmIds = new Set(nmIds);
 
-    // Create a Set of requested nmIds for faster lookup
-    const requestedNmIds = new Set(nmIds);
-
-    for (const good of goods) {
-      // Only process if this nmId was requested (or we're fetching all)
-      if (nmIds.length === 0 || requestedNmIds.has(good.nmID)) {
-        const price = extractWbPrice(good);
-        if (price > 0) {
-          priceMap.set(good.nmID, price);
+      for (const good of goods) {
+        if (nmIds.length === 0 || requestedNmIds.has(good.nmID)) {
+          const price = extractWbPrice(good);
+          if (price > 0) {
+            priceMap.set(good.nmID, price);
+          }
         }
       }
+    } else {
+      console.warn(`⚠️ WB Prices API error: ${response.status}`);
     }
 
-    // Log missing prices
-    const foundCount = priceMap.size;
-    const requestedCount = nmIds.length || goods.length;
+    // Step 2: Statistics API fallback for missing prices
+    const missing = nmIds.filter(id => !priceMap.has(id));
+    if (missing.length > 0) {
+      console.log(`📡 WB: ${missing.length} products missing prices, trying Statistics API...`);
 
-    if (foundCount < requestedCount && nmIds.length > 0) {
-      const missing = nmIds.filter(id => !priceMap.has(id));
-      if (missing.length <= 5) {
-        console.warn(`⚠️ WB: Missing prices for nmIDs: ${missing.join(', ')}`);
-      } else {
-        console.warn(`⚠️ WB: Missing prices for ${missing.length} products`);
+      const today = new Date();
+      const dateFrom = new Date(today);
+      dateFrom.setDate(today.getDate() - 30); // Last 30 days
+
+      try {
+        const salesRes = await fetch(
+          `https://statistics-api.wildberries.ru/api/v1/supplier/sales?dateFrom=${dateFrom.toISOString().split('T')[0]}`,
+          {
+            method: 'GET',
+            headers: { Authorization: apiKey },
+          }
+        );
+
+        if (salesRes.ok) {
+          const sales = await salesRes.json();
+          const missingSet = new Set(missing);
+
+          if (Array.isArray(sales)) {
+            for (const sale of sales) {
+              if (sale.nmId && missingSet.has(sale.nmId) && !priceMap.has(sale.nmId)) {
+                // Use priceWithDisc or finishedPrice
+                const price = sale.finishedPrice || sale.priceWithDisc || 0;
+                if (price > 0) {
+                  priceMap.set(sale.nmId, Math.round(price));
+                }
+              }
+            }
+          }
+
+          const foundFromSales = missing.filter(id => priceMap.has(id)).length;
+          if (foundFromSales > 0) {
+            console.log(`💰 WB Statistics: Found ${foundFromSales} additional prices from sales`);
+          }
+        }
+      } catch (e) {
+        console.warn('⚠️ WB Statistics API fallback failed:', e);
       }
     }
 
-    console.log(`💰 WB: Extracted ${foundCount}/${requestedCount} prices`);
+    // Log final results
+    const foundCount = priceMap.size;
+    const stillMissing = nmIds.filter(id => !priceMap.has(id));
+
+    if (stillMissing.length > 0) {
+      if (stillMissing.length <= 5) {
+        console.warn(`⚠️ WB: Still missing prices for nmIDs: ${stillMissing.join(', ')}`);
+      } else {
+        console.warn(`⚠️ WB: Still missing prices for ${stillMissing.length} products`);
+      }
+    }
+
+    console.log(`💰 WB: Extracted ${foundCount}/${nmIds.length} prices total`);
     return { priceMap };
   } catch (e) {
     const error = e instanceof Error ? e.message : 'Unknown error';
