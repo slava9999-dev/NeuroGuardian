@@ -293,8 +293,9 @@ async function callOpenAIWithTools(
     };
   }
 
-  // Groq models mapping (Groq uses Llama models)
-  const groqModel = model.includes('gpt-4o') ? 'llama-3.3-70b-versatile' : 'llama-3.1-8b-instant';
+  // Groq models mapping
+  // Note: llama-3.3-70b-versatile has very low TPM limits (12k), using 8b for all requests
+  const groqModel = 'llama-3.1-8b-instant'; // Fast model with higher limits
   const finalModel = isGroq ? groqModel : model;
   const apiUrl = isGroq
     ? 'https://api.groq.com/openai/v1/chat/completions'
