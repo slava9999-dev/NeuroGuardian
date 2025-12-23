@@ -22,28 +22,44 @@ async function getUserApiKeys(userId: number): Promise<{
   ozon?: { clientId: string; apiKey: string };
   wb?: string;
 }> {
+  console.log(`🔑 getUserApiKeys: fetching keys for userId=${userId}`);
+
   const user = await getUserById(userId);
-  if (!user) return {};
+  if (!user) {
+    console.warn(`⚠️ getUserApiKeys: User ${userId} not found in database`);
+    return {};
+  }
+
+  console.log(
+    `🔑 getUserApiKeys: user found, api_key_wb=${!!user.api_key_wb}, api_key_ozon=${!!user.api_key_ozon}`
+  );
 
   const result: { ozon?: { clientId: string; apiKey: string }; wb?: string } = {};
 
   if (user.api_key_ozon) {
     const decrypted = decryptApiKey(user.api_key_ozon);
+    console.log(`🔑 Ozon key decryption: ${decrypted ? 'SUCCESS' : 'FAILED'}`);
     if (decrypted) {
       const [clientId, apiKey] = decrypted.split(':');
       if (clientId && apiKey) {
         result.ozon = { clientId, apiKey };
+        console.log(`✅ Ozon API configured: clientId=${clientId.substring(0, 4)}...`);
+      } else {
+        console.warn(`⚠️ Ozon key format invalid (missing clientId or apiKey)`);
       }
     }
   }
 
   if (user.api_key_wb) {
     const decrypted = decryptApiKey(user.api_key_wb);
+    console.log(`🔑 WB key decryption: ${decrypted ? 'SUCCESS' : 'FAILED'}`);
     if (decrypted) {
       result.wb = decrypted;
+      console.log(`✅ WB API configured: key starts with ${decrypted.substring(0, 8)}...`);
     }
   }
 
+  console.log(`🔑 getUserApiKeys result: wb=${!!result.wb}, ozon=${!!result.ozon}`);
   return result;
 }
 
@@ -105,6 +121,10 @@ export async function executeGetSalesStats(
   userId: number,
   args: { period: string; marketplace?: string }
 ): Promise<ToolResult> {
+  console.log(
+    `📊 executeGetSalesStats: userId=${userId}, period=${args.period}, mp=${args.marketplace}`
+  );
+
   const keys = await getUserApiKeys(userId);
 
   if (!keys.ozon && !keys.wb) {
