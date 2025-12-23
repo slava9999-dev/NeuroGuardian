@@ -308,6 +308,8 @@ async function callOpenAIWithTools(
   console.log(`🤖 Using ${provider} with model: ${finalModel}`);
 
   try {
+    console.log(`🔧 Calling ${provider} API with ${AGENT_TOOLS.length} tools defined`);
+
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
@@ -320,7 +322,7 @@ async function callOpenAIWithTools(
         tools: AGENT_TOOLS,
         tool_choice: 'auto',
         max_tokens: maxTokens,
-        temperature: 0.7,
+        temperature: 0.3, // Lower temperature for more reliable tool calling
       }),
     });
 
