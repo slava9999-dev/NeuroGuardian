@@ -74,7 +74,7 @@ export const useChatStore = create<ChatState>()(
     }),
     {
       name: 'neuroagent-chat', // localStorage key
-      storage: createJSONStorage(() => sessionStorage), // Use sessionStorage so it persists during session
+      storage: createJSONStorage(() => localStorage), // Use localStorage for reliable persistence
       partialize: state => ({
         messages: state.messages.filter(m => !m.isLoading), // Don't persist loading messages
       }),
