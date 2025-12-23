@@ -467,3 +467,280 @@ export async function fetchWbSalesStats(
 
   return null;
 }
+
+// ============================================
+// SENTINEL DEFENSE OPERATIONS
+// ============================================
+
+/**
+ * Fetch current prices from Ozon for price monitoring
+ * Uses v4/product/info/prices for accurate promotional prices
+ */
+export async function fetchOzonCurrentPrices(
+  clientId: string,
+  apiKey: string,
+  productIds: number[]
+): Promise<Map<number, number>> {
+  const priceMap = new Map<number, number>();
+
+  if (productIds.length === 0) return priceMap;
+
+  try {
+    const response = await fetchWithRetry('https://api-seller.ozon.ru/v4/product/info/prices', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Client-Id': clientId,
+        'Api-Key': apiKey,
+      },
+      body: JSON.stringify({
+        filter: { product_id: productIds },
+        limit: 1000,
+      }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const items = data.result?.items || [];
+
+      for (const p of items) {
+        // Use marketing_price (actual selling price) or price
+        const actualPrice = parseFloat(p.price?.marketing_price || p.price?.price || '0');
+        if (p.product_id && actualPrice > 0) {
+          priceMap.set(p.product_id, actualPrice);
+        }
+      }
+      console.log(`💰 Ozon Prices API: Fetched ${priceMap.size} prices`);
+    }
+  } catch (e) {
+    console.warn('⚠️ Failed to fetch Ozon prices:', e);
+  }
+
+  return priceMap;
+}
+
+/**
+ * Fetch product info from Ozon (for offer_id needed in defense actions)
+ */
+export async function fetchOzonProductInfo(
+  clientId: string,
+  apiKey: string,
+  productIds: number[]
+): Promise<Map<number, { offer_id: string; name: string }>> {
+  const infoMap = new Map<number, { offer_id: string; name: string }>();
+
+  if (productIds.length === 0) return infoMap;
+
+  try {
+    const response = await fetchWithRetry('https://api-seller.ozon.ru/v3/product/info/list', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Client-Id': clientId,
+        'Api-Key': apiKey,
+      },
+      body: JSON.stringify({ product_id: productIds }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const items = data.result?.items || data.items || [];
+
+      for (const item of items) {
+        if (item.id) {
+          infoMap.set(item.id, {
+            offer_id: item.offer_id || '',
+            name: item.name || '',
+          });
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('⚠️ Failed to fetch Ozon product info:', e);
+  }
+
+  return infoMap;
+}
+
+/**
+ * Set Ozon product stock to zero (defense action)
+ */
+export async function setOzonZeroStock(
+  clientId: string,
+  apiKey: string,
+  products: Array<{ productId: number; offerId: string }>
+): Promise<{ success: boolean; error?: string }> {
+  if (products.length === 0) {
+    return { success: true };
+  }
+
+  try {
+    const payload = {
+      stocks: products.map(p => ({
+        offer_id: p.offerId,
+        product_id: p.productId,
+        stock: 0,
+      })),
+    };
+
+    const response = await fetchWithRetry('https://api-seller.ozon.ru/v1/product/import/stocks', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Client-Id': clientId,
+        'Api-Key': apiKey,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (response.ok) {
+      console.log(`✅ Ozon: Set zero stock for ${products.length} products`);
+      return { success: true };
+    } else {
+      const errorText = await response.text();
+      return { success: false, error: errorText };
+    }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
+  }
+}
+
+/**
+ * Set Ozon product price (defense action - price correction)
+ */
+export async function setOzonDefensePrice(
+  clientId: string,
+  apiKey: string,
+  products: Array<{ productId: number; offerId: string; price: number }>
+): Promise<{ success: boolean; error?: string }> {
+  if (products.length === 0) {
+    return { success: true };
+  }
+
+  try {
+    const payload = {
+      prices: products.map(p => ({
+        offer_id: p.offerId,
+        product_id: p.productId,
+        price: String(p.price),
+        old_price: String(Math.round(p.price * 1.2)),
+        min_price: String(p.price),
+        currency_code: 'RUB',
+      })),
+    };
+
+    const response = await fetchWithRetry('https://api-seller.ozon.ru/v1/product/import/prices', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Client-Id': clientId,
+        'Api-Key': apiKey,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (response.ok) {
+      console.log(`✅ Ozon: Set defense price for ${products.length} products`);
+      return { success: true };
+    } else {
+      const errorText = await response.text();
+      return { success: false, error: errorText };
+    }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
+  }
+}
+
+/**
+ * Set WB product stock to zero on all warehouses (defense action)
+ */
+export async function setWbZeroStock(
+  apiKey: string,
+  skus: string[]
+): Promise<{ success: boolean; error?: string }> {
+  if (skus.length === 0) {
+    return { success: true };
+  }
+
+  try {
+    // First get warehouse IDs
+    const warehousesRes = await fetchWithRetry(
+      'https://suppliers-api.wildberries.ru/api/v3/warehouses',
+      {
+        method: 'GET',
+        headers: { Authorization: apiKey },
+      }
+    );
+
+    if (!warehousesRes.ok) {
+      return { success: false, error: 'Failed to fetch warehouses' };
+    }
+
+    const warehouses = await warehousesRes.json();
+
+    // Zero stock on all warehouses for these SKUs
+    for (const wh of warehouses || []) {
+      await fetchWithRetry(`https://suppliers-api.wildberries.ru/api/v3/stocks/${wh.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: apiKey,
+        },
+        body: JSON.stringify({
+          stocks: skus.map(sku => ({ sku, amount: 0 })),
+        }),
+      });
+    }
+
+    console.log(
+      `✅ WB: Set zero stock for ${skus.length} SKUs on ${warehouses?.length || 0} warehouses`
+    );
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
+  }
+}
+
+/**
+ * Set WB product price (defense action - price correction)
+ */
+export async function setWbDefensePrice(
+  apiKey: string,
+  products: Array<{ nmId: number; price: number }>
+): Promise<{ success: boolean; error?: string }> {
+  if (products.length === 0) {
+    return { success: true };
+  }
+
+  try {
+    const payload = {
+      data: products.map(p => ({
+        nmID: p.nmId,
+        price: p.price,
+        discount: 0,
+      })),
+    };
+
+    const response = await fetchWithRetry(
+      'https://discounts-prices-api.wildberries.ru/api/v2/upload/task',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: apiKey,
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    if (response.ok) {
+      console.log(`✅ WB: Set defense price for ${products.length} products`);
+      return { success: true };
+    } else {
+      const errorText = await response.text();
+      return { success: false, error: errorText };
+    }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
+  }
+}

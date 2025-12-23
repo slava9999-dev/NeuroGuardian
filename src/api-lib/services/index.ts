@@ -46,6 +46,13 @@ export {
   updateOzonPrices,
   fetchOzonSalesStats,
   fetchWbSalesStats,
+  // Sentinel defense operations
+  fetchOzonCurrentPrices,
+  fetchOzonProductInfo,
+  setOzonZeroStock,
+  setOzonDefensePrice,
+  setWbZeroStock,
+  setWbDefensePrice,
   type MarketplaceProduct,
   type MarketplacePriceUpdate,
   type MarketplaceSalesStats,

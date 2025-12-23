@@ -2,6 +2,32 @@
 
 All notable changes to NeuroGUARDIAN project.
 
+## [2.7.0] - 2024-12-23
+
+### 🏗️ MarketplaceService Unification
+
+- **BREAKING**: Refactored `sentinel.ts` to use centralized `MarketplaceService`
+- **New Functions in MarketplaceService**:
+  - `fetchOzonCurrentPrices()` — Accurate price fetching via v4 API
+  - `fetchOzonProductInfo()` — Get product details including offer_id
+  - `setOzonZeroStock()` — Defense action: zero stock
+  - `setOzonDefensePrice()` — Defense action: price correction
+  - `setWbZeroStock()` — WB defense: zero stock on all warehouses
+  - `setWbDefensePrice()` — WB defense: price correction
+
+### 📊 Code Quality
+
+- **sentinel.ts**: Reduced from 557 lines to ~380 lines (-32%)
+- **ESLint Warnings**: Reduced from 64 to 15 (-76%)
+- **Eliminated duplicate API calls** in Sentinel handler
+
+### 🔒 Security
+
+- All marketplace API calls now go through single service layer
+- Consistent error handling across all defense operations
+
+---
+
 ## [2.6.0] - 2024-12-22
 
 ### 🏗️ API Refactoring

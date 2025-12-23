@@ -1,12 +1,45 @@
-# 🔧 РЕФАКТОРИНГ 22 ДЕКАБРЯ 2024
+# 🔧 РЕФАКТОРИНГ ДЕКАБРЬ 2024
 
-**Дата:** 22 декабря 2024, 21:13  
-**Версия:** 2.6.0 → 2.9.0  
-**Статус:** ✅ Phase 4 Complete — Fine-tuning + Metrics
+**Дата:** 23 декабря 2024, 09:12  
+**Версия:** 2.7.0  
+**Статус:** ✅ Phase 5 Complete — MarketplaceService Unification
 
 ---
 
-## 📈 PHASE 4: FINE-TUNING + METRICS (НОВОЕ!)
+## 📈 PHASE 5: MARKETPLACESERVICE UNIFICATION (НОВОЕ!)
+
+### Что сделано:
+
+1. ✅ **Новые функции в MarketplaceService** (6 штук):
+   - `fetchOzonCurrentPrices()` — получение актуальных цен Ozon v4 API
+   - `fetchOzonProductInfo()` — получение offer_id для defense actions
+   - `setOzonZeroStock()` — обнуление остатков Ozon
+   - `setOzonDefensePrice()` — коррекция цены Ozon
+   - `setWbZeroStock()` — обнуление остатков WB (все склады)
+   - `setWbDefensePrice()` — коррекция цены WB
+
+2. ✅ **sentinel.ts полностью рефакторен**:
+   - Было: 557 строк с inline API calls
+   - Стало: ~380 строк (-32%) через MarketplaceService
+   - Removed: `decryptApiKey`, `fetchWithRetry` inline usage
+
+3. ✅ **Улучшена архитектура**:
+   - Single Source of Truth для всех marketplace операций
+   - Централизованная обработка ошибок
+   - Переиспользуемые defense-функции
+
+### Файлы изменены:
+
+```
+src/api-lib/services/
+├── marketplace.ts  # +296 строк (Sentinel functions)
+└── index.ts        # +6 exports
+
+api/handlers/
+└── sentinel.ts     # Полностью переписан
+```
+
+---
 
 ### Few-Shot Examples (8 штук):
 
