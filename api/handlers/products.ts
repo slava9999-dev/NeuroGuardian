@@ -36,11 +36,12 @@ export async function handleProducts(
     const formatted = products.map((p: Record<string, unknown>) => ({
       id: p.product_id,
       nmId: p.nm_id,
+      vendorCode: p.vendor_code || p.product_id,
       title: sanitizeInput(String(p.title || '')),
       imageUrl: p.image_url,
       currentPrice: Number(p.current_price || 0),
       minPrice: Number(p.min_price || 0),
-      currentStock: Number(p.current_stock || 0),
+      stock: Number(p.current_stock || 0),
       marketplace: p.marketplace,
       status: p.status,
       isMonitored: p.is_monitored,
