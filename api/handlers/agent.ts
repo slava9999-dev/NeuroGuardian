@@ -464,12 +464,23 @@ export async function handleAgent(
   const initData = sanitizeInput(
     (req.headers['x-init-data'] as string) || req.body?.initData || ''
   );
-  const validation = validateTelegramInitData(initData);
-  if (!validation.valid || !validation.user) {
-    return res.status(401).json({ error: 'Unauthorized' });
+  const adminKey = req.headers['x-admin-key'] as string;
+  const validAdminKeys = [process.env.ADMIN_API_KEY].filter(Boolean);
+
+  let userId: number;
+
+  // Admin bypass for testing
+  if (adminKey && validAdminKeys.includes(adminKey) && req.body?.userId) {
+    userId = parseInt(req.body.userId);
+    console.log(`🔧 Agent: Admin bypass for userId=${userId}`);
+  } else {
+    const validation = validateTelegramInitData(initData);
+    if (!validation.valid || !validation.user) {
+      return res.status(401).json({ error: 'Unauthorized', code: 'AUTH_FAILED' });
+    }
+    userId = validation.user.id;
   }
 
-  const userId = validation.user.id;
   const user = await getUserById(userId);
 
   // Check subscription
