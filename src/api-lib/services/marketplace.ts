@@ -202,6 +202,9 @@ export async function fetchWbStocks(apiKey: string, nmIds: number[]): Promise<Ma
 
     if (fboRes.ok) {
       const fboStocks = await fboRes.json();
+      console.log(
+        `📦 WB FBO API: Got ${Array.isArray(fboStocks) ? fboStocks.length : 0} stock items from Statistics API`
+      );
 
       if (Array.isArray(fboStocks)) {
         // Group by nmId and sum quantities
@@ -215,7 +218,7 @@ export async function fetchWbStocks(apiKey: string, nmIds: number[]): Promise<Ma
         }
 
         console.log(
-          `📦 WB FBO Stocks: Found stocks for ${stockMap.size} products from Statistics API`
+          `📦 WB FBO Stocks: Matched ${stockMap.size}/${fboStocks.length} items to our ${nmIds.length} products`
         );
       }
     } else {
