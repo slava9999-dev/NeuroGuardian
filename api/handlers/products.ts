@@ -294,7 +294,9 @@ export async function handleSyncProducts(
       let stockMap = new Map<number, number>();
       if (nmIds.length > 0) {
         try {
-          console.log(`🔍 WB: Fetching stocks for ${nmIds.length} products...`);
+          console.log(
+            `🔍 WB SYNC: Calling fetchWbStocks for ${nmIds.length} products [v2.7.1-fix]`
+          );
           stockMap = await fetchWbStocks(apiKey, nmIds);
           console.log(`📦 WB: Got stocks for ${stockMap.size} products`);
         } catch (_e) {
