@@ -303,15 +303,30 @@ export async function handleSyncProducts(
       }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      products = cards.map((card: any) => ({
-        product_id: `wb-${card.nmID}`,
-        nm_id: card.nmID,
-        title: card.title || card.subjectName || 'Без названия',
-        image_url: card.photos?.[0]?.big || card.photos?.[0]?.c246x328 || null,
-        current_price: priceMap.get(card.nmID) || 0,
-        current_stock: stockMap.get(card.nmID) || 0,
-        marketplace: 'WB',
-      }));
+      products = cards.map((card: any) => {
+        // Price priority: Prices API > Content API sizes > 0
+        let price = priceMap.get(card.nmID) || 0;
+
+        // Content API fallback - use size price if Prices API didn't return
+        if (price === 0 && card.sizes?.length > 0) {
+          const sizePrice = card.sizes[0]?.price || card.sizes[0]?.discountedPrice || 0;
+          if (sizePrice > 0) {
+            // Content API prices might be in kopecks
+            price = sizePrice > 100000 ? Math.round(sizePrice / 100) : sizePrice;
+            console.log(`💡 WB: Using Content API price for ${card.nmID}: ${price}`);
+          }
+        }
+
+        return {
+          product_id: `wb-${card.nmID}`,
+          nm_id: card.nmID,
+          title: card.title || card.subjectName || 'Без названия',
+          image_url: card.photos?.[0]?.big || card.photos?.[0]?.c246x328 || null,
+          current_price: price,
+          current_stock: stockMap.get(card.nmID) || 0,
+          marketplace: 'WB',
+        };
+      });
     }
 
     // Limit and Save
