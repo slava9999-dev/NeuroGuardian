@@ -275,9 +275,15 @@ async function callOpenAIWithTools(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   actionRequired?: any;
 }> {
-  const apiKey = process.env.OPENAI_API_KEY;
+  // Try Groq first (faster and free tier), fallback to OpenAI
+  const groqKey = process.env.GROQ_API_KEY;
+  const openaiKey = process.env.OPENAI_API_KEY;
+
+  const apiKey = groqKey || openaiKey;
+  const isGroq = !!groqKey;
+
   if (!apiKey) {
-    console.error('❌ OPENAI_API_KEY not configured!');
+    console.error('❌ No LLM API key configured! Set GROQ_API_KEY or OPENAI_API_KEY');
     return {
       success: false,
       content:
@@ -287,15 +293,24 @@ async function callOpenAIWithTools(
     };
   }
 
+  // Groq models mapping (Groq uses Llama models)
+  const groqModel = model.includes('gpt-4o') ? 'llama-3.3-70b-versatile' : 'llama-3.1-8b-instant';
+  const finalModel = isGroq ? groqModel : model;
+  const apiUrl = isGroq
+    ? 'https://api.groq.com/openai/v1/chat/completions'
+    : 'https://api.openai.com/v1/chat/completions';
+
+  console.log(`🤖 Using ${isGroq ? 'Groq' : 'OpenAI'} with model: ${finalModel}`);
+
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model,
+        model: finalModel,
         messages,
         tools: AGENT_TOOLS,
         tool_choice: 'auto',
@@ -305,7 +320,8 @@ async function callOpenAIWithTools(
     });
 
     if (!response.ok) {
-      throw new Error(`OpenAI API Error: ${response.status}`);
+      const errorText = await response.text();
+      throw new Error(`${isGroq ? 'Groq' : 'OpenAI'} API Error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
@@ -408,18 +424,18 @@ async function callOpenAIWithTools(
         });
       }
 
-      // Second call to OpenAI with tool outputs
-      const secondResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      // Second call with tool outputs
+      const secondResponse = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model,
+          model: finalModel,
           messages: [...messages, ...toolOutputs],
           max_tokens: maxTokens,
-          temperature: 0.7, // Some creativity
+          temperature: 0.7,
         }),
       });
 
