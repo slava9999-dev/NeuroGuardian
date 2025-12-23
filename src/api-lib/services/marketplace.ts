@@ -122,6 +122,10 @@ export async function fetchWbStocks(apiKey: string, nmIds: number[]): Promise<Ma
         );
 
         // FBS mode - get stocks from seller's warehouses
+        // Prepare SKUs from nmIds (WB uses nmId as SKU string)
+        const skus = nmIds.map(id => String(id));
+        console.log(`📦 WB: Will request stocks for ${skus.length} SKUs`);
+
         for (const wh of warehouses) {
           try {
             console.log(
@@ -135,7 +139,7 @@ export async function fetchWbStocks(apiKey: string, nmIds: number[]): Promise<Ma
                   'Content-Type': 'application/json',
                   Authorization: apiKey,
                 },
-                body: JSON.stringify({ skus: [] }), // Empty = all SKUs
+                body: JSON.stringify({ skus }), // Pass nmIds as SKU strings
               }
             );
 
