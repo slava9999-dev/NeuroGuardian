@@ -35,3 +35,19 @@ export {
   sendExpiryReminders,
   sendProtectionAlert,
 } from './notifications.js';
+
+// Marketplace (WB & Ozon unified API)
+export {
+  getMarketplaceKeys,
+  fetchWbProducts,
+  fetchWbPrices,
+  updateWbPrices,
+  fetchOzonProducts,
+  updateOzonPrices,
+  fetchOzonSalesStats,
+  fetchWbSalesStats,
+  type MarketplaceProduct,
+  type MarketplacePriceUpdate,
+  type MarketplaceSalesStats,
+  type MarketplaceApiKeys,
+} from './marketplace.js';
