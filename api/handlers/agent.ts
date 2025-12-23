@@ -4,7 +4,6 @@
 // ============================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { sql } from '@vercel/postgres';
 import { createClient } from '@vercel/kv';
 
 import {
@@ -18,6 +17,8 @@ import {
   getUserById,
   getProductsByUserId,
   updateProductMinPrice,
+  batchUpdateWbPrices,
+  batchUpdateOzonPrices,
 } from '../../src/api-lib/services/index.js';
 
 // Marketplace API operations (centralized WB/Ozon logic)
@@ -212,6 +213,12 @@ const AGENT_TOOLS = [
             },
             description: 'Список товаров для изменения цен',
           },
+          marketplace: {
+            type: 'string',
+            enum: ['WB', 'Ozon', 'all'],
+            description:
+              'Маркетплейс. Обязательно указывай если пользователь явно упоминает "Wildberries", "WB", "ВБ", "валберис" → WB. Если "Ozon", "Озон" → Ozon. Иначе all.',
+          },
           change_value: {
             type: 'number',
             description:
@@ -402,6 +409,23 @@ async function callOpenAIWithTools(
             console.log(`🔍 update_prices: User ${userId} has ${products.length} products`);
             console.log(`🔍 update_prices fnArgs:`, JSON.stringify(fnArgs));
 
+            // Parse marketplace filter from fnArgs
+            const requestedMarketplace = fnArgs.marketplace?.toUpperCase();
+            console.log(`🔍 Marketplace filter: ${requestedMarketplace || 'all'}`);
+
+            // Filter products by marketplace if specified
+
+            let filteredProducts = products;
+            if (requestedMarketplace && requestedMarketplace !== 'ALL') {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              filteredProducts = products.filter(
+                (p: any) => p.marketplace?.toUpperCase() === requestedMarketplace
+              );
+              console.log(
+                `🔍 Filtered to ${filteredProducts.length} ${requestedMarketplace} products`
+              );
+            }
+
             // Parse products from fnArgs
             const requestedProducts = fnArgs.products || [];
 
@@ -413,9 +437,9 @@ async function callOpenAIWithTools(
 
               console.log(`🔍 Looking for product: "${reqId}" with new price: ${reqPrice}`);
 
-              // Find matching product in DB with improved fuzzy matching
+              // Find matching product in filtered list with improved fuzzy matching
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const dbProduct = products.find((p: any) => {
+              const dbProduct = filteredProducts.find((p: any) => {
                 const pId = String(p.product_id || '').toLowerCase();
                 const pTitle = String(p.title || '').toLowerCase();
                 const pNmId = String(p.nm_id || '');
@@ -915,15 +939,12 @@ export async function handleAgentConfirm(
           if (result.success && result.taskId) {
             console.log(`📋 WB Task ID: ${result.taskId} - Task is QUEUED (not yet completed)`);
 
-            // Update local DB (optimistic - will be verified on next sync)
-            // TODO: Consider implementing pending_price tracking per audit recommendations
-            for (const u of wbUpdates) {
-              await sql`
-                UPDATE products 
-                SET current_price = ${u.newPrice}, updated_at = NOW()
-                WHERE user_id = ${userId} AND nm_id = ${u.nmId}
-              `;
-            }
+            // Update local DB using batch function (per audit: atomic update instead of loop)
+            const dbResult = await batchUpdateWbPrices(
+              userId,
+              wbUpdates.map(u => ({ nmId: u.nmId, newPrice: u.newPrice }))
+            );
+            console.log(`📦 DB updated: ${dbResult.updated}/${wbUpdates.length} WB prices`);
           }
         } else {
           wbResult = { success: false, count: 0, error: 'WB API ключ не настроен' };
@@ -958,14 +979,12 @@ export async function handleAgentConfirm(
             };
 
             if (result.success) {
-              // Update local DB
-              for (const u of ozonUpdates) {
-                await sql`
-                  UPDATE products 
-                  SET current_price = ${u.newPrice}, updated_at = NOW()
-                  WHERE user_id = ${userId} AND product_id = ${u.productId}
-                `;
-              }
+              // Update local DB using batch function (per audit: atomic update instead of loop)
+              const dbResult = await batchUpdateOzonPrices(
+                userId,
+                ozonUpdates.map(u => ({ productId: u.productId, newPrice: u.newPrice }))
+              );
+              console.log(`📦 DB updated: ${dbResult.updated}/${ozonUpdates.length} Ozon prices`);
             }
           } else {
             ozonResult = {

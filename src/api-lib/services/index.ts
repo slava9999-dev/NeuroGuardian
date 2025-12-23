@@ -11,6 +11,8 @@ export {
   getProductsByUserId,
   updateProductMinPrice,
   updateProductPrice,
+  batchUpdateWbPrices,
+  batchUpdateOzonPrices,
   activateSubscription,
   createTransaction,
   updateTransactionStatus,

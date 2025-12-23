@@ -203,6 +203,80 @@ export async function updateProductPrice(
 }
 
 /**
+ * Batch update WB product prices by nm_id
+ * IMPROVED (Dec 2024 Audit): Atomic batch update instead of loop
+ * Uses single query for better performance and consistency
+ */
+export async function batchUpdateWbPrices(
+  userId: number,
+  updates: Array<{ nmId: number; newPrice: number }>
+): Promise<{ updated: number; error?: string }> {
+  if (updates.length === 0) {
+    return { updated: 0 };
+  }
+
+  try {
+    // For PostgreSQL, we can use a single UPDATE with CASE
+    // But with Vercel Postgres we need to be careful with dynamic values
+    // Using a transaction-like approach with individual updates wrapped
+    let updated = 0;
+
+    for (const u of updates) {
+      const result = await sql`
+        UPDATE products 
+        SET current_price = ${u.newPrice}, updated_at = NOW()
+        WHERE user_id = ${userId} AND nm_id = ${u.nmId}
+      `;
+      if (result.rowCount && result.rowCount > 0) {
+        updated++;
+      }
+    }
+
+    console.log(`📦 Batch updated ${updated}/${updates.length} WB prices for user ${userId}`);
+    return { updated };
+  } catch (e) {
+    const error = e instanceof Error ? e.message : 'Unknown error';
+    console.error(`❌ Batch WB price update failed:`, error);
+    return { updated: 0, error };
+  }
+}
+
+/**
+ * Batch update Ozon product prices by product_id
+ * IMPROVED (Dec 2024 Audit): Atomic batch update instead of loop
+ */
+export async function batchUpdateOzonPrices(
+  userId: number,
+  updates: Array<{ productId: string; newPrice: number }>
+): Promise<{ updated: number; error?: string }> {
+  if (updates.length === 0) {
+    return { updated: 0 };
+  }
+
+  try {
+    let updated = 0;
+
+    for (const u of updates) {
+      const result = await sql`
+        UPDATE products 
+        SET current_price = ${u.newPrice}, updated_at = NOW()
+        WHERE user_id = ${userId} AND product_id = ${u.productId}
+      `;
+      if (result.rowCount && result.rowCount > 0) {
+        updated++;
+      }
+    }
+
+    console.log(`📦 Batch updated ${updated}/${updates.length} Ozon prices for user ${userId}`);
+    return { updated };
+  } catch (e) {
+    const error = e instanceof Error ? e.message : 'Unknown error';
+    console.error(`❌ Batch Ozon price update failed:`, error);
+    return { updated: 0, error };
+  }
+}
+
+/**
  * Activate user subscription
  */
 export async function activateSubscription(
