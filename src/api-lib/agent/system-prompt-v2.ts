@@ -773,6 +773,18 @@ ${context.unprotectedCount && context.unprotectedCount > 0 ? `⚠️ ВНИМА�
 - "подними цену на 10%" → update_prices(change_value: 10)
 - "установи цену 1000 на кабель" → update_prices(products: [{product_id: "кабель", new_price: 1000}])
 
+## 📦 КРИТИЧНО: ДЕЙСТВИЯ С ОСТАТКАМИ
+
+Когда пользователь ПРОСИТ изменить остаток, поменять количество, сделать N штук:
+→ ОБЯЗАТЕЛЬНО вызови update_stocks с параметрами marketplace и products!
+
+Примеры запросов на изменение остатков:
+- "поменяй остаток на 5 штук" → update_stocks(marketplace: "WB", products: [{product_id: "<название>", new_stock: 5}])
+- "сделай 10 штук на озоне" → update_stocks(marketplace: "Ozon", products: [{product_id: "<название>", new_stock: 10}])
+- "измени остаток панно на 3" → update_stocks(marketplace: "<из контекста>", products: [{product_id: "панно", new_stock: 3}])
+
+⚠️ Работает ТОЛЬКО для FBS! Для FBO остатки менять нельзя.
+
 Когда пользователь ПРОСИТ защитить товары, установить Stop-Loss:
 → ОБЯЗАТЕЛЬНО вызови set_stop_loss или bulk_protect_products!
 
