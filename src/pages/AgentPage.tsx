@@ -614,12 +614,19 @@ function MessageBubble({ message, onConfirm }: MessageBubbleProps) {
           className="text-[15px] leading-relaxed whitespace-pre-wrap font-sans break-words overflow-hidden"
           style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
           onClick={e => {
-            // Intercept link clicks to open in external browser
-            const target = e.target as HTMLElement;
-            if (target.tagName === 'A') {
+            // Intercept ALL link clicks to open in external browser
+            // Walk up the DOM tree to find the nearest <a> element
+            let target = e.target as HTMLElement | null;
+            while (target && target.tagName !== 'A') {
+              target = target.parentElement;
+            }
+
+            if (target && target.tagName === 'A') {
               e.preventDefault();
+              e.stopPropagation();
               const href = target.getAttribute('href');
-              if (href) {
+              console.log('🔗 Link clicked:', href);
+              if (href && href.startsWith('http')) {
                 openExternalLink(href);
               }
             }
