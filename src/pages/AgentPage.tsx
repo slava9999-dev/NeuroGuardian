@@ -326,6 +326,35 @@ export function AgentPage() {
                 Я на связи. Спроси меня о чём угодно — я помогу.
               </p>
             </motion.div>
+
+            {/* Quick Actions */}
+            <motion.div
+              className="mt-8 grid grid-cols-2 gap-3 max-w-sm mx-auto px-4"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <QuickActionButton
+                icon="📦"
+                label="Мои товары"
+                onClick={() => handleSendMessage('покажи мои товары')}
+              />
+              <QuickActionButton
+                icon="📊"
+                label="Продажи"
+                onClick={() => handleSendMessage('покажи продажи за неделю')}
+              />
+              <QuickActionButton
+                icon="🛡️"
+                label="Защитить всё"
+                onClick={() => handleSendMessage('защити все товары')}
+              />
+              <QuickActionButton
+                icon="💰"
+                label="Юнит-экономика"
+                onClick={() => handleSendMessage('рассчитай юнит-экономику')}
+              />
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -632,4 +661,28 @@ function formatMessage(content: string): string {
     )
     .replace(/\n\n/g, '<br/><br/>') // Better spacing compared to single br
     .replace(/\n/g, '<br/>');
+}
+
+// Quick Action Button component
+interface QuickActionButtonProps {
+  icon: string;
+  label: string;
+  onClick: () => void;
+}
+
+function QuickActionButton({ icon, label, onClick }: QuickActionButtonProps) {
+  return (
+    <motion.button
+      onClick={() => {
+        hapticFeedback('light');
+        onClick();
+      }}
+      className="flex items-center gap-2 px-4 py-3 rounded-xl bg-stone-800/80 border border-stone-700/50 text-stone-300 hover:text-white hover:bg-stone-700/80 hover:border-stone-600 transition-all text-sm font-medium"
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+    >
+      <span className="text-lg">{icon}</span>
+      <span>{label}</span>
+    </motion.button>
+  );
 }
