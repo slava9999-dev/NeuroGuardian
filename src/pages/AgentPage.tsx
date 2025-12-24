@@ -319,33 +319,33 @@ export function AgentPage() {
 
             {/* Clean Typography */}
             <motion.div
-              className="text-center space-y-4 max-w-xs mx-auto"
+              className="text-center space-y-3 max-w-xs mx-auto"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
             >
-              <h1 className="text-3xl font-light text-white">
+              <h1 className="text-2xl font-light text-white">
                 Привет,{' '}
                 <span className="font-semibold text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-fuchsia-400">
                   {firstName}
                 </span>
               </h1>
 
-              <p className="text-stone-400 font-light text-lg leading-relaxed">
-                Я на связи. Спроси меня о чём угодно — я помогу.
+              <p className="text-stone-400 font-light text-base leading-relaxed">
+                Я на связи. Спроси меня о чём угодно.
               </p>
             </motion.div>
 
-            {/* Quick Actions */}
+            {/* Quick Actions - Compact grid */}
             <motion.div
-              className="mt-8 grid grid-cols-2 gap-3 max-w-sm mx-auto px-4"
+              className="mt-6 grid grid-cols-2 gap-2 w-full max-w-xs mx-auto px-2"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
             >
               <QuickActionButton
                 icon="📦"
-                label="Мои товары"
+                label="Товары"
                 onClick={() => handleSendMessage('покажи мои товары')}
               />
               <QuickActionButton
@@ -355,12 +355,12 @@ export function AgentPage() {
               />
               <QuickActionButton
                 icon="🛡️"
-                label="Защитить всё"
+                label="Защита"
                 onClick={() => handleSendMessage('защити все товары')}
               />
               <QuickActionButton
                 icon="💰"
-                label="Юнит-экономика"
+                label="Экономика"
                 onClick={() => handleSendMessage('рассчитай юнит-экономику')}
               />
             </motion.div>
@@ -609,9 +609,10 @@ function MessageBubble({ message, onConfirm }: MessageBubbleProps) {
             : 'rounded-bl-sm bg-stone-800/90 border border-stone-700/50 text-stone-200'
         }`}
       >
-        {/* Message content */}
+        {/* Message content - improved mobile readability */}
         <div
-          className="text-[15px] leading-relaxed whitespace-pre-wrap font-sans"
+          className="text-[15px] leading-relaxed whitespace-pre-wrap font-sans break-words overflow-hidden"
+          style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
           dangerouslySetInnerHTML={{
             __html: formatMessage(message.content),
           }}
@@ -659,17 +660,29 @@ function MessageBubble({ message, onConfirm }: MessageBubbleProps) {
   );
 }
 
-// Refined message formatting
+// Refined message formatting with clickable links
 function formatMessage(content: string): string {
-  return content
-    .replace(/\*\*(.*?)\*\*/g, '<span class="font-bold text-white">$1</span>')
-    .replace(/\*(.*?)\*/g, '<span class="italic text-stone-300">$1</span>')
-    .replace(
-      /`(.*?)`/g,
-      '<code class="px-1.5 py-0.5 rounded-md bg-black/30 font-mono text-[0.9em] text-violet-200 border border-white/5">$1</code>'
-    )
-    .replace(/\n\n/g, '<br/><br/>') // Better spacing compared to single br
-    .replace(/\n/g, '<br/>');
+  return (
+    content
+      // URLs to clickable links (must be before other replacements)
+      .replace(
+        /(https?:\/\/[^\s<>]+)/gi,
+        '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-violet-400 hover:text-violet-300 underline break-all">$1</a>'
+      )
+      // Markdown links [text](url)
+      .replace(
+        /\[([^\]]+)\]\(([^)]+)\)/g,
+        '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-violet-400 hover:text-violet-300 underline">$1</a>'
+      )
+      .replace(/\*\*(.*?)\*\*/g, '<span class="font-bold text-white">$1</span>')
+      .replace(/\*(.*?)\*/g, '<span class="italic text-stone-300">$1</span>')
+      .replace(
+        /`(.*?)`/g,
+        '<code class="px-1.5 py-0.5 rounded-md bg-black/30 font-mono text-[0.9em] text-violet-200 border border-white/5">$1</code>'
+      )
+      .replace(/\n\n/g, '<br/><br/>')
+      .replace(/\n/g, '<br/>')
+  );
 }
 
 // Quick Action Button component
@@ -686,11 +699,11 @@ function QuickActionButton({ icon, label, onClick }: QuickActionButtonProps) {
         hapticFeedback('light');
         onClick();
       }}
-      className="flex items-center gap-2 px-4 py-3 rounded-xl bg-stone-800/80 border border-stone-700/50 text-stone-300 hover:text-white hover:bg-stone-700/80 hover:border-stone-600 transition-all text-sm font-medium"
+      className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg bg-stone-800/80 border border-stone-700/50 text-stone-300 hover:text-white hover:bg-stone-700/80 hover:border-stone-600 transition-all text-xs font-medium"
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
     >
-      <span className="text-lg">{icon}</span>
+      <span className="text-base">{icon}</span>
       <span>{label}</span>
     </motion.button>
   );
