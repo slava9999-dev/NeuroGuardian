@@ -673,11 +673,23 @@ function MessageBubble({ message, onConfirm }: MessageBubbleProps) {
 
 // Refined message formatting with clickable links
 function formatMessage(content: string): string {
+  // First, clean up raw HTML that GPT sometimes returns
+  const cleaned = content
+    // Remove malformed HTML link patterns like: text" target="_blank" rel="..." class="...">URL)
+    .replace(/" target="_blank"[^>]*>/gi, ': ')
+    .replace(/" rel="noopener noreferrer"[^>]*>/gi, ': ')
+    .replace(/ class="text-violet[^"]*"/gi, '')
+    .replace(/<a href="[^"]*">/gi, '')
+    .replace(/<\/a>/gi, '')
+    // Clean up leftover artifacts
+    .replace(/\)\s*$/gm, '')
+    .replace(/"\s*\)/g, '');
+
   return (
-    content
+    cleaned
       // URLs to clickable links (must be before other replacements)
       .replace(
-        /(https?:\/\/[^\s<>]+)/gi,
+        /(https?:\/\/[^\s<>)\]]+)/gi,
         '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-violet-400 hover:text-violet-300 underline break-all">$1</a>'
       )
       // Markdown links [text](url)
