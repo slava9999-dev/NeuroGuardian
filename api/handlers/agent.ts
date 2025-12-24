@@ -775,6 +775,48 @@ export async function handleAgent(
     'прогноз',
   ];
   const isComplex = complexPatterns.some(p => lowerMessage.includes(p));
+
+  // =====================================================
+  // FORCED COMPETITOR SEARCH (100% guarantee)
+  // When user asks about competitors, we FORCE search_web
+  // =====================================================
+  const competitorPatterns = [
+    'конкурент',
+    'конкуренц',
+    'competitor',
+    'соперник',
+    'аналогичн',
+    'похожи',
+    'сравни цен',
+    'цены у друг',
+    'кто продает',
+    'кто еще продает',
+  ];
+  const isCompetitorQuery = competitorPatterns.some(p => lowerMessage.includes(p));
+  let competitorSearchResult: string | null = null;
+
+  if (isCompetitorQuery) {
+    console.log('🔍 FORCED COMPETITOR SEARCH: Detected competitor query, forcing search_web');
+
+    // Extract product name from user's products (first one as example)
+    const sampleProduct = typedProducts[0];
+    const searchQuery = sampleProduct
+      ? `${sampleProduct.title} ${sampleProduct.marketplace === 'WB' ? 'wildberries' : 'ozon'} цена купить`
+      : 'товары маркетплейс цены конкуренты';
+
+    try {
+      const searchResult = await executeSearchWeb(userId, {
+        query: searchQuery,
+        topic: 'competitors',
+      });
+      if (searchResult.success && searchResult.data) {
+        competitorSearchResult = JSON.stringify(searchResult.data);
+        console.log('✅ Competitor search completed, injecting results');
+      }
+    } catch (e) {
+      console.warn('⚠️ Competitor search failed:', e);
+    }
+  }
   const model = isComplex ? 'gpt-4o' : 'gpt-4o-mini';
 
   // V2 MEGA-BRAIN: Expert Persona (Виктор Маржин) + CoT + Few-Shot + Dynamic Context
@@ -805,6 +847,14 @@ export async function handleAgent(
   }
 
   messages.push({ role: 'user', content: message });
+
+  // If we have forced competitor search results, inject them as system context
+  if (competitorSearchResult) {
+    messages.push({
+      role: 'system',
+      content: `[РЕЗУЛЬТАТ ПОИСКА КОНКУРЕНТОВ - используй ЭТИ данные, не выдумывай!]\n${competitorSearchResult}`,
+    });
+  }
 
   const gptResult = await callOpenAIWithTools(
     messages,
