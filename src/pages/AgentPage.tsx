@@ -615,20 +615,47 @@ function MessageBubble({ message, onConfirm }: MessageBubbleProps) {
           style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
           onClick={e => {
             // Intercept ALL link clicks to open in external browser
-            // Walk up the DOM tree to find the nearest <a> element
-            let target = e.target as HTMLElement | null;
-            while (target && target.tagName !== 'A') {
-              target = target.parentElement;
+            const target = (e.target as HTMLElement).closest('a');
+            if (!target) return;
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            const rawHref = target.getAttribute('href');
+            console.log('🔗 Raw href:', rawHref);
+
+            if (!rawHref) return;
+
+            let cleanUrl: string | null = null;
+
+            try {
+              // Try to parse as URL
+              const parsed = new URL(rawHref, window.location.origin);
+
+              // If URL points to our domain — it's garbage
+              if (
+                parsed.hostname.includes('vercel.app') ||
+                parsed.hostname === window.location.hostname
+              ) {
+                console.warn('🚫 Blocked internal redirect:', rawHref);
+                return;
+              }
+
+              cleanUrl = parsed.href;
+            } catch {
+              // If href is garbage like `" target="_blank"...`
+              // Extract actual URL using regex
+              const urlMatch = rawHref.match(/^(https?:\/\/[^\s"'<>]+)/);
+              if (urlMatch) {
+                cleanUrl = urlMatch[1];
+              }
             }
 
-            if (target && target.tagName === 'A') {
-              e.preventDefault();
-              e.stopPropagation();
-              const href = target.getAttribute('href');
-              console.log('🔗 Link clicked:', href);
-              if (href && href.startsWith('http')) {
-                openExternalLink(href);
-              }
+            if (cleanUrl) {
+              console.log('✅ Clean URL:', cleanUrl);
+              openExternalLink(cleanUrl);
+            } else {
+              console.warn('❌ Could not extract valid URL from:', rawHref);
             }
           }}
           dangerouslySetInnerHTML={{
@@ -680,17 +707,34 @@ function MessageBubble({ message, onConfirm }: MessageBubbleProps) {
 
 // Refined message formatting with clickable links
 function formatMessage(content: string): string {
-  // First, clean up raw HTML that GPT sometimes returns
-  const cleaned = content
-    // Remove malformed HTML link patterns like: text" target="_blank" rel="..." class="...">URL)
-    .replace(/" target="_blank"[^>]*>/gi, ': ')
-    .replace(/" rel="noopener noreferrer"[^>]*>/gi, ': ')
-    .replace(/ class="text-violet[^"]*"/gi, '')
-    .replace(/<a href="[^"]*">/gi, '')
+  // Step 1: Extract clean URLs from malformed HTML
+  // Pattern: https://url" target="_blank" rel="..." class="...">Text
+  let cleaned = content.replace(/(https?:\/\/[^\s"'<>]+)["'][^>]*>/gi, '$1 ');
+
+  // Step 2: Remove any remaining HTML tags
+  cleaned = cleaned
+    .replace(/<a\s[^>]*>/gi, '')
     .replace(/<\/a>/gi, '')
-    // Clean up leftover artifacts
-    .replace(/\)\s*$/gm, '')
-    .replace(/"\s*\)/g, '');
+    .replace(/<[^>]+>/g, '');
+
+  // Step 3: Fix fake/invalid URLs - replace with search links
+  // am.ozon.com -> ozon.ru/search
+  // Non-existent category URLs -> search links
+  cleaned = cleaned.replace(/https?:\/\/am\.ozon\.com\/[^\s]+/gi, match => {
+    // Extract product name from URL
+    const nameMatch = match.match(/\/product\/([^/]+)/);
+    if (nameMatch) {
+      const productName = nameMatch[1].replace(/-/g, ' ').substring(0, 50);
+      return `https://www.ozon.ru/search/?text=${encodeURIComponent(productName)}`;
+    }
+    return 'https://www.ozon.ru/';
+  });
+
+  // Replace /category/ URLs with search (categories are often invalid)
+  cleaned = cleaned.replace(/https?:\/\/www\.ozon\.ru\/category\/([^\s/]+)/gi, (_, category) => {
+    const searchTerm = category.replace(/-/g, ' ');
+    return `https://www.ozon.ru/search/?text=${encodeURIComponent(searchTerm)}`;
+  });
 
   return (
     cleaned
