@@ -327,6 +327,30 @@ export const AGENT_TOOLS = [
       },
     },
   },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'search_web',
+      description:
+        'Найти актуальную информацию в интернете. Используй для анализа рынка, поиска новостей маркетплейсов или проверки гипотез. НЕ ИСПОЛЬЗУЙ для простых вопросов, на которые знаешь ответ.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description:
+              'Поисковый запрос. Сформулируй максимально точно для получения хороших результатов.',
+          },
+          topic: {
+            type: 'string',
+            enum: ['competitors', 'market', 'news', 'general'],
+            description: 'Тема поиска для улучшения фильтрации результатов',
+          },
+        },
+        required: ['query'],
+      },
+    },
+  },
 ];
 
 /**

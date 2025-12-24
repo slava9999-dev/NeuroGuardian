@@ -8,6 +8,9 @@
 import { decryptApiKey, fetchWithRetry } from '../lib/index.js';
 import { getUserById, getProductsByUserId } from '../services/index.js';
 
+// Zod validation schemas
+import { validateToolArgs, SearchWebArgsSchema } from './validators.js';
+
 // Types for tool responses
 interface ToolResult {
   success: boolean;
@@ -964,4 +967,112 @@ export function executeGetMarketplaceInfo(args: {
     success: true,
     data: { info: content },
   };
+}
+
+/**
+ * SEARCH_WEB — Search the internet for relevant info
+ * Uses Serper.dev (Google Search API)
+ */
+export async function executeSearchWeb(_userId: number, rawArgs: unknown): Promise<ToolResult> {
+  // Validate arguments with Zod
+  const validation = validateToolArgs(SearchWebArgsSchema, rawArgs);
+  if (!validation.success) {
+    return { success: false, error: validation.error };
+  }
+  const args = validation.data;
+
+  console.log(`🌐 executeSearchWeb: query="${args.query}" topic=${args.topic}`);
+
+  // Retrieve Serper.dev API key from environment
+  const apiKey = process.env.SERPER_API_KEY;
+
+  if (!apiKey) {
+    console.warn('⚠️ Web Search: SERPER_API_KEY not found');
+
+    // Fallback for development/demo (mock data)
+    if (process.env.NODE_ENV === 'development' || !process.env.NODE_ENV) {
+      return {
+        success: true,
+        data: {
+          query: args.query,
+          answer: 'Это демонстрационный ответ (Serper API ключ не настроен).',
+          results: [
+            {
+              title: 'Анализ конкурентов на Wildberries (Demo)',
+              link: 'https://mpstats.io/blog/competitor-analysis',
+              snippet: `Для анализа конкурентов по запросу "${args.query}" рекомендуем использовать внешние сервисы аналитики...`,
+            },
+            {
+              title: 'Тренды Wildberries 2024 (Demo)',
+              link: 'https://vc.ru/marketplace/trends',
+              snippet:
+                'Основные тренды: снижение среднего чека, рост комиссий, важность SEO оптимизации карточек...',
+            },
+          ],
+          note: '⚠️ ПОИСК РАБОТАЕТ В ДЕМО-РЕЖИМЕ (нет API ключа)',
+        },
+      };
+    }
+    return {
+      success: false,
+      error: 'Web search is disabled (API key missing). Please contact support.',
+    };
+  }
+
+  try {
+    // 10 second timeout for search
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    const response = await fetch('https://google.serper.dev/search', {
+      method: 'POST',
+      headers: {
+        'X-API-KEY': apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        q: args.query,
+        gl: 'ru', // Russia
+        hl: 'ru', // Russian language
+        num: 5, // Number of results
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`Serper API error: ${response.status}`);
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data: any = await response.json();
+
+    // Extract relevant data from Serper response
+    const results =
+      data.organic?.map((r: any) => ({
+        title: r.title,
+        link: r.link,
+        snippet: r.snippet,
+      })) || [];
+
+    // Try to get a direct answer or featured snippet if available
+    const answer =
+      data.answerBox?.answer ||
+      data.answerBox?.snippet ||
+      data.organic?.[0]?.snippet ||
+      'Нет прямого ответа';
+
+    return {
+      success: true,
+      data: {
+        query: args.query,
+        answer, // AI agent can use this as a summary
+        results,
+      },
+    };
+  } catch (error) {
+    console.error('Web search error:', error);
+    return { success: false, error: 'Ошибка поиска: ' + String(error) };
+  }
 }

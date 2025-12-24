@@ -62,6 +62,11 @@ export const GetMarketplaceInfoArgsSchema = z.object({
   ]),
 });
 
+export const SearchWebArgsSchema = z.object({
+  query: z.string().min(1, 'Query is required'),
+  topic: z.enum(['competitors', 'market', 'news', 'general']).optional().default('general'),
+});
+
 // === WRITE TOOLS (REQUIRE CONFIRMATION) ===
 
 export const SetStopLossArgsSchema = z.object({
@@ -119,6 +124,7 @@ export type GetStockForecastArgs = z.infer<typeof GetStockForecastArgsSchema>;
 export type GetOrdersArgs = z.infer<typeof GetOrdersArgsSchema>;
 export type GetWarehouseStocksArgs = z.infer<typeof GetWarehouseStocksArgsSchema>;
 export type GetMarketplaceInfoArgs = z.infer<typeof GetMarketplaceInfoArgsSchema>;
+export type SearchWebArgs = z.infer<typeof SearchWebArgsSchema>;
 export type SetStopLossArgs = z.infer<typeof SetStopLossArgsSchema>;
 export type BulkProtectProductsArgs = z.infer<typeof BulkProtectProductsArgsSchema>;
 export type UpdatePricesArgs = z.infer<typeof UpdatePricesArgsSchema>;
