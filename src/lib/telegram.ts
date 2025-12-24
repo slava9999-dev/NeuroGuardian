@@ -208,23 +208,56 @@ export const BackButton = {
 };
 
 /**
- * Open external link in browser (not inside WebApp)
- * Uses Telegram WebApp API if available
+ * Normalize and validate HTTP URL
+ * Cleans garbage from malformed HTML, adds https:// if missing
  */
-export function openExternalLink(url: string): void {
-  console.log('🔗 openExternalLink called with:', url);
+function normalizeHttpUrl(raw: string): string | null {
+  if (!raw) return null;
+
+  // 1) Trim and cut at first space/quote/tag (handles: https://url" target=...)
+  let s = raw.trim();
+  s = s.split(/[\s"'<>]/)[0];
+
+  // 2) If looks like domain but missing scheme, add https://
+  if (/^[a-z0-9.-]+\.[a-z]{2,}\/?/i.test(s) && !/^https?:\/\//i.test(s)) {
+    s = `https://${s}`;
+  }
+
+  // 3) Validate as URL and only allow http/https
+  try {
+    const u = new URL(s);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Open external link in browser (not inside WebApp)
+ * Uses Telegram WebApp API if available, with URL normalization
+ */
+export function openExternalLink(rawUrl: string): void {
+  console.log('🔗 openExternalLink called with raw:', rawUrl);
+
+  const url = normalizeHttpUrl(rawUrl);
+  if (!url) {
+    console.warn('❌ Invalid URL after normalization:', rawUrl);
+    return;
+  }
+
+  console.log('✅ Normalized URL:', url);
 
   const tg = getTelegramWebApp();
 
-  // Use Telegram's openLink if available (opens in external browser)
+  // Must be called from click handler (user gesture) for WebView to allow
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   if (tg && typeof (tg as any).openLink === 'function') {
     console.log('🔗 Using Telegram.WebApp.openLink()');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (tg as any).openLink(url);
+    (tg as any).openLink(url, { try_instant_view: false });
   } else {
     console.log('🔗 Fallback: window.open()');
-    // Fallback: open in new tab
     window.open(url, '_blank', 'noopener,noreferrer');
   }
 }
