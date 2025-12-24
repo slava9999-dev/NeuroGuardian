@@ -297,6 +297,7 @@ async function processOzonDefense(
         minPrice,
         defenseAction,
         savedAmount,
+        marketplace: 'Ozon',
       });
     }
   }
@@ -398,6 +399,7 @@ async function processWbDefense(
         minPrice,
         defenseAction,
         savedAmount,
+        marketplace: 'WB',
       });
     }
   }
@@ -407,17 +409,34 @@ async function processWbDefense(
 // HELPER: TELEGRAM ALERT
 // ============================================
 
-async function sendSentinelAlert(userId: number, data: SentinelAlertData) {
-  if (process.env.TELEGRAM_BOT_TOKEN) {
-    const msg =
-      `🛡️ <b>NeuroGUARDIAN SENTRY</b>\n\n` +
-      `⚠️ <b>Демпинг обнаружен!</b>\n` +
-      `📦 ${data.title}\n` +
-      `📉 Цена упала: ${data.currentPrice} ₽ → ${data.minPrice} ₽\n` +
-      `⚔️ <b>Защита активирована:</b> ${data.defenseAction}\n` +
-      `💰 Спасено: ${data.savedAmount} ₽`;
+async function sendSentinelAlert(
+  userId: number,
+  data: SentinelAlertData & { marketplace?: string }
+) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
 
-    await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+  if (!token) {
+    console.warn('⚠️ TELEGRAM_BOT_TOKEN not configured, skipping alert');
+    return;
+  }
+
+  const marketplaceEmoji = data.marketplace === 'WB' ? '🟣' : '🔵';
+  const time = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  const date = new Date().toLocaleDateString('ru-RU');
+
+  const msg =
+    `🛡️ <b>NeuroGUARDIAN SENTINEL</b>\n\n` +
+    `⚠️ <b>АТАКА ОБНАРУЖЕНА!</b>\n` +
+    `📅 ${date} в ${time}\n\n` +
+    `${marketplaceEmoji} <b>${data.marketplace || 'Маркетплейс'}</b>\n` +
+    `📦 ${data.title}\n\n` +
+    `📉 Цена упала: <s>${data.minPrice}₽</s> → <b>${data.currentPrice}₽</b>\n` +
+    `⚔️ <b>Защита:</b> ${data.defenseAction}\n` +
+    `💰 <b>Спасено:</b> ${data.savedAmount}₽\n\n` +
+    `✅ Ваш товар защищён!`;
+
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -426,5 +445,14 @@ async function sendSentinelAlert(userId: number, data: SentinelAlertData) {
         parse_mode: 'HTML',
       }),
     });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error(`❌ Failed to send Telegram alert to ${userId}:`, error);
+    } else {
+      console.log(`✅ Telegram alert sent to ${userId}`);
+    }
+  } catch (error) {
+    console.error(`❌ Error sending Telegram alert to ${userId}:`, error);
   }
 }
