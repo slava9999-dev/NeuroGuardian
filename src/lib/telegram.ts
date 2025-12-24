@@ -206,3 +206,23 @@ export const BackButton = {
     tg?.BackButton?.hide();
   },
 };
+
+/**
+ * Open external link in browser (not inside WebApp)
+ * Uses Telegram WebApp API if available
+ */
+export function openExternalLink(url: string): void {
+  const tg = getTelegramWebApp();
+
+  // Use Telegram's openLink if available (opens in external browser)
+  if (tg && 'openLink' in tg) {
+    (
+      tg as TelegramWebApp & {
+        openLink: (url: string, options?: { try_instant_view?: boolean }) => void;
+      }
+    ).openLink(url, { try_instant_view: false });
+  } else {
+    // Fallback: open in new tab
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+}

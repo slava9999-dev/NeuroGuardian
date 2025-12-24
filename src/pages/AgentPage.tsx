@@ -6,7 +6,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAppStore, useChatStore, type ChatMessage } from '../stores';
-import { hapticFeedback } from '../lib/telegram';
+import { hapticFeedback, openExternalLink } from '../lib/telegram';
 import { agentApi, type AgentMessage, type AgentResponse } from '../lib/agentApi';
 
 export function AgentPage() {
@@ -613,6 +613,17 @@ function MessageBubble({ message, onConfirm }: MessageBubbleProps) {
         <div
           className="text-[15px] leading-relaxed whitespace-pre-wrap font-sans break-words overflow-hidden"
           style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
+          onClick={e => {
+            // Intercept link clicks to open in external browser
+            const target = e.target as HTMLElement;
+            if (target.tagName === 'A') {
+              e.preventDefault();
+              const href = target.getAttribute('href');
+              if (href) {
+                openExternalLink(href);
+              }
+            }
+          }}
           dangerouslySetInnerHTML={{
             __html: formatMessage(message.content),
           }}
