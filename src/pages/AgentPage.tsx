@@ -707,21 +707,28 @@ function MessageBubble({ message, onConfirm }: MessageBubbleProps) {
 
 // Refined message formatting with clickable links
 function formatMessage(content: string): string {
-  // Step 1: Extract clean URLs from malformed HTML
-  // Pattern: https://url" target="_blank" rel="..." class="...">Text
-  let cleaned = content.replace(/(https?:\/\/[^\s"'<>]+)["'][^>]*>/gi, '$1 ');
+  // STEP 1: Aggressive cleanup of HTML garbage from GPT
+  // Pattern handles: https://url/" target="_blank" rel="..." class="...">Text
+  let cleaned = content;
 
-  // Step 2: Remove any remaining HTML tags
-  cleaned = cleaned
-    .replace(/<a\s[^>]*>/gi, '')
-    .replace(/<\/a>/gi, '')
-    .replace(/<[^>]+>/g, '');
+  // Remove all HTML-like attributes that GPT adds to URLs
+  // This catches: /" target="_blank" rel="noopener noreferrer" class="...">
+  cleaned = cleaned.replace(/\/?"?\s*target\s*=\s*["'][^"']*["'][^>]*/gi, '');
+  cleaned = cleaned.replace(/\s*rel\s*=\s*["'][^"']*["']/gi, '');
+  cleaned = cleaned.replace(/\s*class\s*=\s*["'][^"']*["']/gi, '');
 
-  // Step 3: Fix fake/invalid URLs - replace with search links
-  // am.ozon.com -> ozon.ru/search
-  // Non-existent category URLs -> search links
-  cleaned = cleaned.replace(/https?:\/\/am\.ozon\.com\/[^\s]+/gi, match => {
-    // Extract product name from URL
+  // Remove any remaining HTML tags
+  cleaned = cleaned.replace(/<[^>]+>/g, '');
+
+  // Clean up broken markdown links: [text](url" garbage)
+  // Extract just the URL part before the quote
+  cleaned = cleaned.replace(/\[([^\]]+)\]\((https?:\/\/[^\s"'<>]+)[^)]*\)/gi, '[$1]($2)');
+
+  // Clean URLs that have garbage after them (url/" text or url" text)
+  cleaned = cleaned.replace(/(https?:\/\/[^\s"'<>]+?)\/?"[^h]/gi, '$1 ');
+
+  // STEP 2: Fix fake/invalid URLs - replace with search links
+  cleaned = cleaned.replace(/https?:\/\/am\.ozon\.com\/[^\s"'<>]+/gi, match => {
     const nameMatch = match.match(/\/product\/([^/]+)/);
     if (nameMatch) {
       const productName = nameMatch[1].replace(/-/g, ' ').substring(0, 50);
@@ -730,11 +737,14 @@ function formatMessage(content: string): string {
     return 'https://www.ozon.ru/';
   });
 
-  // Replace /category/ URLs with search (categories are often invalid)
-  cleaned = cleaned.replace(/https?:\/\/www\.ozon\.ru\/category\/([^\s/]+)/gi, (_, category) => {
-    const searchTerm = category.replace(/-/g, ' ');
-    return `https://www.ozon.ru/search/?text=${encodeURIComponent(searchTerm)}`;
-  });
+  // Replace /category/ URLs with search
+  cleaned = cleaned.replace(
+    /https?:\/\/www\.ozon\.ru\/category\/([^\s"'<>/]+)/gi,
+    (_, category) => {
+      const searchTerm = category.replace(/-/g, ' ');
+      return `https://www.ozon.ru/search/?text=${encodeURIComponent(searchTerm)}`;
+    }
+  );
 
   return (
     cleaned
