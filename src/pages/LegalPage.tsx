@@ -123,13 +123,28 @@ export function LegalPage({ onBack }: LegalPageProps) {
 
             <ul className="space-y-2 mb-6">
               <li className="flex gap-3 text-sm text-stone-300">
-                <span className="text-violet-500">✓</span> Полная защита маржи (Stop-Loss)
+                <span className="text-violet-500">✓</span> 🧠 AI-агент с голосовым управлением
               </li>
               <li className="flex gap-3 text-sm text-stone-300">
-                <span className="text-violet-500">✓</span> AI Агент 24/7
+                <span className="text-violet-500">✓</span> 🛡️ SENTINEL — защита от акций 24/7
               </li>
               <li className="flex gap-3 text-sm text-stone-300">
-                <span className="text-violet-500">✓</span> Управление до 500 товаров
+                <span className="text-violet-500">✓</span> 📊 Продажи и выручка в реальном времени
+              </li>
+              <li className="flex gap-3 text-sm text-stone-300">
+                <span className="text-violet-500">✓</span> 🔍 Поиск и анализ конкурентов
+              </li>
+              <li className="flex gap-3 text-sm text-stone-300">
+                <span className="text-violet-500">✓</span> 📦 Синхронизация до 500 товаров
+              </li>
+              <li className="flex gap-3 text-sm text-stone-300">
+                <span className="text-violet-500">✓</span> 📈 ABC-анализ и прогноз стоков
+              </li>
+              <li className="flex gap-3 text-sm text-stone-300">
+                <span className="text-violet-500">✓</span> 🧮 Юнит-экономика WB/Ozon
+              </li>
+              <li className="flex gap-3 text-sm text-stone-300">
+                <span className="text-violet-500">✓</span> 🔐 Шифрование API-ключей (AES-256)
               </li>
             </ul>
 
@@ -158,13 +173,16 @@ export function LegalPage({ onBack }: LegalPageProps) {
 
             <ul className="space-y-2 mb-6">
               <li className="flex gap-3 text-sm text-stone-300">
-                <span className="text-amber-500">✓</span> Все функции Pro
+                <span className="text-amber-500">✓</span> ✅ Все функции Pro
               </li>
               <li className="flex gap-3 text-sm text-stone-300">
-                <span className="text-amber-500">✓</span> <b>2 месяца</b> в подарок
+                <span className="text-amber-500">✓</span> 💰 Экономия <b>2000₽</b>
               </li>
               <li className="flex gap-3 text-sm text-stone-300">
-                <span className="text-amber-500">✓</span> Приоритетная поддержка
+                <span className="text-amber-500">✓</span> 🎁 <b>2 месяца</b> в подарок
+              </li>
+              <li className="flex gap-3 text-sm text-stone-300">
+                <span className="text-amber-500">✓</span> 👑 Персональный менеджер
               </li>
             </ul>
 

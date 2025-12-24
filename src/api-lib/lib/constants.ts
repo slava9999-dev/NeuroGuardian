@@ -14,28 +14,47 @@ export const SUBSCRIPTION_PLANS: Record<PlanId, SubscriptionPlan> = {
     id: 'basic',
     name: 'Базовый',
     price: 499,
-    discountedPrice: 349, // 30% off for first month
+    discountedPrice: 349,
     durationDays: 30,
     maxProducts: 50,
-    features: ['До 50 товаров', 'Защита Zero Stock', 'Telegram уведомления'],
+    features: [
+      '🧠 AI-агент с голосовым управлением',
+      '📊 Продажи и выручка в реальном времени',
+      '🛡️ SENTINEL — защита от акций 24/7',
+      '📦 До 50 товаров',
+    ],
   },
   pro: {
     id: 'pro',
     name: 'Профессиональный',
     price: 999,
-    discountedPrice: 699, // 30% off for first month
+    discountedPrice: 699,
     durationDays: 30,
     maxProducts: 500,
-    features: ['До 500 товаров', 'Оба режима защиты', 'Приоритетная поддержка', 'API доступ'],
+    features: [
+      '🧠 AI-агент с голосовым управлением',
+      '📊 Продажи и выручка в реальном времени',
+      '🛡️ SENTINEL — защита от акций 24/7',
+      '🔍 Поиск и анализ конкурентов',
+      '📦 Синхронизация товаров и остатков',
+      '📈 ABC-анализ и прогноз стоков',
+      '🧮 Юнит-экономика WB/Ozon',
+      '🔐 Шифрование API-ключей (AES-256)',
+    ],
   },
   yearly: {
     id: 'yearly',
     name: 'Годовой Pro',
     price: 9990,
-    discountedPrice: 9990, // No discount on yearly
+    discountedPrice: 9990,
     durationDays: 365,
     maxProducts: 500,
-    features: ['Все из Pro', 'Экономия 2000₽', 'Персональный менеджер'],
+    features: [
+      '✅ Все функции Pro',
+      '💰 Экономия 2000₽',
+      '🎁 2 месяца бесплатно',
+      '👑 Персональный менеджер',
+    ],
   },
 };
 
