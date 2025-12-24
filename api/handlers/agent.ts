@@ -51,6 +51,7 @@ import {
   executeGetAbcAnalysis,
   executeGetStockForecast,
   executeGetMarketplaceInfo,
+  executeSearchWeb,
 } from '../../src/api-lib/agent/tool-executors.js';
 
 // Import canonical AGENT_TOOLS definition (single source of truth)
@@ -600,6 +601,10 @@ ${examples}
                   };
                 }
               }
+            } else if (fnName === 'search_web') {
+              // Web search via Serper.dev
+              const toolResult = await executeSearchWeb(userId, fnArgs);
+              result = JSON.stringify(toolResult.data || { error: toolResult.error });
             } else {
               result = JSON.stringify({ message: `Tool ${fnName} not implemented yet` });
             }

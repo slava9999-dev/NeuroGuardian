@@ -1045,15 +1045,39 @@ export async function executeSearchWeb(_userId: number, rawArgs: unknown): Promi
       throw new Error(`Serper API error: ${response.status}`);
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data: any = await response.json();
+    // Serper.dev response types
+    interface SerperOrganicResult {
+      title?: string;
+      link?: string;
+      snippet?: string;
+      position?: number;
+    }
 
-    // Extract relevant data from Serper response
+    interface SerperKnowledgeGraph {
+      title?: string;
+      type?: string;
+      description?: string;
+      descriptionSource?: string;
+      website?: string;
+      imageUrl?: string;
+      attributes?: Record<string, string>;
+    }
+
+    interface SerperResponse {
+      organic?: SerperOrganicResult[];
+      answerBox?: { answer?: string; snippet?: string };
+      knowledgeGraph?: SerperKnowledgeGraph;
+      peopleAlsoAsk?: Array<{ question: string; snippet: string }>;
+    }
+
+    const data: SerperResponse = await response.json();
+
+    // Extract organic search results
     const results =
-      data.organic?.map((r: any) => ({
-        title: r.title,
-        link: r.link,
-        snippet: r.snippet,
+      data.organic?.map((r: SerperOrganicResult) => ({
+        title: r.title || '',
+        link: r.link || '',
+        snippet: r.snippet || '',
       })) || [];
 
     // Try to get a direct answer or featured snippet if available
@@ -1063,12 +1087,32 @@ export async function executeSearchWeb(_userId: number, rawArgs: unknown): Promi
       data.organic?.[0]?.snippet ||
       'Нет прямого ответа';
 
+    // Extract knowledge graph if available (rich company/product info)
+    const knowledgeGraph = data.knowledgeGraph
+      ? {
+          title: data.knowledgeGraph.title,
+          type: data.knowledgeGraph.type,
+          description: data.knowledgeGraph.description,
+          website: data.knowledgeGraph.website,
+          attributes: data.knowledgeGraph.attributes,
+        }
+      : null;
+
+    // Extract "People also ask" for additional context
+    const relatedQuestions =
+      data.peopleAlsoAsk?.slice(0, 3).map(q => ({
+        question: q.question,
+        answer: q.snippet,
+      })) || [];
+
     return {
       success: true,
       data: {
         query: args.query,
         answer, // AI agent can use this as a summary
+        knowledgeGraph, // Rich info about companies/products
         results,
+        relatedQuestions, // Common follow-up questions
       },
     };
   } catch (error) {

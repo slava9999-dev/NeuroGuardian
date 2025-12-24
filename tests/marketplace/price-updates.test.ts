@@ -3,7 +3,7 @@
 // Tests for price update functionality
 // ============================================
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 
 // Mock types matching marketplace.ts
 interface WbPricePayload {
