@@ -58,9 +58,9 @@ describe('Input Validation', () => {
     });
 
     it('should return empty for non-string input', () => {
-      expect(sanitizeInput(null as any)).toBe('');
-      expect(sanitizeInput(undefined as any)).toBe('');
-      expect(sanitizeInput(123 as any)).toBe('');
+      expect(sanitizeInput(null as unknown as string)).toBe('');
+      expect(sanitizeInput(undefined as unknown as string)).toBe('');
+      expect(sanitizeInput(123 as unknown as string)).toBe('');
     });
   });
 

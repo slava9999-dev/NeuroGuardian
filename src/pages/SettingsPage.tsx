@@ -9,7 +9,7 @@ import { hapticFeedback } from '../lib/telegram';
 import { PaymentModal } from '../components/ui/PaymentModal';
 import { settingsApi, productsApi } from '../lib/api';
 import { SecurityBadge } from '../components/ui/SecurityBadge';
-import type { DefenseMode } from '../types';
+import type { DefenseMode, Product } from '../types';
 
 export function SettingsPage({ onBack }: { onBack: () => void }) {
   const { user, defenseMode, setDefenseMode, setUser } = useAppStore();
@@ -76,17 +76,20 @@ export function SettingsPage({ onBack }: { onBack: () => void }) {
 
       // Reload products
       const productsResult = await productsApi.getProducts();
-      if (productsResult.success) {
-        setProducts(productsResult.products as any);
+      if (productsResult.success && productsResult.products) {
+        setProducts(productsResult.products as Product[]);
       }
 
       hapticFeedback('success');
 
       // Clear status after 3 seconds
       setTimeout(() => setSyncStatus(null), 3000);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Sync error:', error);
-      setSyncStatus(`Ошибка: ${error.response?.data?.error || error.message}`);
+      const apiError = error as { response?: { data?: { error?: string } }; message?: string };
+      setSyncStatus(
+        `Ошибка: ${apiError.response?.data?.error || apiError.message || 'Неизвестная ошибка'}`
+      );
       hapticFeedback('error');
     }
   };

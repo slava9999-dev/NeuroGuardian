@@ -41,7 +41,11 @@ export class ErrorBoundary extends Component<Props, State> {
 
   async reportError(error: Error, errorInfo: ErrorInfo) {
     try {
-      const tg = (window as any).Telegram?.WebApp;
+      interface TelegramWebApp {
+        initData?: string;
+        WebApp?: { initData?: string };
+      }
+      const tg = (window as unknown as { Telegram?: TelegramWebApp }).Telegram?.WebApp;
       if (tg?.initData) {
         // Log error details for debugging
         console.log('📤 Error could be reported to backend:', {

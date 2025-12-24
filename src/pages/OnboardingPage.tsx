@@ -58,9 +58,11 @@ export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
       setSyncedCount(syncResult.count || 0);
       hapticFeedback('success');
       setStep('complete');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('❌ Error:', err);
-      setError(err.response?.data?.error || err.message || 'Ошибка сохранения ключа');
+      const errorMessage = err instanceof Error ? err.message : 'Ошибка сохранения ключа';
+      const apiError = err as { response?: { data?: { error?: string } } };
+      setError(apiError.response?.data?.error || errorMessage);
       hapticFeedback('error');
       setStep('apiKey'); // Go back to input on error
     } finally {

@@ -5,6 +5,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@vercel/kv';
+import { randomUUID } from 'crypto';
 
 import {
   validateTelegramInitData,
@@ -51,6 +52,9 @@ import {
   executeGetStockForecast,
   executeGetMarketplaceInfo,
 } from '../../src/api-lib/agent/tool-executors.js';
+
+// Import canonical AGENT_TOOLS definition (single source of truth)
+import { AGENT_TOOLS } from '../../src/api-lib/agent/tools.js';
 
 // Note: System prompt is now imported from system-prompt-v2.ts
 // Using Expert Persona (Виктор Маржин) + CoT + Few-Shot examples
@@ -110,8 +114,10 @@ interface ToolCallItem {
 /** Action requiring user confirmation */
 interface ActionRequired {
   operation: string;
+  taskId: string; // Unique ID for idempotency
   confirmationMessage: string;
   details: Record<string, unknown>;
+  expiresAt: number; // Timestamp when confirmation expires (5 minutes)
 }
 
 /** User API context for tools */
@@ -130,242 +136,6 @@ function getKVClient() {
   }
   return null;
 }
-
-// Function calling definitions
-const AGENT_TOOLS = [
-  {
-    type: 'function' as const,
-    function: {
-      name: 'get_products',
-      description: 'Получить список товаров пользователя с ценами и остатками',
-      parameters: {
-        type: 'object',
-        properties: {
-          limit: { type: 'number', description: 'Лимит товаров (по умолчанию 10)' },
-          sort: {
-            type: 'string',
-            enum: ['price', 'stock', 'name'],
-            description: 'Сортировка: price (по цене), stock (по остаткам), name (по названию)',
-          },
-        },
-      },
-    },
-  },
-  {
-    type: 'function' as const,
-    function: {
-      name: 'get_sales_stats',
-      description: 'Получить статистику продаж за период (выручка, заказы)',
-      parameters: {
-        type: 'object',
-        properties: {
-          period: {
-            type: 'string',
-            enum: ['today', 'yesterday', 'week', 'month'],
-            description: 'Период анализа',
-          },
-          marketplace: {
-            type: 'string',
-            enum: ['WB', 'Ozon', 'all'],
-            description: 'Маркетплейс',
-          },
-        },
-        required: ['period'],
-      },
-    },
-  },
-  {
-    type: 'function' as const,
-    function: {
-      name: 'calculate_unit_economics',
-      description: 'Рассчитать юнит-экономику товара (прибыль, маржа, комиссии)',
-      parameters: {
-        type: 'object',
-        properties: {
-          product_id: { type: 'string', description: 'ID товара (артикул)' },
-          price: { type: 'number', description: 'Цена продажи (опционально)' },
-          cost_price: { type: 'number', description: 'Себестоимость (опционально)' },
-          marketplace: {
-            type: 'string',
-            enum: ['WB', 'Ozon'],
-            description: 'Маркетплейс для расчёта комиссий',
-          },
-        },
-      },
-    },
-  },
-  {
-    type: 'function' as const,
-    function: {
-      name: 'get_abc_analysis',
-      description: 'Провести ABC-анализ товаров (классификация по важности)',
-      parameters: { type: 'object', properties: {} },
-    },
-  },
-  {
-    type: 'function' as const,
-    function: {
-      name: 'get_stock_forecast',
-      description: 'Получить прогноз остатков (на сколько дней хватит товара)',
-      parameters: {
-        type: 'object',
-        properties: {
-          product_id: {
-            type: 'string',
-            description: 'ID товара (опционально, если не указан - все товары)',
-          },
-        },
-      },
-    },
-  },
-  {
-    type: 'function' as const,
-    function: {
-      name: 'set_stop_loss',
-      description:
-        'Установить минимальную цену (Stop-Loss) для ОДНОГО конкретного товара. Используй когда пользователь просит защитить конкретный товар или установить минимальную цену.',
-      parameters: {
-        type: 'object',
-        properties: {
-          product_id: {
-            type: 'string',
-            description: 'ID или название товара',
-          },
-          min_price: { type: 'number', description: 'Минимальная цена (в рублях)' },
-        },
-        required: ['product_id', 'min_price'],
-      },
-    },
-  },
-  {
-    type: 'function' as const,
-    function: {
-      name: 'bulk_protect_products',
-      description:
-        'Массовая защита ВСЕХ товаров Stop-Loss. Используй ТОЛЬКО когда пользователь просит "защитить ВСЕ товары" или "установить защиту на все". НЕ используй для изменения цены на конкретный товар!',
-      parameters: {
-        type: 'object',
-        properties: {
-          percentage: {
-            type: 'number',
-            description: 'Процент от текущей цены (например, 15 для -15%)',
-          },
-          only_unprotected: {
-            type: 'boolean',
-            description: 'Только незащищённые товары (по умолчанию true)',
-          },
-        },
-        required: ['percentage'],
-      },
-    },
-  },
-  {
-    type: 'function' as const,
-    function: {
-      name: 'update_prices',
-      description:
-        'ОБЯЗАТЕЛЬНО вызывай эту функцию когда пользователь просит: изменить цену, поставить цену, установить цену, сделать цену, поднять/понизить цену на конкретный товар. Пример: "сделай цену 7500 на панно" → вызови update_prices. Функция запросит подтверждение автоматически.',
-      parameters: {
-        type: 'object',
-        properties: {
-          products: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                product_id: {
-                  type: 'string',
-                  description:
-                    'Название товара или его ID. Можно передать часть названия, например: "зимние горы", "панно", "кабель"',
-                },
-                new_price: { type: 'number', description: 'Новая цена в рублях' },
-              },
-              required: ['product_id', 'new_price'],
-            },
-            description: 'Список товаров для изменения цен',
-          },
-          marketplace: {
-            type: 'string',
-            enum: ['WB', 'Ozon', 'all'],
-            description:
-              'Маркетплейс. Обязательно указывай если пользователь явно упоминает "Wildberries", "WB", "ВБ", "валберис" → WB. Если "Ozon", "Озон" → Ozon. Иначе all.',
-          },
-          change_value: {
-            type: 'number',
-            description:
-              'Процентное изменение цены для ВСЕХ товаров. +10 = повысить на 10%, -5 = понизить на 5%',
-          },
-        },
-        required: [],
-      },
-    },
-  },
-  {
-    type: 'function' as const,
-    function: {
-      name: 'get_orders',
-      description: 'Получить список последних заказов',
-      parameters: {
-        type: 'object',
-        properties: {
-          limit: { type: 'number', description: 'Количество заказов (по умолчанию 5)' },
-        },
-      },
-    },
-  },
-  {
-    type: 'function' as const,
-    function: {
-      name: 'get_warehouse_stocks',
-      description: 'Получить остатки по складам',
-      parameters: {
-        type: 'object',
-        properties: {
-          product_id: { type: 'string', description: 'ID товара' },
-        },
-        required: ['product_id'],
-      },
-    },
-  },
-  {
-    type: 'function' as const,
-    function: {
-      name: 'update_stocks',
-      description:
-        'Изменить остатки товаров на складе. ВАЖНО: Работает ТОЛЬКО для FBS (товары на СВОЁМ складе продавца). Для FBO (товары на складе маркетплейса) изменить остатки НЕЛЬЗЯ — они зависят от поставок. ТРЕБУЕТ ПОДТВЕРЖДЕНИЯ!',
-      parameters: {
-        type: 'object',
-        properties: {
-          products: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                product_id: {
-                  type: 'string',
-                  description: 'Название товара или его ID',
-                },
-                new_stock: {
-                  type: 'number',
-                  description: 'Новое количество остатка (целое число >= 0)',
-                },
-              },
-              required: ['product_id', 'new_stock'],
-            },
-            description: 'Список товаров для изменения остатков',
-          },
-          marketplace: {
-            type: 'string',
-            enum: ['WB', 'Ozon'],
-            description:
-              'Маркетплейс для изменения остатков. Обязательно указывай: "Wildberries" → WB, "Ozon" → Ozon',
-          },
-        },
-        required: ['products', 'marketplace'],
-      },
-    },
-  },
-];
 
 type OpenAIMessage = {
   role: 'system' | 'user' | 'assistant' | 'tool';
@@ -436,326 +206,109 @@ async function callOpenAIWithTools(
   try {
     console.log(`🔧 Calling ${provider} API with ${AGENT_TOOLS.length} tools defined`);
 
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: finalModel,
-        messages,
-        tools: AGENT_TOOLS,
-        tool_choice: 'auto',
-        max_tokens: maxTokens,
-        temperature: 0.3, // Lower temperature for more reliable tool calling
-      }),
-    });
+    // === TIMEOUT PROTECTION ===
+    // Prevent hanging on API issues (P0 fix from audit)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 seconds
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`${provider} API Error: ${response.status} - ${errorText}`);
-    }
+    try {
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: finalModel,
+          messages,
+          tools: AGENT_TOOLS,
+          tool_choice: 'auto',
+          max_tokens: maxTokens,
+          temperature: 0.3, // Lower temperature for more reliable tool calling
+        }),
+        signal: controller.signal,
+      });
 
-    const data = await response.json();
-    const choice = data.choices[0];
-    const message = choice.message;
-    const tokens = data.usage?.total_tokens || 0;
+      clearTimeout(timeoutId);
 
-    if (message.tool_calls) {
-      // Handle tool calls
-      const toolCalls = message.tool_calls;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const toolNames = toolCalls.map((tc: any) => tc.function.name);
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`${provider} API Error: ${response.status} - ${errorText}`);
+      }
 
-      // Accumulate tool outputs
-      const toolOutputs: OpenAIMessage[] = [message]; // Add assistant's tool call message
+      const data = await response.json();
+      const choice = data.choices[0];
+      const message = choice.message;
+      const tokens = data.usage?.total_tokens || 0;
 
-      // Simplified handling: We just mock execution for read-only tools or simple logic
-      // For complex actions (update_prices), we return actionRequired
+      if (message.tool_calls) {
+        // Handle tool calls
+        const toolCalls = message.tool_calls;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const toolNames = toolCalls.map((tc: any) => tc.function.name);
 
-      // Tool executors are now imported statically at the top of the file
+        // Accumulate tool outputs
+        const toolOutputs: OpenAIMessage[] = [message]; // Add assistant's tool call message
 
-      for (const toolCall of toolCalls) {
-        const fnName = toolCall.function.name;
-        const fnArgs = JSON.parse(toolCall.function.arguments);
-        let result = '';
+        // Simplified handling: We just mock execution for read-only tools or simple logic
+        // For complex actions (update_prices), we return actionRequired
 
-        try {
-          // Execute real tool implementations
-          if (fnName === 'get_products') {
-            const toolResult = await executeGetProducts(userId, fnArgs);
-            result = JSON.stringify(toolResult.data || { error: toolResult.error });
-          } else if (fnName === 'get_sales_stats') {
-            const toolResult = await executeGetSalesStats(userId, fnArgs);
-            result = JSON.stringify(toolResult.data || { error: toolResult.error });
-          } else if (fnName === 'get_orders') {
-            const toolResult = await executeGetOrders(userId, fnArgs);
-            result = JSON.stringify(toolResult.data || { error: toolResult.error });
-          } else if (fnName === 'get_warehouse_stocks') {
-            const toolResult = await executeGetWarehouseStocks(userId, fnArgs);
-            result = JSON.stringify(toolResult.data || { error: toolResult.error });
-          } else if (fnName === 'calculate_unit_economics') {
-            const toolResult = await executeCalculateUnitEconomics(userId, fnArgs);
-            result = JSON.stringify(toolResult.data || { error: toolResult.error });
-          } else if (fnName === 'get_abc_analysis') {
-            const toolResult = await executeGetAbcAnalysis(userId, fnArgs);
-            result = JSON.stringify(toolResult.data || { error: toolResult.error });
-          } else if (fnName === 'get_stock_forecast') {
-            const toolResult = await executeGetStockForecast(userId, fnArgs);
-            result = JSON.stringify(toolResult.data || { error: toolResult.error });
-          } else if (fnName === 'get_marketplace_info') {
-            const toolResult = executeGetMarketplaceInfo(fnArgs);
-            result = JSON.stringify(toolResult.data || { error: toolResult.error });
-          } else if (fnName === 'update_prices') {
-            // Fetch product details to build proper price_changes array
-            const products = await getProductsByUserId(userId);
-            const priceChanges = [];
+        // Tool executors are now imported statically at the top of the file
 
-            console.log(`🔍 update_prices: User ${userId} has ${products.length} products`);
-            console.log(`🔍 update_prices fnArgs:`, JSON.stringify(fnArgs));
+        for (const toolCall of toolCalls) {
+          const fnName = toolCall.function.name;
+          const fnArgs = JSON.parse(toolCall.function.arguments);
+          let result = '';
 
-            // Parse marketplace filter from fnArgs
-            const requestedMarketplace = fnArgs.marketplace?.toUpperCase();
-            console.log(`🔍 Marketplace filter: ${requestedMarketplace || 'all'}`);
+          try {
+            // Execute real tool implementations
+            if (fnName === 'get_products') {
+              const toolResult = await executeGetProducts(userId, fnArgs);
+              result = JSON.stringify(toolResult.data || { error: toolResult.error });
+            } else if (fnName === 'get_sales_stats') {
+              const toolResult = await executeGetSalesStats(userId, fnArgs);
+              result = JSON.stringify(toolResult.data || { error: toolResult.error });
+            } else if (fnName === 'get_orders') {
+              const toolResult = await executeGetOrders(userId, fnArgs);
+              result = JSON.stringify(toolResult.data || { error: toolResult.error });
+            } else if (fnName === 'get_warehouse_stocks') {
+              const toolResult = await executeGetWarehouseStocks(userId, fnArgs);
+              result = JSON.stringify(toolResult.data || { error: toolResult.error });
+            } else if (fnName === 'calculate_unit_economics') {
+              const toolResult = await executeCalculateUnitEconomics(userId, fnArgs);
+              result = JSON.stringify(toolResult.data || { error: toolResult.error });
+            } else if (fnName === 'get_abc_analysis') {
+              const toolResult = await executeGetAbcAnalysis(userId, fnArgs);
+              result = JSON.stringify(toolResult.data || { error: toolResult.error });
+            } else if (fnName === 'get_stock_forecast') {
+              const toolResult = await executeGetStockForecast(userId, fnArgs);
+              result = JSON.stringify(toolResult.data || { error: toolResult.error });
+            } else if (fnName === 'get_marketplace_info') {
+              const toolResult = executeGetMarketplaceInfo(fnArgs);
+              result = JSON.stringify(toolResult.data || { error: toolResult.error });
+            } else if (fnName === 'update_prices') {
+              // Fetch product details to build proper price_changes array
+              const products = await getProductsByUserId(userId);
+              const priceChanges = [];
 
-            // Filter products by marketplace if specified
-            const typedProducts = products as DBProductRecord[];
-            let filteredProducts: DBProductRecord[] = typedProducts;
-            if (requestedMarketplace && requestedMarketplace !== 'ALL') {
-              filteredProducts = typedProducts.filter(
-                p => p.marketplace?.toUpperCase() === requestedMarketplace
-              );
-              console.log(
-                `🔍 Filtered to ${filteredProducts.length} ${requestedMarketplace} products`
-              );
-            }
+              console.log(`🔍 update_prices: User ${userId} has ${products.length} products`);
+              console.log(`🔍 update_prices fnArgs:`, JSON.stringify(fnArgs));
 
-            // Parse products from fnArgs
-            const requestedProducts = fnArgs.products || [];
+              // Parse marketplace filter from fnArgs
+              const requestedMarketplace = fnArgs.marketplace?.toUpperCase();
+              console.log(`🔍 Marketplace filter: ${requestedMarketplace || 'all'}`);
 
-            for (const req of requestedProducts) {
-              const reqId = String(req.product_id || req.name || req.title || '')
-                .toLowerCase()
-                .trim();
-              const reqPrice = req.new_price || req.price || req.newPrice;
-
-              console.log(`🔍 Looking for product: "${reqId}" with new price: ${reqPrice}`);
-
-              // Find matching product in filtered list with improved fuzzy matching
-              const dbProduct = filteredProducts.find((p: DBProductRecord) => {
-                const pId = String(p.product_id || '').toLowerCase();
-                const pTitle = String(p.title || '').toLowerCase();
-                const pNmId = String(p.nm_id || '');
-
-                // Exact matches
-                if (pId === reqId) return true;
-                if (pNmId === reqId) return true;
-
-                // Partial ID matches
-                if (pId.includes(reqId) || reqId.includes(pId)) return true;
-                if (reqId.includes(pNmId) && pNmId.length > 3) return true;
-
-                // Title fuzzy match - check if request contains significant part of title
-                const titleWords = pTitle.split(/\s+/).filter(w => w.length > 3);
-                const reqWords = reqId.split(/\s+/).filter(w => w.length > 2);
-
-                // If at least 2 significant words match, it's likely the same product
-                let matchCount = 0;
-                for (const rw of reqWords) {
-                  if (
-                    pTitle.includes(rw) ||
-                    titleWords.some(tw => tw.includes(rw) || rw.includes(tw))
-                  ) {
-                    matchCount++;
-                  }
-                }
-                if (
-                  matchCount >= 2 ||
-                  (reqWords.length === 1 && matchCount === 1 && pTitle.includes(reqId))
-                ) {
-                  console.log(`✅ Fuzzy match found: "${reqId}" -> "${p.title}"`);
-                  return true;
-                }
-
-                return false;
-              });
-
-              if (dbProduct) {
-                console.log(
-                  `✅ Matched: "${reqId}" -> ${dbProduct.title} (${dbProduct.marketplace})`
+              // Filter products by marketplace if specified
+              const typedProducts = products as DBProductRecord[];
+              let filteredProducts: DBProductRecord[] = typedProducts;
+              if (requestedMarketplace && requestedMarketplace !== 'ALL') {
+                filteredProducts = typedProducts.filter(
+                  p => p.marketplace?.toUpperCase() === requestedMarketplace
                 );
-                priceChanges.push({
-                  product_id: dbProduct.product_id,
-                  nm_id: dbProduct.nm_id,
-                  title: dbProduct.title,
-                  marketplace: dbProduct.marketplace,
-                  currentPrice: dbProduct.current_price,
-                  newPrice: reqPrice,
-                });
-              } else {
-                console.log(`❌ No match found for: "${reqId}"`);
-                // Log available products for debugging
                 console.log(
-                  `📦 Available products:`,
-                  (products as DBProductRecord[]).slice(0, 5).map(p => p.title)
+                  `🔍 Filtered to ${filteredProducts.length} ${requestedMarketplace} products`
                 );
               }
-            }
-
-            // If no specific products, check if change_value is set (percentage change)
-            if (priceChanges.length === 0 && fnArgs.change_value) {
-              console.log(`📊 Applying percentage change: ${fnArgs.change_value}%`);
-              for (const p of products.slice(0, 10)) {
-                const newPrice = Math.round(p.current_price * (1 + fnArgs.change_value / 100));
-                priceChanges.push({
-                  product_id: p.product_id,
-                  nm_id: p.nm_id,
-                  title: p.title,
-                  marketplace: p.marketplace,
-                  currentPrice: p.current_price,
-                  newPrice,
-                });
-              }
-            }
-
-            if (priceChanges.length === 0) {
-              console.log(`❌ No products matched for price update`);
-
-              // Build helpful error message with available products
-              const availableList = (products as DBProductRecord[])
-                .slice(0, 8)
-                .map(p => `• ${p.title.substring(0, 40)} (${p.marketplace})`)
-                .join('\n');
-
-              return {
-                success: true,
-                content: `❌ **Товар не найден**
-
-Не смог найти товар по твоему запросу. 
-
-📦 **Доступные товары:**
-${availableList}
-
-💡 Попробуй указать название точнее или выбери из списка выше.`,
-                toolsUsed: [fnName],
-                tokensUsed: tokens,
-              };
-            } else {
-              console.log(`✅ Prepared ${priceChanges.length} price changes`);
-
-              // Build detailed price change table
-              const priceTable = priceChanges
-                .slice(0, 5)
-                .map(
-                  (pc: {
-                    title: string;
-                    currentPrice: number;
-                    newPrice: number;
-                    marketplace: string;
-                  }) => {
-                    const diff = pc.newPrice - pc.currentPrice;
-                    const diffPercent = ((diff / pc.currentPrice) * 100).toFixed(1);
-                    const arrow = diff > 0 ? '↑' : diff < 0 ? '↓' : '→';
-                    return `• ${pc.title.substring(0, 25)}... ${pc.currentPrice}₽ ${arrow} **${pc.newPrice}₽** (${diff > 0 ? '+' : ''}${diffPercent}%)`;
-                  }
-                )
-                .join('\n');
-
-              const detailedContent = `📊 **Изменение цен**
-
-**Будет изменено:** ${priceChanges.length} товар(ов)
-
-**Детали:**
-${priceTable}${priceChanges.length > 5 ? `\n... и ещё ${priceChanges.length - 5} товаров` : ''}
-
-⚠️ Новые цены применятся в течение 1-5 минут.`;
-
-              return {
-                success: true,
-                content: detailedContent,
-                toolsUsed: [fnName],
-                tokensUsed: tokens,
-                actionRequired: {
-                  operation: 'update_prices',
-                  confirmationMessage: `Изменить цены на ${priceChanges.length} товар(ов)?`,
-                  details: { price_changes: priceChanges },
-                },
-              };
-            }
-          } else if (fnName === 'bulk_protect_products') {
-            // Get product count for detailed confirmation
-            const products = (await getProductsByUserId(userId)) as DBProductRecord[];
-            const percentage = fnArgs.percentage || 15;
-            const unprotectedProducts = fnArgs.only_unprotected
-              ? products.filter(p => !p.min_price || p.min_price === 0)
-              : products;
-            const count = unprotectedProducts.length;
-
-            // Build example calculations (first 3 products)
-            const examples = unprotectedProducts
-              .slice(0, 3)
-              .map(p => {
-                const stopLoss = Math.floor(p.current_price * (1 - percentage / 100));
-                return `• ${p.title.substring(0, 30)}... ${p.current_price}₽ → **${stopLoss}₽**`;
-              })
-              .join('\n');
-
-            const detailedMessage = `📊 **Массовая защита товаров**
-
-**Будет защищено:** ${count} товаров (-${percentage}%)
-
-**Примеры расчёта:**
-${examples}
-
-⚠️ При акциях WB + СПП цена может упасть до твоего Stop-Loss.`;
-
-            return {
-              success: true,
-              content: detailedMessage,
-              toolsUsed: [fnName],
-              tokensUsed: tokens,
-              actionRequired: {
-                operation: 'bulk_set_min_price',
-                confirmationMessage: `Установить Stop-Loss -${percentage}% для ${count} товаров?`,
-                details: { ...fnArgs, percentage },
-              },
-            };
-          } else if (fnName === 'set_stop_loss') {
-            return {
-              success: true,
-              content: `Требуется подтверждение для установки Stop-Loss на товар ${fnArgs.product_id}.`,
-              toolsUsed: [fnName],
-              tokensUsed: tokens,
-              actionRequired: {
-                operation: 'set_stop_loss',
-                confirmationMessage: `Установить Stop-Loss ${fnArgs.min_price}₽ для товара?`,
-                details: fnArgs,
-              },
-            };
-          } else if (fnName === 'update_stocks') {
-            // Fetch product details to build proper stock_changes array
-            const products = await getProductsByUserId(userId);
-            const stockChanges = [];
-
-            console.log(`🔍 update_stocks: User ${userId} has ${products.length} products`);
-            console.log(`🔍 update_stocks fnArgs:`, JSON.stringify(fnArgs));
-
-            // Parse marketplace filter from fnArgs (required for stocks)
-            const requestedMarketplace = fnArgs.marketplace?.toUpperCase();
-            if (!requestedMarketplace || !['WB', 'OZON'].includes(requestedMarketplace)) {
-              result = JSON.stringify({
-                error: 'Не указан маркетплейс. Укажите WB или Ozon.',
-              });
-            } else {
-              // Filter products by marketplace
-              const stockProducts = products as DBProductRecord[];
-              const filteredProducts = stockProducts.filter(
-                p => p.marketplace?.toUpperCase() === requestedMarketplace
-              );
-              console.log(
-                `🔍 Filtered to ${filteredProducts.length} ${requestedMarketplace} products`
-              );
 
               // Parse products from fnArgs
               const requestedProducts = fnArgs.products || [];
@@ -764,103 +317,346 @@ ${examples}
                 const reqId = String(req.product_id || req.name || req.title || '')
                   .toLowerCase()
                   .trim();
-                const reqStock = req.new_stock ?? req.stock ?? req.amount;
+                const reqPrice = req.new_price || req.price || req.newPrice;
 
-                console.log(`🔍 Looking for product: "${reqId}" with new stock: ${reqStock}`);
+                console.log(`🔍 Looking for product: "${reqId}" with new price: ${reqPrice}`);
 
-                // Find matching product
+                // Find matching product in filtered list with improved fuzzy matching
                 const dbProduct = filteredProducts.find((p: DBProductRecord) => {
+                  const pId = String(p.product_id || '').toLowerCase();
                   const pTitle = String(p.title || '').toLowerCase();
-                  return (
-                    pTitle.includes(reqId) ||
-                    reqId.split(/\s+/).some(w => w.length > 3 && pTitle.includes(w))
-                  );
+                  const pNmId = String(p.nm_id || '');
+
+                  // Exact matches
+                  if (pId === reqId) return true;
+                  if (pNmId === reqId) return true;
+
+                  // Partial ID matches
+                  if (pId.includes(reqId) || reqId.includes(pId)) return true;
+                  if (reqId.includes(pNmId) && pNmId.length > 3) return true;
+
+                  // Title fuzzy match - check if request contains significant part of title
+                  const titleWords = pTitle.split(/\s+/).filter(w => w.length > 3);
+                  const reqWords = reqId.split(/\s+/).filter(w => w.length > 2);
+
+                  // If at least 2 significant words match, it's likely the same product
+                  let matchCount = 0;
+                  for (const rw of reqWords) {
+                    if (
+                      pTitle.includes(rw) ||
+                      titleWords.some(tw => tw.includes(rw) || rw.includes(tw))
+                    ) {
+                      matchCount++;
+                    }
+                  }
+                  if (
+                    matchCount >= 2 ||
+                    (reqWords.length === 1 && matchCount === 1 && pTitle.includes(reqId))
+                  ) {
+                    console.log(`✅ Fuzzy match found: "${reqId}" -> "${p.title}"`);
+                    return true;
+                  }
+
+                  return false;
                 });
 
-                if (dbProduct && Number.isFinite(reqStock) && reqStock >= 0) {
-                  console.log(`✅ Matched: "${reqId}" -> ${dbProduct.title}`);
-                  stockChanges.push({
+                if (dbProduct) {
+                  console.log(
+                    `✅ Matched: "${reqId}" -> ${dbProduct.title} (${dbProduct.marketplace})`
+                  );
+                  priceChanges.push({
                     product_id: dbProduct.product_id,
                     nm_id: dbProduct.nm_id,
-                    vendor_code: dbProduct.vendor_code || String(dbProduct.nm_id),
                     title: dbProduct.title,
                     marketplace: dbProduct.marketplace,
-                    currentStock: dbProduct.current_stock || 0,
-                    newStock: Math.floor(reqStock),
+                    currentPrice: dbProduct.current_price,
+                    newPrice: reqPrice,
                   });
                 } else {
                   console.log(`❌ No match found for: "${reqId}"`);
+                  // Log available products for debugging
+                  console.log(
+                    `📦 Available products:`,
+                    (products as DBProductRecord[]).slice(0, 5).map(p => p.title)
+                  );
                 }
               }
 
-              if (stockChanges.length === 0) {
-                result = JSON.stringify({
-                  error: 'Не найдены товары для изменения остатков',
-                  note: 'Остатки можно менять только для FBS (товары на своём складе). Для FBO это невозможно.',
-                });
-              } else {
-                console.log(`✅ Prepared ${stockChanges.length} stock changes`);
+              // If no specific products, check if change_value is set (percentage change)
+              if (priceChanges.length === 0 && fnArgs.change_value) {
+                console.log(`📊 Applying percentage change: ${fnArgs.change_value}%`);
+                for (const p of products.slice(0, 10)) {
+                  const newPrice = Math.round(p.current_price * (1 + fnArgs.change_value / 100));
+                  priceChanges.push({
+                    product_id: p.product_id,
+                    nm_id: p.nm_id,
+                    title: p.title,
+                    marketplace: p.marketplace,
+                    currentPrice: p.current_price,
+                    newPrice,
+                  });
+                }
+              }
+
+              if (priceChanges.length === 0) {
+                console.log(`❌ No products matched for price update`);
+
+                // Build helpful error message with available products
+                const availableList = (products as DBProductRecord[])
+                  .slice(0, 8)
+                  .map(p => `• ${p.title.substring(0, 40)} (${p.marketplace})`)
+                  .join('\n');
+
                 return {
                   success: true,
-                  content: `Требуется подтверждение для изменения остатков на ${stockChanges.length} товар(ов). (Только FBS!)`,
+                  content: `❌ **Товар не найден**
+
+Не смог найти товар по твоему запросу. 
+
+📦 **Доступные товары:**
+${availableList}
+
+💡 Попробуй указать название точнее или выбери из списка выше.`,
+                  toolsUsed: [fnName],
+                  tokensUsed: tokens,
+                };
+              } else {
+                console.log(`✅ Prepared ${priceChanges.length} price changes`);
+
+                // Build detailed price change table
+                const priceTable = priceChanges
+                  .slice(0, 5)
+                  .map(
+                    (pc: {
+                      title: string;
+                      currentPrice: number;
+                      newPrice: number;
+                      marketplace: string;
+                    }) => {
+                      const diff = pc.newPrice - pc.currentPrice;
+                      const diffPercent = ((diff / pc.currentPrice) * 100).toFixed(1);
+                      const arrow = diff > 0 ? '↑' : diff < 0 ? '↓' : '→';
+                      return `• ${pc.title.substring(0, 25)}... ${pc.currentPrice}₽ ${arrow} **${pc.newPrice}₽** (${diff > 0 ? '+' : ''}${diffPercent}%)`;
+                    }
+                  )
+                  .join('\n');
+
+                const detailedContent = `📊 **Изменение цен**
+
+**Будет изменено:** ${priceChanges.length} товар(ов)
+
+**Детали:**
+${priceTable}${priceChanges.length > 5 ? `\n... и ещё ${priceChanges.length - 5} товаров` : ''}
+
+⚠️ Новые цены применятся в течение 1-5 минут.`;
+
+                return {
+                  success: true,
+                  content: detailedContent,
                   toolsUsed: [fnName],
                   tokensUsed: tokens,
                   actionRequired: {
-                    operation: 'update_stocks',
-                    confirmationMessage: `Изменить остатки на ${stockChanges.length} товар(ов)?`,
-                    details: { stock_changes: stockChanges, marketplace: requestedMarketplace },
+                    operation: 'update_prices',
+                    taskId: randomUUID(),
+                    confirmationMessage: `Изменить цены на ${priceChanges.length} товар(ов)?`,
+                    details: { price_changes: priceChanges },
+                    expiresAt: Date.now() + 5 * 60 * 1000, // 5 minutes
                   },
                 };
               }
+            } else if (fnName === 'bulk_protect_products') {
+              // Get product count for detailed confirmation
+              const products = (await getProductsByUserId(userId)) as DBProductRecord[];
+              const percentage = fnArgs.percentage || 15;
+              const unprotectedProducts = fnArgs.only_unprotected
+                ? products.filter(p => !p.min_price || p.min_price === 0)
+                : products;
+              const count = unprotectedProducts.length;
+
+              // Build example calculations (first 3 products)
+              const examples = unprotectedProducts
+                .slice(0, 3)
+                .map(p => {
+                  const stopLoss = Math.floor(p.current_price * (1 - percentage / 100));
+                  return `• ${p.title.substring(0, 30)}... ${p.current_price}₽ → **${stopLoss}₽**`;
+                })
+                .join('\n');
+
+              const detailedMessage = `📊 **Массовая защита товаров**
+
+**Будет защищено:** ${count} товаров (-${percentage}%)
+
+**Примеры расчёта:**
+${examples}
+
+⚠️ При акциях WB + СПП цена может упасть до твоего Stop-Loss.`;
+
+              return {
+                success: true,
+                content: detailedMessage,
+                toolsUsed: [fnName],
+                tokensUsed: tokens,
+                actionRequired: {
+                  operation: 'bulk_set_min_price',
+                  taskId: randomUUID(),
+                  confirmationMessage: `Установить Stop-Loss -${percentage}% для ${count} товаров?`,
+                  details: { ...fnArgs, percentage },
+                  expiresAt: Date.now() + 5 * 60 * 1000, // 5 minutes
+                },
+              };
+            } else if (fnName === 'set_stop_loss') {
+              return {
+                success: true,
+                content: `Требуется подтверждение для установки Stop-Loss на товар ${fnArgs.product_id}.`,
+                toolsUsed: [fnName],
+                tokensUsed: tokens,
+                actionRequired: {
+                  operation: 'set_stop_loss',
+                  taskId: randomUUID(),
+                  confirmationMessage: `Установить Stop-Loss ${fnArgs.min_price}₽ для товара?`,
+                  details: fnArgs,
+                  expiresAt: Date.now() + 5 * 60 * 1000, // 5 minutes
+                },
+              };
+            } else if (fnName === 'update_stocks') {
+              // Fetch product details to build proper stock_changes array
+              const products = await getProductsByUserId(userId);
+              const stockChanges = [];
+
+              console.log(`🔍 update_stocks: User ${userId} has ${products.length} products`);
+              console.log(`🔍 update_stocks fnArgs:`, JSON.stringify(fnArgs));
+
+              // Parse marketplace filter from fnArgs (required for stocks)
+              const requestedMarketplace = fnArgs.marketplace?.toUpperCase();
+              if (!requestedMarketplace || !['WB', 'OZON'].includes(requestedMarketplace)) {
+                result = JSON.stringify({
+                  error: 'Не указан маркетплейс. Укажите WB или Ozon.',
+                });
+              } else {
+                // Filter products by marketplace
+                const stockProducts = products as DBProductRecord[];
+                const filteredProducts = stockProducts.filter(
+                  p => p.marketplace?.toUpperCase() === requestedMarketplace
+                );
+                console.log(
+                  `🔍 Filtered to ${filteredProducts.length} ${requestedMarketplace} products`
+                );
+
+                // Parse products from fnArgs
+                const requestedProducts = fnArgs.products || [];
+
+                for (const req of requestedProducts) {
+                  const reqId = String(req.product_id || req.name || req.title || '')
+                    .toLowerCase()
+                    .trim();
+                  const reqStock = req.new_stock ?? req.stock ?? req.amount;
+
+                  console.log(`🔍 Looking for product: "${reqId}" with new stock: ${reqStock}`);
+
+                  // Find matching product
+                  const dbProduct = filteredProducts.find((p: DBProductRecord) => {
+                    const pTitle = String(p.title || '').toLowerCase();
+                    return (
+                      pTitle.includes(reqId) ||
+                      reqId.split(/\s+/).some(w => w.length > 3 && pTitle.includes(w))
+                    );
+                  });
+
+                  if (dbProduct && Number.isFinite(reqStock) && reqStock >= 0) {
+                    console.log(`✅ Matched: "${reqId}" -> ${dbProduct.title}`);
+                    stockChanges.push({
+                      product_id: dbProduct.product_id,
+                      nm_id: dbProduct.nm_id,
+                      vendor_code: dbProduct.vendor_code || String(dbProduct.nm_id),
+                      title: dbProduct.title,
+                      marketplace: dbProduct.marketplace,
+                      currentStock: dbProduct.current_stock || 0,
+                      newStock: Math.floor(reqStock),
+                    });
+                  } else {
+                    console.log(`❌ No match found for: "${reqId}"`);
+                  }
+                }
+
+                if (stockChanges.length === 0) {
+                  result = JSON.stringify({
+                    error: 'Не найдены товары для изменения остатков',
+                    note: 'Остатки можно менять только для FBS (товары на своём складе). Для FBO это невозможно.',
+                  });
+                } else {
+                  console.log(`✅ Prepared ${stockChanges.length} stock changes`);
+                  return {
+                    success: true,
+                    content: `Требуется подтверждение для изменения остатков на ${stockChanges.length} товар(ов). (Только FBS!)`,
+                    toolsUsed: [fnName],
+                    tokensUsed: tokens,
+                    actionRequired: {
+                      operation: 'update_stocks',
+                      taskId: randomUUID(),
+                      confirmationMessage: `Изменить остатки на ${stockChanges.length} товар(ов)?`,
+                      details: { stock_changes: stockChanges, marketplace: requestedMarketplace },
+                      expiresAt: Date.now() + 5 * 60 * 1000, // 5 minutes
+                    },
+                  };
+                }
+              }
+            } else {
+              result = JSON.stringify({ message: `Tool ${fnName} not implemented yet` });
             }
-          } else {
-            result = JSON.stringify({ message: `Tool ${fnName} not implemented yet` });
+          } catch (toolError) {
+            console.error(`Tool ${fnName} execution error:`, toolError);
+            result = JSON.stringify({ error: `Ошибка выполнения ${fnName}: ${toolError}` });
           }
-        } catch (toolError) {
-          console.error(`Tool ${fnName} execution error:`, toolError);
-          result = JSON.stringify({ error: `Ошибка выполнения ${fnName}: ${toolError}` });
+
+          toolOutputs.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            name: fnName,
+            content: result,
+          });
         }
 
-        toolOutputs.push({
-          role: 'tool',
-          tool_call_id: toolCall.id,
-          name: fnName,
-          content: result,
+        // Second call with tool outputs
+        const secondResponse = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: finalModel,
+            messages: [...messages, ...toolOutputs],
+            max_tokens: maxTokens,
+            temperature: 0.7,
+          }),
         });
+
+        if (secondResponse.ok) {
+          const secondData = await secondResponse.json();
+          return {
+            success: true,
+            content: secondData.choices[0].message.content,
+            toolsUsed: toolNames,
+            tokensUsed: tokens + (secondData.usage?.total_tokens || 0),
+          };
+        }
       }
 
-      // Second call with tool outputs
-      const secondResponse = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: finalModel,
-          messages: [...messages, ...toolOutputs],
-          max_tokens: maxTokens,
-          temperature: 0.7,
-        }),
-      });
+      return {
+        success: true,
+        content: message.content || '',
+        toolsUsed: [],
+        tokensUsed: tokens,
+      };
+    } catch (fetchError: unknown) {
+      // Handle timeout or network errors
+      clearTimeout(timeoutId);
 
-      if (secondResponse.ok) {
-        const secondData = await secondResponse.json();
-        return {
-          success: true,
-          content: secondData.choices[0].message.content,
-          toolsUsed: toolNames,
-          tokensUsed: tokens + (secondData.usage?.total_tokens || 0),
-        };
+      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+        throw new Error(`${provider} API timeout after 30 seconds`);
       }
+      throw fetchError;
     }
-
-    return {
-      success: true,
-      content: message.content || '',
-      toolsUsed: [],
-      tokensUsed: tokens,
-    };
   } catch (e) {
     console.error('OpenAI Call Failed:', e);
     return {
@@ -1092,10 +888,46 @@ export async function handleAgentConfirm(
   if (!validation.valid || !validation.user) return res.status(401).json({ error: 'Unauthorized' });
 
   const userId = validation.user.id;
-  const { operation, confirmed, details: _details } = req.body;
+  const { operation, confirmed, details: _details, taskId, expiresAt } = req.body;
 
   if (!confirmed) {
     return res.json({ success: true, content: '👍 Операция отменена.', executed: false });
+  }
+
+  // === IDEMPOTENCY CHECK ===
+  // Prevent double execution of the same operation
+  if (!taskId) {
+    return res.status(400).json({
+      success: false,
+      error: 'Missing taskId. Please request the operation again.',
+    });
+  }
+
+  const kv = getKVClient();
+  if (kv) {
+    try {
+      const alreadyExecuted = await kv.get(`task:${taskId}`);
+      if (alreadyExecuted) {
+        return res.json({
+          success: true,
+          content: '✅ Операция уже выполнена ранее.',
+          executed: true,
+        });
+      }
+    } catch (e) {
+      console.warn('⚠️ Failed to check idempotency:', e);
+      // Continue anyway - better to execute than to fail
+    }
+  }
+
+  // === TTL CHECK ===
+  // Confirmation must be within 5 minutes
+  if (expiresAt && Date.now() > expiresAt) {
+    return res.json({
+      success: false,
+      content: '⏰ Время подтверждения истекло (5 минут). Запросите операцию заново.',
+      executed: false,
+    });
   }
 
   let resultContent = '';
@@ -1415,6 +1247,17 @@ export async function handleAgentConfirm(
     }
   } else {
     resultContent = '❌ Неизвестная операция.';
+  }
+
+  // === SAVE TASK ID FOR IDEMPOTENCY ===
+  // Mark this task as executed to prevent double execution
+  if (kv && executed && taskId) {
+    try {
+      await kv.set(`task:${taskId}`, true, { ex: 3600 }); // 1 hour TTL
+    } catch (e) {
+      console.warn('⚠️ Failed to save task execution state:', e);
+      // Don't fail the request - operation already executed
+    }
   }
 
   return res.json({ success: true, content: resultContent, executed });

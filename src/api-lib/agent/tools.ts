@@ -171,30 +171,36 @@ export const AGENT_TOOLS = [
     function: {
       name: 'update_prices',
       description:
-        'Изменить цены на товары. ТРЕБУЕТ ПОДТВЕРЖДЕНИЯ! Если product_ids не указан — система возьмёт все товары (макс 10). Укажи либо price_change (в рублях), либо price_change_percent (в %).',
+        'ОБЯЗАТЕЛЬНО вызывай эту функцию когда пользователь просит: изменить цену, поставить цену, установить цену, сделать цену, поднять/понизить цену на конкретный товар. Пример: "сделай цену 7500 на панно" → вызови update_prices. Функция запросит подтверждение автоматически.',
       parameters: {
         type: 'object',
         properties: {
-          product_ids: {
+          products: {
             type: 'array',
-            items: { type: 'string' },
-            description:
-              'Опционально: список конкретных ID товаров. Если не указать — изменятся все товары.',
+            items: {
+              type: 'object',
+              properties: {
+                product_id: {
+                  type: 'string',
+                  description:
+                    'Название товара или его ID. Можно передать часть названия, например: "зимние горы", "панно", "кабель"',
+                },
+                new_price: { type: 'number', description: 'Новая цена в рублях' },
+              },
+              required: ['product_id', 'new_price'],
+            },
+            description: 'Список товаров для изменения цен (используй для конкретных товаров)',
           },
           marketplace: {
             type: 'string',
             enum: ['WB', 'Ozon', 'all'],
-            description: 'Маркетплейс для изменения цен (по умолчанию all)',
+            description:
+              'Маркетплейс. Обязательно указывай если пользователь явно упоминает "Wildberries", "WB", "ВБ", "валберис" → WB. Если "Ozon", "Озон" → Ozon. Иначе all.',
           },
-          price_change: {
+          change_value: {
             type: 'number',
             description:
-              'Изменение цены в рублях. Положительное = повысить (+500), отрицательное = понизить (-200)',
-          },
-          price_change_percent: {
-            type: 'number',
-            description:
-              'Или изменение в процентах. Положительное = повысить (+10), отрицательное = понизить (-5)',
+              'Процентное изменение цены для ВСЕХ товаров. +10 = повысить на 10%, -5 = понизить на 5%. Используй когда пользователь просит изменить цены на все товары.',
           },
         },
         required: [],
@@ -283,6 +289,44 @@ export const AGENT_TOOLS = [
       },
     },
   },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'update_stocks',
+      description:
+        'Изменить остатки товаров на складе. ВАЖНО: Работает ТОЛЬКО для FBS (товары на СВОЁМ складе продавца). Для FBO (товары на складе маркетплейса) изменить остатки НЕЛЬЗЯ — они зависят от поставок. ТРЕБУЕТ ПОДТВЕРЖДЕНИЯ!',
+      parameters: {
+        type: 'object',
+        properties: {
+          products: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                product_id: {
+                  type: 'string',
+                  description: 'Название товара или его ID',
+                },
+                new_stock: {
+                  type: 'number',
+                  description: 'Новое количество остатка (целое число >= 0)',
+                },
+              },
+              required: ['product_id', 'new_stock'],
+            },
+            description: 'Список товаров для изменения остатков',
+          },
+          marketplace: {
+            type: 'string',
+            enum: ['WB', 'Ozon'],
+            description:
+              'Маркетплейс для изменения остатков. Обязательно указывай: "Wildberries" → WB, "Ozon" → Ozon',
+          },
+        },
+        required: ['products', 'marketplace'],
+      },
+    },
+  },
 ];
 
 /**
@@ -292,6 +336,7 @@ export const CONFIRMATION_REQUIRED_TOOLS = [
   'set_stop_loss',
   'bulk_protect_products',
   'update_prices',
+  'update_stocks',
 ];
 
 /**

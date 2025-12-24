@@ -227,7 +227,10 @@ export function DashboardPage({ onGoToSettings, onGoToAgent }: DashboardPageProp
 
     // Run check immediately on mount
     const runCheck = async () => {
-      const tg = (window as any).Telegram?.WebApp;
+      interface TelegramWebApp {
+        initData?: string;
+      }
+      const tg = (window as unknown as { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp;
       const initData = tg?.initData;
       if (!initData) return;
 
