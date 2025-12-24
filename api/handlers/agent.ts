@@ -621,12 +621,26 @@ async function callOpenAIWithTools(
 
             if (priceChanges.length === 0) {
               console.log(`❌ No products matched for price update`);
-              result = JSON.stringify({
-                error: 'Не найдены товары для изменения цен',
-                availableProducts: products
-                  .slice(0, 5)
-                  .map((p: any) => ({ title: p.title, id: p.product_id })),
-              });
+
+              // Build helpful error message with available products
+              const availableList = (products as DBProductRecord[])
+                .slice(0, 8)
+                .map(p => `• ${p.title.substring(0, 40)} (${p.marketplace})`)
+                .join('\n');
+
+              return {
+                success: true,
+                content: `❌ **Товар не найден**
+
+Не смог найти товар по твоему запросу. 
+
+📦 **Доступные товары:**
+${availableList}
+
+💡 Попробуй указать название точнее или выбери из списка выше.`,
+                toolsUsed: [fnName],
+                tokensUsed: tokens,
+              };
             } else {
               console.log(`✅ Prepared ${priceChanges.length} price changes`);
 
