@@ -629,9 +629,37 @@ async function callOpenAIWithTools(
               });
             } else {
               console.log(`✅ Prepared ${priceChanges.length} price changes`);
+
+              // Build detailed price change table
+              const priceTable = priceChanges
+                .slice(0, 5)
+                .map(
+                  (pc: {
+                    title: string;
+                    currentPrice: number;
+                    newPrice: number;
+                    marketplace: string;
+                  }) => {
+                    const diff = pc.newPrice - pc.currentPrice;
+                    const diffPercent = ((diff / pc.currentPrice) * 100).toFixed(1);
+                    const arrow = diff > 0 ? '↑' : diff < 0 ? '↓' : '→';
+                    return `• ${pc.title.substring(0, 25)}... ${pc.currentPrice}₽ ${arrow} **${pc.newPrice}₽** (${diff > 0 ? '+' : ''}${diffPercent}%)`;
+                  }
+                )
+                .join('\n');
+
+              const detailedContent = `📊 **Изменение цен**
+
+**Будет изменено:** ${priceChanges.length} товар(ов)
+
+**Детали:**
+${priceTable}${priceChanges.length > 5 ? `\n... и ещё ${priceChanges.length - 5} товаров` : ''}
+
+⚠️ Новые цены применятся в течение 1-5 минут.`;
+
               return {
                 success: true,
-                content: `Требуется подтверждение для изменения цен на ${priceChanges.length} товар(ов).`,
+                content: detailedContent,
                 toolsUsed: [fnName],
                 tokensUsed: tokens,
                 actionRequired: {
@@ -642,15 +670,41 @@ async function callOpenAIWithTools(
               };
             }
           } else if (fnName === 'bulk_protect_products') {
+            // Get product count for detailed confirmation
+            const products = (await getProductsByUserId(userId)) as DBProductRecord[];
+            const percentage = fnArgs.percentage || 15;
+            const unprotectedProducts = fnArgs.only_unprotected
+              ? products.filter(p => !p.min_price || p.min_price === 0)
+              : products;
+            const count = unprotectedProducts.length;
+
+            // Build example calculations (first 3 products)
+            const examples = unprotectedProducts
+              .slice(0, 3)
+              .map(p => {
+                const stopLoss = Math.floor(p.current_price * (1 - percentage / 100));
+                return `• ${p.title.substring(0, 30)}... ${p.current_price}₽ → **${stopLoss}₽**`;
+              })
+              .join('\n');
+
+            const detailedMessage = `📊 **Массовая защита товаров**
+
+**Будет защищено:** ${count} товаров (-${percentage}%)
+
+**Примеры расчёта:**
+${examples}
+
+⚠️ При акциях WB + СПП цена может упасть до твоего Stop-Loss.`;
+
             return {
               success: true,
-              content: 'Требуется подтверждение для массовой защиты.',
+              content: detailedMessage,
               toolsUsed: [fnName],
               tokensUsed: tokens,
               actionRequired: {
                 operation: 'bulk_set_min_price',
-                confirmationMessage: 'Установить Stop-Loss для всех товаров?',
-                details: fnArgs,
+                confirmationMessage: `Установить Stop-Loss -${percentage}% для ${count} товаров?`,
+                details: { ...fnArgs, percentage },
               },
             };
           } else if (fnName === 'set_stop_loss') {
