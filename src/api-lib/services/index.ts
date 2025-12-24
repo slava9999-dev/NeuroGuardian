@@ -29,6 +29,10 @@ export {
   getProductsWithPendingPrices,
   batchConfirmPendingByTaskId,
   migrateAddPendingColumns,
+  // Chat history (Dec 2024)
+  getChatHistory,
+  saveChatHistory,
+  clearChatHistory,
 } from './database.js';
 
 // YooKassa

@@ -329,6 +329,52 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return handleAgentStatus(req, res);
       }
 
+      // ========== CHAT HISTORY: GET ==========
+      case 'get-chat-history': {
+        const initData = sanitizeInput(
+          (req.headers['x-init-data'] as string) || req.body?.initData || ''
+        );
+        const validation = validateTelegramInitData(initData);
+        if (!validation.valid || !validation.user) {
+          return res.status(401).json({ error: 'Unauthorized', code: 'AUTH_FAILED' });
+        }
+
+        const { getChatHistory } = await import('../src/api-lib/services/database.js');
+        const messages = await getChatHistory(validation.user.id);
+        return res.status(200).json({ success: true, messages });
+      }
+
+      // ========== CHAT HISTORY: SAVE ==========
+      case 'save-chat-history': {
+        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+        const initData = sanitizeInput(req.body?.initData || '');
+        const validation = validateTelegramInitData(initData);
+        if (!validation.valid || !validation.user) {
+          return res.status(401).json({ error: 'Unauthorized', code: 'AUTH_FAILED' });
+        }
+
+        const messages = req.body?.messages || [];
+        const { saveChatHistory } = await import('../src/api-lib/services/database.js');
+        await saveChatHistory(validation.user.id, messages);
+        return res.status(200).json({ success: true });
+      }
+
+      // ========== CHAT HISTORY: CLEAR ==========
+      case 'clear-chat-history': {
+        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+        const initData = sanitizeInput(req.body?.initData || '');
+        const validation = validateTelegramInitData(initData);
+        if (!validation.valid || !validation.user) {
+          return res.status(401).json({ error: 'Unauthorized', code: 'AUTH_FAILED' });
+        }
+
+        const { clearChatHistory } = await import('../src/api-lib/services/database.js');
+        await clearChatHistory(validation.user.id);
+        return res.status(200).json({ success: true });
+      }
+
       // ========== DEFAULT ==========
       default:
         return res.status(400).json({

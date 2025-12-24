@@ -10,8 +10,10 @@ const API_BASE = '/api';
 
 // Agent message types
 export interface AgentMessage {
+  id?: string;
   role: 'user' | 'assistant';
   content: string;
+  timestamp?: string;
 }
 
 export interface AgentResponse {
@@ -188,6 +190,84 @@ export const agentApi = {
         model: 'gpt-4o-mini',
         capabilities: ['Статистика продаж', 'Управление ценами', 'Защита товаров', 'Аналитика'],
       };
+    }
+  },
+
+  /**
+   * Load chat history from server
+   */
+  loadHistory: async (): Promise<AgentMessage[]> => {
+    const initData = getInitData();
+
+    try {
+      const response = await fetch(`${API_BASE}?action=get-chat-history`, {
+        headers: {
+          'X-Init-Data': initData || '',
+        },
+      });
+
+      if (!response.ok) {
+        return [];
+      }
+
+      const data = await response.json();
+      return data.messages || [];
+    } catch (error) {
+      console.error('Load history error:', error);
+      return [];
+    }
+  },
+
+  /**
+   * Save chat history to server
+   */
+  saveHistory: async (messages: AgentMessage[]): Promise<boolean> => {
+    const initData = getInitData();
+
+    try {
+      const response = await fetch(`${API_BASE}?action=save-chat-history`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Init-Data': initData || '',
+        },
+        body: JSON.stringify({
+          action: 'save-chat-history',
+          messages,
+          initData,
+        }),
+      });
+
+      return response.ok;
+    } catch (error) {
+      console.error('Save history error:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Clear chat history on server
+   */
+  clearHistory: async (): Promise<boolean> => {
+    const initData = getInitData();
+
+    try {
+      const response = await fetch(`${API_BASE}?action=clear-chat-history`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Init-Data': initData || '',
+        },
+        body: JSON.stringify({
+          action: 'clear-chat-history',
+          initData,
+        }),
+      });
+
+      return response.ok;
+    } catch (error) {
+      console.error('Clear history error:', error);
+      return false;
     }
   },
 };

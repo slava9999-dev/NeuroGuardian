@@ -19,6 +19,8 @@ export function AgentPage() {
   const clearMessages = useChatStore(state => state.clearMessages);
   const isProcessing = useChatStore(state => state.isProcessing);
   const setProcessing = useChatStore(state => state.setProcessing);
+  const loadFromServer = useChatStore(state => state.loadFromServer);
+  const isSynced = useChatStore(state => state.isSynced);
 
   const [inputValue, setInputValue] = useState('');
   const [isListening, setIsListening] = useState(false);
@@ -27,6 +29,13 @@ export function AgentPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const firstName = user?.firstName || user?.username || 'друг';
+
+  // Load chat history from server on mount
+  useEffect(() => {
+    if (!isSynced) {
+      loadFromServer();
+    }
+  }, [isSynced, loadFromServer]);
 
   // Scroll to bottom when new messages arrive
   const scrollToBottom = useCallback(() => {

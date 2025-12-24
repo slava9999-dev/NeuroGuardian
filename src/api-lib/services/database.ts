@@ -91,12 +91,23 @@ export async function initializeDatabase(): Promise<void> {
     )
   `;
 
+  // Chat history table
+  await sql`
+    CREATE TABLE IF NOT EXISTS chat_history (
+      id SERIAL PRIMARY KEY,
+      user_id BIGINT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+      messages JSONB NOT NULL DEFAULT '[]',
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+
   // Indexes
   await sql`CREATE INDEX IF NOT EXISTS idx_products_user_id ON products(user_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_users_protection ON users(protection_enabled, subscription_active) WHERE protection_enabled = true`;
   await sql`CREATE INDEX IF NOT EXISTS idx_products_monitoring ON products(user_id, min_price) WHERE min_price > 0`;
   await sql`CREATE INDEX IF NOT EXISTS idx_sentinel_logs_user ON sentinel_logs(user_id, created_at DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_chat_history_user ON chat_history(user_id)`;
 }
 
 /**
@@ -600,4 +611,55 @@ export async function migrateAddPendingColumns(): Promise<void> {
     // Columns may already exist
     console.log('ℹ️ Migration: pending columns already exist or error:', e);
   }
+}
+
+// ========================================
+// Chat History Functions
+// ========================================
+
+interface ChatMessageDB {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: string;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Get chat history for a user
+ */
+export async function getChatHistory(userId: number): Promise<ChatMessageDB[]> {
+  const result = await sql`
+    SELECT messages FROM chat_history WHERE user_id = ${userId}
+  `;
+
+  if (result.rows.length === 0) {
+    return [];
+  }
+
+  return result.rows[0].messages as ChatMessageDB[];
+}
+
+/**
+ * Save chat history for a user (upsert)
+ */
+export async function saveChatHistory(userId: number, messages: ChatMessageDB[]): Promise<void> {
+  // Keep only last 50 messages to prevent bloat
+  const trimmedMessages = messages.slice(-50);
+
+  await sql`
+    INSERT INTO chat_history (user_id, messages, updated_at)
+    VALUES (${userId}, ${JSON.stringify(trimmedMessages)}::jsonb, NOW())
+    ON CONFLICT (user_id) 
+    DO UPDATE SET messages = ${JSON.stringify(trimmedMessages)}::jsonb, updated_at = NOW()
+  `;
+}
+
+/**
+ * Clear chat history for a user
+ */
+export async function clearChatHistory(userId: number): Promise<void> {
+  await sql`
+    DELETE FROM chat_history WHERE user_id = ${userId}
+  `;
 }
