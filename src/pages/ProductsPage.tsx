@@ -122,41 +122,37 @@ export function ProductsPage({ onBack }: ProductsPageProps) {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-stone-900 to-stone-800 pb-24">
-      {/* Header - Reordered as requested */}
-      <header className="sticky top-0 z-10 bg-stone-900/95 backdrop-blur-md border-b border-stone-800 px-4 py-4">
-        <div className="flex flex-col gap-4">
-          {/* 1. Global Protection Switch - VERY TOP */}
-          <div className="w-full flex justify-center pb-2 border-b border-white/5">
-            <GlobalSwitch />
+      {/* Header - Compact Mobile Version */}
+      <header className="sticky top-0 z-10 bg-stone-900/95 backdrop-blur-md border-b border-stone-800 px-3 py-2">
+        <div className="flex items-center justify-between gap-2">
+          {/* Back button + Title */}
+          <div className="flex items-center gap-2 min-w-0">
+            <button
+              onClick={onBack}
+              className="p-1.5 rounded-lg hover:bg-stone-800 transition-colors text-stone-400 flex-shrink-0"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M19 12H5M12 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <div className="min-w-0">
+              <h1 className="text-lg font-bold text-white truncate">Товары</h1>
+              <p className="text-[10px] text-stone-500">
+                {stats.total} • {stats.protected} защищено
+              </p>
+            </div>
           </div>
 
-          {/* 2. Page Title & Stats */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={onBack}
-                className="p-2 -ml-2 rounded-lg hover:bg-stone-800 transition-colors text-stone-400"
-              >
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M19 12H5M12 19l-7-7 7-7" />
-                </svg>
-              </button>
-              <div>
-                <h1 className="text-xl font-bold text-white">Мои товары</h1>
-                <p className="text-xs text-stone-400">
-                  {stats.total} товаров • {stats.protected} защищено
-                </p>
-              </div>
-            </div>
-
-            {/* Add button or something else here if needed */}
+          {/* Global Switch - Compact */}
+          <div className="flex-shrink-0">
+            <GlobalSwitch compact />
           </div>
         </div>
       </header>
