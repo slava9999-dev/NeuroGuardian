@@ -9,6 +9,7 @@ import type { Product } from '../../types';
 import { useProductsStore } from '../../stores';
 import { hapticFeedback } from '../../lib/telegram';
 import { LazyImage } from '../ui/LazyImage';
+import { PriceCalculator } from './PriceCalculator';
 
 interface ProductCardProps {
   product: Product;
@@ -48,6 +49,7 @@ const STATUS_CONFIG: Record<string, StatusConfig> = {
 export function ProductCard({ product }: ProductCardProps) {
   const updateProduct = useProductsStore(s => s.updateProduct);
   const [isEditing, setIsEditing] = useState(false);
+  const [showCalculator, setShowCalculator] = useState(false);
   const [minPriceInput, setMinPriceInput] = useState(product.minPrice.toString());
 
   const status = STATUS_CONFIG[product.status] || STATUS_CONFIG.active;
@@ -225,6 +227,16 @@ export function ProductCard({ product }: ProductCardProps) {
                 : 'Установить'}
             </p>
           )}
+
+          {/* Calculator button */}
+          {!isEditing && (
+            <button
+              onClick={() => setShowCalculator(true)}
+              className="mt-2 w-full text-xs text-stone-400 hover:text-amber-400 transition-colors flex items-center justify-center gap-1"
+            >
+              🧮 Рассчитать автоматически
+            </button>
+          )}
         </div>
       </div>
 
@@ -314,6 +326,55 @@ export function ProductCard({ product }: ProductCardProps) {
           <span>{product.stock} шт</span>
         </div>
       </div>
+
+      {/* Price Calculator Modal */}
+      {showCalculator && (
+        <PriceCalculator
+          marketplace={product.marketplace}
+          onCalculated={calculatedPrice => {
+            // Update input and trigger save
+            setMinPriceInput(calculatedPrice.toString());
+            setIsEditing(false);
+
+            // Save to store and server
+            hapticFeedback('light');
+            updateProduct(product.id, {
+              minPrice: calculatedPrice,
+              status: calculatedPrice > 0 ? 'protected' : 'active',
+            });
+
+            // Save to server
+            (async () => {
+              try {
+                interface TelegramWebApp {
+                  initData?: string;
+                }
+                const tg = (window as unknown as { Telegram?: { WebApp?: TelegramWebApp } })
+                  .Telegram?.WebApp;
+                const initData = tg?.initData || 'demo';
+
+                await fetch('/api?action=products', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'X-Init-Data': initData,
+                  },
+                  body: JSON.stringify({
+                    action: 'products',
+                    initData,
+                    productId: product.productId,
+                    minPrice: calculatedPrice,
+                  }),
+                });
+                console.log(`✅ Минимальная цена saved: ${product.productId} → ${calculatedPrice}`);
+              } catch (error) {
+                console.error('❌ Failed to save минимальная цена:', error);
+              }
+            })();
+          }}
+          onClose={() => setShowCalculator(false)}
+        />
+      )}
     </div>
   );
 }
