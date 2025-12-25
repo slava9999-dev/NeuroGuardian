@@ -193,16 +193,15 @@ export type BulkProtectDetails = z.infer<typeof BulkProtectDetailsSchema>;
 
 // === VALIDATION HELPER ===
 
+export type ValidationResult<T> = { success: true; data: T } | { success: false; error: string };
+
 /**
  * Validate tool arguments and return typed result
  * @param schema Zod schema to validate against
  * @param args Raw arguments from OpenAI
  * @returns Validation result with parsed data or error
  */
-export function validateToolArgs<T>(
-  schema: z.ZodSchema<T>,
-  args: unknown
-): { success: true; data: T } | { success: false; error: string } {
+export function validateToolArgs<T>(schema: z.ZodSchema<T>, args: unknown): ValidationResult<T> {
   const result = schema.safeParse(args);
 
   if (result.success) {
