@@ -895,6 +895,8 @@ export async function fetchOzonCurrentPrices(
   if (productIds.length === 0) return priceMap;
 
   try {
+    console.log(`📡 Ozon Prices API: Fetching for ${productIds.length} products`);
+
     const response = await fetchWithRetry('https://api-seller.ozon.ru/v4/product/info/prices', {
       method: 'POST',
       headers: {
@@ -908,18 +910,30 @@ export async function fetchOzonCurrentPrices(
       }),
     });
 
+    console.log(`📡 Ozon Prices API: status=${response.status}`);
+
     if (response.ok) {
       const data = await response.json();
       const items = data.result?.items || [];
+
+      console.log(`📦 Ozon Prices API: received ${items.length} items`);
 
       for (const p of items) {
         // Use marketing_price (actual selling price) or price
         const actualPrice = parseFloat(p.price?.marketing_price || p.price?.price || '0');
         if (p.product_id && actualPrice > 0) {
           priceMap.set(p.product_id, actualPrice);
+        } else {
+          console.warn(
+            `⚠️ Ozon: No price for product ${p.product_id}, price object:`,
+            JSON.stringify(p.price)
+          );
         }
       }
-      console.log(`💰 Ozon Prices API: Fetched ${priceMap.size} prices`);
+      console.log(`💰 Ozon Prices API: Fetched ${priceMap.size}/${items.length} valid prices`);
+    } else {
+      const errorText = await response.text();
+      console.error(`❌ Ozon Prices API error: ${response.status}`, errorText);
     }
   } catch (e) {
     console.warn('⚠️ Failed to fetch Ozon prices:', e);
