@@ -108,6 +108,10 @@ export async function initializeDatabase(): Promise<void> {
   await sql`CREATE INDEX IF NOT EXISTS idx_products_monitoring ON products(user_id, min_price) WHERE min_price > 0`;
   await sql`CREATE INDEX IF NOT EXISTS idx_sentinel_logs_user ON sentinel_logs(user_id, created_at DESC)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_chat_history_user ON chat_history(user_id)`;
+
+  // Migration: Add offer_id column for Ozon (Dec 2024)
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS offer_id VARCHAR(255)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_products_offer_id ON products(offer_id)`;
 }
 
 /**
