@@ -11,6 +11,7 @@ import { getUserById, getProductsByUserId } from '../services/index.js';
 // Zod validation schemas
 import {
   validateToolArgs,
+  isValidationError,
   GetProductsArgsSchema,
   GetSalesStatsArgsSchema,
   GetOrdersArgsSchema,
@@ -84,7 +85,7 @@ async function getUserApiKeys(userId: number): Promise<{
 export async function executeGetProducts(userId: number, rawArgs: unknown): Promise<ToolResult> {
   // Validate args
   const validation = validateToolArgs(GetProductsArgsSchema, rawArgs);
-  if (!validation.success) return { success: false, error: validation.error };
+  if (isValidationError(validation)) return { success: false, error: validation.error };
   const args = validation.data;
 
   try {
@@ -134,7 +135,7 @@ export async function executeGetProducts(userId: number, rawArgs: unknown): Prom
 export async function executeGetSalesStats(userId: number, rawArgs: unknown): Promise<ToolResult> {
   // Validate args
   const validation = validateToolArgs(GetSalesStatsArgsSchema, rawArgs);
-  if (!validation.success) return { success: false, error: validation.error };
+  if (isValidationError(validation)) return { success: false, error: validation.error };
   const args = validation.data;
 
   console.log(
@@ -444,7 +445,7 @@ export async function executeGetSalesStats(userId: number, rawArgs: unknown): Pr
  */
 export async function executeGetOrders(userId: number, rawArgs: unknown): Promise<ToolResult> {
   const validation = validateToolArgs(GetOrdersArgsSchema, rawArgs);
-  if (!validation.success) return { success: false, error: validation.error };
+  if (isValidationError(validation)) return { success: false, error: validation.error };
   const args = validation.data;
   const keys = await getUserApiKeys(userId);
 
@@ -565,7 +566,7 @@ export async function executeGetWarehouseStocks(
   rawArgs: unknown
 ): Promise<ToolResult> {
   const validation = validateToolArgs(GetWarehouseStocksArgsSchema, rawArgs);
-  if (!validation.success) return { success: false, error: validation.error };
+  if (isValidationError(validation)) return { success: false, error: validation.error };
   const args = validation.data;
   const keys = await getUserApiKeys(userId);
 
@@ -690,7 +691,7 @@ export async function executeCalculateUnitEconomics(
   rawArgs: unknown
 ): Promise<ToolResult> {
   const validation = validateToolArgs(CalculateUnitEconomicsArgsSchema, rawArgs);
-  if (!validation.success) return { success: false, error: validation.error };
+  if (isValidationError(validation)) return { success: false, error: validation.error };
   const args = validation.data;
   // Get products
   const products = await getProductsByUserId(userId);
@@ -762,7 +763,7 @@ export async function executeCalculateUnitEconomics(
  */
 export async function executeGetAbcAnalysis(userId: number, rawArgs: unknown): Promise<ToolResult> {
   const validation = validateToolArgs(GetAbcAnalysisArgsSchema, rawArgs);
-  if (!validation.success) return { success: false, error: validation.error };
+  if (isValidationError(validation)) return { success: false, error: validation.error };
 
   // For now, use database products and their prices as proxy for revenue
   // _args.period could be used for time-based filtering in future
@@ -860,7 +861,7 @@ export async function executeGetStockForecast(
   rawArgs: unknown
 ): Promise<ToolResult> {
   const validation = validateToolArgs(GetStockForecastArgsSchema, rawArgs);
-  if (!validation.success) return { success: false, error: validation.error };
+  if (isValidationError(validation)) return { success: false, error: validation.error };
   const args = validation.data;
   const products = await getProductsByUserId(userId);
 
@@ -908,7 +909,7 @@ export async function executeGetStockForecast(
  */
 export function executeGetMarketplaceInfo(rawArgs: unknown): ToolResult {
   const validation = validateToolArgs(GetMarketplaceInfoArgsSchema, rawArgs);
-  if (!validation.success) return { success: false, error: validation.error };
+  if (isValidationError(validation)) return { success: false, error: validation.error };
   const args = validation.data;
   const info: Record<string, Record<string, string>> = {
     commissions: {
@@ -1003,7 +1004,7 @@ export function executeGetMarketplaceInfo(rawArgs: unknown): ToolResult {
 export async function executeSearchWeb(_userId: number, rawArgs: unknown): Promise<ToolResult> {
   // Validate arguments with Zod
   const validation = validateToolArgs(SearchWebArgsSchema, rawArgs);
-  if (!validation.success) {
+  if (isValidationError(validation)) {
     return { success: false, error: validation.error };
   }
   const args = validation.data;

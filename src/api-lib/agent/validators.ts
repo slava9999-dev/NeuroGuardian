@@ -195,6 +195,16 @@ export type BulkProtectDetails = z.infer<typeof BulkProtectDetailsSchema>;
 export type ValidationResult<T> = { success: true; data: T } | { success: false; error: string };
 
 /**
+ * Type guard to check if validation failed
+ * This ensures TypeScript correctly narrows the type across different TS versions
+ */
+export function isValidationError<T>(
+  result: ValidationResult<T>
+): result is { success: false; error: string } {
+  return result.success === false;
+}
+
+/**
  * Validate tool arguments and return typed result
  * @param schema Zod schema to validate against
  * @param args Raw arguments from OpenAI

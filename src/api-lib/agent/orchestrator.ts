@@ -10,6 +10,7 @@ import { routeMessage, getSpecialistConfig, isConfirmation, isRejection } from '
 import { sanitizeTextUrls } from './url-validator.js';
 import {
   validateToolArgs,
+  isValidationError,
   UpdatePricesDetailsSchema,
   UpdateStocksDetailsSchema,
   SetStopLossDetailsSchema,
@@ -640,7 +641,8 @@ async function handleConfirmableAction(
   switch (toolName) {
     case 'set_stop_loss': {
       const v = validateToolArgs(SetStopLossArgsSchema, args);
-      if (!v.success) return { success: false, content: v.error, toolsUsed: toolNames, tokensUsed };
+      if (isValidationError(v))
+        return { success: false, content: v.error, toolsUsed: toolNames, tokensUsed };
       const { product_id, min_price, percentage } = v.data;
 
       const product = findProductMatch(product_id, products as any);
@@ -672,7 +674,8 @@ async function handleConfirmableAction(
 
     case 'update_prices': {
       const v = validateToolArgs(UpdatePricesArgsSchema, args);
-      if (!v.success) return { success: false, content: v.error, toolsUsed: toolNames, tokensUsed };
+      if (isValidationError(v))
+        return { success: false, content: v.error, toolsUsed: toolNames, tokensUsed };
       const { products: updates, marketplace, change_value } = v.data;
 
       const priceChanges: any[] = [];
@@ -730,7 +733,8 @@ async function handleConfirmableAction(
 
     case 'bulk_protect_products': {
       const v = validateToolArgs(BulkProtectProductsArgsSchema, args);
-      if (!v.success) return { success: false, content: v.error, toolsUsed: toolNames, tokensUsed };
+      if (isValidationError(v))
+        return { success: false, content: v.error, toolsUsed: toolNames, tokensUsed };
       const { percentage, only_unprotected } = v.data;
 
       const targets = products.filter(p => !only_unprotected || p.min_price === 0);
@@ -756,7 +760,8 @@ async function handleConfirmableAction(
 
     case 'update_stocks': {
       const v = validateToolArgs(UpdateStocksArgsSchema, args);
-      if (!v.success) return { success: false, content: v.error, toolsUsed: toolNames, tokensUsed };
+      if (isValidationError(v))
+        return { success: false, content: v.error, toolsUsed: toolNames, tokensUsed };
       const { products: stockUpdates, marketplace } = v.data;
 
       const stockChanges: any[] = [];
@@ -837,7 +842,7 @@ async function handleConfirmation(
       // ========================================
       case 'update_prices': {
         const validation = validateToolArgs(UpdatePricesDetailsSchema, details);
-        if (!validation.success) {
+        if (isValidationError(validation)) {
           return createErrorResult(validation.error, operation, startTime);
         }
 
@@ -894,7 +899,8 @@ async function handleConfirmation(
       // ========================================
       case 'set_stop_loss': {
         const validation = validateToolArgs(SetStopLossDetailsSchema, details);
-        if (!validation.success) return createErrorResult(validation.error, operation, startTime);
+        if (isValidationError(validation))
+          return createErrorResult(validation.error, operation, startTime);
 
         const { product_id, min_price } = validation.data;
         await updateProductMinPrice(context.userId, product_id, min_price);
@@ -911,7 +917,8 @@ async function handleConfirmation(
       // ========================================
       case 'bulk_protect_products': {
         const validation = validateToolArgs(BulkProtectDetailsSchema, details);
-        if (!validation.success) return createErrorResult(validation.error, operation, startTime);
+        if (isValidationError(validation))
+          return createErrorResult(validation.error, operation, startTime);
 
         const { products: updates } = validation.data;
         if (!updates) return createErrorResult('Список товаров пуст', operation, startTime);
@@ -933,7 +940,7 @@ async function handleConfirmation(
       case 'update_stocks': {
         // Validate details with Zod schema
         const validation = validateToolArgs(UpdateStocksDetailsSchema, details);
-        if (!validation.success) {
+        if (isValidationError(validation)) {
           return {
             success: false,
             content: `❌ ${validation.error}`,
