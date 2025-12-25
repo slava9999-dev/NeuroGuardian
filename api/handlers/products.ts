@@ -35,6 +35,7 @@ export async function handleProducts(
 
     const formatted = products.map((p: Record<string, unknown>) => ({
       id: p.product_id,
+      productId: p.product_id, // CRITICAL: Frontend needs this for updates!
       nmId: p.nm_id,
       vendorCode: p.vendor_code || p.product_id,
       title: sanitizeInput(String(p.title || '')),
