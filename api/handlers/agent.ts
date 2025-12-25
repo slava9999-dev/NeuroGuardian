@@ -61,6 +61,52 @@ import { AGENT_TOOLS } from '../../src/api-lib/agent/tools.js';
 // Using Expert Persona (Виктор Маржин) + CoT + Few-Shot examples
 
 // ============================================
+// RESPONSE SANITIZATION (remove HTML garbage from GPT)
+// ============================================
+
+/**
+ * Sanitize agent response - remove HTML garbage that GPT sometimes adds
+ * This runs on the server BEFORE sending to client
+ */
+function sanitizeAgentResponse(text: string): string {
+  if (!text) return text;
+
+  let cleaned = text;
+
+  // Step 1: Fix URLs with HTML garbage after them
+  // Pattern: https://url" target="_blank" rel="..." class="...">Text
+  // Replace with just the URL
+  cleaned = cleaned.replace(
+    /(https?:\/\/[^\s"'<>]+?)["']\s*(?:target|rel|class)\s*=\s*["'][^"']*["'][^>]*>([^<]*)/gi,
+    (_, url, linkText) => {
+      // Clean URL (remove trailing slash before quote if present)
+      const cleanUrl = url.replace(/\/$/, '');
+      return linkText ? `[${linkText}](${cleanUrl})` : cleanUrl;
+    }
+  );
+
+  // Step 2: Remove orphaned HTML attributes
+  cleaned = cleaned.replace(/"\s*target\s*=\s*["'][^"']*["']/gi, '');
+  cleaned = cleaned.replace(/\s*rel\s*=\s*["'][^"']*["']/gi, '');
+  cleaned = cleaned.replace(/\s*class\s*=\s*["'][^"']*["']/gi, '');
+
+  // Step 3: Remove any remaining HTML tags
+  cleaned = cleaned.replace(/<a\s[^>]*>/gi, '');
+  cleaned = cleaned.replace(/<\/a>/gi, '');
+
+  // Step 4: Clean up broken markdown links [text](url" garbage)
+  cleaned = cleaned.replace(/\[([^\]]+)\]\((https?:\/\/[^\s"'<>)]+)[^)]*\)/gi, '[$1]($2)');
+
+  // Step 5: Clean orphaned closing parentheses after URLs
+  cleaned = cleaned.replace(/(https?:\/\/[^\s<>]+)\)\s*$/gm, '$1');
+  cleaned = cleaned.replace(/(https?:\/\/[^\s<>]+)\)\s+/g, '$1 ');
+
+  console.log('🧹 Sanitized response length:', text.length, '->', cleaned.length);
+
+  return cleaned;
+}
+
+// ============================================
 // TYPE DEFINITIONS (Dec 2024 Audit: Replace any)
 // ============================================
 
@@ -875,8 +921,11 @@ export async function handleAgent(
     };
   }
 
+  // === SANITIZE RESPONSE (remove HTML garbage) ===
+  const sanitizedContent = sanitizeAgentResponse(gptResult.content || '');
+
   const agentResponse: AgentResponseType = {
-    content: gptResult.content || '',
+    content: sanitizedContent,
     metadata: {
       executionTime: Date.now() - startTime,
       model,
