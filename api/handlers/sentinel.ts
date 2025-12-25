@@ -232,6 +232,10 @@ async function processOzonDefense(
   `;
   const monitoredProducts: MonitoredProduct[] = productsRes.rows as MonitoredProduct[];
 
+  console.log(
+    `📦 Ozon: Found ${monitoredProducts.length} products with stop-loss for user ${user.id}`
+  );
+
   if (monitoredProducts.length === 0) return;
 
   // Get product IDs for API calls
@@ -364,6 +368,10 @@ async function processWbDefense(
     AND status != 'disabled'
   `;
   const monitoredProducts: MonitoredProduct[] = productsRes.rows as MonitoredProduct[];
+
+  console.log(
+    `📦 WB: Found ${monitoredProducts.length} products with stop-loss for user ${user.id}`
+  );
 
   if (monitoredProducts.length === 0) return;
 
