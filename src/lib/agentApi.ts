@@ -8,12 +8,44 @@ import { getInitData } from './telegram';
 // API base - uses /api for Vercel
 const API_BASE = '/api';
 
+// ============================================
+// V4 AGENT CONFIGURATION
+// Set to true to use the new two-phase pipeline
+// ============================================
+const USE_V4_AGENT = true;
+
 // Agent message types
 export interface AgentMessage {
   id?: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp?: string;
+}
+
+// V4 Response with structured links
+export interface AgentV4Response {
+  success: boolean;
+  message: string;
+  links?: Array<{
+    title: string;
+    url: string;
+    source: 'search_web' | 'marketplace' | 'documentation';
+  }>;
+  actions?: Array<{
+    type: string;
+    summary: string;
+    details: Record<string, unknown>;
+    affected_count: number;
+  }>;
+  data?: Record<string, unknown>;
+  metadata?: {
+    totalTime?: number;
+    planningTime?: number;
+    executionTime?: number;
+    answeringTime?: number;
+    tokensUsed?: number;
+    toolsCalled?: string[];
+  };
 }
 
 export interface AgentResponse {
@@ -73,19 +105,21 @@ export function classifyComplexity(message: string): TaskComplexity {
 export const agentApi = {
   /**
    * Send a message to the AI agent
+   * Uses V4 (two-phase pipeline) when USE_V4_AGENT is true
    */
   sendMessage: async (message: string, history: AgentMessage[] = []): Promise<AgentResponse> => {
     const initData = getInitData();
+    const action = USE_V4_AGENT ? 'agent-v4' : 'agent';
 
     try {
-      const response = await fetch(`${API_BASE}?action=agent`, {
+      const response = await fetch(`${API_BASE}?action=${action}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-Init-Data': initData || '',
         },
         body: JSON.stringify({
-          action: 'agent',
+          action,
           message,
           history,
           initData,
@@ -97,6 +131,34 @@ export const agentApi = {
       }
 
       const data = await response.json();
+
+      // V4 returns 'message' field, V3 returns 'content' field
+      if (USE_V4_AGENT) {
+        const v4Data = data as AgentV4Response;
+
+        // Build content with links formatted as markdown
+        let content = v4Data.message;
+
+        // Append validated links section if present
+        if (v4Data.links && v4Data.links.length > 0) {
+          content += '\n\n**🔗 Ссылки:**\n';
+          for (const link of v4Data.links) {
+            content += `- [${link.title}](${link.url})\n`;
+          }
+        }
+
+        return {
+          success: v4Data.success,
+          content,
+          metadata: {
+            tokensUsed: v4Data.metadata?.tokensUsed,
+            executionTime: v4Data.metadata?.totalTime,
+            toolsUsed: v4Data.metadata?.toolsCalled,
+            model: 'v4-pipeline',
+          },
+        };
+      }
+
       return data;
     } catch (error) {
       console.error('Agent API error:', error);
