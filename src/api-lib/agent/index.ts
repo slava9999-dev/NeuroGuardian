@@ -3,6 +3,71 @@
 // Re-export all agent-related components
 // ============================================
 
+// ============================================
+// V3 Architecture: Router + Specialists + Structured Output
+// ============================================
+
+// Orchestrator (main entry point for V3)
+export {
+  orchestrateAgentRequest,
+  routeMessage,
+  isConfirmation,
+  isRejection,
+  type UserContext,
+  type OrchestratorResult,
+} from './orchestrator.js';
+
+// Router
+export { getSpecialistConfig, SPECIALIST_CONFIG } from './router.js';
+
+// Schemas (Zod validation)
+export {
+  RouterResultSchema,
+  AgentResponseSchema,
+  AgentLinkSchema,
+  AgentActionSchema,
+  parseRouterResult,
+  parseAgentResponse,
+  validateLLMResponse,
+  type RouterResult,
+  type AgentResponse,
+  type AgentLink,
+  type AgentAction,
+} from './schemas.js';
+
+// URL Validator
+export {
+  validateUrl,
+  validateLinks,
+  sanitizeTextUrls,
+  generateSearchUrl,
+  ALLOWED_HOSTS,
+} from './url-validator.js';
+
+// Specialists
+export {
+  buildAnalyticsPrompt,
+  buildPricingPrompt,
+  buildCompetitorsPrompt,
+  buildGeneralPrompt,
+  ANALYTICS_TOOLS,
+  PRICING_TOOLS,
+  COMPETITORS_TOOLS,
+  GENERAL_TOOLS,
+} from './specialists/index.js';
+
+// Prompts
+export {
+  BASE_PERSONA,
+  CRITICAL_RULES,
+  TOOL_USAGE_RULES,
+  buildSpecialistPrompt,
+} from './prompts/index.js';
+
+// ============================================
+// V2 Legacy (for backwards compatibility)
+// ============================================
+
 // V1 System Prompt (legacy)
 export { AGENT_SYSTEM_PROMPT } from './system-prompt.js';
 
@@ -38,4 +103,5 @@ export {
   executeGetAbcAnalysis,
   executeGetStockForecast,
   executeGetMarketplaceInfo,
+  executeSearchWeb,
 } from './tool-executors.js';

@@ -2,6 +2,44 @@
 
 All notable changes to NeuroGUARDIAN project.
 
+## [2.9.0] - 2024-12-25
+
+### 🏗️ Agent Architecture V3 (Router + Specialists + Structured Output)
+
+- **NEW**: Multi-agent architecture with intent routing
+  - `orchestrator.ts` — Main orchestration: Router → Specialist → Response
+  - `router.ts` — Fast intent classification (GPT-4o-mini, ~100ms)
+  - `schemas.ts` — Zod validation for structured LLM output
+  - `url-validator.ts` — Server-side URL whitelist + sanitization
+
+- **NEW**: Modular prompts (reduced from 1223 to ~200 lines per specialist)
+  - `prompts/base.ts` — Shared persona and critical rules
+  - `prompts/router.ts` — Classification prompt with pattern matching
+
+- **NEW**: Specialized agents by domain
+  - `specialists/analytics.ts` — Sales, ABC, unit economics (GPT-4o, 7 tools)
+  - `specialists/pricing.ts` — Price changes, stop-loss (GPT-4o, 4 tools)
+  - `specialists/competitors.ts` — Web search (GPT-4o-mini, 1 tool)
+  - `specialists/general.ts` — Onboarding, help (GPT-4o-mini, no tools)
+
+### 🔒 Anti-Hallucination
+
+- **URL Whitelist**: Only ozon.ru, wildberries.ru, t.me domains allowed
+- **Blocked Patterns**: am.ozon.com, example.com, localhost blocked
+- **Auto Sanitization**: Fake URLs replaced with search links
+
+### 📊 Expected Improvements
+
+| Metric                       | Before (V2) | After (V3) |
+| ---------------------------- | ----------- | ---------- |
+| Instruction following        | ~60%        | ~90%       |
+| Tool calling accuracy        | ~70%        | ~95%       |
+| HTML garbage                 | Common      | 0%         |
+| Fake URLs                    | Common      | 0%         |
+| Token usage (simple queries) | ~2000       | ~800       |
+
+---
+
 ## [2.8.0] - 2024-12-24
 
 ### 🔴 Critical Fixes (Dec 24 Audit - 3 AI Models Consilium)

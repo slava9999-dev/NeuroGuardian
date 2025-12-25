@@ -1,0 +1,583 @@
+// ============================================
+// NeuroGUARDIAN — Agent Orchestrator V3
+// Main orchestration: Router → Specialist → Response
+// Version: 3.0.0 | Date: December 2024
+// ============================================
+
+import { randomUUID } from 'crypto';
+
+import { routeMessage, getSpecialistConfig, isConfirmation, isRejection } from './router.js';
+import { sanitizeTextUrls } from './url-validator.js';
+import { type RouterResult } from './schemas.js';
+import { buildAnalyticsPrompt, ANALYTICS_TOOLS } from './specialists/analytics.js';
+import { buildPricingPrompt, PRICING_TOOLS } from './specialists/pricing.js';
+import { buildCompetitorsPrompt, COMPETITORS_TOOLS } from './specialists/competitors.js';
+import { buildGeneralPrompt, GENERAL_TOOLS } from './specialists/general.js';
+import { AGENT_TOOLS } from './tools.js';
+
+// Tool executors
+import {
+  executeGetProducts,
+  executeGetSalesStats,
+  executeGetOrders,
+  executeGetWarehouseStocks,
+  executeCalculateUnitEconomics,
+  executeGetAbcAnalysis,
+  executeGetStockForecast,
+  executeGetMarketplaceInfo,
+  executeSearchWeb,
+} from './tool-executors.js';
+
+// ============================================
+// TYPES
+// ============================================
+
+export interface UserContext {
+  userId: number;
+  productsCount?: number;
+  protectedCount?: number;
+  hasWbApi?: boolean;
+  hasOzonApi?: boolean;
+  marketplace?: string;
+  wbApiKey?: string;
+  ozonApiKey?: string;
+}
+
+export interface OrchestratorResult {
+  success: boolean;
+  content: string;
+  category: string;
+  model: string;
+  toolsUsed: string[];
+  tokensUsed: number;
+  executionTimeMs: number;
+  actionRequired?: {
+    operation: string;
+    taskId: string;
+    confirmationMessage: string;
+    details: Record<string, unknown>;
+    expiresAt: number;
+  };
+  routerResult?: RouterResult;
+}
+
+interface OpenAIMessage {
+  role: 'system' | 'user' | 'assistant' | 'tool';
+  content?: string | null;
+  tool_calls?: Array<{
+    id: string;
+    type: 'function';
+    function: { name: string; arguments: string };
+  }>;
+  tool_call_id?: string;
+  name?: string;
+}
+
+// ============================================
+// SPECIALIST PROMPT BUILDERS
+// ============================================
+
+function getSpecialistPrompt(category: string, context: UserContext): string {
+  switch (category) {
+    case 'analytics':
+      return buildAnalyticsPrompt({
+        productsCount: context.productsCount,
+        marketplace: context.marketplace,
+        hasWbApi: context.hasWbApi,
+        hasOzonApi: context.hasOzonApi,
+      });
+    case 'pricing':
+    case 'sentinel':
+      return buildPricingPrompt({
+        productsCount: context.productsCount,
+        protectedCount: context.protectedCount,
+        marketplace: context.marketplace,
+      });
+    case 'competitors':
+      return buildCompetitorsPrompt({
+        marketplace: context.marketplace,
+      });
+    case 'stocks':
+      return buildAnalyticsPrompt({
+        productsCount: context.productsCount,
+        marketplace: context.marketplace,
+        hasWbApi: context.hasWbApi,
+        hasOzonApi: context.hasOzonApi,
+      });
+    case 'general':
+    default:
+      return buildGeneralPrompt({
+        productsCount: context.productsCount,
+        protectedCount: context.protectedCount,
+        hasWbApi: context.hasWbApi,
+        hasOzonApi: context.hasOzonApi,
+        isNewUser: !context.hasWbApi && !context.hasOzonApi,
+      });
+  }
+}
+
+function getSpecialistTools(category: string): string[] {
+  switch (category) {
+    case 'analytics':
+      return ANALYTICS_TOOLS;
+    case 'pricing':
+    case 'sentinel':
+      return PRICING_TOOLS;
+    case 'competitors':
+      return COMPETITORS_TOOLS;
+    case 'stocks':
+      return ['get_products', 'get_warehouse_stocks', 'update_stocks', 'get_stock_forecast'];
+    case 'general':
+    default:
+      return GENERAL_TOOLS;
+  }
+}
+
+// ============================================
+// TOOL EXECUTOR
+// ============================================
+
+interface ToolResult {
+  success: boolean;
+  data?: unknown;
+  error?: string;
+}
+
+async function executeTool(
+  toolName: string,
+  args: Record<string, unknown>,
+  userId: number
+): Promise<ToolResult> {
+  try {
+    switch (toolName) {
+      case 'get_products':
+        return await executeGetProducts(
+          userId,
+          args as { marketplace?: string; limit?: number; sort_by?: string }
+        );
+      case 'get_sales_stats':
+        return await executeGetSalesStats(userId, args as { period: string; marketplace?: string });
+      case 'get_orders':
+        return await executeGetOrders(
+          userId,
+          args as { period: string; marketplace?: string; status?: string }
+        );
+      case 'get_warehouse_stocks':
+        return await executeGetWarehouseStocks(
+          userId,
+          args as { marketplace?: string; low_stock_only?: boolean }
+        );
+      case 'calculate_unit_economics':
+        return await executeCalculateUnitEconomics(
+          userId,
+          args as { product_id?: string; cost_price?: number; marketplace?: string }
+        );
+      case 'get_abc_analysis':
+        return await executeGetAbcAnalysis(userId, args as { period?: string });
+      case 'get_stock_forecast':
+        return await executeGetStockForecast(userId, args as { product_id?: string });
+      case 'get_marketplace_info':
+        return executeGetMarketplaceInfo(args as { marketplace?: string; topic: string });
+      case 'search_web':
+        return await executeSearchWeb(userId, args);
+      default:
+        return { success: false, error: `Unknown tool: ${toolName}` };
+    }
+  } catch (error) {
+    console.error(`Tool ${toolName} execution error:`, error);
+    return { success: false, error: String(error) };
+  }
+}
+
+// ============================================
+// RESPONSE SANITIZATION
+// ============================================
+
+function sanitizeResponse(content: string): string {
+  if (!content) return content;
+
+  let cleaned = content;
+
+  // Remove HTML attributes from URLs
+  cleaned = cleaned.replace(
+    /(https?:\/\/[^\s"'<>]+?)["']\s*(?:target|rel|class)\s*=\s*["'][^"']*["'][^>]*>([^<]*)/gi,
+    (_, url, linkText) => (linkText ? `[${linkText}](${url})` : url)
+  );
+
+  // Remove orphaned HTML attributes
+  cleaned = cleaned.replace(/"\s*target\s*=\s*["'][^"']*["']/gi, '');
+  cleaned = cleaned.replace(/\s*rel\s*=\s*["'][^"']*["']/gi, '');
+  cleaned = cleaned.replace(/\s*class\s*=\s*["'][^"']*["']/gi, '');
+
+  // Remove HTML tags
+  cleaned = cleaned.replace(/<a\s[^>]*>/gi, '');
+  cleaned = cleaned.replace(/<\/a>/gi, '');
+
+  // Validate URLs against whitelist
+  cleaned = sanitizeTextUrls(cleaned);
+
+  return cleaned;
+}
+
+// ============================================
+// MAIN ORCHESTRATOR
+// ============================================
+
+/**
+ * Main orchestration function
+ * Routes message → Specialist → Tools → Response
+ */
+export async function orchestrateAgentRequest(
+  message: string,
+  context: UserContext,
+  conversationHistory?: Array<{ role: string; content: string }>,
+  pendingAction?: { operation: string; taskId: string; details: Record<string, unknown> }
+): Promise<OrchestratorResult> {
+  const startTime = Date.now();
+
+  // Check for confirmation/rejection of pending action
+  if (pendingAction) {
+    if (isConfirmation(message)) {
+      return handleConfirmation(pendingAction, context, startTime);
+    }
+    if (isRejection(message)) {
+      return {
+        success: true,
+        content: '❌ Действие отменено.',
+        category: 'confirmation',
+        model: 'none',
+        toolsUsed: [],
+        tokensUsed: 0,
+        executionTimeMs: Date.now() - startTime,
+      };
+    }
+  }
+
+  // Step 1: Route the message
+  console.log(`🎯 Routing message: "${message.substring(0, 50)}..."`);
+  const routerResult = await routeMessage(message, conversationHistory);
+
+  const { category, extractedParams } = routerResult;
+  const config = getSpecialistConfig(category);
+
+  console.log(`📍 Category: ${category}, Model: ${config.model}, Tools: ${config.tools.length}`);
+
+  // Step 2: Build specialist prompt
+  const systemPrompt = getSpecialistPrompt(category, {
+    ...context,
+    marketplace: extractedParams?.marketplace || context.marketplace,
+  });
+
+  // Step 3: Filter tools for this specialist
+  const allowedTools = getSpecialistTools(category);
+  const filteredTools =
+    allowedTools.length > 0
+      ? AGENT_TOOLS.filter(t => allowedTools.includes(t.function.name))
+      : undefined;
+
+  // Step 4: Call specialist
+  const result = await callSpecialist(
+    systemPrompt,
+    message,
+    conversationHistory || [],
+    context.userId,
+    config.model,
+    config.maxTokens,
+    config.temperature,
+    filteredTools
+  );
+
+  // Step 5: Sanitize response
+  const sanitizedContent = sanitizeResponse(result.content);
+
+  return {
+    success: result.success,
+    content: sanitizedContent,
+    category,
+    model: config.model,
+    toolsUsed: result.toolsUsed,
+    tokensUsed: result.tokensUsed,
+    executionTimeMs: Date.now() - startTime,
+    actionRequired: result.actionRequired,
+    routerResult,
+  };
+}
+
+// ============================================
+// SPECIALIST CALLER
+// ============================================
+
+async function callSpecialist(
+  systemPrompt: string,
+  userMessage: string,
+  history: Array<{ role: string; content: string }>,
+  userId: number,
+  model: string,
+  maxTokens: number,
+  temperature: number,
+  tools?: typeof AGENT_TOOLS
+): Promise<{
+  success: boolean;
+  content: string;
+  toolsUsed: string[];
+  tokensUsed: number;
+  actionRequired?: OrchestratorResult['actionRequired'];
+}> {
+  const openaiKey = process.env.OPENAI_API_KEY;
+
+  if (!openaiKey) {
+    return {
+      success: false,
+      content: '⚠️ AI-агент временно недоступен. Попробуйте позже.',
+      toolsUsed: [],
+      tokensUsed: 0,
+    };
+  }
+
+  const messages: OpenAIMessage[] = [
+    { role: 'system', content: systemPrompt },
+    ...history.slice(-10).map(m => ({
+      role: m.role as 'user' | 'assistant',
+      content: m.content,
+    })),
+    { role: 'user', content: userMessage },
+  ];
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    const requestBody: Record<string, unknown> = {
+      model,
+      messages,
+      max_tokens: maxTokens,
+      temperature,
+    };
+
+    if (tools && tools.length > 0) {
+      requestBody.tools = tools;
+      requestBody.tool_choice = 'auto';
+    }
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${openaiKey}`,
+      },
+      body: JSON.stringify(requestBody),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    const choice = data.choices[0];
+    const message = choice.message;
+    const tokens = data.usage?.total_tokens || 0;
+
+    // Handle tool calls
+    if (message.tool_calls && message.tool_calls.length > 0) {
+      return await handleToolCalls(message, messages, userId, model, maxTokens, tokens, openaiKey);
+    }
+
+    return {
+      success: true,
+      content: message.content || '',
+      toolsUsed: [],
+      tokensUsed: tokens,
+    };
+  } catch (error) {
+    console.error('Specialist call error:', error);
+    return {
+      success: false,
+      content: '❌ Произошла ошибка. Попробуйте переформулировать вопрос.',
+      toolsUsed: [],
+      tokensUsed: 0,
+    };
+  }
+}
+
+// ============================================
+// TOOL CALL HANDLER
+// ============================================
+
+async function handleToolCalls(
+  assistantMessage: {
+    tool_calls: Array<{ id: string; function: { name: string; arguments: string } }>;
+  },
+  messages: OpenAIMessage[],
+  userId: number,
+  model: string,
+  maxTokens: number,
+  tokensUsed: number,
+  apiKey: string
+): Promise<{
+  success: boolean;
+  content: string;
+  toolsUsed: string[];
+  tokensUsed: number;
+  actionRequired?: OrchestratorResult['actionRequired'];
+}> {
+  const toolCalls = assistantMessage.tool_calls;
+  const toolNames = toolCalls.map(tc => tc.function.name);
+  // Build properly typed assistant message with tool_calls
+  const assistantMsg: OpenAIMessage = {
+    role: 'assistant',
+    content: null,
+    tool_calls: toolCalls.map(tc => ({
+      id: tc.id,
+      type: 'function' as const,
+      function: tc.function,
+    })),
+  };
+  const toolOutputs: OpenAIMessage[] = [assistantMsg];
+
+  console.log(`🔧 Executing ${toolCalls.length} tools: ${toolNames.join(', ')}`);
+
+  for (const toolCall of toolCalls) {
+    const fnName = toolCall.function.name;
+    const fnArgs = JSON.parse(toolCall.function.arguments);
+
+    // Check for actions requiring confirmation
+    if (
+      ['update_prices', 'set_stop_loss', 'bulk_protect_products', 'update_stocks'].includes(fnName)
+    ) {
+      return handleConfirmableAction(fnName, fnArgs, userId, toolNames, tokensUsed);
+    }
+
+    // Execute read-only tool
+    const result = await executeTool(fnName, fnArgs, userId);
+
+    toolOutputs.push({
+      role: 'tool',
+      tool_call_id: toolCall.id,
+      name: fnName,
+      content: JSON.stringify(result.data || { error: result.error }),
+    });
+  }
+
+  // Second call with tool results
+  const secondResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [...messages, ...toolOutputs],
+      max_tokens: maxTokens,
+      temperature: 0.7,
+    }),
+  });
+
+  if (!secondResponse.ok) {
+    throw new Error(`OpenAI second call failed: ${secondResponse.status}`);
+  }
+
+  const secondData = await secondResponse.json();
+  const totalTokens = tokensUsed + (secondData.usage?.total_tokens || 0);
+
+  return {
+    success: true,
+    content: secondData.choices[0].message.content || '',
+    toolsUsed: toolNames,
+    tokensUsed: totalTokens,
+  };
+}
+
+// ============================================
+// CONFIRMABLE ACTION HANDLER
+// ============================================
+
+async function handleConfirmableAction(
+  toolName: string,
+  args: Record<string, unknown>,
+  _userId: number, // Reserved for future use
+  toolNames: string[],
+  tokensUsed: number
+): Promise<{
+  success: boolean;
+  content: string;
+  toolsUsed: string[];
+  tokensUsed: number;
+  actionRequired: OrchestratorResult['actionRequired'];
+}> {
+  const taskId = randomUUID();
+  const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
+
+  let confirmationMessage = '';
+  const details: Record<string, unknown> = { ...args };
+
+  switch (toolName) {
+    case 'update_prices':
+      confirmationMessage = `Изменить цены на указанные товары?`;
+      break;
+    case 'set_stop_loss':
+      confirmationMessage = `Установить Stop-Loss ${args.min_price || args.percentage + '%'} для товара?`;
+      break;
+    case 'bulk_protect_products':
+      confirmationMessage = `Установить защиту -${args.percentage || 15}% для всех товаров?`;
+      break;
+    case 'update_stocks':
+      confirmationMessage = `Изменить остатки для указанных товаров?`;
+      break;
+    default:
+      confirmationMessage = `Выполнить действие ${toolName}?`;
+  }
+
+  // Build preview content
+  let content = `📊 **Требуется подтверждение**\n\n`;
+  content += `${confirmationMessage}\n\n`;
+  content += `⚠️ Это действие изменит данные на маркетплейсе.\n\n`;
+  content += `🚀 Отправьте **"да"** для подтверждения или **"нет"** для отмены.`;
+
+  return {
+    success: true,
+    content,
+    toolsUsed: toolNames,
+    tokensUsed,
+    actionRequired: {
+      operation: toolName,
+      taskId,
+      confirmationMessage,
+      details,
+      expiresAt,
+    },
+  };
+}
+
+// ============================================
+// CONFIRMATION HANDLER
+// ============================================
+
+async function handleConfirmation(
+  pendingAction: { operation: string; taskId: string; details: Record<string, unknown> },
+  _context: UserContext, // Reserved for future use
+  startTime: number
+): Promise<OrchestratorResult> {
+  // TODO: Execute the confirmed action
+  // This will be implemented in the agent.ts handler
+
+  return {
+    success: true,
+    content: '✅ Действие подтверждено. Выполняется...',
+    category: 'confirmation',
+    model: 'none',
+    toolsUsed: [pendingAction.operation],
+    tokensUsed: 0,
+    executionTimeMs: Date.now() - startTime,
+  };
+}
+
+// ============================================
+// EXPORTS
+// ============================================
+
+export { routeMessage, isConfirmation, isRejection };
