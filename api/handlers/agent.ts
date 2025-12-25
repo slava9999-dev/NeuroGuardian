@@ -818,6 +818,24 @@ export async function handleAgent(
   if (USE_V3_ARCHITECTURE) {
     console.log('🚀 Using V3 Agent Architecture (Router + Specialists)');
 
+    // Check for pending action from previous turn (for confirmation flow)
+    let pendingAction:
+      | { operation: string; taskId: string; details: Record<string, unknown> }
+      | undefined;
+    if (kv) {
+      try {
+        const stored = await kv.get(`pending:${userId}`);
+        if (stored && typeof stored === 'object') {
+          pendingAction = stored as typeof pendingAction;
+          console.log(
+            `📋 Found pending action: ${pendingAction?.operation} (taskId: ${pendingAction?.taskId})`
+          );
+        }
+      } catch (e) {
+        console.warn('Failed to retrieve pending action:', e);
+      }
+    }
+
     // Build V3 context
     const v3Context: UserContext = {
       userId,
@@ -830,12 +848,23 @@ export async function handleAgent(
       ozonApiKey: user?.api_key_ozon ? decryptApiKey(user.api_key_ozon) : undefined,
     };
 
-    // Call V3 orchestrator
+    // Call V3 orchestrator with pending action
     const v3Result = await orchestrateAgentRequest(
       message,
       v3Context,
-      conversationHistory as Array<{ role: string; content: string }>
+      conversationHistory as Array<{ role: string; content: string }>,
+      pendingAction
     );
+
+    // Clear pending action after processing confirmation
+    if (pendingAction && kv && (v3Result.category === 'confirmation' || !v3Result.actionRequired)) {
+      try {
+        await kv.del(`pending:${userId}`);
+        console.log('🧹 Cleared pending action after processing');
+      } catch (e) {
+        console.warn('Failed to clear pending action:', e);
+      }
+    }
 
     // Build response
     interface AgentResponseType {

@@ -31,8 +31,15 @@ import {
 // Services for executing confirmed actions
 import { updateProductMinPrice, getProductsByUserId } from '../services/index.js';
 
-// Marketplace API (WB/Ozon price updates)
-import { updateWbPrices, updateOzonPrices } from '../services/marketplace.js';
+// Marketplace API (WB/Ozon price and stock updates)
+import {
+  updateWbPrices,
+  updateOzonPrices,
+  updateWbStockFbs,
+  updateOzonStockFbs,
+  getWbFbsWarehouses,
+  getOzonFbsWarehouses,
+} from '../services/marketplace.js';
 
 // ============================================
 // TYPES
@@ -329,9 +336,18 @@ async function callSpecialist(
   tokensUsed: number;
   actionRequired?: OrchestratorResult['actionRequired'];
 }> {
+  // ========================================
+  // LLM Provider Selection: OpenAI > Groq > AgentRouter
+  // ========================================
   const openaiKey = process.env.OPENAI_API_KEY;
+  const groqKey = process.env.GROQ_API_KEY;
+  const agentRouterKey = process.env.AGENTROUTER_API_KEY;
 
-  if (!openaiKey) {
+  const apiKey = openaiKey || groqKey || agentRouterKey;
+  const provider = openaiKey ? 'OpenAI' : groqKey ? 'Groq' : 'AgentRouter';
+
+  if (!apiKey) {
+    console.error('❌ No LLM API key configured! Set OPENAI_API_KEY');
     return {
       success: false,
       content: '⚠️ AI-агент временно недоступен. Попробуйте позже.',
@@ -339,6 +355,25 @@ async function callSpecialist(
       tokensUsed: 0,
     };
   }
+
+  // Model and URL selection based on provider
+  let finalModel = model;
+  let apiUrl = 'https://api.openai.com/v1/chat/completions';
+
+  if (groqKey && !openaiKey) {
+    apiUrl = 'https://api.groq.com/openai/v1/chat/completions';
+    // Map OpenAI models to Groq equivalents
+    if (model === 'gpt-4o' || model === 'gpt-4o-mini') {
+      finalModel = 'llama-3.1-70b-versatile'; // Best Groq model for complex tasks
+    } else {
+      finalModel = 'llama-3.1-8b-instant'; // Fast model for simple tasks
+    }
+  } else if (agentRouterKey && !openaiKey && !groqKey) {
+    apiUrl = 'https://agentrouter.org/v1/chat/completions';
+    // AgentRouter supports OpenAI model names
+  }
+
+  console.log(`🤖 V3 Specialist using ${provider} with model: ${finalModel}`);
 
   const messages: OpenAIMessage[] = [
     { role: 'system', content: systemPrompt },
@@ -354,7 +389,7 @@ async function callSpecialist(
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
     const requestBody: Record<string, unknown> = {
-      model,
+      model: finalModel,
       messages,
       max_tokens: maxTokens,
       temperature,
@@ -365,11 +400,11 @@ async function callSpecialist(
       requestBody.tool_choice = 'auto';
     }
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${openaiKey}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify(requestBody),
       signal: controller.signal,
@@ -389,7 +424,16 @@ async function callSpecialist(
 
     // Handle tool calls
     if (message.tool_calls && message.tool_calls.length > 0) {
-      return await handleToolCalls(message, messages, userId, model, maxTokens, tokens, openaiKey);
+      return await handleToolCalls(
+        message,
+        messages,
+        userId,
+        finalModel,
+        maxTokens,
+        tokens,
+        apiKey,
+        apiUrl
+      );
     }
 
     return {
@@ -422,7 +466,8 @@ async function handleToolCalls(
   model: string,
   maxTokens: number,
   tokensUsed: number,
-  apiKey: string
+  apiKey: string,
+  apiUrl: string = 'https://api.openai.com/v1/chat/completions'
 ): Promise<{
   success: boolean;
   content: string;
@@ -469,7 +514,7 @@ async function handleToolCalls(
   }
 
   // Second call with tool results
-  const secondResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+  const secondResponse = await fetch(apiUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -812,12 +857,138 @@ async function handleConfirmation(
       }
 
       // ========================================
-      // UPDATE_STOCKS - Not implemented yet
+      // UPDATE_STOCKS - Update product stocks (FBS only)
       // ========================================
       case 'update_stocks': {
+        const stockChanges = details.stock_changes as Array<{
+          product_id?: string;
+          sku?: string;
+          offer_id?: string;
+          new_stock: number;
+          marketplace?: string;
+        }>;
+        const marketplace = (details.marketplace as string) || 'WB';
+
+        if (!stockChanges || stockChanges.length === 0) {
+          return {
+            success: false,
+            content: '❌ Нет данных для обновления остатков.',
+            category: 'confirmation',
+            model: 'none',
+            toolsUsed: [operation],
+            tokensUsed: 0,
+            executionTimeMs: Date.now() - startTime,
+          };
+        }
+
+        let resultMessage = '';
+
+        if (marketplace === 'WB') {
+          if (!context.wbApiKey) {
+            return {
+              success: false,
+              content: '❌ WB API ключ не настроен.',
+              category: 'confirmation',
+              model: 'none',
+              toolsUsed: [operation],
+              tokensUsed: 0,
+              executionTimeMs: Date.now() - startTime,
+            };
+          }
+
+          // Get first FBS warehouse
+          const warehousesResult = await getWbFbsWarehouses(context.wbApiKey);
+          if (warehousesResult.warehouses.length === 0) {
+            return {
+              success: false,
+              content:
+                '❌ Нет FBS складов для обновления остатков. Убедитесь, что у вас есть свой склад.',
+              category: 'confirmation',
+              model: 'none',
+              toolsUsed: [operation],
+              tokensUsed: 0,
+              executionTimeMs: Date.now() - startTime,
+            };
+          }
+
+          const warehouseId = warehousesResult.warehouses[0].id;
+          const wbUpdates = stockChanges.map(sc => ({
+            sku: sc.sku || sc.product_id?.replace('wb-', '') || '',
+            amount: sc.new_stock,
+          }));
+
+          const result = await updateWbStockFbs(context.wbApiKey, warehouseId, wbUpdates);
+
+          if (result.success) {
+            resultMessage = `✅ **Остатки обновлены на WB!**\n\n`;
+            resultMessage += `📦 Обновлено товаров: **${result.count}**\n`;
+            resultMessage += `🏭 Склад: ${warehousesResult.warehouses[0].name}`;
+          } else {
+            resultMessage = `❌ Ошибка обновления остатков WB: ${result.error}`;
+          }
+        } else if (marketplace === 'Ozon') {
+          if (!context.ozonApiKey) {
+            return {
+              success: false,
+              content: '❌ Ozon API ключ не настроен.',
+              category: 'confirmation',
+              model: 'none',
+              toolsUsed: [operation],
+              tokensUsed: 0,
+              executionTimeMs: Date.now() - startTime,
+            };
+          }
+
+          const [clientId, apiKey] = context.ozonApiKey.split(':');
+          if (!clientId || !apiKey) {
+            return {
+              success: false,
+              content: '❌ Неверный формат Ozon API ключа.',
+              category: 'confirmation',
+              model: 'none',
+              toolsUsed: [operation],
+              tokensUsed: 0,
+              executionTimeMs: Date.now() - startTime,
+            };
+          }
+
+          // Get first FBS warehouse
+          const warehousesResult = await getOzonFbsWarehouses(clientId, apiKey);
+          const warehouseId = warehousesResult.warehouses[0]?.id;
+
+          const ozonUpdates = stockChanges.map(sc => ({
+            productId: parseInt((sc.product_id || '').replace('ozon-', '')),
+            offerId: sc.offer_id || sc.product_id || '',
+            stock: sc.new_stock,
+            warehouseId,
+          }));
+
+          const result = await updateOzonStockFbs(clientId, apiKey, ozonUpdates);
+
+          if (result.success) {
+            resultMessage = `✅ **Остатки обновлены на Ozon!**\n\n`;
+            resultMessage += `📦 Обновлено товаров: **${result.count}**`;
+            if (warehousesResult.warehouses[0]) {
+              resultMessage += `\n🏭 Склад: ${warehousesResult.warehouses[0].name}`;
+            }
+          } else {
+            resultMessage = `❌ Ошибка обновления остатков Ozon: ${result.error}`;
+          }
+        } else {
+          return {
+            success: false,
+            content: `❌ Неизвестный маркетплейс: ${marketplace}`,
+            category: 'confirmation',
+            model: 'none',
+            toolsUsed: [operation],
+            tokensUsed: 0,
+            executionTimeMs: Date.now() - startTime,
+          };
+        }
+
         return {
-          success: false,
-          content: '⚠️ Обновление остатков пока не реализовано в V3.',
+          success: true,
+          content: resultMessage,
           category: 'confirmation',
           model: 'none',
           toolsUsed: [operation],
