@@ -897,7 +897,8 @@ export async function fetchOzonCurrentPrices(
   try {
     console.log(`📡 Ozon Prices API: Fetching for ${productIds.length} products`);
 
-    const response = await fetchWithRetry('https://api-seller.ozon.ru/v4/product/info/prices', {
+    // CRITICAL FIX: Use v2 endpoint (v4 returns 404)
+    const response = await fetchWithRetry('https://api-seller.ozon.ru/v2/product/info/prices', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
