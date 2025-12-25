@@ -1,39 +1,35 @@
 // ============================================
 // NeuroGUARDIAN — Agent Module Index
 // Re-export all agent-related components
+// Version: 4.0.0 | V3 Legacy removed
 // ============================================
 
 // ============================================
-// V3 Architecture: Router + Specialists + Structured Output
+// V4 Architecture: Two-Phase Pipeline
 // ============================================
 
-// Orchestrator (main entry point for V3)
+// V4 Orchestrator (main entry point)
+export { orchestrateV4, type UserContext } from './orchestrator-v4.js';
+
+// V4 Schemas (Zod validation)
 export {
-  orchestrateAgentRequest,
-  routeMessage,
-  isConfirmation,
-  isRejection,
-  type UserContext,
-  type OrchestratorResult,
-} from './orchestrator.js';
+  PlanSchema,
+  AnswerSchema,
+  ToolNameEnum,
+  ResponseLinkSchema,
+  ResponseActionSchema,
+  validateAnswerLinks,
+  sanitizeAnswerLinks,
+  ANSWER_JSON_SCHEMA,
+  PLAN_JSON_SCHEMA,
+  type Plan,
+  type Answer,
+  type ToolName,
+  type ToolResult,
+} from './schemas-v4.js';
 
 // Router
 export { getSpecialistConfig, SPECIALIST_CONFIG } from './router.js';
-
-// Schemas (Zod validation)
-export {
-  RouterResultSchema,
-  AgentResponseSchema,
-  AgentLinkSchema,
-  AgentActionSchema,
-  parseRouterResult,
-  parseAgentResponse,
-  validateLLMResponse,
-  type RouterResult,
-  type AgentResponse,
-  type AgentLink,
-  type AgentAction,
-} from './schemas.js';
 
 // URL Validator
 export {
@@ -64,20 +60,6 @@ export {
   buildSpecialistPrompt,
 } from './prompts/index.js';
 
-// ============================================
-// V2 Legacy (for backwards compatibility)
-// ============================================
-
-// V1 System Prompt (legacy)
-export { AGENT_SYSTEM_PROMPT } from './system-prompt.js';
-
-// V2 MEGA-BRAIN System Prompt (Expert Persona + CoT + Few-Shot)
-export {
-  AGENT_SYSTEM_PROMPT_V2,
-  AGENT_SYSTEM_PROMPT_V2_SHORT,
-  getEnhancedSystemPrompt,
-} from './system-prompt-v2.js';
-
 // Tools
 export { AGENT_TOOLS, CONFIRMATION_REQUIRED_TOOLS, requiresConfirmation } from './tools.js';
 
@@ -105,3 +87,16 @@ export {
   executeGetMarketplaceInfo,
   executeSearchWeb,
 } from './tool-executors.js';
+
+// Validators (Zod schemas for tool arguments)
+export {
+  GetProductsArgsSchema,
+  GetSalesStatsArgsSchema,
+  GetOrdersArgsSchema,
+  GetWarehouseStocksArgsSchema,
+  CalculateUnitEconomicsArgsSchema,
+  GetAbcAnalysisArgsSchema,
+  GetStockForecastArgsSchema,
+  GetMarketplaceInfoArgsSchema,
+  SearchWebArgsSchema,
+} from './validators.js';

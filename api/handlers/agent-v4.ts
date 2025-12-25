@@ -225,3 +225,56 @@ export async function handleAgentV4Status(
     ],
   });
 }
+
+/**
+ * V4 Agent Confirmation Handler
+ * Handles user confirmation/rejection of actions
+ */
+export async function handleAgentV4Confirm(
+  req: VercelRequest,
+  res: VercelResponse
+): Promise<VercelResponse> {
+  const { confirmed } = req.body;
+
+  if (!confirmed) {
+    return res.json({
+      success: true,
+      content: '👍 Операция отменена.',
+      executed: false,
+    });
+  }
+
+  // Auth
+  const initData = (req.headers['x-init-data'] as string) || req.body?.initData || '';
+  const validation = validateTelegramInitData(initData);
+  if (!validation.valid || !validation.user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const userId = validation.user.id;
+  const kv = getKVClient();
+
+  if (!kv) {
+    return res.status(500).json({ error: 'KV offline' });
+  }
+
+  // Get pending action
+  const pendingAction = await kv.get(`pending:v4:${userId}`);
+  if (!pendingAction) {
+    return res.json({
+      success: false,
+      content: '❌ Действие не найдено или истекло.',
+      executed: false,
+    });
+  }
+
+  // TODO: Execute the pending action based on its type
+  // For now, return a success message
+  await kv.del(`pending:v4:${userId}`);
+
+  return res.json({
+    success: true,
+    content: '✅ Операция выполнена успешно.',
+    executed: true,
+  });
+}

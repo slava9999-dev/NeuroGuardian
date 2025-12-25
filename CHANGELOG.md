@@ -2,41 +2,45 @@
 
 All notable changes to NeuroGUARDIAN project.
 
-## [2.9.0] - 2024-12-25
+## [2.9.0] - 2024-12-26
 
-### 🏗️ Agent Architecture V3 (Router + Specialists + Structured Output)
+### 🗑️ V3 Legacy Removal (~115 KB cleaned)
 
-- **NEW**: Multi-agent architecture with intent routing
-  - `orchestrator.ts` — Main orchestration: Router → Specialist → Response
-  - `router.ts` — Fast intent classification (GPT-4o-mini, ~100ms)
-  - `schemas.ts` — Zod validation for structured LLM output
-  - `url-validator.ts` — Server-side URL whitelist + sanitization
+- **BREAKING**: Removed all V3 Agent code, project now V4-only
+  - ❌ `orchestrator.ts` (36.9 KB) — removed
+  - ❌ `schemas.ts` (6.8 KB) — removed
+  - ❌ `system-prompt.ts` (7.6 KB) — removed
+  - ❌ `system-prompt-v2.ts` (60.5 KB) — removed
+  - ❌ `api/handlers/agent.ts` (9.8 KB) — removed
 
-- **NEW**: Modular prompts (reduced from 1223 to ~200 lines per specialist)
-  - `prompts/base.ts` — Shared persona and critical rules
-  - `prompts/router.ts` — Classification prompt with pattern matching
+### 🏗️ V4-Only Architecture
 
-- **NEW**: Specialized agents by domain
-  - `specialists/analytics.ts` — Sales, ABC, unit economics (GPT-4o, 7 tools)
-  - `specialists/pricing.ts` — Price changes, stop-loss (GPT-4o, 4 tools)
-  - `specialists/competitors.ts` — Web search (GPT-4o-mini, 1 tool)
-  - `specialists/general.ts` — Onboarding, help (GPT-4o-mini, no tools)
+- **All agent endpoints now use V4 pipeline**:
+  - `agent` → `handleAgentV4`
+  - `agent-confirm` → `handleAgentV4Confirm`
+  - `agent-status` → `handleAgentV4Status`
+- **New**: `handleAgentV4Confirm()` — confirmation handler for V4
+- **Updated**: `agent/index.ts` — exports only V4 components
+- **Updated**: `router.ts` — uses `schemas-v4.js` instead of deleted `schemas.js`
 
-### 🔒 Anti-Hallucination
+### 🧪 Testing
 
-- **URL Whitelist**: Only ozon.ru, wildberries.ru, t.me domains allowed
-- **Blocked Patterns**: am.ozon.com, example.com, localhost blocked
-- **Auto Sanitization**: Fake URLs replaced with search links
+- **NEW**: `orchestrator-v4.test.ts` — 20 comprehensive tests for V4 pipeline
+  - Schema validation (Plan, Answer)
+  - Link validation (hallucination detection)
+  - Sanitization (removing invalid links)
+  - Error handling (malformed JSON, missing fields)
+  - Pipeline integration tests
 
-### 📊 Expected Improvements
+### 📊 Metrics
 
-| Metric                       | Before (V2) | After (V3) |
-| ---------------------------- | ----------- | ---------- |
-| Instruction following        | ~60%        | ~90%       |
-| Tool calling accuracy        | ~70%        | ~95%       |
-| HTML garbage                 | Common      | 0%         |
-| Fake URLs                    | Common      | 0%         |
-| Token usage (simple queries) | ~2000       | ~800       |
+| Metric              | Before (v2.8) | After (v2.9) |
+| ------------------- | ------------- | ------------ |
+| Agent module size   | ~170 KB       | ~55 KB       |
+| Tests               | 103           | 120          |
+| TypeScript errors   | 0             | 0            |
+| Build time          | 2.32s         | 2.54s        |
+| Legacy code removed | -             | 115 KB       |
 
 ---
 

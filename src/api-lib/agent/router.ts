@@ -5,7 +5,7 @@
 // ============================================
 
 import { ROUTER_PROMPT, fastRoute, extractMarketplace } from './prompts/router.js';
-import { RouterResultSchema, type RouterResult } from './schemas.js';
+import { RouterResultSchema, type RouterResult } from './schemas-v4.js';
 
 /**
  * Router configuration
@@ -92,7 +92,7 @@ export async function routeMessage(
     return {
       category: fastResult.category as RouterResult['category'],
       confidence: fastResult.confidence,
-      extractedParams: {
+      extracted_params: {
         marketplace: extractMarketplace(message),
       },
     };
@@ -105,7 +105,7 @@ export async function routeMessage(
     return {
       category: 'general',
       confidence: 0.5,
-      extractedParams: { marketplace: extractMarketplace(message) },
+      extracted_params: { marketplace: extractMarketplace(message) },
     };
   }
 
@@ -170,7 +170,7 @@ export async function routeMessage(
     return {
       category: fallbackCategory as RouterResult['category'],
       confidence: 0.5,
-      extractedParams: { marketplace },
+      extracted_params: { marketplace },
     };
   }
 }

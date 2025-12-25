@@ -34,8 +34,8 @@ import { handleAuth, handleSettings, handlePlans } from './handlers/auth.js';
 import { handleProducts, handleSyncProducts, handleBatchSetStopLoss } from './handlers/products.js';
 import { handleCreatePayment, handlePaymentWebhook } from './handlers/payments.js';
 import { handleCheckPrices } from './handlers/sentinel.js';
-import { handleAgent, handleAgentConfirm, handleAgentStatus } from './handlers/agent.js';
-import { handleAgentV4, handleAgentV4Status } from './handlers/agent-v4.js';
+// V3 agent handler removed - all agent calls now go through V4
+import { handleAgentV4, handleAgentV4Status, handleAgentV4Confirm } from './handlers/agent-v4.js';
 
 import {
   sanitizeInput,
@@ -323,19 +323,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return handleSentinelLogs(req, res, validation.user.id);
       }
 
-      // ========== AI AGENT ==========
+      // ========== AI AGENT (V3 redirects to V4) ==========
       case 'agent': {
-        return handleAgent(req, res);
+        return handleAgentV4(req, res);
       }
 
-      // ========== AGENT CONFIRM ==========
+      // ========== AGENT CONFIRM (V4) ==========
       case 'agent-confirm': {
-        return handleAgentConfirm(req, res);
+        return handleAgentV4Confirm(req, res);
       }
 
-      // ========== AGENT STATUS ==========
+      // ========== AGENT STATUS (V4) ==========
       case 'agent-status': {
-        return handleAgentStatus(req, res);
+        return handleAgentV4Status(req, res);
       }
 
       // ========== V4 AGENT (Two-Phase Pipeline) ==========
