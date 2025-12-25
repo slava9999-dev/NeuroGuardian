@@ -114,6 +114,59 @@ export const UpdateStocksArgsSchema = z.object({
   marketplace: z.enum(['WB', 'Ozon']),
 });
 
+// === CONFIRMATION DETAILS SCHEMAS (for handleConfirmation) ===
+
+/** Schema for validated price change item */
+export const PriceChangeItemSchema = z.object({
+  product_id: z.string().min(1),
+  nm_id: z.number().nullable().optional(),
+  title: z.string().optional(),
+  marketplace: z.enum(['WB', 'Ozon']),
+  currentPrice: z.number().positive(),
+  newPrice: z.number().positive(),
+});
+
+/** Schema for update_prices confirmation details */
+export const UpdatePricesDetailsSchema = z.object({
+  price_changes: z.array(PriceChangeItemSchema).min(1, 'At least one price change required'),
+  marketplace: z.enum(['WB', 'Ozon', 'all']).optional(),
+});
+
+/** Schema for validated stock change item */
+export const StockChangeItemSchema = z.object({
+  product_id: z.string().optional(),
+  sku: z.string().optional(),
+  offer_id: z.string().optional(),
+  new_stock: z.number().int().min(0),
+  marketplace: z.enum(['WB', 'Ozon']).optional(),
+});
+
+/** Schema for update_stocks confirmation details */
+export const UpdateStocksDetailsSchema = z.object({
+  stock_changes: z.array(StockChangeItemSchema).min(1, 'At least one stock change required'),
+  marketplace: z.enum(['WB', 'Ozon']),
+});
+
+/** Schema for set_stop_loss confirmation details */
+export const SetStopLossDetailsSchema = z.object({
+  product_id: z.string().min(1),
+  min_price: z.number().positive(),
+});
+
+/** Schema for bulk_protect_products confirmation details */
+export const BulkProtectDetailsSchema = z.object({
+  percentage: z.number().min(1).max(50),
+  only_unprotected: z.boolean().optional(),
+  products: z
+    .array(
+      z.object({
+        product_id: z.string(),
+        min_price: z.number().positive(),
+      })
+    )
+    .optional(),
+});
+
 // === TYPE EXPORTS ===
 
 export type GetProductsArgs = z.infer<typeof GetProductsArgsSchema>;
@@ -129,6 +182,14 @@ export type SetStopLossArgs = z.infer<typeof SetStopLossArgsSchema>;
 export type BulkProtectProductsArgs = z.infer<typeof BulkProtectProductsArgsSchema>;
 export type UpdatePricesArgs = z.infer<typeof UpdatePricesArgsSchema>;
 export type UpdateStocksArgs = z.infer<typeof UpdateStocksArgsSchema>;
+
+// Confirmation details types
+export type PriceChangeItem = z.infer<typeof PriceChangeItemSchema>;
+export type UpdatePricesDetails = z.infer<typeof UpdatePricesDetailsSchema>;
+export type StockChangeItem = z.infer<typeof StockChangeItemSchema>;
+export type UpdateStocksDetails = z.infer<typeof UpdateStocksDetailsSchema>;
+export type SetStopLossDetails = z.infer<typeof SetStopLossDetailsSchema>;
+export type BulkProtectDetails = z.infer<typeof BulkProtectDetailsSchema>;
 
 // === VALIDATION HELPER ===
 

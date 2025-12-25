@@ -8,6 +8,17 @@ import { randomUUID } from 'crypto';
 
 import { routeMessage, getSpecialistConfig, isConfirmation, isRejection } from './router.js';
 import { sanitizeTextUrls } from './url-validator.js';
+import {
+  validateToolArgs,
+  UpdatePricesDetailsSchema,
+  UpdateStocksDetailsSchema,
+  SetStopLossDetailsSchema,
+  BulkProtectDetailsSchema,
+  type UpdatePricesDetails,
+  type UpdateStocksDetails,
+  type SetStopLossDetails,
+  type BulkProtectDetails,
+} from './validators.js';
 import { type RouterResult } from './schemas.js';
 import { buildAnalyticsPrompt, ANALYTICS_TOOLS } from './specialists/analytics.js';
 import { buildPricingPrompt, PRICING_TOOLS } from './specialists/pricing.js';
@@ -623,18 +634,12 @@ async function handleConfirmation(
       // UPDATE_PRICES - Change prices on marketplace
       // ========================================
       case 'update_prices': {
-        const priceChanges = details.price_changes as Array<{
-          product_id?: string;
-          nm_id?: number;
-          new_price: number;
-          marketplace?: string;
-        }>;
-        const marketplace = (details.marketplace as string) || 'WB';
-
-        if (!priceChanges || priceChanges.length === 0) {
+        // Validate details with Zod schema
+        const validation = validateToolArgs(UpdatePricesDetailsSchema, details);
+        if (!validation.success) {
           return {
             success: false,
-            content: '❌ Нет данных для обновления цен.',
+            content: `❌ ${validation.error}`,
             category: 'confirmation',
             model: 'none',
             toolsUsed: [operation],
@@ -642,6 +647,10 @@ async function handleConfirmation(
             executionTimeMs: Date.now() - startTime,
           };
         }
+
+        const validatedDetails = validation.data as UpdatePricesDetails;
+        const priceChanges = validatedDetails.price_changes;
+        const marketplace = validatedDetails.marketplace || 'WB';
 
         let resultMessage = '';
 
@@ -661,7 +670,7 @@ async function handleConfirmation(
           // Format for WB: { nmId, price }
           const wbUpdates = priceChanges.map(pc => ({
             nmId: pc.nm_id || parseInt((pc.product_id || '').replace('wb-', '')),
-            price: pc.new_price,
+            price: pc.newPrice,
           }));
 
           const result = await updateWbPrices(context.wbApiKey, wbUpdates);
@@ -706,7 +715,7 @@ async function handleConfirmation(
           // Format for Ozon: { productId, price }
           const ozonUpdates = priceChanges.map(pc => ({
             productId: parseInt((pc.product_id || '').replace('ozon-', '')),
-            price: pc.new_price,
+            price: pc.newPrice,
           }));
 
           const result = await updateOzonPrices(clientId, apiKey, ozonUpdates);
@@ -740,13 +749,12 @@ async function handleConfirmation(
       // SET_STOP_LOSS - Protect single product
       // ========================================
       case 'set_stop_loss': {
-        const productId = details.product_id as string;
-        const minPrice = details.min_price as number;
-
-        if (!productId || !minPrice) {
+        // Validate details with Zod schema
+        const validation = validateToolArgs(SetStopLossDetailsSchema, details);
+        if (!validation.success) {
           return {
             success: false,
-            content: '❌ Не указан товар или минимальная цена.',
+            content: `❌ ${validation.error}`,
             category: 'confirmation',
             model: 'none',
             toolsUsed: [operation],
@@ -754,6 +762,10 @@ async function handleConfirmation(
             executionTimeMs: Date.now() - startTime,
           };
         }
+
+        const validatedDetails = validation.data as SetStopLossDetails;
+        const productId = validatedDetails.product_id;
+        const minPrice = validatedDetails.min_price;
 
         // Find product in database
         const products = await getProductsByUserId(context.userId);
@@ -797,11 +809,23 @@ async function handleConfirmation(
       // BULK_PROTECT_PRODUCTS - Mass protection
       // ========================================
       case 'bulk_protect_products': {
-        const productsToProtect = details.products as Array<{
-          product_id: string;
-          min_price: number;
-        }>;
-        const percentage = details.percentage as number;
+        // Validate details with Zod schema (percentage is required, products optional)
+        const validation = validateToolArgs(BulkProtectDetailsSchema, details);
+        if (!validation.success) {
+          return {
+            success: false,
+            content: `❌ ${validation.error}`,
+            category: 'confirmation',
+            model: 'none',
+            toolsUsed: [operation],
+            tokensUsed: 0,
+            executionTimeMs: Date.now() - startTime,
+          };
+        }
+
+        const validatedDetails = validation.data as BulkProtectDetails;
+        const productsToProtect = validatedDetails.products;
+        const percentage = validatedDetails.percentage;
 
         if (!productsToProtect || productsToProtect.length === 0) {
           // If no specific products, protect all with percentage
@@ -860,19 +884,12 @@ async function handleConfirmation(
       // UPDATE_STOCKS - Update product stocks (FBS only)
       // ========================================
       case 'update_stocks': {
-        const stockChanges = details.stock_changes as Array<{
-          product_id?: string;
-          sku?: string;
-          offer_id?: string;
-          new_stock: number;
-          marketplace?: string;
-        }>;
-        const marketplace = (details.marketplace as string) || 'WB';
-
-        if (!stockChanges || stockChanges.length === 0) {
+        // Validate details with Zod schema
+        const validation = validateToolArgs(UpdateStocksDetailsSchema, details);
+        if (!validation.success) {
           return {
             success: false,
-            content: '❌ Нет данных для обновления остатков.',
+            content: `❌ ${validation.error}`,
             category: 'confirmation',
             model: 'none',
             toolsUsed: [operation],
@@ -880,6 +897,10 @@ async function handleConfirmation(
             executionTimeMs: Date.now() - startTime,
           };
         }
+
+        const validatedDetails = validation.data as UpdateStocksDetails;
+        const stockChanges = validatedDetails.stock_changes;
+        const marketplace = validatedDetails.marketplace;
 
         let resultMessage = '';
 
