@@ -186,6 +186,7 @@ export async function handleSyncProducts(
               current_price: price,
               current_stock: totalStock,
               marketplace: 'Ozon',
+              offer_id: item.offer_id || '', // CRITICAL: Save offer_id for price updates
             };
           });
         }
@@ -337,13 +338,14 @@ export async function handleSyncProducts(
     for (const p of productsToSave) {
       try {
         await sql`
-          INSERT INTO products (user_id, product_id, nm_id, title, image_url, current_price, current_stock, marketplace, status)
-          VALUES (${userId}, ${p.product_id}, ${p.nm_id || null}, ${p.title}, ${p.image_url}, ${Math.round(p.current_price)}, ${p.current_stock}, ${p.marketplace}, 'active')
+          INSERT INTO products (user_id, product_id, nm_id, title, image_url, current_price, current_stock, marketplace, status, offer_id)
+          VALUES (${userId}, ${p.product_id}, ${p.nm_id || null}, ${p.title}, ${p.image_url}, ${Math.round(p.current_price)}, ${p.current_stock}, ${p.marketplace}, 'active', ${(p as { offer_id?: string }).offer_id || null})
           ON CONFLICT (user_id, product_id) DO UPDATE SET
             title = EXCLUDED.title,
             image_url = EXCLUDED.image_url,
             current_price = EXCLUDED.current_price,
             current_stock = EXCLUDED.current_stock,
+            offer_id = EXCLUDED.offer_id,
             updated_at = CURRENT_TIMESTAMP
         `;
         savedCount++;

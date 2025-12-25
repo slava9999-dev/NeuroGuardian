@@ -34,6 +34,7 @@ interface MonitoredProduct {
   current_price?: number; // From DB, updated by sync
   updated_at?: string; // For cooldown check
   vendor_code?: string;
+  offer_id?: string; // Ozon offer_id (required for price updates)
 }
 
 interface SentinelAlertData {
@@ -247,19 +248,21 @@ async function processOzonDefense(
   // Use current_price from DB (updated by sync) instead
   console.log(`📊 Ozon: Using DB prices (Prices API unavailable)`);
 
-  // Fetch product info (for offer_id) via MarketplaceService
-  const productInfoMap = await fetchOzonProductInfo(clientId, apiKey, productIds);
-
   // Check for violations
   for (const dbProduct of monitoredProducts) {
     const ozonId = parseInt(dbProduct.product_id.replace('ozon-', ''));
-    const productInfo = productInfoMap.get(ozonId);
 
-    // Use current_price from DB (updated by sync)
+    // Use current_price and offer_id from DB (updated by sync)
     const currentPrice = dbProduct.current_price || 0;
+    const offerId = dbProduct.offer_id || ''; // offer_id from sync
 
     if (currentPrice === 0) {
       console.warn(`⚠️ No price in DB for Ozon product ${ozonId} - run sync first`);
+      continue;
+    }
+
+    if (!offerId) {
+      console.warn(`⚠️ No offer_id in DB for Ozon product ${ozonId} - run sync first`);
       continue;
     }
 
@@ -300,14 +303,12 @@ async function processOzonDefense(
       if (user.defense_mode === 'zero_stock') {
         // Option A: Set Stock to 0
         defenseAction = 'Zero Stock';
-        defenseResult = await setOzonZeroStock(clientId, apiKey, [
-          { productId: ozonId, offerId: productInfo?.offer_id || '' },
-        ]);
+        defenseResult = await setOzonZeroStock(clientId, apiKey, [{ productId: ozonId, offerId }]);
       } else {
         // Option B: Price Correction (Set to min_price)
         defenseAction = 'Price Correction';
         defenseResult = await setOzonDefensePrice(clientId, apiKey, [
-          { productId: ozonId, offerId: productInfo?.offer_id || '', price: minPrice },
+          { productId: ozonId, offerId, price: minPrice },
         ]);
       }
 
