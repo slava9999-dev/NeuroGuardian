@@ -298,7 +298,14 @@ export const ANSWER_JSON_SCHEMA = {
         type: 'object',
         properties: {
           type: { type: 'string' },
-          items: { type: 'array', items: {} },
+          items: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {},
+              additionalProperties: false,
+            },
+          },
           summary: {
             type: 'object',
             properties: {},
