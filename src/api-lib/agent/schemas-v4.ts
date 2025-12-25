@@ -285,7 +285,8 @@ export const ANSWER_JSON_SCHEMA = {
             summary: { type: 'string' },
             details: {
               type: 'object',
-              additionalProperties: true,
+              properties: {},
+              additionalProperties: false,
             },
             affected_count: { type: 'integer' },
           },
@@ -300,7 +301,8 @@ export const ANSWER_JSON_SCHEMA = {
           items: { type: 'array', items: {} },
           summary: {
             type: 'object',
-            additionalProperties: true,
+            properties: {},
+            additionalProperties: false,
           },
         },
         additionalProperties: false,
@@ -345,7 +347,8 @@ export const PLAN_JSON_SCHEMA = {
             },
             args: {
               type: 'object',
-              additionalProperties: true, // Allow any properties for tool args
+              properties: {}, // Empty properties allows any args
+              additionalProperties: false, // OpenAI requires false
             },
             reason: { type: 'string' },
           },
