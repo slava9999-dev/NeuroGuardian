@@ -91,25 +91,36 @@ export function validateUrl(rawUrl: string): ValidatedLink {
 
 /**
  * Clean URL from HTML garbage and formatting issues
+ * Handles cases where GPT generates broken HTML inside markdown links
  */
 export function cleanUrl(rawUrl: string): string | null {
   if (!rawUrl || typeof rawUrl !== 'string') return null;
 
   let url = rawUrl.trim();
 
-  // Remove HTML attributes that GPT sometimes adds
-  url = url.replace(/["']\s*(?:target|rel|class|style|onclick)\s*=\s*["'][^"']*["']/gi, '');
+  // First, extract just the URL part before any HTML attributes
+  // This handles: https://example.com/" target="_blank" ... >Text)
+  const htmlAttrMatch = url.match(/^(https?:\/\/[^"'\s<>]+?)(?:\/)?["'\s]/);
+  if (htmlAttrMatch) {
+    url = htmlAttrMatch[1];
+  }
 
-  // Remove trailing HTML tags
+  // Remove everything after " target= or " rel= or similar HTML attributes
+  url = url.replace(/["']\s*(?:target|rel|class|style|onclick|href)\s*=.*$/gi, '');
+
+  // Remove trailing HTML tags and content
   url = url.replace(/<[^>]+>.*$/gi, '');
 
-  // Remove trailing quotes and parentheses
-  url = url.replace(/[)"'>]+$/, '');
+  // Remove trailing quotes, parentheses, brackets, angle brackets
+  url = url.replace(/[)"'>\]]+$/, '');
 
-  // Remove leading garbage
+  // Remove trailing slash followed by garbage
+  url = url.replace(/\/["'].*$/, '');
+
+  // Remove leading garbage before http
   url = url.replace(/^[^h]*(?=https?:\/\/)/i, '');
 
-  // Extract URL if it's inside markdown link
+  // Extract URL if it's inside markdown link [text](url)
   const markdownMatch = url.match(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/);
   if (markdownMatch) {
     url = markdownMatch[2];
