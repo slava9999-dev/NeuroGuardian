@@ -66,12 +66,22 @@ export async function handleCheckPrices(
     (querySecret && cronSecret && querySecret === cronSecret);
   const isAdmin = adminKey === process.env.ADMIN_API_KEY;
 
+  // TEST_MODE: bypass subscription check
+  const isTestMode = process.env.TEST_MODE === 'true';
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let targetUsers: any[] = [];
 
   // Scenario A: Auto/Admin Run (All Users)
   if (isCron || isAdmin) {
-    const usersRes = await sql`
+    // In TEST_MODE, check all users with protection enabled (ignore subscription)
+    const usersRes = isTestMode
+      ? await sql`
+          SELECT * FROM users 
+          WHERE protection_enabled = true 
+          AND (api_key_ozon IS NOT NULL OR api_key_wb IS NOT NULL)
+        `
+      : await sql`
           SELECT * FROM users 
           WHERE protection_enabled = true 
           AND subscription_active = true
