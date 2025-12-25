@@ -283,7 +283,10 @@ export const ANSWER_JSON_SCHEMA = {
               enum: ['update_prices', 'set_stop_loss', 'bulk_protect_products', 'update_stocks'],
             },
             summary: { type: 'string' },
-            details: { type: 'object' },
+            details: {
+              type: 'object',
+              additionalProperties: true,
+            },
             affected_count: { type: 'integer' },
           },
           required: ['type', 'summary', 'details', 'affected_count'],
@@ -294,8 +297,11 @@ export const ANSWER_JSON_SCHEMA = {
         type: 'object',
         properties: {
           type: { type: 'string' },
-          items: { type: 'array' },
-          summary: { type: 'object' },
+          items: { type: 'array', items: {} },
+          summary: {
+            type: 'object',
+            additionalProperties: true,
+          },
         },
         additionalProperties: false,
       },
@@ -337,7 +343,10 @@ export const PLAN_JSON_SCHEMA = {
                 'search_web',
               ],
             },
-            args: { type: 'object' },
+            args: {
+              type: 'object',
+              additionalProperties: true, // Allow any properties for tool args
+            },
             reason: { type: 'string' },
           },
           required: ['tool', 'args', 'reason'],
