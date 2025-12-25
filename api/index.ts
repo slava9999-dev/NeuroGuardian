@@ -35,6 +35,7 @@ import { handleProducts, handleSyncProducts, handleBatchSetStopLoss } from './ha
 import { handleCreatePayment, handlePaymentWebhook } from './handlers/payments.js';
 import { handleCheckPrices } from './handlers/sentinel.js';
 import { handleAgent, handleAgentConfirm, handleAgentStatus } from './handlers/agent.js';
+import { handleAgentV4, handleAgentV4Status } from './handlers/agent-v4.js';
 
 import {
   sanitizeInput,
@@ -337,6 +338,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return handleAgentStatus(req, res);
       }
 
+      // ========== V4 AGENT (Two-Phase Pipeline) ==========
+      case 'agent-v4': {
+        return handleAgentV4(req, res);
+      }
+
+      // ========== V4 AGENT STATUS ==========
+      case 'agent-v4-status': {
+        return handleAgentV4Status(req, res);
+      }
+
       // ========== CHAT HISTORY: GET ==========
       case 'get-chat-history': {
         const initData = sanitizeInput(
@@ -404,6 +415,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             'agent',
             'agent-confirm',
             'agent-status',
+            'agent-v4',
+            'agent-v4-status',
             'admin-activate-trial',
             'admin-check-user',
             'admin-list-users',
