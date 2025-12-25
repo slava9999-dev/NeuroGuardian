@@ -897,8 +897,9 @@ export async function fetchOzonCurrentPrices(
   try {
     console.log(`📡 Ozon Prices API: Fetching for ${productIds.length} products`);
 
-    // CRITICAL FIX: Use v2 endpoint (v4 returns 404)
-    const response = await fetchWithRetry('https://api-seller.ozon.ru/v2/product/info/prices', {
+    // CRITICAL FIX: Use v3/product/info/list (same as sync)
+    // This endpoint returns full product info including prices
+    const response = await fetchWithRetry('https://api-seller.ozon.ru/v3/product/info/list', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -906,8 +907,7 @@ export async function fetchOzonCurrentPrices(
         'Api-Key': apiKey,
       },
       body: JSON.stringify({
-        filter: { product_id: productIds },
-        limit: 1000,
+        product_id: productIds,
       }),
     });
 
@@ -920,13 +920,19 @@ export async function fetchOzonCurrentPrices(
       console.log(`📦 Ozon Prices API: received ${items.length} items`);
 
       for (const p of items) {
-        // Use marketing_price (actual selling price) or price
-        const actualPrice = parseFloat(p.price?.marketing_price || p.price?.price || '0');
-        if (p.product_id && actualPrice > 0) {
-          priceMap.set(p.product_id, actualPrice);
+        // Extract price from product info (same logic as sync)
+        let actualPrice = 0;
+        if (typeof p.price === 'object' && p.price !== null) {
+          actualPrice = parseFloat(p.price.marketing_price || p.price.price || '0');
+        } else if (typeof p.price === 'string') {
+          actualPrice = parseFloat(p.price || p.marketing_price || '0');
+        }
+
+        if (p.id && actualPrice > 0) {
+          priceMap.set(p.id, Math.round(actualPrice));
         } else {
           console.warn(
-            `⚠️ Ozon: No price for product ${p.product_id}, price object:`,
+            `⚠️ Ozon: No price for product ${p.id}, price object:`,
             JSON.stringify(p.price)
           );
         }

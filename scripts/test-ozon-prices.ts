@@ -23,7 +23,8 @@ async function testOzonPricesAPI() {
   console.log(`Product IDs: ${testProductIds.join(', ')}\n`);
 
   try {
-    const response = await fetch('https://api-seller.ozon.ru/v4/product/info/prices', {
+    // Try v3/product/info/list instead (includes prices in response)
+    const response = await fetch('https://api-seller.ozon.ru/v3/product/info/list', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -31,8 +32,7 @@ async function testOzonPricesAPI() {
         'Api-Key': OZON_API_KEY,
       },
       body: JSON.stringify({
-        filter: { product_id: testProductIds },
-        limit: 1000,
+        product_id: testProductIds,
       }),
     });
 
