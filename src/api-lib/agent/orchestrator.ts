@@ -28,6 +28,12 @@ import {
   executeSearchWeb,
 } from './tool-executors.js';
 
+// Services for executing confirmed actions
+import { updateProductMinPrice, getProductsByUserId } from '../services/index.js';
+
+// Marketplace API (WB/Ozon price updates)
+import { updateWbPrices, updateOzonPrices } from '../services/marketplace.js';
+
 // ============================================
 // TYPES
 // ============================================
@@ -559,21 +565,293 @@ async function handleConfirmableAction(
 
 async function handleConfirmation(
   pendingAction: { operation: string; taskId: string; details: Record<string, unknown> },
-  _context: UserContext, // Reserved for future use
+  context: UserContext,
   startTime: number
 ): Promise<OrchestratorResult> {
-  // TODO: Execute the confirmed action
-  // This will be implemented in the agent.ts handler
+  const { operation, details } = pendingAction;
 
-  return {
-    success: true,
-    content: '✅ Действие подтверждено. Выполняется...',
-    category: 'confirmation',
-    model: 'none',
-    toolsUsed: [pendingAction.operation],
-    tokensUsed: 0,
-    executionTimeMs: Date.now() - startTime,
-  };
+  console.log(`✅ Executing confirmed action: ${operation}, taskId: ${pendingAction.taskId}`);
+
+  try {
+    switch (operation) {
+      // ========================================
+      // UPDATE_PRICES - Change prices on marketplace
+      // ========================================
+      case 'update_prices': {
+        const priceChanges = details.price_changes as Array<{
+          product_id?: string;
+          nm_id?: number;
+          new_price: number;
+          marketplace?: string;
+        }>;
+        const marketplace = (details.marketplace as string) || 'WB';
+
+        if (!priceChanges || priceChanges.length === 0) {
+          return {
+            success: false,
+            content: '❌ Нет данных для обновления цен.',
+            category: 'confirmation',
+            model: 'none',
+            toolsUsed: [operation],
+            tokensUsed: 0,
+            executionTimeMs: Date.now() - startTime,
+          };
+        }
+
+        let resultMessage = '';
+
+        if (marketplace === 'WB') {
+          if (!context.wbApiKey) {
+            return {
+              success: false,
+              content: '❌ WB API ключ не настроен. Добавьте его в настройках.',
+              category: 'confirmation',
+              model: 'none',
+              toolsUsed: [operation],
+              tokensUsed: 0,
+              executionTimeMs: Date.now() - startTime,
+            };
+          }
+
+          // Format for WB: { nmId, price }
+          const wbUpdates = priceChanges.map(pc => ({
+            nmId: pc.nm_id || parseInt((pc.product_id || '').replace('wb-', '')),
+            price: pc.new_price,
+          }));
+
+          const result = await updateWbPrices(context.wbApiKey, wbUpdates);
+
+          if (result.success) {
+            resultMessage = `✅ **Цены обновлены на Wildberries!**\n\n`;
+            resultMessage += `📦 Обновлено товаров: **${result.count}**\n`;
+            if (result.taskId) {
+              resultMessage += `📋 ID задачи: ${result.taskId}\n`;
+              resultMessage += `\n⏳ Новые цены появятся в течение 1-5 минут.`;
+            }
+          } else {
+            resultMessage = `❌ Ошибка обновления цен WB: ${result.error}`;
+          }
+        } else if (marketplace === 'Ozon') {
+          if (!context.ozonApiKey) {
+            return {
+              success: false,
+              content: '❌ Ozon API ключ не настроен. Добавьте его в настройках.',
+              category: 'confirmation',
+              model: 'none',
+              toolsUsed: [operation],
+              tokensUsed: 0,
+              executionTimeMs: Date.now() - startTime,
+            };
+          }
+
+          // Parse clientId:apiKey format
+          const [clientId, apiKey] = context.ozonApiKey.split(':');
+          if (!clientId || !apiKey) {
+            return {
+              success: false,
+              content: '❌ Неверный формат Ozon API ключа.',
+              category: 'confirmation',
+              model: 'none',
+              toolsUsed: [operation],
+              tokensUsed: 0,
+              executionTimeMs: Date.now() - startTime,
+            };
+          }
+
+          // Format for Ozon: { productId, price }
+          const ozonUpdates = priceChanges.map(pc => ({
+            productId: parseInt((pc.product_id || '').replace('ozon-', '')),
+            price: pc.new_price,
+          }));
+
+          const result = await updateOzonPrices(clientId, apiKey, ozonUpdates);
+
+          if (result.success) {
+            resultMessage = `✅ **Цены обновлены на Ozon!**\n\n`;
+            resultMessage += `📦 Обновлено товаров: **${result.count}**\n`;
+            if (result.partialErrors && result.partialErrors.length > 0) {
+              resultMessage += `\n⚠️ Предупреждения:\n`;
+              result.partialErrors.forEach(e => {
+                resultMessage += `- ${e}\n`;
+              });
+            }
+          } else {
+            resultMessage = `❌ Ошибка обновления цен Ozon: ${result.error}`;
+          }
+        }
+
+        return {
+          success: true,
+          content: resultMessage,
+          category: 'confirmation',
+          model: 'none',
+          toolsUsed: [operation],
+          tokensUsed: 0,
+          executionTimeMs: Date.now() - startTime,
+        };
+      }
+
+      // ========================================
+      // SET_STOP_LOSS - Protect single product
+      // ========================================
+      case 'set_stop_loss': {
+        const productId = details.product_id as string;
+        const minPrice = details.min_price as number;
+
+        if (!productId || !minPrice) {
+          return {
+            success: false,
+            content: '❌ Не указан товар или минимальная цена.',
+            category: 'confirmation',
+            model: 'none',
+            toolsUsed: [operation],
+            tokensUsed: 0,
+            executionTimeMs: Date.now() - startTime,
+          };
+        }
+
+        // Find product in database
+        const products = await getProductsByUserId(context.userId);
+        const product = products.find(
+          p => p.product_id === productId || p.title.toLowerCase().includes(productId.toLowerCase())
+        );
+
+        if (!product) {
+          return {
+            success: false,
+            content: `❌ Товар "${productId}" не найден.`,
+            category: 'confirmation',
+            model: 'none',
+            toolsUsed: [operation],
+            tokensUsed: 0,
+            executionTimeMs: Date.now() - startTime,
+          };
+        }
+
+        await updateProductMinPrice(context.userId, product.product_id, minPrice);
+
+        const resultMessage =
+          `✅ **Защита установлена!**\n\n` +
+          `📦 Товар: **${product.title.substring(0, 40)}**\n` +
+          `💰 Текущая цена: ${product.current_price}₽\n` +
+          `🛡️ Минимальная цена: **${minPrice}₽**\n\n` +
+          `Если цена упадёт ниже ${minPrice}₽, сработает автоматическая защита.`;
+
+        return {
+          success: true,
+          content: resultMessage,
+          category: 'confirmation',
+          model: 'none',
+          toolsUsed: [operation],
+          tokensUsed: 0,
+          executionTimeMs: Date.now() - startTime,
+        };
+      }
+
+      // ========================================
+      // BULK_PROTECT_PRODUCTS - Mass protection
+      // ========================================
+      case 'bulk_protect_products': {
+        const productsToProtect = details.products as Array<{
+          product_id: string;
+          min_price: number;
+        }>;
+        const percentage = details.percentage as number;
+
+        if (!productsToProtect || productsToProtect.length === 0) {
+          // If no specific products, protect all with percentage
+          const allProducts = await getProductsByUserId(context.userId);
+          const discount = percentage || 15;
+
+          let protectedCount = 0;
+          for (const product of allProducts) {
+            if (product.current_price > 0) {
+              const minPrice = Math.round(product.current_price * (1 - discount / 100));
+              await updateProductMinPrice(context.userId, product.product_id, minPrice);
+              protectedCount++;
+            }
+          }
+
+          return {
+            success: true,
+            content:
+              `✅ **Массовая защита установлена!**\n\n` +
+              `🛡️ Защищено товаров: **${protectedCount}**\n` +
+              `📉 Порог: **-${discount}%** от текущей цены\n\n` +
+              `Sentinel будет следить за ценами 24/7.`,
+            category: 'confirmation',
+            model: 'none',
+            toolsUsed: [operation],
+            tokensUsed: 0,
+            executionTimeMs: Date.now() - startTime,
+          };
+        }
+
+        // Protect specific products
+        let protectedCount = 0;
+        for (const item of productsToProtect) {
+          const products = await getProductsByUserId(context.userId);
+          const product = products.find(p => p.product_id === item.product_id);
+          if (product) {
+            await updateProductMinPrice(context.userId, product.product_id, item.min_price);
+            protectedCount++;
+          }
+        }
+
+        return {
+          success: true,
+          content:
+            `✅ **Защита установлена!**\n\n` +
+            `🛡️ Защищено товаров: **${protectedCount}/${productsToProtect.length}**`,
+          category: 'confirmation',
+          model: 'none',
+          toolsUsed: [operation],
+          tokensUsed: 0,
+          executionTimeMs: Date.now() - startTime,
+        };
+      }
+
+      // ========================================
+      // UPDATE_STOCKS - Not implemented yet
+      // ========================================
+      case 'update_stocks': {
+        return {
+          success: false,
+          content: '⚠️ Обновление остатков пока не реализовано в V3.',
+          category: 'confirmation',
+          model: 'none',
+          toolsUsed: [operation],
+          tokensUsed: 0,
+          executionTimeMs: Date.now() - startTime,
+        };
+      }
+
+      // ========================================
+      // UNKNOWN OPERATION
+      // ========================================
+      default:
+        return {
+          success: false,
+          content: `❌ Неизвестное действие: ${operation}`,
+          category: 'confirmation',
+          model: 'none',
+          toolsUsed: [operation],
+          tokensUsed: 0,
+          executionTimeMs: Date.now() - startTime,
+        };
+    }
+  } catch (error) {
+    console.error('❌ Confirmation execution error:', error);
+    return {
+      success: false,
+      content: `❌ Ошибка выполнения: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`,
+      category: 'confirmation',
+      model: 'none',
+      toolsUsed: [operation],
+      tokensUsed: 0,
+      executionTimeMs: Date.now() - startTime,
+    };
+  }
 }
 
 // ============================================
