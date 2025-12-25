@@ -509,6 +509,28 @@ async function sendSentinelAlert(
   }
 
   try {
+    // Step 1: Send a short voice message "siren" to get attention
+    // This makes Telegram play a different notification sound
+    // Using a pre-recorded alert sound hosted on a CDN
+    const sirenUrl = 'https://cdn.pixabay.com/audio/2022/03/10/audio_23a6d0e89a.mp3'; // Short alert sound
+
+    try {
+      await fetch(`https://api.telegram.org/bot${token}/sendVoice`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: userId,
+          voice: sirenUrl,
+          caption: data.isError ? '🆘 КРИТИЧЕСКАЯ ОШИБКА!' : '🚨 АТАКА ОБНАРУЖЕНА!',
+          duration: 2,
+        }),
+      });
+    } catch {
+      // Voice sending failed, continue with text
+      console.warn('Voice alert failed, sending text only');
+    }
+
+    // Step 2: Send the detailed text message
     const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -516,6 +538,8 @@ async function sendSentinelAlert(
         chat_id: userId,
         text: msg,
         parse_mode: 'HTML',
+        // Do NOT disable notification - we want it loud!
+        disable_notification: false,
       }),
     });
 
