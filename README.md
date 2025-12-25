@@ -8,6 +8,12 @@
 
 > **Ваш личный AI-агент для управления магазином на Wildberries и Ozon**
 
+**🔥 NEW in v2.6.0:**
+
+- **NeuroAgent V4:** Умный агент с двухступенчатым планированием (Planner → Executor)
+- **Voice Sentinel:** Голосовые сирены при атаках на цены
+- **Structured Links:** 100% валидные ссылки без галлюцинаций
+
 Управляйте продажами через чат с искусственным интеллектом. NeuroAgent знает всё о вашем магазине и готов помочь 24/7!
 
 📚 **Документация:** [CHANGELOG](CHANGELOG.md) | [AUDIT](AUDIT_FINAL_2024-12-21.md) | [NeuroAgent](NEUROAGENT_PROGRESS.md) | [Telegram Setup](TELEGRAM_QUICK_SETUP.md)
