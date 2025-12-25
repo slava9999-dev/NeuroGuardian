@@ -192,17 +192,7 @@ export type SetStopLossDetails = z.infer<typeof SetStopLossDetailsSchema>;
 export type BulkProtectDetails = z.infer<typeof BulkProtectDetailsSchema>;
 
 // === VALIDATION HELPER ===
-export interface ValidationSuccess<T> {
-  success: true;
-  data: T;
-}
-
-export interface ValidationError {
-  success: false;
-  error: string;
-}
-
-export type ValidationResult<T> = ValidationSuccess<T> | ValidationError;
+export type ValidationResult<T> = { success: true; data: T } | { success: false; error: string };
 
 /**
  * Validate tool arguments and return typed result
