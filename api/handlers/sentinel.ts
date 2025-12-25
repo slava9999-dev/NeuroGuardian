@@ -32,6 +32,7 @@ interface MonitoredProduct {
   title: string;
   min_price: number;
   current_price?: number; // From DB, updated by sync
+  updated_at?: string; // For cooldown check
   vendor_code?: string;
 }
 
@@ -278,6 +279,19 @@ async function processOzonDefense(
     // VIOLATION DETECTED!
     if (currentPrice > 0 && currentPrice < minPrice) {
       console.warn(`🚨 ALARM: ${dbProduct.title} Price: ${currentPrice} < StopLoss: ${minPrice}`);
+
+      // RATE LIMITING: Check if we changed this product recently (last 10 minutes)
+      const lastUpdate = new Date(dbProduct.updated_at || 0);
+      const now = new Date();
+      const minutesSinceUpdate = (now.getTime() - lastUpdate.getTime()) / 1000 / 60;
+
+      if (minutesSinceUpdate < 10) {
+        console.log(
+          `⏳ Cooldown: Product ${ozonId} was updated ${Math.round(minutesSinceUpdate)}m ago, skipping`
+        );
+        continue;
+      }
+
       callbacks.onTrigger();
 
       let defenseAction = '';
