@@ -136,38 +136,52 @@ export async function handleCheckPrices(
   let totalTriggered = 0;
 
   try {
-    // Iterate users
-    for (const user of targetUsers) {
-      // Get decrypted API keys via MarketplaceService
-      const keys = await getMarketplaceKeys(user.id);
+    // Parallel Processing with Batching
+    const BATCH_SIZE = 5;
+    for (let i = 0; i < targetUsers.length; i += BATCH_SIZE) {
+      const batch = targetUsers.slice(i, i + BATCH_SIZE);
+      console.log(
+        `🛡️ Sentinel Batch ${Math.floor(i / BATCH_SIZE) + 1}: Processing ${batch.length} users...`
+      );
 
-      // --- OZON DEFENSE ---
-      if (keys.ozon) {
-        try {
-          await processOzonDefense(user, keys.ozon, {
-            onScan: () => totalScanned++,
-            onTrigger: () => totalTriggered++,
-            log,
-          });
-        } catch (e) {
-          console.error(`Error checking Ozon for user ${user.id}:`, e);
-          log.push(`Error Ozon user ${user.id}: ${e}`);
-        }
-      }
+      await Promise.all(
+        batch.map(async user => {
+          try {
+            // Get decrypted API keys via MarketplaceService
+            const keys = await getMarketplaceKeys(user.id);
 
-      // --- WB DEFENSE ---
-      if (keys.wb) {
-        try {
-          await processWbDefense(user, keys.wb, {
-            onScan: () => totalScanned++,
-            onTrigger: () => totalTriggered++,
-            log,
-          });
-        } catch (e) {
-          console.error(`Error checking WB for user ${user.id}:`, e);
-          log.push(`Error WB user ${user.id}: ${e}`);
-        }
-      }
+            // --- OZON DEFENSE ---
+            if (keys.ozon) {
+              try {
+                await processOzonDefense(user, keys.ozon, {
+                  onScan: () => totalScanned++,
+                  onTrigger: () => totalTriggered++,
+                  log,
+                });
+              } catch (e) {
+                console.error(`Error checking Ozon for user ${user.id}:`, e);
+                log.push(`Error Ozon user ${user.id}: ${e}`);
+              }
+            }
+
+            // --- WB DEFENSE ---
+            if (keys.wb) {
+              try {
+                await processWbDefense(user, keys.wb, {
+                  onScan: () => totalScanned++,
+                  onTrigger: () => totalTriggered++,
+                  log,
+                });
+              } catch (e) {
+                console.error(`Error checking WB for user ${user.id}:`, e);
+                log.push(`Error WB user ${user.id}: ${e}`);
+              }
+            }
+          } catch (error) {
+            console.error(`Error processing user ${user.id}:`, error);
+          }
+        })
+      );
     }
 
     // Restore console
@@ -280,35 +294,53 @@ async function processOzonDefense(
       // Log defense action result
       console.log(`🛡️ Defense API response: ${defenseResult.success ? 'OK' : 'FAILED'}`);
 
-      // UPDATE DB & NOTIFY
-      await sql`
-        UPDATE products SET status = 'triggered', updated_at = CURRENT_TIMESTAMP 
-        WHERE id = ${dbProduct.id}
-      `;
+      if (defenseResult.success) {
+        // UPDATE DB & NOTIFY success
+        await sql`
+          UPDATE products SET status = 'triggered', updated_at = CURRENT_TIMESTAMP 
+          WHERE id = ${dbProduct.id}
+        `;
 
-      const savedAmount = minPrice - currentPrice;
-      await sql`
-        UPDATE users SET 
-          triggered_today = triggered_today + 1,
-          saved_amount = saved_amount + ${savedAmount}
-        WHERE id = ${user.id}
-      `;
+        const savedAmount = minPrice - currentPrice;
+        await sql`
+          UPDATE users SET 
+            triggered_today = triggered_today + 1,
+            saved_amount = saved_amount + ${savedAmount}
+          WHERE id = ${user.id}
+        `;
 
-      // Log to sentinel_logs for audit
-      await sql`
-        INSERT INTO sentinel_logs (user_id, product_id, product_title, detected_price, min_price, defense_action, saved_amount, marketplace)
-        VALUES (${user.id}, ${dbProduct.product_id}, ${dbProduct.title}, ${Math.round(currentPrice)}, ${minPrice}, ${defenseAction}, ${savedAmount}, 'Ozon')
-      `;
+        // Log to sentinel_logs
+        await sql`
+          INSERT INTO sentinel_logs (user_id, product_id, product_title, detected_price, min_price, defense_action, saved_amount, marketplace)
+          VALUES (${user.id}, ${dbProduct.product_id}, ${dbProduct.title}, ${Math.round(currentPrice)}, ${minPrice}, ${defenseAction}, ${savedAmount}, 'Ozon')
+        `;
 
-      // TELEGRAM ALERT
-      await sendSentinelAlert(user.id, {
-        title: dbProduct.title,
-        currentPrice,
-        minPrice,
-        defenseAction,
-        savedAmount,
-        marketplace: 'Ozon',
-      });
+        // TELEGRAM ALERT
+        await sendSentinelAlert(user.id, {
+          title: dbProduct.title,
+          currentPrice,
+          minPrice,
+          defenseAction,
+          savedAmount,
+          marketplace: 'Ozon',
+        });
+      } else {
+        // DEFENSE FAILED
+        console.error(
+          `❌ ALARM: Defense FAILED for ${dbProduct.product_id}. Error: ${defenseResult.error}`
+        );
+
+        // Notify user about FAILURE
+        await sendSentinelAlert(user.id, {
+          title: dbProduct.title,
+          currentPrice,
+          minPrice,
+          defenseAction: `❌ ОШИБКА: ${defenseResult.error || 'API Error'}`,
+          savedAmount: 0,
+          marketplace: 'Ozon',
+          isError: true,
+        });
+      }
     }
   }
 }
@@ -382,35 +414,50 @@ async function processWbDefense(
 
       console.log(`🛡️ WB Defense: ${defenseResult.success ? 'OK' : 'FAILED'}`);
 
-      // UPDATE DB & NOTIFY
-      await sql`
-        UPDATE products SET status = 'triggered', updated_at = CURRENT_TIMESTAMP 
-        WHERE id = ${dbProduct.id}
-      `;
+      if (defenseResult.success) {
+        // UPDATE DB & NOTIFY success
+        await sql`
+          UPDATE products SET status = 'triggered', updated_at = CURRENT_TIMESTAMP 
+          WHERE id = ${dbProduct.id}
+        `;
 
-      const savedAmount = minPrice - currentPrice;
-      await sql`
-        UPDATE users SET 
-          triggered_today = triggered_today + 1,
-          saved_amount = saved_amount + ${savedAmount}
-        WHERE id = ${user.id}
-      `;
+        const savedAmount = minPrice - currentPrice;
+        await sql`
+          UPDATE users SET 
+            triggered_today = triggered_today + 1,
+            saved_amount = saved_amount + ${savedAmount}
+          WHERE id = ${user.id}
+        `;
 
-      // Log to sentinel_logs for audit
-      await sql`
-        INSERT INTO sentinel_logs (user_id, product_id, product_title, detected_price, min_price, defense_action, saved_amount, marketplace)
-        VALUES (${user.id}, ${dbProduct.product_id}, ${dbProduct.title}, ${Math.round(currentPrice)}, ${minPrice}, ${defenseAction}, ${savedAmount}, 'WB')
-      `;
+        // Log to sentinel_logs
+        await sql`
+          INSERT INTO sentinel_logs (user_id, product_id, product_title, detected_price, min_price, defense_action, saved_amount, marketplace)
+          VALUES (${user.id}, ${dbProduct.product_id}, ${dbProduct.title}, ${Math.round(currentPrice)}, ${minPrice}, ${defenseAction}, ${savedAmount}, 'WB')
+        `;
 
-      // TELEGRAM ALERT
-      await sendSentinelAlert(user.id, {
-        title: dbProduct.title,
-        currentPrice,
-        minPrice,
-        defenseAction,
-        savedAmount,
-        marketplace: 'WB',
-      });
+        // TELEGRAM ALERT
+        await sendSentinelAlert(user.id, {
+          title: dbProduct.title,
+          currentPrice,
+          minPrice,
+          defenseAction,
+          savedAmount,
+          marketplace: 'WB',
+        });
+      } else {
+        // DEFENSE FAILED
+        console.error(`❌ WB ALARM: Defense FAILED for ${dbProduct.nm_id}`);
+
+        await sendSentinelAlert(user.id, {
+          title: dbProduct.title,
+          currentPrice,
+          minPrice,
+          defenseAction: `❌ ОШИБКА: ${defenseResult.error || 'API Error'}`,
+          savedAmount: 0,
+          marketplace: 'WB',
+          isError: true,
+        });
+      }
     }
   }
 }
@@ -421,7 +468,7 @@ async function processWbDefense(
 
 async function sendSentinelAlert(
   userId: number,
-  data: SentinelAlertData & { marketplace?: string }
+  data: SentinelAlertData & { marketplace?: string; isError?: boolean }
 ) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
 
@@ -434,16 +481,32 @@ async function sendSentinelAlert(
   const time = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
   const date = new Date().toLocaleDateString('ru-RU');
 
-  const msg =
-    `🛡️ <b>NeuroGUARDIAN SENTINEL</b>\n\n` +
-    `⚠️ <b>АТАКА ОБНАРУЖЕНА!</b>\n` +
-    `📅 ${date} в ${time}\n\n` +
-    `${marketplaceEmoji} <b>${data.marketplace || 'Маркетплейс'}</b>\n` +
-    `📦 ${data.title}\n\n` +
-    `📉 Цена упала: <s>${data.minPrice}₽</s> → <b>${data.currentPrice}₽</b>\n` +
-    `⚔️ <b>Защита:</b> ${data.defenseAction}\n` +
-    `💰 <b>Спасено:</b> ${data.savedAmount}₽\n\n` +
-    `✅ Ваш товар защищён!`;
+  let msg = '';
+
+  if (data.isError) {
+    // CRITICAL FAILURE ALERT
+    msg =
+      `🆘 <b>NeuroGUARDIAN SENTINEL</b>\n\n` +
+      `❌ <b>ОШИБКА ЗАЩИТЫ!</b>\n` +
+      `📅 ${date} в ${time}\n\n` +
+      `${marketplaceEmoji} <b>${data.marketplace || 'Маркетплейс'}</b>\n` +
+      `📦 ${data.title}\n\n` +
+      `📉 Цена упала: <s>${data.minPrice}₽</s> → <b>${data.currentPrice}₽</b>\n` +
+      `⚠️ <b>Ошибка:</b> ${data.defenseAction}\n\n` +
+      `⚡ <b>СРОЧНО ИЗМЕНИТЕ ЦЕНУ ВРУЧНУЮ!</b>`;
+  } else {
+    // SUCCESS ALERT
+    msg =
+      `🛡️ <b>NeuroGUARDIAN SENTINEL</b>\n\n` +
+      `⚠️ <b>АТАКА ОБНАРУЖЕНА!</b>\n` +
+      `📅 ${date} в ${time}\n\n` +
+      `${marketplaceEmoji} <b>${data.marketplace || 'Маркетплейс'}</b>\n` +
+      `📦 ${data.title}\n\n` +
+      `📉 Цена упала: <s>${data.minPrice}₽</s> → <b>${data.currentPrice}₽</b>\n` +
+      `⚔️ <b>Защита:</b> ${data.defenseAction}\n` +
+      `💰 <b>Спасено:</b> ${data.savedAmount}₽\n\n` +
+      `✅ Ваш товар защищён!`;
+  }
 
   try {
     const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {

@@ -9,7 +9,21 @@ import { decryptApiKey, fetchWithRetry } from '../lib/index.js';
 import { getUserById, getProductsByUserId } from '../services/index.js';
 
 // Zod validation schemas
-import { validateToolArgs, SearchWebArgsSchema } from './validators.js';
+import {
+  validateToolArgs,
+  GetProductsArgsSchema,
+  GetSalesStatsArgsSchema,
+  GetOrdersArgsSchema,
+  GetWarehouseStocksArgsSchema,
+  CalculateUnitEconomicsArgsSchema,
+  GetAbcAnalysisArgsSchema,
+  GetStockForecastArgsSchema,
+  GetMarketplaceInfoArgsSchema,
+  SearchWebArgsSchema,
+} from './validators.js';
+
+// Unified product matching
+import { filterProducts } from '../utils/product-matcher.js';
 
 // Types for tool responses
 interface ToolResult {
@@ -41,24 +55,22 @@ async function getUserApiKeys(userId: number): Promise<{
 
   if (user.api_key_ozon) {
     const decrypted = decryptApiKey(user.api_key_ozon);
-    console.log(`🔑 Ozon key decryption: ${decrypted ? 'SUCCESS' : 'FAILED'}`);
     if (decrypted) {
       const [clientId, apiKey] = decrypted.split(':');
       if (clientId && apiKey) {
         result.ozon = { clientId, apiKey };
-        console.log(`✅ Ozon API configured: clientId=${clientId.substring(0, 4)}...`);
+        console.log(`✅ Ozon API configured`);
       } else {
-        console.warn(`⚠️ Ozon key format invalid (missing clientId or apiKey)`);
+        console.warn(`⚠️ Ozon key format invalid`);
       }
     }
   }
 
   if (user.api_key_wb) {
     const decrypted = decryptApiKey(user.api_key_wb);
-    console.log(`🔑 WB key decryption: ${decrypted ? 'SUCCESS' : 'FAILED'}`);
     if (decrypted) {
       result.wb = decrypted;
-      console.log(`✅ WB API configured: key starts with ${decrypted.substring(0, 8)}...`);
+      console.log(`✅ WB API configured`);
     }
   }
 
@@ -69,25 +81,23 @@ async function getUserApiKeys(userId: number): Promise<{
 /**
  * GET_PRODUCTS — Get user's products with prices and stocks
  */
-export async function executeGetProducts(
-  userId: number,
-  args: { marketplace?: string; limit?: number; sort_by?: string }
-): Promise<ToolResult> {
+export async function executeGetProducts(userId: number, rawArgs: unknown): Promise<ToolResult> {
+  // Validate args
+  const validation = validateToolArgs(GetProductsArgsSchema, rawArgs);
+  if (!validation.success) return { success: false, error: validation.error };
+  const args = validation.data;
+
   try {
     const products = await getProductsByUserId(userId);
 
-    let filtered = products;
-
-    // Filter by marketplace
-    if (args.marketplace && args.marketplace !== 'all') {
-      filtered = filtered.filter(p => p.marketplace === args.marketplace);
-    }
+    const marketplace = args.marketplace === 'all' ? undefined : args.marketplace;
+    let filtered = filterProducts(products as any, marketplace);
 
     // Sort
     if (args.sort_by === 'price') {
       filtered.sort((a, b) => (b.current_price || 0) - (a.current_price || 0));
     } else if (args.sort_by === 'stock') {
-      filtered.sort((a, b) => (b.stock || 0) - (a.stock || 0));
+      filtered.sort((a, b) => ((b as any).current_stock || 0) - ((a as any).current_stock || 0));
     } else if (args.sort_by === 'name') {
       filtered.sort((a, b) => a.title.localeCompare(b.title));
     }
@@ -121,10 +131,12 @@ export async function executeGetProducts(
  * GET_SALES_STATS — Get sales statistics from WB/Ozon API
  * Enhanced with trend analysis and recommendations
  */
-export async function executeGetSalesStats(
-  userId: number,
-  args: { period: string; marketplace?: string }
-): Promise<ToolResult> {
+export async function executeGetSalesStats(userId: number, rawArgs: unknown): Promise<ToolResult> {
+  // Validate args
+  const validation = validateToolArgs(GetSalesStatsArgsSchema, rawArgs);
+  if (!validation.success) return { success: false, error: validation.error };
+  const args = validation.data;
+
   console.log(
     `📊 executeGetSalesStats: userId=${userId}, period=${args.period}, mp=${args.marketplace}`
   );
@@ -187,76 +199,88 @@ export async function executeGetSalesStats(
     let periodRevenue = 0;
     let periodReturns = 0;
 
-    // Fetch Ozon stats
+    // Parallel execution for Ozon and WB
+    const tasks: Promise<void>[] = [];
+
+    // Ozon Task
     if (
       keys.ozon &&
       (!args.marketplace || args.marketplace === 'Ozon' || args.marketplace === 'all')
     ) {
-      try {
-        const ozonRes = await fetchWithRetry('https://api-seller.ozon.ru/v1/analytics/data', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Client-Id': keys.ozon.clientId,
-            'Api-Key': keys.ozon.apiKey,
-          },
-          body: JSON.stringify({
-            date_from: from.toISOString().split('T')[0],
-            date_to: to.toISOString().split('T')[0],
-            metrics: ['revenue', 'ordered_units', 'returns'],
-            dimension: ['day'],
-            limit: 1000,
-          }),
-        });
+      tasks.push(
+        (async () => {
+          try {
+            const ozonRes = await fetchWithRetry('https://api-seller.ozon.ru/v1/analytics/data', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Client-Id': keys.ozon!.clientId,
+                'Api-Key': keys.ozon!.apiKey,
+              },
+              body: JSON.stringify({
+                date_from: from.toISOString().split('T')[0],
+                date_to: to.toISOString().split('T')[0],
+                metrics: ['revenue', 'ordered_units', 'returns'],
+                dimension: ['day'],
+                limit: 1000,
+              }),
+            });
 
-        if (ozonRes.ok) {
-          const ozonData = await ozonRes.json();
-          const result = ozonData.result?.data || [];
-
-          for (const row of result) {
-            periodRevenue += row.metrics?.[0] || 0;
-            periodOrders += row.metrics?.[1] || 0;
-            periodReturns += row.metrics?.[2] || 0;
-          }
-        }
-      } catch (e) {
-        console.error('Ozon stats error:', e);
-      }
-    }
-
-    // Fetch WB stats
-    if (keys.wb && (!args.marketplace || args.marketplace === 'WB' || args.marketplace === 'all')) {
-      try {
-        const wbRes = await fetchWithRetry(
-          `https://statistics-api.wildberries.ru/api/v1/supplier/sales?dateFrom=${from.toISOString().split('T')[0]}`,
-          {
-            method: 'GET',
-            headers: {
-              Authorization: keys.wb,
-            },
-          }
-        );
-
-        if (wbRes.ok) {
-          const wbData = await wbRes.json();
-          const sales = (wbData || []).filter((s: { date: string }) => {
-            const saleDate = new Date(s.date);
-            return saleDate >= from && saleDate <= to;
-          });
-
-          for (const sale of sales) {
-            if (sale.saleID && !sale.saleID.startsWith('R')) {
-              periodOrders++;
-              periodRevenue += sale.finishedPrice || sale.priceWithDisc || 0;
-            } else if (sale.saleID?.startsWith('R')) {
-              periodReturns++;
+            if (ozonRes.ok) {
+              const ozonData = await ozonRes.json();
+              const result = ozonData.result?.data || [];
+              for (const row of result) {
+                periodRevenue += row.metrics?.[0] || 0;
+                periodOrders += row.metrics?.[1] || 0;
+                periodReturns += row.metrics?.[2] || 0;
+              }
             }
+          } catch (e) {
+            console.error('Ozon stats error:', e);
           }
-        }
-      } catch (e) {
-        console.error('WB stats error:', e);
-      }
+        })()
+      );
     }
+
+    // WB Task
+    if (keys.wb && (!args.marketplace || args.marketplace === 'WB' || args.marketplace === 'all')) {
+      tasks.push(
+        (async () => {
+          try {
+            const wbRes = await fetchWithRetry(
+              `https://statistics-api.wildberries.ru/api/v1/supplier/sales?dateFrom=${from.toISOString().split('T')[0]}`,
+              {
+                method: 'GET',
+                headers: {
+                  Authorization: keys.wb!,
+                },
+              }
+            );
+
+            if (wbRes.ok) {
+              const wbData = await wbRes.json();
+              const sales = (wbData || []).filter((s: { date: string }) => {
+                const saleDate = new Date(s.date);
+                return saleDate >= from && saleDate <= to;
+              });
+
+              for (const sale of sales) {
+                if (sale.saleID && !sale.saleID.startsWith('R')) {
+                  periodOrders++;
+                  periodRevenue += sale.finishedPrice || sale.priceWithDisc || 0;
+                } else if (sale.saleID?.startsWith('R')) {
+                  periodReturns++;
+                }
+              }
+            }
+          } catch (e) {
+            console.error('WB stats error:', e);
+          }
+        })()
+      );
+    }
+
+    await Promise.all(tasks);
 
     return { orders: periodOrders, revenue: Math.round(periodRevenue), returns: periodReturns };
   }
@@ -418,10 +442,10 @@ export async function executeGetSalesStats(
 /**
  * GET_ORDERS — Get orders list from WB/Ozon
  */
-export async function executeGetOrders(
-  userId: number,
-  args: { period: string; marketplace?: string; status?: string }
-): Promise<ToolResult> {
+export async function executeGetOrders(userId: number, rawArgs: unknown): Promise<ToolResult> {
+  const validation = validateToolArgs(GetOrdersArgsSchema, rawArgs);
+  if (!validation.success) return { success: false, error: validation.error };
+  const args = validation.data;
   const keys = await getUserApiKeys(userId);
 
   if (!keys.ozon && !keys.wb) {
@@ -538,8 +562,11 @@ export async function executeGetOrders(
  */
 export async function executeGetWarehouseStocks(
   userId: number,
-  args: { marketplace?: string; low_stock_only?: boolean }
+  rawArgs: unknown
 ): Promise<ToolResult> {
+  const validation = validateToolArgs(GetWarehouseStocksArgsSchema, rawArgs);
+  if (!validation.success) return { success: false, error: validation.error };
+  const args = validation.data;
   const keys = await getUserApiKeys(userId);
 
   if (!keys.ozon && !keys.wb) {
@@ -660,17 +687,17 @@ export async function executeGetWarehouseStocks(
  */
 export async function executeCalculateUnitEconomics(
   userId: number,
-  args: { product_id?: string; cost_price?: number; marketplace?: string }
+  rawArgs: unknown
 ): Promise<ToolResult> {
+  const validation = validateToolArgs(CalculateUnitEconomicsArgsSchema, rawArgs);
+  if (!validation.success) return { success: false, error: validation.error };
+  const args = validation.data;
   // Get products
   const products = await getProductsByUserId(userId);
 
   let targetProducts = products;
   if (args.product_id) {
-    const searchId = args.product_id.toLowerCase();
-    targetProducts = products.filter(
-      p => p.product_id === args.product_id || p.title.toLowerCase().includes(searchId)
-    );
+    targetProducts = filterProducts(products as any, args.marketplace, args.product_id);
   }
 
   if (targetProducts.length === 0) {
@@ -733,10 +760,10 @@ export async function executeCalculateUnitEconomics(
  * GET_ABC_ANALYSIS — ABC analysis of products
  * Improved: Now shows top products from each category
  */
-export async function executeGetAbcAnalysis(
-  userId: number,
-  _args: { period?: string }
-): Promise<ToolResult> {
+export async function executeGetAbcAnalysis(userId: number, rawArgs: unknown): Promise<ToolResult> {
+  const validation = validateToolArgs(GetAbcAnalysisArgsSchema, rawArgs);
+  if (!validation.success) return { success: false, error: validation.error };
+  const _args = validation.data;
   // For now, use database products and their prices as proxy for revenue
   // _args.period could be used for time-based filtering in future
   const products = await getProductsByUserId(userId);
@@ -830,16 +857,16 @@ export async function executeGetAbcAnalysis(
  */
 export async function executeGetStockForecast(
   userId: number,
-  args: { product_id?: string }
+  rawArgs: unknown
 ): Promise<ToolResult> {
+  const validation = validateToolArgs(GetStockForecastArgsSchema, rawArgs);
+  if (!validation.success) return { success: false, error: validation.error };
+  const args = validation.data;
   const products = await getProductsByUserId(userId);
 
   let filtered = products;
   if (args.product_id) {
-    const searchId = args.product_id.toLowerCase();
-    filtered = products.filter(
-      p => p.product_id === args.product_id || p.title.toLowerCase().includes(searchId)
-    );
+    filtered = filterProducts(products as any, undefined, args.product_id);
   }
 
   if (filtered.length === 0) {
@@ -879,10 +906,10 @@ export async function executeGetStockForecast(
 /**
  * GET_MARKETPLACE_INFO — Reference information about marketplaces
  */
-export function executeGetMarketplaceInfo(args: {
-  marketplace?: string;
-  topic: string;
-}): ToolResult {
+export function executeGetMarketplaceInfo(rawArgs: unknown): ToolResult {
+  const validation = validateToolArgs(GetMarketplaceInfoArgsSchema, rawArgs);
+  if (!validation.success) return { success: false, error: validation.error };
+  const args = validation.data;
   const info: Record<string, Record<string, string>> = {
     commissions: {
       WB: `📊 Комиссии Wildberries (декабрь 2024):

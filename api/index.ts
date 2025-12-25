@@ -83,9 +83,17 @@ function setCorsHeaders(req: VercelRequest, res: VercelResponse) {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { method, query, body } = req;
+  const sanitizeBodyForLog = (body: any) => {
+    if (!body) return {};
+    const clone = { ...body };
+    if (clone.initData) clone.initData = '***REDACTED***';
+    if (clone.password) clone.password = '***REDACTED***';
+    return clone;
+  };
+
   console.log(
     `📥 API Request: ${method} action=${query.action || body?.action}`,
-    JSON.stringify(body || {}).substring(0, 200)
+    JSON.stringify(sanitizeBodyForLog(body)).substring(0, 200)
   );
 
   // Handle CORS preflight

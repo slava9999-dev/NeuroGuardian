@@ -97,16 +97,6 @@ export async function handlePaymentWebhook(
   res: VercelResponse
 ): Promise<VercelResponse> {
   // SECURITY: Verify webhook is from YooKassa IP addresses
-  const YOOKASSA_IPS = [
-    '185.71.76.0/27',
-    '185.71.77.0/27',
-    '77.75.153.0/25',
-    '77.75.156.11',
-    '77.75.156.35',
-    '77.75.154.128/25',
-    '2a02:5180::/32',
-  ];
-
   const clientIP =
     (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
     (req.headers['x-real-ip'] as string) ||
@@ -115,16 +105,37 @@ export async function handlePaymentWebhook(
   const IS_PRODUCTION =
     process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
 
-  // Simple IP check
-  const isYooKassaIp = YOOKASSA_IPS.some(ip => {
-    if (ip.includes('/')) {
-      const prefix = ip.split('/')[0].split('.').slice(0, 3).join('.');
-      return clientIP.startsWith(prefix);
-    }
-    return clientIP === ip;
-  });
+  // Strict IP Validation
+  const isYookassaIp = (ip: string) => {
+    if (ip === '77.75.156.11' || ip === '77.75.156.35') return true;
+    if (ip.startsWith('2a02:5180:')) return true; // IPv6 check
 
-  if (IS_PRODUCTION && !isYooKassaIp && clientIP !== 'unknown') {
+    const parts = ip.split('.').map(Number);
+    if (parts.length !== 4 || parts.some(isNaN)) return false;
+
+    // 185.71.76.0/27 (0-31)
+    if (parts[0] === 185 && parts[1] === 71 && parts[2] === 76 && parts[3] >= 0 && parts[3] <= 31)
+      return true;
+    // 185.71.77.0/27 (0-31)
+    if (parts[0] === 185 && parts[1] === 71 && parts[2] === 77 && parts[3] >= 0 && parts[3] <= 31)
+      return true;
+    // 77.75.153.0/25 (0-127)
+    if (parts[0] === 77 && parts[1] === 75 && parts[2] === 153 && parts[3] >= 0 && parts[3] <= 127)
+      return true;
+    // 77.75.154.128/25 (128-255)
+    if (
+      parts[0] === 77 &&
+      parts[1] === 75 &&
+      parts[2] === 154 &&
+      parts[3] >= 128 &&
+      parts[3] <= 255
+    )
+      return true;
+
+    return false;
+  };
+
+  if (IS_PRODUCTION && !isYookassaIp(clientIP) && clientIP !== 'unknown') {
     console.error(`🚫 BLOCKED: Webhook from unauthorized IP: ${clientIP}`);
     return res.status(403).json({ error: 'Forbidden: Invalid source IP' });
   }
@@ -144,13 +155,22 @@ export async function handlePaymentWebhook(
     const plan = SUBSCRIPTION_PLANS[planId as PlanId];
     if (plan) {
       const actualPlan = planId === 'yearly' ? 'pro' : planId;
+
+      // CHECK REFERRAL ELIGIBILITY *BEFORE* UPDATING TRANSACTION
+      // Because isFirstPayment checks for existing 'succeeded' transactions
+      let isFirst = false;
+      if (referrerId) {
+        const { isFirstPayment } = await import('../../src/api-lib/services/index.js');
+        isFirst = await isFirstPayment(userId);
+      }
+
+      // Activate subscription
       await activateSubscription(userId, actualPlan, plan.durationDays, payment.payment_method?.id);
 
-      // Update transaction in DB
+      // Update transaction status
       if (metadata.transaction_id) {
         await updateTransactionStatus(metadata.transaction_id, 'succeeded', payment.id);
       } else {
-        // Fallback: update the most recent pending transaction for this user
         await sql`
           UPDATE transactions SET status = 'succeeded', yookassa_payment_id = ${payment.id}, paid_at = CURRENT_TIMESTAMP
           WHERE user_id = ${userId} AND status = 'pending'
@@ -158,15 +178,11 @@ export async function handlePaymentWebhook(
         `;
       }
 
-      // Apply referral bonus
-      if (referrerId) {
-        const { isFirstPayment, applyReferralBonus } =
-          await import('../../src/api-lib/services/index.js');
-        const isFirst = await isFirstPayment(userId);
-        if (isFirst) {
-          await applyReferralBonus(referrerId);
-          console.log(`🎁 Referral bonus applied to user ${referrerId}`);
-        }
+      // Apply referral bonus if eligible
+      if (referrerId && isFirst) {
+        const { applyReferralBonus } = await import('../../src/api-lib/services/index.js');
+        await applyReferralBonus(referrerId);
+        console.log(`🎁 Referral bonus applied to user ${referrerId}`);
       }
 
       // Send success notification
