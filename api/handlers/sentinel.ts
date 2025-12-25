@@ -31,6 +31,7 @@ interface MonitoredProduct {
   nm_id?: number;
   title: string;
   min_price: number;
+  current_price?: number; // From DB, updated by sync
   vendor_code?: string;
 }
 
@@ -241,8 +242,9 @@ async function processOzonDefense(
   // Get product IDs for API calls
   const productIds = monitoredProducts.map(p => parseInt(p.product_id.replace('ozon-', '')));
 
-  // Fetch current prices via MarketplaceService
-  const priceMap = await fetchOzonCurrentPrices(clientId, apiKey, productIds);
+  // WORKAROUND: Ozon Prices API returns 404 for all endpoints
+  // Use current_price from DB (updated by sync) instead
+  console.log(`📊 Ozon: Using DB prices (Prices API unavailable)`);
 
   // Fetch product info (for offer_id) via MarketplaceService
   const productInfoMap = await fetchOzonProductInfo(clientId, apiKey, productIds);
@@ -252,11 +254,11 @@ async function processOzonDefense(
     const ozonId = parseInt(dbProduct.product_id.replace('ozon-', ''));
     const productInfo = productInfoMap.get(ozonId);
 
-    // Get price from prices API, or try item fields
-    const currentPrice = priceMap.get(ozonId) || 0;
+    // Use current_price from DB (updated by sync)
+    const currentPrice = dbProduct.current_price || 0;
 
     if (currentPrice === 0) {
-      console.warn(`⚠️ No price found for Ozon product ${ozonId}`);
+      console.warn(`⚠️ No price in DB for Ozon product ${ozonId} - run sync first`);
       continue;
     }
 

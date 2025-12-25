@@ -23,8 +23,8 @@ async function testOzonPricesAPI() {
   console.log(`Product IDs: ${testProductIds.join(', ')}\n`);
 
   try {
-    // Try v3/product/info/list instead (includes prices in response)
-    const response = await fetch('https://api-seller.ozon.ru/v3/product/info/list', {
+    // Try v1/product/info/prices (old but should work)
+    const response = await fetch('https://api-seller.ozon.ru/v1/product/info/prices', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

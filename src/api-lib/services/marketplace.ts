@@ -897,9 +897,9 @@ export async function fetchOzonCurrentPrices(
   try {
     console.log(`📡 Ozon Prices API: Fetching for ${productIds.length} products`);
 
-    // CRITICAL FIX: Use v4/product/info/prices for FBS products
-    // v3/product/info/list returns 0 items for FBS products
-    const response = await fetchWithRetry('https://api-seller.ozon.ru/v4/product/info/prices', {
+    // CRITICAL FIX: Use v1/product/info/prices (old but working)
+    // v2, v3, v4 all return 404 or empty results for FBS products
+    const response = await fetchWithRetry('https://api-seller.ozon.ru/v1/product/info/prices', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -907,11 +907,7 @@ export async function fetchOzonCurrentPrices(
         'Api-Key': apiKey,
       },
       body: JSON.stringify({
-        filter: {
-          product_id: productIds,
-          visibility: 'ALL', // Include both FBS and FBO
-        },
-        limit: 1000,
+        product_id: productIds,
       }),
     });
 
@@ -919,21 +915,18 @@ export async function fetchOzonCurrentPrices(
 
     if (response.ok) {
       const data = await response.json();
-      const items = data.result?.items || [];
+      const items = data.result?.items || data.items || [];
 
       console.log(`📦 Ozon Prices API: received ${items.length} items`);
 
       for (const p of items) {
-        // Extract price from v4 response
-        const actualPrice = parseFloat(p.price?.marketing_price || p.price?.price || '0');
+        // v1 response structure
+        const actualPrice = parseFloat(p.marketing_price || p.price || '0');
 
         if (p.product_id && actualPrice > 0) {
           priceMap.set(p.product_id, Math.round(actualPrice));
         } else {
-          console.warn(
-            `⚠️ Ozon: No price for product ${p.product_id}, price object:`,
-            JSON.stringify(p.price)
-          );
+          console.warn(`⚠️ Ozon: No price for product ${p.product_id}, data:`, JSON.stringify(p));
         }
       }
       console.log(`💰 Ozon Prices API: Fetched ${priceMap.size}/${items.length} valid prices`);
