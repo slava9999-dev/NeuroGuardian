@@ -467,11 +467,17 @@ const SIMPLE_INTENTS: Record<string, string> = {
 async function handleSimpleIntent(message: string): Promise<string | null> {
   const normalized = message.toLowerCase().trim();
 
+  // Only match if message is short (simple greeting) - max 25 chars
+  // This prevents matching "привет давай выровняем цены..." as simple intent
+  if (normalized.length > 25) {
+    return null;
+  }
+
   for (const [trigger, response] of Object.entries(SIMPLE_INTENTS)) {
     if (
       normalized === trigger ||
-      normalized.startsWith(trigger + ' ') ||
-      normalized.endsWith(' ' + trigger)
+      normalized.startsWith(trigger + '!') ||
+      normalized === trigger + '.'
     ) {
       return response;
     }
