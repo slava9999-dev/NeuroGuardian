@@ -91,12 +91,20 @@ export function buildPricingPrompt(context?: {
   let dynamicContext = '';
 
   if (context) {
+    // CRITICAL: If marketplace is specified, enforce it in tool calls
+    const marketplaceRule =
+      context.marketplace && context.marketplace !== 'all'
+        ? `\n\n⚠️ **ОБЯЗАТЕЛЬНО**: Пользователь указал маркетплейс **${context.marketplace}**. 
+При вызове ЛЮБОГО tool добавляй параметр: marketplace: "${context.marketplace}"`
+        : '';
+
     dynamicContext = `
 # 📋 Контекст пользователя:
 - Всего товаров: ${context.productsCount || 0}
 - Защищено: ${context.protectedCount || 0}
 - Без защиты: ${(context.productsCount || 0) - (context.protectedCount || 0)}
 - Маркетплейс: ${context.marketplace || 'не указан'}
+${marketplaceRule}
 `;
   }
 

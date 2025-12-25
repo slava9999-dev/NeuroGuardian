@@ -82,12 +82,20 @@ export function buildAnalyticsPrompt(context?: {
   let dynamicContext = '';
 
   if (context) {
+    // CRITICAL: If marketplace is specified, enforce it in tool calls
+    const marketplaceRule =
+      context.marketplace && context.marketplace !== 'all'
+        ? `\n\n⚠️ **ОБЯЗАТЕЛЬНО**: Пользователь указал маркетплейс **${context.marketplace}**. 
+При вызове ЛЮБОГО tool добавляй параметр: marketplace: "${context.marketplace}"`
+        : '';
+
     dynamicContext = `
 # 📋 Контекст пользователя:
 - Товаров: ${context.productsCount || 0}
 - Маркетплейс: ${context.marketplace || 'не указан'}
 - WB API: ${context.hasWbApi ? '✅' : '❌'}
 - Ozon API: ${context.hasOzonApi ? '✅' : '❌'}
+${marketplaceRule}
 `;
   }
 
