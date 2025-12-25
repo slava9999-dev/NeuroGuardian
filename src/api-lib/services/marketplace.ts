@@ -897,9 +897,9 @@ export async function fetchOzonCurrentPrices(
   try {
     console.log(`📡 Ozon Prices API: Fetching for ${productIds.length} products`);
 
-    // CRITICAL FIX: Use v3/product/info/list (same as sync)
-    // This endpoint returns full product info including prices
-    const response = await fetchWithRetry('https://api-seller.ozon.ru/v3/product/info/list', {
+    // CRITICAL FIX: Use v4/product/info/prices for FBS products
+    // v3/product/info/list returns 0 items for FBS products
+    const response = await fetchWithRetry('https://api-seller.ozon.ru/v4/product/info/prices', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -907,7 +907,11 @@ export async function fetchOzonCurrentPrices(
         'Api-Key': apiKey,
       },
       body: JSON.stringify({
-        product_id: productIds,
+        filter: {
+          product_id: productIds,
+          visibility: 'ALL', // Include both FBS and FBO
+        },
+        limit: 1000,
       }),
     });
 
@@ -920,19 +924,14 @@ export async function fetchOzonCurrentPrices(
       console.log(`📦 Ozon Prices API: received ${items.length} items`);
 
       for (const p of items) {
-        // Extract price from product info (same logic as sync)
-        let actualPrice = 0;
-        if (typeof p.price === 'object' && p.price !== null) {
-          actualPrice = parseFloat(p.price.marketing_price || p.price.price || '0');
-        } else if (typeof p.price === 'string') {
-          actualPrice = parseFloat(p.price || p.marketing_price || '0');
-        }
+        // Extract price from v4 response
+        const actualPrice = parseFloat(p.price?.marketing_price || p.price?.price || '0');
 
-        if (p.id && actualPrice > 0) {
-          priceMap.set(p.id, Math.round(actualPrice));
+        if (p.product_id && actualPrice > 0) {
+          priceMap.set(p.product_id, Math.round(actualPrice));
         } else {
           console.warn(
-            `⚠️ Ozon: No price for product ${p.id}, price object:`,
+            `⚠️ Ozon: No price for product ${p.product_id}, price object:`,
             JSON.stringify(p.price)
           );
         }
