@@ -34,6 +34,14 @@ import { handleAuth, handleSettings, handlePlans } from './handlers/auth.js';
 import { handleProducts, handleSyncProducts, handleBatchSetStopLoss } from './handlers/products.js';
 import { handleCreatePayment, handlePaymentWebhook } from './handlers/payments.js';
 import { handleCheckPrices } from './handlers/sentinel.js';
+import {
+  handleSentinelStatus,
+  handleDefenseHistory,
+  handleToggleProtection,
+  handleUpdateSentinelStatus,
+  handleLogDefense,
+  handleBulkLogDefense,
+} from './handlers/sentinel-status.js';
 // V3 agent handler removed - all agent calls now go through V4
 import { handleAgentV4, handleAgentV4Status, handleAgentV4Confirm } from './handlers/agent-v4.js';
 
@@ -321,6 +329,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(401).json({ error: 'Unauthorized', code: 'AUTH_FAILED' });
         }
         return handleSentinelLogs(req, res, validation.user.id);
+      }
+
+      // ========== SENTINEL STATUS (real-time UI) ==========
+      case 'sentinel-status': {
+        return handleSentinelStatus(req, res);
+      }
+
+      // ========== DEFENSE HISTORY ==========
+      case 'defense-history': {
+        return handleDefenseHistory(req, res);
+      }
+
+      // ========== TOGGLE PROTECTION ==========
+      case 'toggle-protection': {
+        return handleToggleProtection(req, res);
+      }
+
+      // ========== UPDATE SENTINEL STATUS (n8n) ==========
+      case 'update-sentinel-status': {
+        return handleUpdateSentinelStatus(req, res);
+      }
+
+      // ========== LOG DEFENSE (n8n) ==========
+      case 'log-defense': {
+        return handleLogDefense(req, res);
+      }
+
+      // ========== BULK LOG DEFENSE (n8n) ==========
+      case 'bulk-log-defense': {
+        return handleBulkLogDefense(req, res);
       }
 
       // ========== AI AGENT (V3 redirects to V4) ==========

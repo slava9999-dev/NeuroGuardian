@@ -112,6 +112,9 @@ export async function handleCheckPrices(
 
   console.log(`🛡️ SENTINEL: Starting price check for ${targetUsers.length} users...`);
 
+  // Check if n8n workflow wants details immediately
+  const includeDetails = req.query.include_details === 'true';
+
   // DEBUG MODE VARIABLES
   const isDebug = req.query.debug === 'true';
   const debugInfo: unknown[] = [];
@@ -137,6 +140,7 @@ export async function handleCheckPrices(
 
   let totalScanned = 0;
   let totalTriggered = 0;
+  const violations: unknown[] = []; // For include_details mode
 
   try {
     // Parallel Processing with Batching
@@ -160,6 +164,7 @@ export async function handleCheckPrices(
                   onScan: () => totalScanned++,
                   onTrigger: () => totalTriggered++,
                   log,
+                  violations: includeDetails ? violations : undefined,
                 });
               } catch (e) {
                 console.error(`Error checking Ozon for user ${user.id}:`, e);
@@ -174,6 +179,7 @@ export async function handleCheckPrices(
                   onScan: () => totalScanned++,
                   onTrigger: () => totalTriggered++,
                   log,
+                  violations: includeDetails ? violations : undefined,
                 });
               } catch (e) {
                 console.error(`Error checking WB for user ${user.id}:`, e);
@@ -191,10 +197,21 @@ export async function handleCheckPrices(
     console.log = originalLog;
     console.error = originalError;
 
+    // Return format based on include_details
+    if (includeDetails) {
+      return res.json({
+        success: true,
+        violations,
+        total: violations.length,
+        scanned: totalScanned,
+      });
+    }
+
     return res.json({
       success: true,
       scanned: totalScanned,
       triggered: totalTriggered,
+      violations_found: totalTriggered,
       log,
       debug_info: isDebug ? debugInfo : undefined,
     });
