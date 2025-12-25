@@ -87,9 +87,9 @@ export function ProductCard({ product }: ProductCardProps) {
             minPrice: newMinPrice,
           }),
         });
-        console.log(`✅ Stop-Loss saved: ${product.productId} → ${newMinPrice}`);
+        console.log(`✅ Минимальная цена saved: ${product.productId} → ${newMinPrice}`);
       } catch (error) {
-        console.error('❌ Failed to save Stop-Loss:', error);
+        console.error('❌ Failed to save минимальная цена:', error);
       }
     }
   }, [minPriceInput, product.id, product.productId, product.minPrice, updateProduct]);
@@ -195,7 +195,12 @@ export function ProductCard({ product }: ProductCardProps) {
             ${isEditing ? 'ring-2 ring-amber-500' : ''}
           `}
         >
-          <p className="text-xs text-stone-400 mb-1">Stop-Loss</p>
+          <p className="text-xs text-stone-400 mb-1 flex items-center gap-1">
+            Минимальная цена
+            <span className="text-stone-500" title="Цена, ниже которой товар продавать невыгодно">
+              ℹ️
+            </span>
+          </p>
           {isEditing ? (
             <input
               type="text"
@@ -222,6 +227,50 @@ export function ProductCard({ product }: ProductCardProps) {
           )}
         </div>
       </div>
+
+      {/* Price Protection Indicator */}
+      {product.minPrice > 0 && (
+        <div className="mb-3 bg-stone-800/30 rounded-xl p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs text-stone-400">🛡️ Защита цены</span>
+            <span
+              className={`text-xs font-medium ${
+                product.currentPrice >= product.minPrice ? 'text-emerald-400' : 'text-red-400'
+              }`}
+            >
+              {product.currentPrice >= product.minPrice ? '✅ Безопасно' : '⚠️ Ниже минимума!'}
+            </span>
+          </div>
+
+          {/* Visual price bar */}
+          <div className="relative h-2 bg-stone-700 rounded-full overflow-hidden">
+            {/* Minimum price marker */}
+            <div
+              className="absolute top-0 bottom-0 w-0.5 bg-amber-500 z-10"
+              style={{ left: '50%' }}
+              title={`Минимум: ${product.minPrice}₽`}
+            />
+
+            {/* Current price fill */}
+            <div
+              className={`absolute top-0 bottom-0 left-0 transition-all duration-500 ${
+                product.currentPrice >= product.minPrice
+                  ? 'bg-gradient-to-r from-emerald-500 to-emerald-400'
+                  : 'bg-gradient-to-r from-red-500 to-red-400'
+              }`}
+              style={{
+                width: `${Math.min(100, (product.currentPrice / (product.minPrice * 2)) * 100)}%`,
+              }}
+            />
+          </div>
+
+          <div className="flex items-center justify-between mt-1 text-xs text-stone-500">
+            <span>0₽</span>
+            <span className="text-amber-400">{product.minPrice}₽</span>
+            <span>{(product.minPrice * 2).toLocaleString('ru-RU')}₽</span>
+          </div>
+        </div>
+      )}
 
       {/* Footer: Price diff + Stock */}
       <div className="flex items-center justify-between text-xs">
