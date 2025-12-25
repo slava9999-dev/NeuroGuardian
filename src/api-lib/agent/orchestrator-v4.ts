@@ -195,12 +195,30 @@ export async function orchestrateV4(
     `✅ V4 Complete in ${totalTimeMs}ms (plan: ${planningTimeMs}ms, exec: ${executionTimeMs}ms, answer: ${answeringTimeMs}ms)`
   );
 
+  // Parse data_json if present
+  let parsedData: Record<string, unknown> | undefined;
+  if (sanitizedAnswer.data_json) {
+    try {
+      parsedData = JSON.parse(sanitizedAnswer.data_json);
+    } catch {
+      console.warn('Failed to parse data_json');
+    }
+  }
+
+  // Parse details_json in actions if present
+  const parsedActions = sanitizedAnswer.actions?.map(action => ({
+    type: action.type,
+    summary: action.summary,
+    details: action.details_json ? JSON.parse(action.details_json) : {},
+    affected_count: action.affected_count,
+  }));
+
   return {
     success: true,
     message: sanitizedAnswer.message,
     links: sanitizedAnswer.links,
-    actions: sanitizedAnswer.actions,
-    data: sanitizedAnswer.data as Record<string, unknown> | undefined,
+    actions: parsedActions,
+    data: parsedData,
     planningTimeMs,
     executionTimeMs,
     answeringTimeMs,

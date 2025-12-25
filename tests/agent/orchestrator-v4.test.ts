@@ -139,7 +139,7 @@ describe('Agent Orchestrator V4', () => {
           {
             type: 'update_prices' as const,
             summary: 'Обновить цены на 5 товаров',
-            details: { product_ids: ['1', '2', '3', '4', '5'] },
+            details_json: JSON.stringify({ product_ids: ['1', '2', '3', '4', '5'] }),
             affected_count: 5,
           },
         ],
@@ -176,7 +176,7 @@ describe('Agent Orchestrator V4', () => {
           {
             type: 'invalid_action_type',
             summary: 'Test',
-            details: {},
+            details_json: '{}',
             affected_count: 0,
           },
         ],
@@ -358,17 +358,13 @@ describe('Agent Orchestrator V4', () => {
       ];
 
       for (const actionType of confirmationActions) {
-        const answer: Answer = {
+        const answer = {
           message: 'Need confirmation',
           actions: [
             {
-              type: actionType as Answer['actions'] extends (infer T)[] | undefined
-                ? T extends { type: infer U }
-                  ? U
-                  : never
-                : never,
+              type: actionType,
               summary: 'Test action',
-              details: {},
+              details_json: '{}',
               affected_count: 1,
             },
           ],

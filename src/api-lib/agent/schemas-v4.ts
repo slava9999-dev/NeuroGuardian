@@ -68,7 +68,7 @@ export const ResponseLinkSchema = z.object({
 export const ResponseActionSchema = z.object({
   type: z.enum(['update_prices', 'set_stop_loss', 'bulk_protect_products', 'update_stocks']),
   summary: z.string().describe('Human-readable description'),
-  details: z.record(z.string(), z.unknown()).describe('Action parameters'),
+  details_json: z.string().describe('JSON-serialized action parameters'),
   affected_count: z.number().int().min(0).describe('Number of items affected'),
 });
 
@@ -98,7 +98,7 @@ export const AnswerSchema = z.object({
   message: z.string().describe('Response text in plain markdown, NO HTML tags'),
   links: z.array(ResponseLinkSchema).optional().describe('Links from tool results only'),
   actions: z.array(ResponseActionSchema).optional().describe('Actions requiring confirmation'),
-  data: ResponseDataSchema.optional().describe('Structured data for UI'),
+  data_json: z.string().optional().describe('JSON-serialized structured data for UI'),
 });
 
 export type Answer = z.infer<typeof AnswerSchema>;
@@ -283,34 +283,19 @@ export const ANSWER_JSON_SCHEMA = {
               enum: ['update_prices', 'set_stop_loss', 'bulk_protect_products', 'update_stocks'],
             },
             summary: { type: 'string' },
-            details: {
-              type: 'object',
-              additionalProperties: true,
+            details_json: {
+              type: 'string',
+              description: 'JSON-serialized details object',
             },
             affected_count: { type: 'integer' },
           },
-          required: ['type', 'summary', 'details', 'affected_count'],
+          required: ['type', 'summary', 'details_json', 'affected_count'],
           additionalProperties: false,
         },
       },
-      data: {
-        type: 'object',
-        properties: {
-          type: { type: 'string' },
-          items: {
-            type: 'array',
-            items: {
-              type: 'object',
-              additionalProperties: true,
-            },
-          },
-          summary: {
-            type: 'object',
-            additionalProperties: true,
-          },
-        },
-        required: ['type'],
-        additionalProperties: false,
+      data_json: {
+        type: 'string',
+        description: 'JSON-serialized data object with type, items, summary',
       },
     },
     required: ['message'],
