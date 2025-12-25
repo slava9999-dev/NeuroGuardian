@@ -763,7 +763,7 @@ export async function executeCalculateUnitEconomics(
 export async function executeGetAbcAnalysis(userId: number, rawArgs: unknown): Promise<ToolResult> {
   const validation = validateToolArgs(GetAbcAnalysisArgsSchema, rawArgs);
   if (!validation.success) return { success: false, error: validation.error };
-  const _args = validation.data;
+
   // For now, use database products and their prices as proxy for revenue
   // _args.period could be used for time-based filtering in future
   const products = await getProductsByUserId(userId);
