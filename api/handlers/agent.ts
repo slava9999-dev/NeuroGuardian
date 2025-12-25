@@ -57,6 +57,9 @@ import {
 // Import canonical AGENT_TOOLS definition (single source of truth)
 import { AGENT_TOOLS } from '../../src/api-lib/agent/tools.js';
 
+// V3 Architecture: Router + Specialists + Structured Output
+import { orchestrateAgentRequest, type UserContext } from '../../src/api-lib/agent/orchestrator.js';
+
 // Note: System prompt is now imported from system-prompt-v2.ts
 // Using Expert Persona (Виктор Маржин) + CoT + Few-Shot examples
 
@@ -805,6 +808,112 @@ export async function handleAgent(
   const typedProducts = products as DBProductRecord[];
   const protectedCount = typedProducts.filter(p => p.min_price > 0).length;
   const unprotectedCount = typedProducts.length - protectedCount;
+
+  // =====================================================
+  // V3 ARCHITECTURE: Router + Specialists + Structured Output
+  // Enable with AGENT_V3=true in environment
+  // =====================================================
+  const USE_V3_ARCHITECTURE = process.env.AGENT_V3 === 'true';
+
+  if (USE_V3_ARCHITECTURE) {
+    console.log('🚀 Using V3 Agent Architecture (Router + Specialists)');
+
+    // Build V3 context
+    const v3Context: UserContext = {
+      userId,
+      productsCount: products.length,
+      protectedCount,
+      hasWbApi: !!user?.api_key_wb,
+      hasOzonApi: !!user?.api_key_ozon,
+      marketplace: 'all',
+      wbApiKey: user?.api_key_wb ? decryptApiKey(user.api_key_wb) : undefined,
+      ozonApiKey: user?.api_key_ozon ? decryptApiKey(user.api_key_ozon) : undefined,
+    };
+
+    // Call V3 orchestrator
+    const v3Result = await orchestrateAgentRequest(
+      message,
+      v3Context,
+      conversationHistory as Array<{ role: string; content: string }>
+    );
+
+    // Build response
+    interface AgentResponseType {
+      content: string;
+      actionRequired?: ActionRequired;
+      metadata?: {
+        executionTime: number;
+        model: string;
+        toolsUsed: string[];
+        tokensUsed: number;
+        category?: string;
+      };
+    }
+
+    const agentResponse: AgentResponseType = {
+      content: v3Result.content,
+      metadata: {
+        executionTime: v3Result.executionTimeMs,
+        model: v3Result.model,
+        toolsUsed: v3Result.toolsUsed,
+        tokensUsed: v3Result.tokensUsed,
+        category: v3Result.category,
+      },
+    };
+
+    if (v3Result.actionRequired) {
+      agentResponse.actionRequired = v3Result.actionRequired as ActionRequired;
+
+      // Store pending action in KV for confirmation
+      if (kv && v3Result.actionRequired.taskId) {
+        try {
+          await kv.set(`pending:${userId}`, v3Result.actionRequired, { ex: 300 });
+        } catch (e) {
+          console.warn('Failed to store pending action:', e);
+        }
+      }
+    }
+
+    // Metrics logging
+    const metrics = createAgentMetrics({
+      userId,
+      userMessage: message,
+      model: v3Result.model,
+      tokensUsed: v3Result.tokensUsed,
+      responseTime: v3Result.executionTimeMs,
+      toolsUsed: v3Result.toolsUsed,
+      hadError: !v3Result.success,
+      errorType: v3Result.success ? undefined : 'v3_error',
+      actionRequired: v3Result.actionRequired
+        ? { type: v3Result.actionRequired.operation }
+        : undefined,
+    });
+
+    logAgentMetrics(metrics).catch(e => console.warn('Metrics logging failed:', e));
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(formatMetricsForLog(metrics));
+    }
+
+    // Save history
+    if (kv && v3Result.content) {
+      try {
+        conversationHistory.push({ role: 'user', content: message });
+        conversationHistory.push({ role: 'assistant', content: v3Result.content });
+        if (conversationHistory.length > 20) conversationHistory = conversationHistory.slice(-20);
+        await kv.set(historyKey, conversationHistory, { ex: 86400 });
+      } catch (e) {
+        console.warn('Failed to save history:', e);
+      }
+    }
+
+    return res.json({ success: true, ...agentResponse });
+  }
+
+  // =====================================================
+  // V2 LEGACY: Full system prompt with all tools
+  // =====================================================
+  console.log('📜 Using V2 Agent Architecture (Legacy)');
 
   // Complexity
   const lowerMessage = message.toLowerCase();
