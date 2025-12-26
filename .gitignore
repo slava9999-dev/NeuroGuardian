@@ -31,3 +31,7 @@ dist-ssr
 *.pem
 *.key
 secrets/
+.env.master
+.env.n8n
+.env.vercel
+.env.vercel.temp

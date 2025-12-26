@@ -1,0 +1,232 @@
+{
+  "name": "NeuroGUARDIAN Product Sync",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "triggerAtHour": 1
+            }
+          ]
+        }
+      },
+      "id": "sync-trigger",
+      "name": "Every Hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [-800, 300]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "apiBaseUrl",
+              "value": "https://neuro-guardian.vercel.app/api",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "cronSecret",
+              "value": "={{ $env.CRON_SECRET }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "telegramBotToken",
+              "value": "={{ $env.TELEGRAM_BOT_TOKEN }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "adminChatId",
+              "value": "={{ $env.ADMIN_CHAT_ID }}",
+              "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "adminTelegramId",
+              "value": "7548070478",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "include": "all",
+        "options": {}
+      },
+      "id": "sync-config",
+      "name": "Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-580, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Configuration').first().json.apiBaseUrl }}?action=sync-products",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Configuration').first().json.cronSecret }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"telegramId\": \"{{ $('Configuration').first().json.adminTelegramId }}\",\n  \"marketplace\": \"ozon\"\n}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "sync-ozon",
+      "name": "Sync Ozon Products",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [-360, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Configuration').first().json.apiBaseUrl }}?action=sync-products",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Configuration').first().json.cronSecret }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"telegramId\": \"{{ $('Configuration').first().json.adminTelegramId }}\",\n  \"marketplace\": \"wildberries\"\n}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "sync-wb",
+      "name": "Sync WB Products",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [-140, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Get results from previous node (WB sync)\nconst wbResult = $input.first()?.json || {};\n\nconst wbSynced = wbResult.synced || wbResult.products_synced || 0;\nconst hasErrors = wbResult.error;\n\nconst message = `📦 *Sync Complete*\\n\\n` +\n  `🟣 WB: ${wbSynced} товаров\\n` +\n  (hasErrors ? `❌ Ошибки: есть\\n` : `✅ Без ошибок\\n`) +\n  `⏰ ${new Date().toLocaleString('ru-RU')}`;\n\nreturn {\n  json: {\n    wbSynced: wbSynced,\n    hasErrors: !!hasErrors,\n    message: message\n  }\n};"
+      },
+      "id": "build-summary",
+      "name": "Build Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [80, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{ $json.hasErrors }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "has-errors",
+      "name": "Has Errors?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [300, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $('Configuration').first().json.telegramBotToken }}/sendMessage",
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{ $('Configuration').first().json.adminChatId }}\",\n  \"text\": \"{{ $json.message }}\",\n  \"parse_mode\": \"Markdown\"\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "send-alert",
+      "name": "Send Error Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [520, 200]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "status",
+              "value": "sync_complete",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "include": "all"
+      },
+      "id": "no-errors",
+      "name": "Success",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [520, 400]
+    }
+  ],
+  "connections": {
+    "Every Hour": {
+      "main": [[{ "node": "Configuration", "type": "main", "index": 0 }]]
+    },
+    "Configuration": {
+      "main": [[{ "node": "Sync Ozon Products", "type": "main", "index": 0 }]]
+    },
+    "Sync Ozon Products": {
+      "main": [[{ "node": "Sync WB Products", "type": "main", "index": 0 }]]
+    },
+    "Sync WB Products": {
+      "main": [[{ "node": "Build Summary", "type": "main", "index": 0 }]]
+    },
+    "Build Summary": {
+      "main": [[{ "node": "Has Errors?", "type": "main", "index": 0 }]]
+    },
+    "Has Errors?": {
+      "main": [
+        [{ "node": "Send Error Alert", "type": "main", "index": 0 }],
+        [{ "node": "Success", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

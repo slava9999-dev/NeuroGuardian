@@ -1,0 +1,177 @@
+{
+  "name": "NeuroGUARDIAN Health Monitor",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "triggerAtHour": 6
+            }
+          ]
+        }
+      },
+      "id": "monitor-trigger",
+      "name": "Every 6 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [-800, 300]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "apiBaseUrl",
+              "value": "https://neuro-guardian.vercel.app/api",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "telegramBotToken",
+              "value": "={{ $env.TELEGRAM_BOT_TOKEN }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "adminChatId",
+              "value": "={{ $env.ADMIN_CHAT_ID }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "include": "all",
+        "options": {}
+      },
+      "id": "monitor-config",
+      "name": "Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-580, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Configuration').first().json.apiBaseUrl }}?action=health",
+        "authentication": "none",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "health-check",
+      "name": "API Health Check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [-360, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const healthResult = $input.first()?.json || {};\n\nconst issues = [];\nlet status = 'healthy';\n\n// Check API health\nif (!healthResult.success && !healthResult.status) {\n  issues.push('❌ API не отвечает');\n  status = 'critical';\n}\n\nlet message = '';\nif (status === 'healthy') {\n  message = `✅ *NeuroGUARDIAN Health Report*\\n\\n` +\n    `🟢 API: Работает\\n` +\n    `⏰ ${new Date().toLocaleString('ru-RU')}`;\n} else {\n  message = `⚠️ *NeuroGUARDIAN Alert*\\n\\n` +\n    `Status: ${status.toUpperCase()}\\n\\n` +\n    `Проблемы:\\n${issues.join('\\n')}\\n\\n` +\n    `⏰ ${new Date().toLocaleString('ru-RU')}`;\n}\n\nreturn {\n  json: {\n    status: status,\n    issues: issues,\n    message: message,\n    shouldNotify: status !== 'healthy',\n    healthResult: healthResult\n  }\n};"
+      },
+      "id": "analyze-health",
+      "name": "Analyze Health",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-80, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{ $json.shouldNotify }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "should-notify",
+      "name": "Should Notify?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [140, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $('Configuration').first().json.telegramBotToken }}/sendMessage",
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{ $('Configuration').first().json.adminChatId }}\",\n  \"text\": \"{{ $json.message }}\",\n  \"parse_mode\": \"Markdown\"\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "send-notification",
+      "name": "Send Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [360, 200]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "status",
+              "value": "all_healthy_no_notification",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "include": "all"
+      },
+      "id": "all-good",
+      "name": "All Good",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [360, 400]
+    }
+  ],
+  "connections": {
+    "Every 6 Hours": {
+      "main": [[{ "node": "Configuration", "type": "main", "index": 0 }]]
+    },
+    "Configuration": {
+      "main": [[{ "node": "API Health Check", "type": "main", "index": 0 }]]
+    },
+    "API Health Check": {
+      "main": [[{ "node": "Analyze Health", "type": "main", "index": 0 }]]
+    },
+    "Analyze Health": {
+      "main": [[{ "node": "Should Notify?", "type": "main", "index": 0 }]]
+    },
+    "Should Notify?": {
+      "main": [
+        [{ "node": "Send Alert", "type": "main", "index": 0 }],
+        [{ "node": "All Good", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
