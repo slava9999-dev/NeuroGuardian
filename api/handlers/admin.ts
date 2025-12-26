@@ -65,6 +65,54 @@ export async function handleResetDb(
 }
 
 /**
+ * Handle run-migration action - applies pending migrations
+ */
+export async function handleRunMigration(
+  req: VercelRequest,
+  res: VercelResponse
+): Promise<VercelResponse> {
+  if (!validateAdminAccess(req)) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  const migrationId = req.query.migration || req.body?.migration || '008';
+  const results: string[] = [];
+
+  try {
+    if (migrationId === '008' || migrationId === 'all') {
+      // Migration 008: Add price buffer settings
+      console.log('🔄 Applying migration 008: price_buffer_settings...');
+
+      // Add columns to users table
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS price_buffer_percent INTEGER DEFAULT 5`;
+      results.push('users.price_buffer_percent added');
+
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS warning_threshold_percent INTEGER DEFAULT 10`;
+      results.push('users.warning_threshold_percent added');
+
+      // Add column to products table
+      await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS card_discount_buffer INTEGER DEFAULT 0`;
+      results.push('products.card_discount_buffer added');
+
+      console.log('✅ Migration 008 complete');
+    }
+
+    return res.json({
+      success: true,
+      migration: migrationId,
+      applied: results,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('Migration error:', error);
+    return res.status(500).json({
+      error: 'Migration failed',
+      details: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+}
+
+/**
  * Handle admin-activate-trial action
  */
 export async function handleAdminActivateTrial(

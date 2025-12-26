@@ -13,6 +13,7 @@ import {
   handleHealth,
   handleInitDb,
   handleResetDb,
+  handleRunMigration,
   handleAdminActivateTrial,
   handleAdminCheckUser,
   handleAdminListUsers,
@@ -206,6 +207,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // ========== HEALTH (migrated to handler) ==========
       case 'health': {
         return handleHealth(req, res);
+      }
+
+      // ========== RUN MIGRATION (admin only) ==========
+      case 'run-migration': {
+        return handleRunMigration(req, res);
       }
 
       // ========== ADMIN: ACTIVATE TRIAL (migrated to handler) ==========

@@ -12,8 +12,6 @@ import { validateTelegramInitData } from '../../src/api-lib/lib/index.js';
 import {
   getUserById,
   getMarketplaceKeys,
-  fetchOzonCurrentPrices,
-  fetchOzonProductInfo,
   setOzonZeroStock,
   setOzonDefensePrice,
   fetchWbPrices,
@@ -275,9 +273,6 @@ async function processOzonDefense(
   );
 
   if (monitoredProducts.length === 0) return;
-
-  // Get product IDs for API calls
-  const productIds = monitoredProducts.map(p => parseInt(p.product_id.replace('ozon-', '')));
 
   // WORKAROUND: Ozon Prices API returns 404 for all endpoints
   // Use current_price from DB (updated by sync) instead
