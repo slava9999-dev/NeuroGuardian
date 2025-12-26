@@ -308,7 +308,7 @@ export const ANSWER_JSON_SCHEMA = {
  */
 export const PLAN_JSON_SCHEMA = {
   name: 'execution_plan',
-  strict: true,
+  strict: false, // Cannot use strict: args properties are optional
   schema: {
     type: 'object',
     properties: {
