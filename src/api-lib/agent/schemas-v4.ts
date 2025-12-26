@@ -251,7 +251,7 @@ export function sanitizeAnswerLinks(answer: Answer, toolResults: ToolResult[]): 
  */
 export const ANSWER_JSON_SCHEMA = {
   name: 'agent_response',
-  strict: true,
+  strict: false, // links, actions, data_json are optional
   schema: {
     type: 'object',
     properties: {
