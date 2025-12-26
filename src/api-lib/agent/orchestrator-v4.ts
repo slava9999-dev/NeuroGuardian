@@ -30,6 +30,145 @@ import {
 } from './tool-executors.js';
 
 // ============================================
+// LLM PROVIDER CONFIG
+// ============================================
+
+interface LLMProvider {
+  name: string;
+  url: string;
+  apiKey: string;
+  model: string;
+  supportsStructuredOutput: boolean;
+}
+
+function getAvailableProviders(): LLMProvider[] {
+  const providers: LLMProvider[] = [];
+
+  // Primary: OpenAI
+  if (process.env.OPENAI_API_KEY) {
+    providers.push({
+      name: 'OpenAI',
+      url: 'https://api.openai.com/v1/chat/completions',
+      apiKey: process.env.OPENAI_API_KEY,
+      model: 'gpt-4o-mini',
+      supportsStructuredOutput: true,
+    });
+  }
+
+  // Fallback: Groq
+  if (process.env.GROQ_API_KEY) {
+    providers.push({
+      name: 'Groq',
+      url: 'https://api.groq.com/openai/v1/chat/completions',
+      apiKey: process.env.GROQ_API_KEY,
+      model: 'llama-3.1-70b-versatile',
+      supportsStructuredOutput: false, // Groq doesn't support json_schema
+    });
+  }
+
+  return providers;
+}
+
+/**
+ * Call LLM with retry and fallback logic
+ */
+async function callLLMWithFallback(
+  messages: Array<{ role: string; content: string }>,
+  options: {
+    temperature?: number;
+    maxTokens?: number;
+    jsonSchema?: unknown;
+    preferredModel?: string;
+  }
+): Promise<{ content: string; tokensUsed: number; provider: string }> {
+  const providers = getAvailableProviders();
+
+  if (providers.length === 0) {
+    throw new Error('No LLM providers configured. Set OPENAI_API_KEY or GROQ_API_KEY.');
+  }
+
+  const maxRetries = 2;
+  let lastError: Error | null = null;
+
+  for (const provider of providers) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`🤖 Calling ${provider.name} (attempt ${attempt}/${maxRetries})...`);
+
+        const body: Record<string, unknown> = {
+          model: options.preferredModel || provider.model,
+          messages,
+          temperature: options.temperature ?? 0.3,
+          max_tokens: options.maxTokens ?? 1500,
+        };
+
+        // Add structured output only if provider supports it
+        if (options.jsonSchema && provider.supportsStructuredOutput) {
+          body.response_format = {
+            type: 'json_schema',
+            json_schema: options.jsonSchema,
+          };
+        } else if (options.jsonSchema) {
+          // Fallback: add JSON instruction to system prompt
+          const systemMsg = messages.find(m => m.role === 'system');
+          if (systemMsg) {
+            systemMsg.content += '\n\nОТВЕТЬ СТРОГО В ФОРМАТЕ JSON.';
+          }
+        }
+
+        const response = await fetch(provider.url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${provider.apiKey}`,
+          },
+          body: JSON.stringify(body),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+
+          // Rate limit - wait and retry
+          if (response.status === 429) {
+            const waitMs = attempt * 2000; // Exponential backoff
+            console.warn(`⏳ Rate limited, waiting ${waitMs}ms...`);
+            await new Promise(r => setTimeout(r, waitMs));
+            continue;
+          }
+
+          throw new Error(`${provider.name} API error: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json();
+        const content = data.choices[0]?.message?.content;
+        const tokensUsed = data.usage?.total_tokens || 0;
+
+        if (!content) {
+          throw new Error('Empty response from LLM');
+        }
+
+        console.log(`✅ ${provider.name} responded (${tokensUsed} tokens)`);
+        return { content, tokensUsed, provider: provider.name };
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        console.warn(`⚠️ ${provider.name} attempt ${attempt} failed:`, lastError.message);
+
+        // Wait before retry
+        if (attempt < maxRetries) {
+          await new Promise(r => setTimeout(r, 1000 * attempt));
+        }
+      }
+    }
+
+    console.warn(
+      `❌ ${provider.name} failed after ${maxRetries} attempts, trying next provider...`
+    );
+  }
+
+  throw lastError || new Error('All LLM providers failed');
+}
+
+// ============================================
 // TYPES
 // ============================================
 
@@ -239,11 +378,6 @@ async function callPlanner(
   context: UserContext,
   history?: Array<{ role: string; content: string }>
 ): Promise<{ success: boolean; plan?: Plan; error?: string; tokensUsed: number }> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    return { success: false, error: 'OpenAI API key not configured', tokensUsed: 0 };
-  }
-
   const systemPrompt = buildPlannerPrompt({
     marketplace: context.marketplace,
     productsCount: 0, // Could be fetched
@@ -259,46 +393,22 @@ async function callPlanner(
   ];
 
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini', // Fast model for planning
-        messages,
-        temperature: 0.1, // Low randomness for consistency
-        max_tokens: 500,
-        response_format: {
-          type: 'json_schema',
-          json_schema: PLAN_JSON_SCHEMA,
-        },
-      }),
+    const result = await callLLMWithFallback(messages, {
+      temperature: 0.1, // Low randomness for consistency
+      maxTokens: 500,
+      jsonSchema: PLAN_JSON_SCHEMA,
+      preferredModel: 'gpt-4o-mini', // Fast model for planning
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
-    }
-
-    const data = await response.json();
-    const content = data.choices[0]?.message?.content;
-    const tokensUsed = data.usage?.total_tokens || 0;
-
-    if (!content) {
-      return { success: false, error: 'Empty response from planner', tokensUsed };
-    }
-
-    const parsed = JSON.parse(content);
+    const parsed = JSON.parse(result.content);
     const validated = PlanSchema.safeParse(parsed);
 
     if (!validated.success) {
       console.error('Plan validation failed:', validated.error);
-      return { success: false, error: 'Invalid plan format', tokensUsed };
+      return { success: false, error: 'Invalid plan format', tokensUsed: result.tokensUsed };
     }
 
-    return { success: true, plan: validated.data, tokensUsed };
+    return { success: true, plan: validated.data, tokensUsed: result.tokensUsed };
   } catch (error) {
     console.error('Planner error:', error);
     return { success: false, error: String(error), tokensUsed: 0 };
@@ -388,11 +498,6 @@ async function callAnswerer(
   toolResults: ToolResult[],
   _context: UserContext
 ): Promise<{ success: boolean; answer?: Answer; error?: string; tokensUsed: number }> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    return { success: false, error: 'OpenAI API key not configured', tokensUsed: 0 };
-  }
-
   const systemPrompt = buildAnswererPrompt();
 
   // Build context message with tool results
@@ -411,42 +516,20 @@ ${JSON.stringify(toolResultsSummary, null, 2)}
 
 Сформируй ответ, используя ТОЛЬКО эти данные. Ссылки бери ТОЛЬКО из available_urls.`;
 
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: userMessage },
+  ];
+
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o', // Better model for final answer
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userMessage },
-        ],
-        temperature: 0.3,
-        max_tokens: 1500,
-        response_format: {
-          type: 'json_schema',
-          json_schema: ANSWER_JSON_SCHEMA,
-        },
-      }),
+    const result = await callLLMWithFallback(messages, {
+      temperature: 0.3,
+      maxTokens: 1500,
+      jsonSchema: ANSWER_JSON_SCHEMA,
+      preferredModel: 'gpt-4o', // Better model for final answer
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
-    }
-
-    const data = await response.json();
-    const content = data.choices[0]?.message?.content;
-    const tokensUsed = data.usage?.total_tokens || 0;
-
-    if (!content) {
-      return { success: false, error: 'Empty response from answerer', tokensUsed };
-    }
-
-    const parsed = JSON.parse(content);
+    const parsed = JSON.parse(result.content);
     const validated = AnswerSchema.safeParse(parsed);
 
     if (!validated.success) {
@@ -456,13 +539,13 @@ ${JSON.stringify(toolResultsSummary, null, 2)}
         return {
           success: true,
           answer: { message: parsed.message },
-          tokensUsed,
+          tokensUsed: result.tokensUsed,
         };
       }
-      return { success: false, error: 'Invalid answer format', tokensUsed };
+      return { success: false, error: 'Invalid answer format', tokensUsed: result.tokensUsed };
     }
 
-    return { success: true, answer: validated.data, tokensUsed };
+    return { success: true, answer: validated.data, tokensUsed: result.tokensUsed };
   } catch (error) {
     console.error('Answerer error:', error);
     return { success: false, error: String(error), tokensUsed: 0 };
