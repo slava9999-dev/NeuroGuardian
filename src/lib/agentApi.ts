@@ -136,8 +136,17 @@ export const agentApi = {
       if (USE_V4_AGENT) {
         const v4Data = data as AgentV4Response;
 
+        // Handle error responses from server
+        if (!v4Data.success && !v4Data.message) {
+          return {
+            success: false,
+            content: '❌ Произошла ошибка при обработке запроса. Попробуйте ещё раз.',
+            error: 'Empty response from server',
+          };
+        }
+
         // Build content with links formatted as markdown
-        let content = v4Data.message;
+        let content = v4Data.message || '❌ Не удалось получить ответ';
 
         // Append validated links section if present
         if (v4Data.links && v4Data.links.length > 0) {
@@ -163,6 +172,19 @@ export const agentApi = {
     } catch (error) {
       console.error('Agent API error:', error);
 
+      // Handle specific error types with user-friendly messages
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      let userMessage = '❌ Не удалось связаться с агентом. Попробуйте ещё раз.';
+
+      if (errorMessage.includes('SyntaxError') || errorMessage.includes('JSON')) {
+        userMessage = '⚠️ Агент получил неполный ответ. Попробуйте уточнить запрос или повторить.';
+      } else if (errorMessage.includes('timeout') || errorMessage.includes('Timeout')) {
+        userMessage =
+          '⏰ Запрос занял слишком много времени. Попробуйте задать более простой вопрос.';
+      } else if (errorMessage.includes('429')) {
+        userMessage = '🔄 Слишком много запросов. Подождите минуту и попробуйте снова.';
+      }
+
       // Fallback to mock response for development
       if (import.meta.env.DEV) {
         return getMockResponse(message);
@@ -170,8 +192,8 @@ export const agentApi = {
 
       return {
         success: false,
-        content: '❌ Не удалось связаться с агентом. Проверьте подключение.',
-        error: error instanceof Error ? error.message : 'Unknown error',
+        content: userMessage,
+        error: errorMessage,
       };
     }
   },

@@ -400,18 +400,36 @@ async function callPlanner(
       preferredModel: 'gpt-4o-mini', // Fast model for planning
     });
 
-    const parsed = JSON.parse(result.content);
+    // Safe JSON parse with fallback
+    let parsed;
+    try {
+      parsed = JSON.parse(result.content);
+    } catch (jsonError) {
+      console.error(
+        'Plan JSON parse error:',
+        jsonError,
+        'Content:',
+        result.content.substring(0, 200)
+      );
+      // Try to extract a direct answer if JSON is broken
+      return {
+        success: false,
+        error: 'Не удалось разобрать ответ. Попробуйте перефразировать запрос.',
+        tokensUsed: result.tokensUsed,
+      };
+    }
+
     const validated = PlanSchema.safeParse(parsed);
 
     if (!validated.success) {
       console.error('Plan validation failed:', validated.error);
-      return { success: false, error: 'Invalid plan format', tokensUsed: result.tokensUsed };
+      return { success: false, error: 'Некорректный формат плана', tokensUsed: result.tokensUsed };
     }
 
     return { success: true, plan: validated.data, tokensUsed: result.tokensUsed };
   } catch (error) {
     console.error('Planner error:', error);
-    return { success: false, error: String(error), tokensUsed: 0 };
+    return { success: false, error: 'Ошибка планирования. Попробуйте ещё раз.', tokensUsed: 0 };
   }
 }
 
@@ -529,7 +547,33 @@ ${JSON.stringify(toolResultsSummary, null, 2)}
       preferredModel: 'gpt-4o', // Better model for final answer
     });
 
-    const parsed = JSON.parse(result.content);
+    // Safe JSON parse with fallback
+    let parsed;
+    try {
+      parsed = JSON.parse(result.content);
+    } catch (jsonError) {
+      console.error(
+        'Answer JSON parse error:',
+        jsonError,
+        'Content:',
+        result.content.substring(0, 200)
+      );
+      // If JSON is broken, try to use the content as-is (it might be plain text)
+      const plainTextContent = result.content.replace(/^[{[].*$/gm, '').trim();
+      if (plainTextContent.length > 20) {
+        return {
+          success: true,
+          answer: { message: plainTextContent },
+          tokensUsed: result.tokensUsed,
+        };
+      }
+      return {
+        success: false,
+        error: 'Не удалось получить ответ. Попробуйте ещё раз.',
+        tokensUsed: result.tokensUsed,
+      };
+    }
+
     const validated = AnswerSchema.safeParse(parsed);
 
     if (!validated.success) {
@@ -542,13 +586,13 @@ ${JSON.stringify(toolResultsSummary, null, 2)}
           tokensUsed: result.tokensUsed,
         };
       }
-      return { success: false, error: 'Invalid answer format', tokensUsed: result.tokensUsed };
+      return { success: false, error: 'Некорректный формат ответа', tokensUsed: result.tokensUsed };
     }
 
     return { success: true, answer: validated.data, tokensUsed: result.tokensUsed };
   } catch (error) {
     console.error('Answerer error:', error);
-    return { success: false, error: String(error), tokensUsed: 0 };
+    return { success: false, error: 'Ошибка генерации ответа. Попробуйте ещё раз.', tokensUsed: 0 };
   }
 }
 

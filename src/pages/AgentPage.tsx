@@ -338,7 +338,7 @@ export function AgentPage() {
 
             {/* Quick Actions - Compact grid */}
             <motion.div
-              className="mt-6 grid grid-cols-2 gap-2 w-full max-w-xs mx-auto px-2"
+              className="mt-6 grid grid-cols-2 gap-3 w-full max-w-sm mx-auto px-4"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
