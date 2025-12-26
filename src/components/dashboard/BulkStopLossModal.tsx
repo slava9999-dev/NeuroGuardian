@@ -1,6 +1,6 @@
 // ============================================
-// NeuroGUARDIAN — Bulk Stop-Loss Modal
-// Set minimum prices for all products at once
+// NeuroGUARDIAN — Bulk Price Guard Modal
+// Включить Сторожа цены для всех товаров
 // ============================================
 
 import { useState } from 'react';
@@ -125,7 +125,7 @@ export function BulkStopLossModal({ isOpen, onClose }: BulkStopLossModalProps) {
                   </div>
                   <div>
                     <h2 className="text-xl font-bold text-white">Массовая защита</h2>
-                    <p className="text-sm text-stone-400">Установить Stop-Loss для всех</p>
+                    <p className="text-sm text-stone-400">Включить Сторожа для всех товаров</p>
                   </div>
                 </div>
                 <button
@@ -190,7 +190,7 @@ export function BulkStopLossModal({ isOpen, onClose }: BulkStopLossModalProps) {
                       <div>
                         <p className="text-sm text-amber-200">
                           {productsToUpdate === 0 ? (
-                            'Все товары уже защищены Stop-Loss!'
+                            'Все товары уже под защитой Сторожа!'
                           ) : (
                             <>
                               <span className="font-bold text-white">{productsToUpdate}</span>{' '}

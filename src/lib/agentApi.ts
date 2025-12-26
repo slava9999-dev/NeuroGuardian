@@ -404,7 +404,7 @@ function getMockResponse(message: string): AgentResponse {
     };
   }
 
-  if (lowerMessage.includes('защит') || lowerMessage.includes('stop-loss')) {
+  if (lowerMessage.includes('защит') || lowerMessage.includes('сторож')) {
     return {
       success: true,
       content: `🛡️ **Статус защиты товаров:**
@@ -413,7 +413,7 @@ function getMockResponse(message: string): AgentResponse {
 ⚠️ Без защиты: **12** товаров
 🚨 Сработало сегодня: **3** раза
 
-**Рекомендация:** У вас 12 товаров без установленного Stop-Loss. Хотите установить минимальную цену для всех?`,
+**Рекомендация:** У вас 12 товаров без Сторожа. Хотите включить защиту для всех?`,
       metadata: {
         tokensUsed: 156,
         executionTime: Date.now() - startTime + 100,
@@ -500,8 +500,8 @@ function getMockResponse(message: string): AgentResponse {
 **2️⃣ Синхронизируйте товары**
 Нажмите "Синхронизировать" — я загружу все ваши товары
 
-**3️⃣ Установите Stop-Loss**
-Для каждого товара укажите минимальную цену — ниже неё продавать невыгодно
+**3️⃣ Включите Сторожа цены**
+Для каждого товара укажите минимальную цену — Сторож будет защищать её 24/7
 
 **4️⃣ Включите защиту**
 Нажмите кнопку "ARMED" — система будет следить 24/7
@@ -604,7 +604,7 @@ function getMockResponse(message: string): AgentResponse {
 • "Статус защиты" — сколько товаров под защитой
 
 **💰 Управление:**
-• "Защити все товары" — массовый Stop-Loss
+• "Защити все товары" — включить Сторожа
 • "Измени цены" — корректировка цен
 
 **❓ Помощь:**

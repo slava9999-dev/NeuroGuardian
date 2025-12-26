@@ -24,8 +24,8 @@ const GUIDE_SECTIONS = [
       },
       {
         step: 2,
-        title: 'Настройте Stop-Loss',
-        text: 'Для каждого товара установите минимальную цену, ниже которой продавать нельзя.',
+        title: 'Включите Сторожа цены',
+        text: 'Установите минимальную цену, которую Сторож будет защищать 24/7.',
       },
       {
         step: 3,
@@ -155,7 +155,7 @@ const GUIDE_SECTIONS = [
 export function GuidePage({ onBack }: GuidePageProps) {
   const [activeSection, setActiveSection] = useState('start');
 
-  const section = GUIDE_SECTIONS.find((s) => s.id === activeSection);
+  const section = GUIDE_SECTIONS.find(s => s.id === activeSection);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-stone-900 to-stone-800">
@@ -165,7 +165,14 @@ export function GuidePage({ onBack }: GuidePageProps) {
           onClick={onBack}
           className="p-2 rounded-xl bg-stone-800 hover:bg-stone-700 transition-colors"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <path d="M19 12H5M12 19l-7-7 7-7" />
           </svg>
         </button>
@@ -175,7 +182,7 @@ export function GuidePage({ onBack }: GuidePageProps) {
       {/* Section tabs */}
       <div className="px-4 py-3 overflow-x-auto">
         <div className="flex gap-2 min-w-max">
-          {GUIDE_SECTIONS.map((s) => (
+          {GUIDE_SECTIONS.map(s => (
             <button
               key={s.id}
               onClick={() => {
@@ -184,9 +191,10 @@ export function GuidePage({ onBack }: GuidePageProps) {
               }}
               className={`
                 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all
-                ${activeSection === s.id
-                  ? 'bg-amber-500 text-stone-900'
-                  : 'bg-stone-800 text-stone-300 hover:bg-stone-700'
+                ${
+                  activeSection === s.id
+                    ? 'bg-amber-500 text-stone-900'
+                    : 'bg-stone-800 text-stone-300 hover:bg-stone-700'
                 }
               `}
             >
@@ -219,22 +227,27 @@ export function GuidePage({ onBack }: GuidePageProps) {
                   transition={{ delay: i * 0.1 }}
                   className={`
                     p-4 rounded-xl border
-                    ${item.warning
-                      ? 'bg-amber-500/10 border-amber-500/30'
-                      : 'bg-stone-800/50 border-stone-700'
+                    ${
+                      item.warning
+                        ? 'bg-amber-500/10 border-amber-500/30'
+                        : 'bg-stone-800/50 border-stone-700'
                     }
                   `}
                 >
                   <div className="flex items-start gap-3">
-                    <div className={`
+                    <div
+                      className={`
                       w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-bold
                       ${item.warning ? 'bg-amber-500 text-stone-900' : 'bg-stone-700 text-white'}
-                    `}>
+                    `}
+                    >
                       {item.step}
                     </div>
                     <div className="flex-1">
                       <h3 className="font-semibold text-white mb-1">{item.title}</h3>
-                      <p className={`text-sm ${item.warning ? 'text-amber-400' : 'text-stone-400'}`}>
+                      <p
+                        className={`text-sm ${item.warning ? 'text-amber-400' : 'text-stone-400'}`}
+                      >
                         {item.text}
                       </p>
                       {item.link && (
@@ -246,7 +259,14 @@ export function GuidePage({ onBack }: GuidePageProps) {
                           onClick={() => hapticFeedback('light')}
                         >
                           Открыть сайт
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
                             <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3" />
                           </svg>
                         </a>
@@ -272,7 +292,7 @@ export function GuidePage({ onBack }: GuidePageProps) {
             onClick={() => hapticFeedback('light')}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z" />
             </svg>
             Написать в поддержку
           </a>

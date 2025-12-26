@@ -125,7 +125,7 @@ export const AGENT_TOOLS = [
     function: {
       name: 'set_stop_loss',
       description:
-        'Установить минимальную цену (Stop-Loss) для защиты от демпинга. ТРЕБУЕТ ПОДТВЕРЖДЕНИЯ!',
+        'Включить Сторожа цены — защитить товар от падения цены ниже минимума. Если маркетплейс снизит цену, Сторож мгновенно её выровняет. ТРЕБУЕТ ПОДТВЕРЖДЕНИЯ!',
       parameters: {
         type: 'object',
         properties: {
@@ -149,13 +149,14 @@ export const AGENT_TOOLS = [
     type: 'function' as const,
     function: {
       name: 'bulk_protect_products',
-      description: 'Массовая защита товаров Stop-Loss. ТРЕБУЕТ ПОДТВЕРЖДЕНИЯ!',
+      description:
+        'Массово включить Сторожа для всех товаров — установить минимальную защищённую цену. ТРЕБУЕТ ПОДТВЕРЖДЕНИЯ!',
       parameters: {
         type: 'object',
         properties: {
           percentage: {
             type: 'number',
-            description: 'Процент от текущей цены для Stop-Loss (5-50%)',
+            description: 'Процент от текущей цены для минимальной защиты (5-50%)',
           },
           only_unprotected: {
             type: 'boolean',

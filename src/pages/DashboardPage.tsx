@@ -208,7 +208,7 @@ export function DashboardPage({ onGoToSettings, onGoToAgent }: DashboardPageProp
 
     // Only play alert if triggered count INCREASED
     if (stats.triggeredToday > lastTriggered) {
-      console.log('🚨 ALERT! Stop-loss triggered:', stats.triggeredToday);
+      console.log('🚨 ALERT! Сторож сработал:', stats.triggeredToday);
 
       // Play alert sound
       playAlertSound();
@@ -606,8 +606,8 @@ export function DashboardPage({ onGoToSettings, onGoToAgent }: DashboardPageProp
               <div className="text-left">
                 <p className="font-bold text-white">Защитить все товары</p>
                 <p className="text-xs text-stone-400">
-                  {products.filter(p => !p.minPrice || p.minPrice === 0).length} товаров без
-                  Stop-Loss
+                  {products.filter(p => !p.minPrice || p.minPrice === 0).length} товаров без защиты
+                  Сторожа
                 </p>
               </div>
             </div>
