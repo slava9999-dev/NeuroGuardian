@@ -393,6 +393,7 @@ export const PLAN_JSON_SCHEMA = {
                   description: 'Only low stock items',
                 },
               },
+              required: [], // All args are optional
               additionalProperties: false,
             },
             reason: { type: 'string' },
