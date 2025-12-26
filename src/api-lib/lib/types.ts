@@ -102,6 +102,8 @@ export interface DBUser {
   referral_code: string | null; // VARCHAR(50) UNIQUE
   referred_by: string | null; // VARCHAR(50)
   last_reminder_sent: Date | null; // TIMESTAMP
+  price_buffer_percent: number; // INTEGER DEFAULT 5 — buffer for card discounts (Ozon Card, WB Pay)
+  warning_threshold_percent: number; // INTEGER DEFAULT 10 — alert when price is within this % of min
   created_at: Date; // TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   updated_at: Date; // TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 }
@@ -146,6 +148,8 @@ export interface DBProduct {
   marketplace: 'WB' | 'Ozon'; // VARCHAR(10) NOT NULL
   status: string; // VARCHAR(50) DEFAULT 'active'
   is_monitored: boolean; // BOOLEAN DEFAULT true
+  // Price protection buffer (overrides user setting if > 0)
+  card_discount_buffer: number | null; // INTEGER DEFAULT 0 — per-product card discount buffer
   // Pending price tracking fields (Dec 2024 Audit)
   pending_price: number | null; // INTEGER
   pending_task_id: number | null; // BIGINT

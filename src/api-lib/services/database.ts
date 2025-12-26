@@ -33,6 +33,8 @@ export async function initializeDatabase(): Promise<void> {
       referral_code VARCHAR(50) UNIQUE,
       referred_by VARCHAR(50),
       last_reminder_sent TIMESTAMP,
+      price_buffer_percent INTEGER DEFAULT 5,
+      warning_threshold_percent INTEGER DEFAULT 10,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )

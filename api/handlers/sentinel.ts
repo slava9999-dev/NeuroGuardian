@@ -35,14 +35,17 @@ interface MonitoredProduct {
   updated_at?: string; // For cooldown check
   vendor_code?: string;
   offer_id?: string; // Ozon offer_id (required for price updates)
+  card_discount_buffer?: number; // Per-product card discount buffer (%)
 }
 
 interface SentinelAlertData {
   title: string;
   currentPrice: number;
   minPrice: number;
+  effectiveMinPrice?: number; // min_price + buffer
   defenseAction: string;
   savedAmount: number;
+  isWarning?: boolean; // True if this is a warning, not a trigger
 }
 
 // ============================================
@@ -301,8 +304,20 @@ async function processOzonDefense(
     const minPrice = dbProduct.min_price;
     callbacks.onScan();
 
+    // PRICE BUFFER: Account for card discounts (Ozon Card up to 30%, WB Pay up to 6%)
+    // User setting: price_buffer_percent (default 5%)
+    // Product override: card_discount_buffer (if > 0)
+    const userBuffer = user.price_buffer_percent || 5; // Default 5%
+    const productBuffer = dbProduct.card_discount_buffer || 0;
+    const bufferPercent = productBuffer > 0 ? productBuffer : userBuffer;
+    const effectiveMinPrice = Math.round(minPrice * (1 + bufferPercent / 100));
+
+    // WARNING THRESHOLD: Alert before stop-loss triggers
+    const warningThreshold = user.warning_threshold_percent || 10; // Default 10%
+    const warningPrice = Math.round(minPrice * (1 + warningThreshold / 100));
+
     console.log(
-      `📊 Check: ${dbProduct.title.substring(0, 30)}... | Current: ${currentPrice} | Min: ${minPrice}`
+      `📊 Check: ${dbProduct.title.substring(0, 30)}... | Current: ${currentPrice} | Min: ${minPrice} | Effective: ${effectiveMinPrice} | Warning: ${warningPrice}`
     );
 
     // Update current_price in DB for analytics
@@ -311,9 +326,38 @@ async function processOzonDefense(
       WHERE id = ${dbProduct.id}
     `;
 
-    // VIOLATION DETECTED!
-    if (currentPrice > 0 && currentPrice < minPrice) {
-      console.warn(`🚨 ALARM: ${dbProduct.title} Price: ${currentPrice} < StopLoss: ${minPrice}`);
+    // WARNING: Price approaching limit (but not violated yet)
+    const isInWarningZone = currentPrice > minPrice && currentPrice <= warningPrice;
+    const isViolation = currentPrice > 0 && currentPrice < effectiveMinPrice;
+
+    if (isInWarningZone && !isViolation) {
+      console.log(
+        `⚠️ WARNING ZONE: ${dbProduct.title} - Price ${currentPrice} approaching min ${minPrice}`
+      );
+
+      // Send warning (only once per hour)
+      const lastWarning = new Date(dbProduct.updated_at || 0);
+      const hoursSinceWarning = (new Date().getTime() - lastWarning.getTime()) / 1000 / 60 / 60;
+
+      if (hoursSinceWarning > 1) {
+        await sendSentinelAlert(user.id, {
+          title: dbProduct.title,
+          currentPrice,
+          minPrice,
+          effectiveMinPrice,
+          defenseAction: '⚠️ Цена приближается к лимиту!',
+          savedAmount: 0,
+          marketplace: 'Ozon',
+          isWarning: true,
+        });
+      }
+    }
+
+    // VIOLATION DETECTED! (using effectiveMinPrice with buffer)
+    if (isViolation) {
+      console.warn(
+        `🚨 ALARM: ${dbProduct.title} Price: ${currentPrice} < EffectiveMin: ${effectiveMinPrice} (StopLoss: ${minPrice} + ${bufferPercent}% buffer)`
+      );
 
       // RATE LIMITING: Check if we changed this product recently (last 10 minutes)
       const lastUpdate = new Date(dbProduct.updated_at || 0);
@@ -446,10 +490,50 @@ async function processWbDefense(
 
     callbacks.onScan();
 
-    // VIOLATION DETECTED!
-    if (currentPrice > 0 && currentPrice < minPrice) {
+    // PRICE BUFFER: Account for WB Pay discounts (up to 6%) and SPP (up to 25%)
+    const userBuffer = user.price_buffer_percent || 5; // Default 5%
+    const productBuffer = dbProduct.card_discount_buffer || 0;
+    const bufferPercent = productBuffer > 0 ? productBuffer : userBuffer;
+    const effectiveMinPrice = Math.round(minPrice * (1 + bufferPercent / 100));
+
+    // WARNING THRESHOLD
+    const warningThreshold = user.warning_threshold_percent || 10;
+    const warningPrice = Math.round(minPrice * (1 + warningThreshold / 100));
+
+    console.log(
+      `📊 WB Check: ${dbProduct.title.substring(0, 30)}... | Current: ${currentPrice} | Min: ${minPrice} | Effective: ${effectiveMinPrice}`
+    );
+
+    // WARNING ZONE
+    const isInWarningZone = currentPrice > minPrice && currentPrice <= warningPrice;
+    const isViolation = currentPrice > 0 && currentPrice < effectiveMinPrice;
+
+    if (isInWarningZone && !isViolation) {
+      console.log(
+        `⚠️ WB WARNING: ${dbProduct.title} - Price ${currentPrice} approaching min ${minPrice}`
+      );
+
+      const lastWarning = new Date(dbProduct.updated_at || 0);
+      const hoursSinceWarning = (new Date().getTime() - lastWarning.getTime()) / 1000 / 60 / 60;
+
+      if (hoursSinceWarning > 1) {
+        await sendSentinelAlert(user.id, {
+          title: dbProduct.title,
+          currentPrice,
+          minPrice,
+          effectiveMinPrice,
+          defenseAction: '⚠️ Цена приближается к лимиту!',
+          savedAmount: 0,
+          marketplace: 'WB',
+          isWarning: true,
+        });
+      }
+    }
+
+    // VIOLATION DETECTED! (using effectiveMinPrice with buffer)
+    if (isViolation) {
       console.warn(
-        `🚨 WB ALARM: ${dbProduct.title} Price: ${currentPrice} < StopLoss: ${minPrice}`
+        `🚨 WB ALARM: ${dbProduct.title} Price: ${currentPrice} < EffectiveMin: ${effectiveMinPrice} (StopLoss: ${minPrice} + ${bufferPercent}% buffer)`
       );
       callbacks.onTrigger();
 
@@ -551,10 +635,24 @@ async function sendSentinelAlert(
       `📉 Цена упала: <s>${data.minPrice}₽</s> → <b>${data.currentPrice}₽</b>\n` +
       `⚠️ <b>Ошибка:</b> ${data.defenseAction}\n\n` +
       `⚡ <b>СРОЧНО ИЗМЕНИТЕ ЦЕНУ ВРУЧНУЮ!</b>`;
-  } else {
-    // SUCCESS ALERT
+  } else if (data.isWarning) {
+    // WARNING ALERT (price approaching limit)
+    const effectiveInfo = data.effectiveMinPrice
+      ? `\n🛡️ <b>Эффективный минимум:</b> ${data.effectiveMinPrice}₽ (с буфером)`
+      : '';
     msg =
-      `🛡️ <b>NeuroGUARDIAN SENTINEL</b>\n\n` +
+      `⚠️ <b>NeuroGUARDIAN СТОРОЖ</b>\n\n` +
+      `🔔 <b>ВНИМАНИЕ: Цена приближается к лимиту!</b>\n` +
+      `📅 ${date} в ${time}\n\n` +
+      `${marketplaceEmoji} <b>${data.marketplace || 'Маркетплейс'}</b>\n` +
+      `📦 ${data.title}\n\n` +
+      `💰 <b>Текущая цена:</b> ${data.currentPrice}₽\n` +
+      `🚨 <b>Минимум:</b> ${data.minPrice}₽${effectiveInfo}\n\n` +
+      `💡 <i>Если цена упадёт ещё — сработает Сторож.</i>`;
+  } else {
+    // SUCCESS ALERT (срабатывание защиты)
+    msg =
+      `🛡️ <b>NeuroGUARDIAN СТОРОЖ</b>\n\n` +
       `⚠️ <b>АТАКА ОБНАРУЖЕНА!</b>\n` +
       `📅 ${date} в ${time}\n\n` +
       `${marketplaceEmoji} <b>${data.marketplace || 'Маркетплейс'}</b>\n` +
@@ -568,23 +666,25 @@ async function sendSentinelAlert(
   try {
     // Step 1: Send a short voice message "siren" to get attention
     // This makes Telegram play a different notification sound
-    // Using a pre-recorded alert sound hosted on a CDN
+    // Skip audio for warnings (less urgent) - only play for actual triggers and errors
     const sirenUrl = 'https://cdn.pixabay.com/audio/2022/03/10/audio_23a6d0e89a.mp3'; // Short alert sound
 
-    try {
-      await fetch(`https://api.telegram.org/bot${token}/sendVoice`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: userId,
-          voice: sirenUrl,
-          caption: data.isError ? '🆘 КРИТИЧЕСКАЯ ОШИБКА!' : '🚨 АТАКА ОБНАРУЖЕНА!',
-          duration: 2,
-        }),
-      });
-    } catch {
-      // Voice sending failed, continue with text
-      console.warn('Voice alert failed, sending text only');
+    if (!data.isWarning) {
+      try {
+        await fetch(`https://api.telegram.org/bot${token}/sendVoice`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: userId,
+            voice: sirenUrl,
+            caption: data.isError ? '🆘 КРИТИЧЕСКАЯ ОШИБКА!' : '🚨 СТОРОЖ СРАБОТАЛ!',
+            duration: 2,
+          }),
+        });
+      } catch {
+        // Voice sending failed, continue with text
+        console.warn('Voice alert failed, sending text only');
+      }
     }
 
     // Step 2: Send the detailed text message
