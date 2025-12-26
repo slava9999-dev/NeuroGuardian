@@ -88,6 +88,8 @@ export async function handleAuth(
       totalProducts: fullUser.total_products || 0,
       triggeredToday: fullUser.triggered_today || 0,
       savedAmount: Number(fullUser.saved_amount) || 0,
+      priceBufferPercent: fullUser.price_buffer_percent ?? 5,
+      warningThresholdPercent: fullUser.warning_threshold_percent ?? 10,
     },
   });
 }
@@ -169,6 +171,19 @@ export async function handleSettings(
   if (body.ozonClientId !== undefined) {
     await sql`UPDATE users SET ozon_client_id = ${body.ozonClientId || null} WHERE id = ${userId}`;
     updates.push('ozonClientId');
+  }
+
+  // Sentinel buffer settings
+  if (body.priceBufferPercent !== undefined) {
+    const buffer = Math.max(0, Math.min(30, Number(body.priceBufferPercent) || 5));
+    await sql`UPDATE users SET price_buffer_percent = ${buffer} WHERE id = ${userId}`;
+    updates.push('priceBufferPercent');
+  }
+
+  if (body.warningThresholdPercent !== undefined) {
+    const threshold = Math.max(5, Math.min(25, Number(body.warningThresholdPercent) || 10));
+    await sql`UPDATE users SET warning_threshold_percent = ${threshold} WHERE id = ${userId}`;
+    updates.push('warningThresholdPercent');
   }
 
   return res.json({ success: true, updated: updates });

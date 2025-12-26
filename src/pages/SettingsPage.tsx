@@ -340,6 +340,99 @@ export function SettingsPage({ onBack }: { onBack: () => void }) {
         </div>
       </section>
 
+      {/* Price Guard Buffer Settings */}
+      <section className="mb-6">
+        <h3 className="text-sm font-medium text-stone-400 uppercase tracking-wider mb-3">
+          🛡️ Настройки Сторожа
+        </h3>
+
+        <div className="glass-panel p-4 space-y-5">
+          {/* Info Banner */}
+          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+            <p className="text-sm text-amber-200">
+              <strong>Буфер скидок карт:</strong> Маркетплейсы дают скидки по картам (Ozon Card до
+              30%, WB Pay до 6%). Буфер добавляется к минимальной цене, чтобы учесть эти скидки.
+            </p>
+          </div>
+
+          {/* Price Buffer Slider */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm text-stone-300">Буфер скидок карт</label>
+              <span className="text-amber-400 font-bold">{user?.priceBufferPercent ?? 5}%</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="30"
+              step="1"
+              value={user?.priceBufferPercent ?? 5}
+              onChange={async e => {
+                const value = Number(e.target.value);
+                if (user) {
+                  setUser({ ...user, priceBufferPercent: value });
+                  await settingsApi.updateSettings({ priceBufferPercent: value });
+                }
+              }}
+              className="w-full h-2 bg-stone-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
+            />
+            <div className="flex justify-between text-xs text-stone-500 mt-1">
+              <span>0% (без буфера)</span>
+              <span>30% (макс)</span>
+            </div>
+            <p className="text-xs text-stone-500 mt-2">
+              💡 Рекомендуем 5-10% для базовой защиты, 15-20% если много клиентов с Ozon Card
+            </p>
+          </div>
+
+          {/* Warning Threshold Slider */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm text-stone-300">Порог предупреждения</label>
+              <span className="text-amber-400 font-bold">
+                {user?.warningThresholdPercent ?? 10}%
+              </span>
+            </div>
+            <input
+              type="range"
+              min="5"
+              max="25"
+              step="1"
+              value={user?.warningThresholdPercent ?? 10}
+              onChange={async e => {
+                const value = Number(e.target.value);
+                if (user) {
+                  setUser({ ...user, warningThresholdPercent: value });
+                  await settingsApi.updateSettings({ warningThresholdPercent: value });
+                }
+              }}
+              className="w-full h-2 bg-stone-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
+            />
+            <div className="flex justify-between text-xs text-stone-500 mt-1">
+              <span>5%</span>
+              <span>25%</span>
+            </div>
+            <p className="text-xs text-stone-500 mt-2">
+              ⚠️ Получите предупреждение, когда цена приблизится к лимиту (до срабатывания Сторожа)
+            </p>
+          </div>
+
+          {/* Example Calculation */}
+          <div className="p-3 rounded-xl bg-stone-800/50 border border-stone-700">
+            <p className="text-sm text-stone-300">
+              <strong>Пример:</strong> min_price = 1000₽, буфер = {user?.priceBufferPercent ?? 5}%
+            </p>
+            <p className="text-sm text-emerald-400 mt-1">
+              → Эффективный минимум:{' '}
+              <strong>{Math.round(1000 * (1 + (user?.priceBufferPercent ?? 5) / 100))}₽</strong>
+            </p>
+            <p className="text-xs text-stone-500 mt-1">
+              Сторож сработает, если цена упадёт ниже этого значения
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* Subscription */}
       <section className="mb-6">
         <h3 className="text-sm font-medium text-stone-400 uppercase tracking-wider mb-3">

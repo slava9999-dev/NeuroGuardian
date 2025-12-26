@@ -43,6 +43,10 @@ export interface User {
   triggeredToday: number;
   savedAmount: number; // Сколько денег сохранено
 
+  // Sentinel buffer settings
+  priceBufferPercent?: number; // Buffer for card discounts (Ozon Card, WB Pay)
+  warningThresholdPercent?: number; // Alert when price is within this % of min
+
   // Timestamps (optional - only used on backend)
   createdAt?: Date;
   updatedAt?: Date;

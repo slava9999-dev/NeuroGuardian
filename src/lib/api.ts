@@ -90,6 +90,8 @@ export const settingsApi = {
     protectionEnabled?: boolean;
     defenseMode?: 'zero_stock' | 'price_correction';
     autoRenew?: boolean;
+    priceBufferPercent?: number;
+    warningThresholdPercent?: number;
   }) => {
     const initData = getInitData();
     const response = await api.post('', { action: 'settings', initData, ...settings });
