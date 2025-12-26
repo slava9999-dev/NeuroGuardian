@@ -81,15 +81,27 @@ export async function handleAgentV4(
   }
 
   // 1. Authentication
-  const initData = sanitizeInput(
-    (req.headers['x-init-data'] as string) || req.body?.initData || ''
-  );
+  // Support admin API key for testing (bypasses Telegram validation)
+  const authHeader = req.headers['authorization'] as string;
+  const adminApiKey = process.env.ADMIN_API_KEY;
+  let userId: number;
 
-  const validation = validateTelegramInitData(initData);
-  if (!validation.valid || !validation.user) {
-    return res.status(401).json({ error: 'Unauthorized', code: 'AUTH_FAILED' });
+  if (adminApiKey && authHeader === `Bearer ${adminApiKey}` && req.body?.telegramId) {
+    // Admin bypass for testing
+    userId = parseInt(req.body.telegramId);
+    console.log(`🔑 Admin API access for agent: user ${userId}`);
+  } else {
+    // Normal Telegram authentication
+    const initData = sanitizeInput(
+      (req.headers['x-init-data'] as string) || req.body?.initData || ''
+    );
+
+    const validation = validateTelegramInitData(initData);
+    if (!validation.valid || !validation.user) {
+      return res.status(401).json({ error: 'Unauthorized', code: 'AUTH_FAILED' });
+    }
+    userId = validation.user.id;
   }
-  const userId = validation.user.id;
 
   const user = (await getUserById(userId)) as DBUserRecord | null;
 
