@@ -337,8 +337,63 @@ export const PLAN_JSON_SCHEMA = {
             },
             args: {
               type: 'object',
-              properties: {}, // Empty properties allows any args
-              additionalProperties: false, // OpenAI requires false
+              properties: {
+                marketplace: {
+                  type: 'string',
+                  enum: ['WB', 'Ozon', 'all'],
+                  description: 'Marketplace filter',
+                },
+                period: {
+                  type: 'string',
+                  enum: ['today', 'yesterday', 'week', 'month', '3months'],
+                  description: 'Time period',
+                },
+                limit: {
+                  type: 'integer',
+                  description: 'Max items to return',
+                },
+                sort_by: {
+                  type: 'string',
+                  enum: ['price', 'stock', 'name'],
+                  description: 'Sort order',
+                },
+                product_id: {
+                  type: 'string',
+                  description: 'Product ID or name',
+                },
+                cost_price: {
+                  type: 'number',
+                  description: 'Cost price in RUB',
+                },
+                topic: {
+                  type: 'string',
+                  enum: [
+                    'commissions',
+                    'logistics',
+                    'payments',
+                    'returns',
+                    'promotions',
+                    'problems',
+                    'tips',
+                    'general',
+                  ],
+                  description: 'Info topic',
+                },
+                query: {
+                  type: 'string',
+                  description: 'Search query',
+                },
+                status: {
+                  type: 'string',
+                  enum: ['all', 'new', 'processing', 'delivered', 'cancelled'],
+                  description: 'Order status',
+                },
+                low_stock_only: {
+                  type: 'boolean',
+                  description: 'Only low stock items',
+                },
+              },
+              additionalProperties: false,
             },
             reason: { type: 'string' },
           },
