@@ -140,7 +140,14 @@ export async function handleCheckPrices(
 
   let totalScanned = 0;
   let totalTriggered = 0;
-  const violations: unknown[] = []; // For include_details mode
+  const violations: Array<{
+    product_id: string;
+    title: string;
+    marketplace: string;
+    current_price: number;
+    min_price: number;
+    action: string;
+  }> = []; // For include_details mode
 
   try {
     // Parallel Processing with Batching
@@ -232,6 +239,14 @@ interface DefenseCallbacks {
   onScan: () => void;
   onTrigger: () => void;
   log: string[];
+  violations?: Array<{
+    product_id: string;
+    title: string;
+    marketplace: string;
+    current_price: number;
+    min_price: number;
+    action: string;
+  }>;
 }
 
 async function processOzonDefense(
