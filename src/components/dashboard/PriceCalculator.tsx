@@ -3,7 +3,7 @@
 // Automatic minimum price calculation
 // ============================================
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 
 interface PriceCalculatorProps {
   marketplace: 'WB' | 'Ozon';
@@ -23,7 +23,7 @@ export function PriceCalculator({ marketplace, onCalculated, onClose }: PriceCal
   const commissionRate = marketplace === 'Ozon' ? 0.15 : 0.15; // 15%
   const bankCommission = 0.02; // 2%
 
-  const calculate = () => {
+  const calculatedPrice = useMemo(() => {
     const cost = parseFloat(costPrice) || 0;
     const labor = (parseFloat(laborHours) || 0) * (parseFloat(laborRate) || 0);
     const log = parseFloat(logistics) || 0;
@@ -40,9 +40,16 @@ export function PriceCalculator({ marketplace, onCalculated, onClose }: PriceCal
     const minPrice = baseTotal / (1 - commissionRate - bankCommission);
 
     return Math.ceil(minPrice / 10) * 10; // Round up to nearest 10
-  };
-
-  const calculatedPrice = calculate();
+  }, [
+    costPrice,
+    laborHours,
+    laborRate,
+    logistics,
+    packaging,
+    adCost,
+    commissionRate,
+    bankCommission,
+  ]);
 
   const handleApply = () => {
     onCalculated(calculatedPrice);
