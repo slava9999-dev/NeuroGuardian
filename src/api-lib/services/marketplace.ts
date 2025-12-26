@@ -318,6 +318,14 @@ export async function fetchWbPrices(
           const price = extractWbPrice(good);
           if (price > 0) {
             priceMap.set(good.nmID, price);
+          } else {
+            // Debug: log first item with zero price to understand structure
+            if (priceMap.size === 0 && goods.length > 0) {
+              console.log(
+                `🔍 WB DEBUG: First good with zero price:`,
+                JSON.stringify(good).substring(0, 500)
+              );
+            }
           }
         }
       }

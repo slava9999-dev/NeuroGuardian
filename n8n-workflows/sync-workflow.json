@@ -82,7 +82,7 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "jsonBody": "={\n  \"telegramId\": \"{{ $('Configuration').first().json.adminTelegramId }}\",\n  \"marketplace\": \"ozon\"\n}",
+        "jsonBody": "={\n  \"telegramId\": \"{{ $('Configuration').first().json.adminTelegramId }}\",\n  \"marketplace\": \"Ozon\"\n}",
         "options": {
           "timeout": 120000
         }
@@ -110,7 +110,7 @@
         },
         "sendBody": true,
         "contentType": "json",
-        "jsonBody": "={\n  \"telegramId\": \"{{ $('Configuration').first().json.adminTelegramId }}\",\n  \"marketplace\": \"wildberries\"\n}",
+        "jsonBody": "={\n  \"telegramId\": \"{{ $('Configuration').first().json.adminTelegramId }}\",\n  \"marketplace\": \"WB\"\n}",
         "options": {
           "timeout": 120000
         }
