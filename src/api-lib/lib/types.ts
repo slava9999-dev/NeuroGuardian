@@ -76,20 +76,34 @@ export interface UserContext {
   ozonClientId?: string;
 }
 
+/**
+ * Database User type — matches `users` table exactly
+ * Primary key is `id` (Telegram user ID stored as BIGINT)
+ */
 export interface DBUser {
-  telegram_id: number;
-  first_name: string;
-  last_name?: string;
-  username?: string;
-  subscription_active: boolean;
-  subscription_expires_at?: Date;
-  subscription_plan?: string;
-  api_key_wb?: string;
-  api_key_ozon?: string;
-  ozon_client_id?: string;
-  defense_mode: 'zero_stock' | 'price_correction';
-  protection_enabled: boolean;
-  created_at: Date;
+  id: number; // BIGINT PRIMARY KEY (Telegram user ID)
+  username: string | null; // VARCHAR(255)
+  first_name: string; // VARCHAR(255) NOT NULL
+  last_name: string | null; // VARCHAR(255)
+  photo_url: string | null; // TEXT
+  is_active: boolean; // BOOLEAN DEFAULT true
+  api_key_wb: string | null; // TEXT
+  api_key_ozon: string | null; // TEXT
+  ozon_client_id: string | null; // VARCHAR(255)
+  protection_enabled: boolean; // BOOLEAN DEFAULT false
+  defense_mode: 'zero_stock' | 'price_correction'; // VARCHAR(50) DEFAULT 'zero_stock'
+  subscription_plan: 'trial' | 'basic' | 'pro' | 'yearly' | null; // VARCHAR(50) DEFAULT 'trial'
+  subscription_end: Date | null; // TIMESTAMP
+  subscription_active: boolean; // BOOLEAN DEFAULT false
+  payment_method_id: string | null; // VARCHAR(255)
+  total_products: number; // INTEGER DEFAULT 0
+  triggered_today: number; // INTEGER DEFAULT 0
+  saved_amount: number; // DECIMAL(12, 2) DEFAULT 0
+  referral_code: string | null; // VARCHAR(50) UNIQUE
+  referred_by: string | null; // VARCHAR(50)
+  last_reminder_sent: Date | null; // TIMESTAMP
+  created_at: Date; // TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  updated_at: Date; // TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 }
 
 export interface Product {
@@ -114,26 +128,31 @@ export interface Product {
 
 export type PendingPriceStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
+/**
+ * Database Product type — matches `products` table exactly
+ * Includes pending price tracking fields (Dec 2024 Audit)
+ */
 export interface DBProduct {
-  id: number;
-  user_id: number;
-  product_id: string;
-  nm_id: number | null;
-  title: string;
-  image_url: string | null;
-  current_price: number;
-  min_price: number;
-  current_stock: number;
-  marketplace: 'WB' | 'Ozon';
-  status: string;
-  is_monitored: boolean;
-  // Pending price tracking fields
-  pending_price: number | null;
-  pending_task_id: number | null;
-  pending_status: PendingPriceStatus | null;
-  pending_since: Date | null;
-  created_at: Date;
-  updated_at: Date;
+  id: number; // SERIAL PRIMARY KEY
+  user_id: number; // BIGINT NOT NULL REFERENCES users(id)
+  product_id: string; // VARCHAR(255) NOT NULL
+  nm_id: number | null; // BIGINT (WB nmId)
+  offer_id: string | null; // VARCHAR(255) (Ozon offer_id - migration 007)
+  title: string; // VARCHAR(500) NOT NULL
+  image_url: string | null; // TEXT
+  current_price: number; // INTEGER NOT NULL
+  min_price: number; // INTEGER DEFAULT 0
+  current_stock: number; // INTEGER DEFAULT 0
+  marketplace: 'WB' | 'Ozon'; // VARCHAR(10) NOT NULL
+  status: string; // VARCHAR(50) DEFAULT 'active'
+  is_monitored: boolean; // BOOLEAN DEFAULT true
+  // Pending price tracking fields (Dec 2024 Audit)
+  pending_price: number | null; // INTEGER
+  pending_task_id: number | null; // BIGINT
+  pending_status: PendingPriceStatus | null; // VARCHAR(20)
+  pending_since: Date | null; // TIMESTAMP
+  created_at: Date; // TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  updated_at: Date; // TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 }
 
 export interface PendingPriceUpdate {

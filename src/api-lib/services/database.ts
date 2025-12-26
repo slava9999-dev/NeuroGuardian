@@ -112,6 +112,12 @@ export async function initializeDatabase(): Promise<void> {
   // Migration: Add offer_id column for Ozon (Dec 2024)
   await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS offer_id VARCHAR(255)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_products_offer_id ON products(offer_id)`;
+
+  // Performance indexes (Dec 2024 Audit)
+  await sql`CREATE INDEX IF NOT EXISTS idx_products_nm_id ON products(nm_id) WHERE nm_id IS NOT NULL`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_products_marketplace ON products(marketplace)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_products_user_marketplace ON products(user_id, marketplace)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_products_pending ON products(pending_status, pending_since) WHERE pending_status = 'pending'`;
 }
 
 /**
