@@ -264,14 +264,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const initData = sanitizeInput(req.body?.initData || '');
         const adminKey = req.headers['x-admin-key'];
+        const authHeader = req.headers.authorization;
         const validAdminKeys = [process.env.ADMIN_API_KEY].filter(Boolean);
 
         const validation = validateTelegramInitData(initData);
         let userId;
 
+        // Check 1: Telegram initData (user auth)
         if (validation.valid && validation.user) {
           userId = validation.user.id;
-        } else if (adminKey && validAdminKeys.includes(adminKey as string) && req.body.telegramId) {
+        }
+        // Check 2: Bearer token (n8n/cron auth)
+        else if (authHeader === `Bearer ${process.env.CRON_SECRET}` && req.body.telegramId) {
+          userId = parseInt(req.body.telegramId);
+        }
+        // Check 3: Admin API key (admin auth)
+        else if (adminKey && validAdminKeys.includes(adminKey as string) && req.body.telegramId) {
           userId = parseInt(req.body.telegramId);
         } else {
           return res.status(401).json({ error: 'Unauthorized', code: 'AUTH_FAILED' });

@@ -167,7 +167,22 @@
         "url": "=https://api.telegram.org/bot{{ $('Configuration').first().json.telegramBotToken }}/sendMessage",
         "sendBody": true,
         "contentType": "json",
-        "jsonBody": "={\n  \"chat_id\": \"{{ $('Configuration').first().json.adminChatId }}\",\n  \"text\": \"{{ $json.message }}\",\n  \"parse_mode\": \"Markdown\"\n}",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "chat_id",
+              "value": "={{ $('Configuration').first().json.adminChatId }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.message }}"
+            },
+            {
+              "name": "parse_mode",
+              "value": "Markdown"
+            }
+          ]
+        },
         "options": {
           "timeout": 30000
         }

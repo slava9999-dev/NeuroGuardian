@@ -31,13 +31,17 @@ function loadEnv(filePath) {
 
 const envVars = loadEnv('.env.n8n');
 
+// Get workflow file from command line argument or use default
+const workflowFileArg = process.argv[2];
+const defaultWorkflowFile = './n8n-workflows/sentinel-workflow.json';
+
 const CONFIG = {
   n8n: {
     host: envVars.N8N_HOST || 'localhost',
     port: parseInt(envVars.N8N_PORT || '5678'),
     apiKey: envVars.N8N_API_KEY || ''
   },
-  workflowFile: './n8n-workflows/sentinel-workflow.json'
+  workflowFile: workflowFileArg || defaultWorkflowFile
 };
 
 // Validate API key
@@ -124,16 +128,15 @@ async function main() {
   const existingWorkflows = workflowsRes.data.data || [];
   console.log(`   📊 Найдено workflows: ${existingWorkflows.length}`);
 
-  // 4. Ищем существующий Sentinel workflow
-  const existingSentinel = existingWorkflows.find(w => 
-    w.name.toLowerCase().includes('sentinel') || 
-    w.name.toLowerCase().includes('neuroguardian')
+  // 4. Ищем существующий workflow с таким же именем
+  const existingWorkflow = existingWorkflows.find(w => 
+    w.name === workflowData.name
   );
 
   // 5. Удаляем старый если есть
-  if (existingSentinel) {
-    console.log(`\n🗑️  Удаляем старый workflow: ${existingSentinel.name} (ID: ${existingSentinel.id})`);
-    const deleteRes = await makeRequest('DELETE', `/api/v1/workflows/${existingSentinel.id}`);
+  if (existingWorkflow) {
+    console.log(`\n🗑️  Удаляем старый workflow: ${existingWorkflow.name} (ID: ${existingWorkflow.id})`);
+    const deleteRes = await makeRequest('DELETE', `/api/v1/workflows/${existingWorkflow.id}`);
     if (deleteRes.status === 200 || deleteRes.status === 204) {
       console.log('   ✅ Удалён');
     } else {
