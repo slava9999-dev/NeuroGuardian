@@ -16,7 +16,10 @@
       "name": "Every 5 Minutes",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
-      "position": [-2000, 1248]
+      "position": [
+        -2000,
+        1248
+      ]
     },
     {
       "parameters": {
@@ -27,7 +30,7 @@
             {
               "id": "id-1",
               "name": "apiBaseUrl",
-              "value": "https://neuro-guardian.vercel.app/api",
+              "value": "={{ $env.API_URL }}",
               "type": "string"
             },
             {
@@ -64,7 +67,10 @@
       "name": "Workflow Configuration",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [-1776, 1248]
+      "position": [
+        -1776,
+        1248
+      ]
     },
     {
       "parameters": {
@@ -88,7 +94,10 @@
       "name": "Check Prices API",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [-1552, 1248]
+      "position": [
+        -1552,
+        1248
+      ]
     },
     {
       "parameters": {
@@ -116,7 +125,10 @@
       "name": "Has Violations?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
-      "position": [-1328, 1248]
+      "position": [
+        -1328,
+        1248
+      ]
     },
     {
       "parameters": {
@@ -144,7 +156,10 @@
       "name": "Rate Limit Check",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
-      "position": [-1104, 1248]
+      "position": [
+        -1104,
+        1248
+      ]
     },
     {
       "parameters": {
@@ -155,7 +170,10 @@
       "name": "Split Violations",
       "type": "n8n-nodes-base.splitOut",
       "typeVersion": 1,
-      "position": [-880, 1248]
+      "position": [
+        -880,
+        1248
+      ]
     },
     {
       "parameters": {
@@ -198,7 +216,10 @@
       "name": "Validate Required Fields",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
-      "position": [-656, 1248]
+      "position": [
+        -656,
+        1248
+      ]
     },
     {
       "parameters": {
@@ -336,7 +357,10 @@
       "name": "Defense Action Router",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.4,
-      "position": [-432, 912]
+      "position": [
+        -432,
+        912
+      ]
     },
     {
       "parameters": {
@@ -362,7 +386,10 @@
       "name": "WB Zero Stock",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [-208, 576]
+      "position": [
+        -208,
+        576
+      ]
     },
     {
       "parameters": {
@@ -388,7 +415,10 @@
       "name": "WB Price Fix",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [-208, 768]
+      "position": [
+        -208,
+        768
+      ]
     },
     {
       "parameters": {
@@ -418,7 +448,10 @@
       "name": "Ozon Zero Stock",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [-208, 960]
+      "position": [
+        -208,
+        960
+      ]
     },
     {
       "parameters": {
@@ -448,7 +481,10 @@
       "name": "Ozon Price Fix",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [-208, 1152]
+      "position": [
+        -208,
+        1152
+      ]
     },
     {
       "parameters": {
@@ -477,7 +513,10 @@
       "name": "Mark as Success",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [16, 864]
+      "position": [
+        16,
+        864
+      ]
     },
     {
       "parameters": {
@@ -506,7 +545,10 @@
       "name": "Mark as Error",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [16, 1536]
+      "position": [
+        16,
+        1536
+      ]
     },
     {
       "parameters": {
@@ -535,7 +577,10 @@
       "name": "Log Unknown Route",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [-208, 1344]
+      "position": [
+        -208,
+        1344
+      ]
     },
     {
       "parameters": {
@@ -552,7 +597,10 @@
       "name": "Alert Admin Unknown",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [16, 1344]
+      "position": [
+        16,
+        1344
+      ]
     },
     {
       "parameters": {
@@ -564,7 +612,10 @@
       "name": "Aggregate Results",
       "type": "n8n-nodes-base.aggregate",
       "typeVersion": 1,
-      "position": [240, 1344]
+      "position": [
+        240,
+        1344
+      ]
     },
     {
       "parameters": {
@@ -575,7 +626,10 @@
       "name": "Build Summary Message",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [464, 1344]
+      "position": [
+        464,
+        1344
+      ]
     },
     {
       "parameters": {
@@ -592,7 +646,10 @@
       "name": "Send Summary Telegram",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [688, 1344]
+      "position": [
+        688,
+        1344
+      ]
     },
     {
       "parameters": {
@@ -618,75 +675,256 @@
       "name": "Bulk Log Results",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [912, 1344]
+      "position": [
+        912,
+        1344
+      ]
     }
   ],
   "connections": {
     "Every 5 Minutes": {
-      "main": [[{ "node": "Workflow Configuration", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Workflow Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Workflow Configuration": {
-      "main": [[{ "node": "Check Prices API", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Check Prices API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Check Prices API": {
-      "main": [[{ "node": "Has Violations?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Has Violations?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Has Violations?": {
-      "main": [[{ "node": "Rate Limit Check", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Rate Limit Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Rate Limit Check": {
-      "main": [[{ "node": "Split Violations", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Split Violations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Split Violations": {
-      "main": [[{ "node": "Validate Required Fields", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Validate Required Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Validate Required Fields": {
       "main": [
-        [{ "node": "Defense Action Router", "type": "main", "index": 0 }],
-        [{ "node": "Mark as Error", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Defense Action Router",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark as Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Defense Action Router": {
       "main": [
-        [{ "node": "WB Zero Stock", "type": "main", "index": 0 }],
-        [{ "node": "WB Price Fix", "type": "main", "index": 0 }],
-        [{ "node": "Ozon Zero Stock", "type": "main", "index": 0 }],
-        [{ "node": "Ozon Price Fix", "type": "main", "index": 0 }],
-        [{ "node": "Log Unknown Route", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "WB Zero Stock",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WB Price Fix",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ozon Zero Stock",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ozon Price Fix",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Unknown Route",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "WB Zero Stock": {
-      "main": [[{ "node": "Mark as Success", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Mark as Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "WB Price Fix": {
-      "main": [[{ "node": "Mark as Success", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Mark as Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Ozon Zero Stock": {
-      "main": [[{ "node": "Mark as Success", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Mark as Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Ozon Price Fix": {
-      "main": [[{ "node": "Mark as Success", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Mark as Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Mark as Success": {
-      "main": [[{ "node": "Aggregate Results", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Aggregate Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Mark as Error": {
-      "main": [[{ "node": "Aggregate Results", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Aggregate Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Log Unknown Route": {
-      "main": [[{ "node": "Alert Admin Unknown", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Alert Admin Unknown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Alert Admin Unknown": {
-      "main": [[{ "node": "Aggregate Results", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Aggregate Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Aggregate Results": {
-      "main": [[{ "node": "Build Summary Message", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Build Summary Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Build Summary Message": {
-      "main": [[{ "node": "Send Summary Telegram", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Send Summary Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Send Summary Telegram": {
-      "main": [[{ "node": "Bulk Log Results", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Bulk Log Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "pinData": {},

@@ -13,17 +13,17 @@ services:
       - N8N_HOST=localhost
       - N8N_PORT=5678
       - N8N_PROTOCOL=http
-      - WEBHOOK_URL=http://localhost:5678/
+      - WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5678/}
       - GENERIC_TIMEZONE=Europe/Moscow
 
       # Database (SQLite by default, or use PostgreSQL)
       - DB_TYPE=sqlite
       - DB_SQLITE_DATABASE=/home/node/.n8n/database.sqlite
 
-      # Security
+      # Security (credentials from .env.n8n)
       - N8N_BASIC_AUTH_ACTIVE=true
-      - N8N_BASIC_AUTH_USER=admin
-      - N8N_BASIC_AUTH_PASSWORD=neuroguardian2024
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD:?N8N_BASIC_AUTH_PASSWORD is required}
 
       # Execution settings
       - EXECUTIONS_DATA_SAVE_ON_ERROR=all
@@ -32,7 +32,7 @@ services:
 
       # Allow $env access in workflows
       - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
-      
+
       # Enable Public API (for automation scripts)
       - N8N_PUBLIC_API_DISABLED=false
 
@@ -48,7 +48,7 @@ services:
       - ./n8n-workflows:/home/node/.n8n/workflows
 
     healthcheck:
-      test: ['CMD', 'wget', '--spider', '-q', 'http://localhost:5678/healthz']
+      test: [ 'CMD', 'wget', '--spider', '-q', 'http://localhost:5678/healthz' ]
       interval: 30s
       timeout: 10s
       retries: 3

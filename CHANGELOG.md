@@ -2,6 +2,91 @@
 
 All notable changes to NeuroGUARDIAN project.
 
+## [2.9.2] - 2024-12-27
+
+### 🔴 Critical Security Fixes
+
+- **[P0] n8n Password Hardcode**: Removed hardcoded `N8N_BASIC_AUTH_PASSWORD` from `docker-compose.n8n.yml`
+  - Now requires password in `.env.n8n` (with validation)
+  - Updated `.env.n8n.example` with all required variables
+- **[P0] n8n Workflow Syntax**: Fixed broken `{{ .API_URL }}` → `{{ $env.API_URL }}` in all 4 workflows
+  - `sentinel-workflow.json`
+  - `sync-workflow.json` (also fixed `ADMIN_TELEGRAM_ID`)
+  - `monitoring-workflow.json`
+  - `analytics-workflow.json` (was already correct)
+- **[P0] WEBHOOK_URL**: Made configurable via `N8N_WEBHOOK_URL` environment variable
+
+### 📊 Analytics Honesty (Major Rewrite)
+
+- **ABC Analysis**: Complete rewrite with REAL sales data from Statistics API
+  - Attempts to fetch actual revenue per product from WB/Ozon APIs
+  - Falls back to price-based estimation with CLEAR warning
+  - New `dataQuality` field shows data source confidence
+  - Returns `isRealData: true/false` per product
+- **Unit Economics**: Now uses database `cost_price` when available
+  - Added `cost_price`, `supplier_sku`, `category` columns to products table
+  - Honest data quality reporting (`dataQuality.coverage`)
+  - Shows commission breakdown by marketplace
+  - Added ROI calculation alongside margin
+
+### 🗄️ Database Changes
+
+- **New Migration**: `009_add_cost_price.sql`
+  - `cost_price` — for accurate profit calculations
+  - `supplier_sku` — manufacturer reference
+  - `category` — for accurate commission rates
+- **New Functions**:
+  - `updateProductCostPrice()` — set COGS for a product
+  - `batchUpdateCostPrices()` — bulk update cost prices
+
+### 📚 Documentation
+
+- Updated `SECURITY.md` with December 2024 security improvements
+- Version bump to 2.9.2
+
+### 📊 Metrics
+
+| Metric             | Before (v2.9.1) | After (v2.9.2) |
+| ------------------ | --------------- | -------------- |
+| Security issues    | 3 P0            | 0              |
+| Analytics honesty  | Fake data       | Real + Warning |
+| n8n workflows      | Broken          | Working        |
+| Cost price support | None            | Full           |
+
+---
+
+## [2.9.1] - 2024-12-26
+
+### 🔴 Critical Fixes (Post-Audit)
+
+- **[CRITICAL]** Fixed Ozon price updates in Agent V4 confirmation handler
+  - Issue: API key was not being split into `clientId:apiKey` format
+  - Impact: All Ozon price updates via AI agent were failing with auth errors
+  - Fix: Aligned `handleAgentV4Confirm` with `tool-executors.ts` key parsing logic
+- **[CRITICAL]** Removed deceptive analytics from AI tools
+  - `executeGetAbcAnalysis`: Added honest warning that analysis is based on prices, not real sales
+  - `executeGetStockForecast`: Removed `Math.random()` fake data, now shows honest "feature in development" message
+  - Impact: Users will no longer make business decisions based on hallucinated data
+
+### 🏗️ Architecture Improvements
+
+- **Modular Chat Handlers**: Extracted chat history logic from monolithic router
+  - Created `api/handlers/chat.ts` with 3 dedicated handlers
+  - Reduced `api/index.ts` from 491 to ~450 lines (-8%)
+  - Improved code maintainability and testability
+
+### 📊 Metrics
+
+| Metric            | Before (v2.9.0) | After (v2.9.1) |
+| ----------------- | --------------- | -------------- |
+| Critical bugs     | 3               | 0              |
+| api/index.ts size | 491 lines       | ~450 lines     |
+| Handler modules   | 7               | 8              |
+| Build time        | 2.92s           | 2.64s          |
+| Tests             | 120/120         | 120/120        |
+
+---
+
 ## [2.9.0] - 2024-12-26
 
 ### 🗑️ V3 Legacy Removal (~115 KB cleaned)

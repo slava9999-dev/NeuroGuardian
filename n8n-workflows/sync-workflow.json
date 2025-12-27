@@ -16,7 +16,10 @@
       "name": "Every Hour",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
-      "position": [-800, 300]
+      "position": [
+        -800,
+        300
+      ]
     },
     {
       "parameters": {
@@ -27,7 +30,7 @@
             {
               "id": "id-1",
               "name": "apiBaseUrl",
-              "value": "https://neuro-guardian.vercel.app/api",
+              "value": "={{ $env.API_URL }}",
               "type": "string"
             },
             {
@@ -51,7 +54,7 @@
             {
               "id": "id-5",
               "name": "adminTelegramId",
-              "value": "7548070478",
+              "value": "={{ $env.ADMIN_TELEGRAM_ID }}",
               "type": "string"
             }
           ]
@@ -64,7 +67,10 @@
       "name": "Configuration",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [-580, 300]
+      "position": [
+        -580,
+        300
+      ]
     },
     {
       "parameters": {
@@ -91,7 +97,10 @@
       "name": "Sync Ozon Products",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [-360, 300],
+      "position": [
+        -360,
+        300
+      ],
       "continueOnFail": true
     },
     {
@@ -119,19 +128,25 @@
       "name": "Sync WB Products",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [-140, 300],
+      "position": [
+        -140,
+        300
+      ],
       "continueOnFail": true
     },
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "// Get results from both Ozon and WB syncs\nconst ozonResult = $('Sync Ozon Products').first()?.json || {};\nconst wbResult = $input.first()?.json || {};\n\n// API returns 'count' field for synced products\nconst ozonSynced = ozonResult.count || ozonResult.synced || 0;\nconst wbSynced = wbResult.count || wbResult.synced || 0;\n\n// Check for errors (error field or non-success response)\nconst ozonError = ozonResult.error || (!ozonResult.success && ozonResult.count === undefined);\nconst wbError = wbResult.error || (!wbResult.success && wbResult.count === undefined);\nconst hasErrors = ozonError || wbError;\n\nconst message = `📦 *Sync Complete*\\n\\n` +\n  `🔵 Ozon: ${ozonSynced} товаров` + (ozonError ? ' ❌' : ' ✅') + `\\n` +\n  `🟣 WB: ${wbSynced} товаров` + (wbError ? ' ❌' : ' ✅') + `\\n` +\n  `⏰ ${new Date().toLocaleString('ru-RU')}`;\n\nreturn {\n  json: {\n    ozonSynced: ozonSynced,\n    wbSynced: wbSynced,\n    hasErrors: !!hasErrors,\n    ozonError: ozonError ? (ozonResult.error || 'Unknown') : null,\n    wbError: wbError ? (wbResult.error || 'Unknown') : null,\n    message: message\n  }\n};"
+        "jsCode": "// Get results from both Ozon and WB syncs\nconst ozonResult = $('Sync Ozon Products').first()?.json || {};\nconst wbResult = $input.first()?.json || {};\n\n// API returns 'count' field for synced products\nconst ozonSynced = ozonResult.count || ozonResult.synced || 0;\nconst wbSynced = wbResult.count || wbResult.synced || 0;\n\n// Check for errors (error field or non-success response)\nconst ozonError = ozonResult.error || (!ozonResult.success && ozonResult.count === undefined);\nconst wbError = wbResult.error || (!wbResult.success && wbResult.count === undefined);\nconst hasErrors = ozonError || wbError;\n\n// Build detailed error info\nlet errorDetails = '';\nif (ozonError && typeof ozonResult.error === 'string') {\n  errorDetails += `\\n❌ Ozon: ${ozonResult.error}`;\n  if (ozonResult.details) errorDetails += ` (${ozonResult.details.substring(0, 100)})`;\n}\nif (wbError && typeof wbResult.error === 'string') {\n  errorDetails += `\\n❌ WB: ${wbResult.error}`;\n  if (wbResult.details) errorDetails += ` (${wbResult.details.substring(0, 100)})`;\n}\n\nconst message = `📦 Sync Complete\\n\\n` +\n  `🔵 Ozon: ${ozonSynced} товаров` + (ozonError ? ' ❌' : ' ✅') + `\\n` +\n  `🟣 WB: ${wbSynced} товаров` + (wbError ? ' ❌' : ' ✅') +\n  (hasErrors ? errorDetails : '') + `\\n` +\n  `⏰ ${new Date().toLocaleString('ru-RU')}`;\n\nreturn {\n  json: {\n    ozonSynced: ozonSynced,\n    wbSynced: wbSynced,\n    hasErrors: !!hasErrors,\n    ozonError: ozonError ? (ozonResult.error || 'Unknown') : null,\n    wbError: wbError ? (wbResult.error || 'Unknown') : null,\n    message: message\n  }\n};"
       },
       "id": "build-summary",
       "name": "Build Summary",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [80, 300]
+      "position": [
+        80,
+        300
+      ]
     },
     {
       "parameters": {
@@ -159,7 +174,10 @@
       "name": "Has Errors?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
-      "position": [300, 300]
+      "position": [
+        300,
+        300
+      ]
     },
     {
       "parameters": {
@@ -183,65 +201,135 @@
             }
           ]
         },
-        "options": {
-          "timeout": 30000
-        }
+        "options": {}
       },
-      "id": "send-alert",
+      "id": "send-error-alert",
       "name": "Send Error Alert",
       "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.3,
-      "position": [520, 200]
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        200
+      ]
     },
     {
       "parameters": {
-        "mode": "manual",
-        "duplicateItem": false,
-        "assignments": {
-          "assignments": [
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $('Configuration').first().json.telegramBotToken }}/sendMessage",
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
             {
-              "id": "id-1",
-              "name": "status",
-              "value": "sync_complete",
-              "type": "string"
+              "name": "chat_id",
+              "value": "={{ $('Configuration').first().json.adminChatId }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.message }}"
+            },
+            {
+              "name": "parse_mode",
+              "value": "Markdown"
             }
           ]
         },
-        "includeOtherFields": true,
-        "include": "all"
+        "options": {}
       },
-      "id": "no-errors",
-      "name": "Success",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [520, 400]
+      "id": "send-success-alert",
+      "name": "Send Success Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        400
+      ]
     }
   ],
   "connections": {
     "Every Hour": {
-      "main": [[{ "node": "Configuration", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Configuration": {
-      "main": [[{ "node": "Sync Ozon Products", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Sync Ozon Products",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Sync Ozon Products": {
-      "main": [[{ "node": "Sync WB Products", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Sync WB Products",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Sync WB Products": {
-      "main": [[{ "node": "Build Summary", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Build Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Build Summary": {
-      "main": [[{ "node": "Has Errors?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Has Errors?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Has Errors?": {
       "main": [
-        [{ "node": "Send Error Alert", "type": "main", "index": 0 }],
-        [{ "node": "Success", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Send Error Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Success Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },
-  "pinData": {},
   "settings": {
     "executionOrder": "v1"
-  }
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "sync-v3",
+  "triggerCount": 0,
+  "tags": []
 }

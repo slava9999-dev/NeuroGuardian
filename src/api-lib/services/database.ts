@@ -120,6 +120,12 @@ export async function initializeDatabase(): Promise<void> {
   await sql`CREATE INDEX IF NOT EXISTS idx_products_marketplace ON products(marketplace)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_products_user_marketplace ON products(user_id, marketplace)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_products_pending ON products(pending_status, pending_since) WHERE pending_status = 'pending'`;
+
+  // Migration: Add cost_price column for unit economics (Dec 2024)
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS cost_price INTEGER DEFAULT 0`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS supplier_sku VARCHAR(100)`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS category VARCHAR(255)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_products_cost_price ON products(cost_price) WHERE cost_price > 0`;
 }
 
 /**
@@ -213,6 +219,47 @@ export async function updateProductMinPrice(
     WHERE user_id = ${userId} AND product_id = ${String(productId)}
   `;
   console.log(`✅ Set min_price=${minPrice} for product ${productId} (User ${userId})`);
+}
+
+/**
+ * Update product cost price (COGS) for unit economics
+ * Added Dec 2024 for honest profit calculations
+ */
+export async function updateProductCostPrice(
+  userId: number,
+  productId: string,
+  costPrice: number
+): Promise<void> {
+  await sql`
+    UPDATE products
+    SET cost_price = ${costPrice}, updated_at = NOW()
+    WHERE user_id = ${userId} AND product_id = ${productId}
+  `;
+  console.log(`✅ Set cost_price=${costPrice} for product ${productId} (User ${userId})`);
+}
+
+/**
+ * Batch update cost prices for multiple products
+ */
+export async function batchUpdateCostPrices(
+  userId: number,
+  updates: Array<{ productId: string; costPrice: number }>
+): Promise<{ updated: number }> {
+  let updated = 0;
+
+  for (const u of updates) {
+    const result = await sql`
+      UPDATE products
+      SET cost_price = ${u.costPrice}, updated_at = NOW()
+      WHERE user_id = ${userId} AND product_id = ${u.productId}
+    `;
+    if (result.rowCount && result.rowCount > 0) {
+      updated++;
+    }
+  }
+
+  console.log(`📦 Batch updated ${updated} cost prices for user ${userId}`);
+  return { updated };
 }
 
 /**

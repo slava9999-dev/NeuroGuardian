@@ -10,6 +10,8 @@ export {
   getUserById,
   getProductsByUserId,
   updateProductMinPrice,
+  updateProductCostPrice,
+  batchUpdateCostPrices,
   updateProductPrice,
   batchUpdateWbPrices,
   batchUpdateOzonPrices,
@@ -78,3 +80,18 @@ export {
   type MarketplaceSalesStats,
   type MarketplaceApiKeys,
 } from './marketplace.js';
+
+// Unit Economics (Dec 2024)
+export {
+  calculateUnitEconomics,
+  getCommissionRate,
+  estimateCostPrice,
+  calculateBreakEvenPrice,
+  WB_COMMISSIONS,
+  OZON_COMMISSIONS,
+  LOGISTICS_COSTS,
+  STORAGE_COSTS,
+  SPP_RATES,
+  type UnitEconomicsInput,
+  type UnitEconomicsResult,
+} from './unit-economics.js';

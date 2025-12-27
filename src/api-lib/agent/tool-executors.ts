@@ -685,6 +685,8 @@ export async function executeGetWarehouseStocks(
 
 /**
  * CALCULATE_UNIT_ECONOMICS — Calculate profit margins
+ * IMPROVED (Dec 2024): Uses real cost_price from database when available
+ * Honest about estimation quality
  */
 export async function executeCalculateUnitEconomics(
   userId: number,
@@ -693,7 +695,8 @@ export async function executeCalculateUnitEconomics(
   const validation = validateToolArgs(CalculateUnitEconomicsArgsSchema, rawArgs);
   if (isValidationError(validation)) return { success: false, error: validation.error };
   const args = validation.data;
-  // Get products
+
+  // Get products with cost_price
   const products = await getProductsByUserId(userId);
 
   let targetProducts = products;
@@ -705,53 +708,102 @@ export async function executeCalculateUnitEconomics(
     return { success: false, error: 'Товары не найдены' };
   }
 
-  // Commission rates (Dec 2024)
-  const wbCommissions = {
-    base: 0.15, // 15% avg commission
-    logistics: 70, // ~70 RUB per item avg
-    storage: 5, // ~5 RUB per item per day
+  // Marketplace commission rates (Dec 2024)
+  // These are average rates - actual rates vary by category
+  const COMMISSIONS = {
+    WB: {
+      base: 0.15, // 15% avg commission (5-25% depending on category)
+      logistics: 70, // ~70 RUB per item avg (depends on weight/size)
+      storage: 5, // ~5 RUB per item per day
+      spp_avg: 0.1, // SPP (Seller's Price Reduction) averages 10%
+    },
+    Ozon: {
+      base: 0.12, // 12% avg commission
+      logistics: 80, // includes last mile
+      processing: 30, // order processing
+      acquiring: 0.015, // 1.5% built into commission
+    },
   };
 
-  const ozonCommissions = {
-    base: 0.12, // 12% avg commission
-    logistics: 80,
-    processing: 30, // обработка/упаковка
-  };
+  // Count products with real cost data
+  const productsWithCost = targetProducts.filter((p: any) => p.cost_price && p.cost_price > 0);
+  const costDataCoverage = Math.round((productsWithCost.length / targetProducts.length) * 100);
 
-  const calculations = targetProducts.slice(0, 10).map(p => {
+  const calculations = targetProducts.slice(0, 10).map((p: any) => {
     const price = p.current_price || 0;
     const mp = (p.marketplace || 'WB') as 'WB' | 'Ozon';
     const isWB = mp === 'WB';
-    const comm = isWB ? wbCommissions : ozonCommissions;
+    const comm = isWB ? COMMISSIONS.WB : COMMISSIONS.Ozon;
 
-    const costPrice = args.cost_price || Math.round(price * 0.3); // Assume 30% if not provided
+    // Use real cost_price if available in DB, then from args, then estimate
+    let costPrice: number;
+    let costSource: string;
+
+    if (p.cost_price && p.cost_price > 0) {
+      costPrice = p.cost_price;
+      costSource = 'из БД';
+    } else if (args.cost_price) {
+      costPrice = args.cost_price;
+      costSource = 'указана вами';
+    } else {
+      // Fallback: estimate as 30% of price (very rough)
+      costPrice = Math.round(price * 0.3);
+      costSource = '⚠️ оценка 30%';
+    }
+
     const commission = Math.round(price * comm.base);
     const logistics = comm.logistics;
-    const otherCosts = isWB ? wbCommissions.storage * 5 : ozonCommissions.processing;
+    const otherCosts = isWB
+      ? COMMISSIONS.WB.storage * 5 + Math.round(price * COMMISSIONS.WB.spp_avg)
+      : COMMISSIONS.Ozon.processing;
 
     const profit = price - costPrice - commission - logistics - otherCosts;
     const margin = price > 0 ? Math.round((profit / price) * 100) : 0;
+    const roi = costPrice > 0 ? Math.round((profit / costPrice) * 100) : 0;
 
     return {
       product: p.title.substring(0, 40),
       marketplace: mp,
       price,
       costPrice,
+      costSource,
       commission,
       logistics,
       otherCosts,
       profit: Math.round(profit),
       margin: `${margin}%`,
+      roi: `${roi}%`,
       status: margin >= 20 ? '🟢 Здоровая' : margin >= 10 ? '🟡 Низкая' : '🔴 Убыток',
     };
   });
 
+  // Generate honest data quality message
+  let dataQualityNote: string;
+  if (costDataCoverage === 100) {
+    dataQualityNote = '✅ Все расчёты основаны на реальной себестоимости из вашей базы данных.';
+  } else if (costDataCoverage > 0) {
+    dataQualityNote = `⚠️ Только ${costDataCoverage}% товаров имеют реальную себестоимость. Остальные — оценка. Добавьте себестоимость в настройках товаров для точного расчёта.`;
+  } else if (args.cost_price) {
+    dataQualityNote = `ℹ️ Использована указанная вами себестоимость (${args.cost_price}₽) для всех товаров.`;
+  } else {
+    dataQualityNote =
+      '⚠️ ВНИМАНИЕ: Себестоимость оценена как 30% от цены. Это ОЧЕНЬ приблизительно! Для точного расчёта укажите реальную себестоимость.';
+  }
+
   return {
     success: true,
     data: {
-      note: args.cost_price
-        ? 'Расчёт с указанной себестоимостью'
-        : 'Себестоимость рассчитана приблизительно (30% от цены). Укажите реальную себестоимость для точного расчёта.',
+      dataQuality: {
+        note: dataQualityNote,
+        productsWithRealCost: productsWithCost.length,
+        totalProducts: targetProducts.length,
+        coverage: `${costDataCoverage}%`,
+      },
+      commissionRates: {
+        note: 'Комиссии усредненные. Реальные зависят от категории товара.',
+        WB: 'Комиссия 5-25%, логистика 50-200₽, СПП до 25%',
+        Ozon: 'Комиссия 5-20%, логистика 70-150₽',
+      },
       products: calculations,
     },
   };
@@ -759,29 +811,164 @@ export async function executeCalculateUnitEconomics(
 
 /**
  * GET_ABC_ANALYSIS — ABC analysis of products
- * Improved: Now shows top products from each category
+ * CRITICAL REWRITE (Dec 2024):
+ * - Attempts to use REAL sales data from Statistics API
+ * - Falls back to price-based approximation with CLEAR warning
+ * - Completely honest about data quality
  */
 export async function executeGetAbcAnalysis(userId: number, rawArgs: unknown): Promise<ToolResult> {
   const validation = validateToolArgs(GetAbcAnalysisArgsSchema, rawArgs);
   if (isValidationError(validation)) return { success: false, error: validation.error };
+  const args = validation.data;
 
-  // For now, use database products and their prices as proxy for revenue
-  // _args.period could be used for time-based filtering in future
   const products = await getProductsByUserId(userId);
 
   if (products.length === 0) {
     return { success: false, error: 'Нет товаров для анализа' };
   }
 
-  // Sort by price (as proxy for revenue since we don't have real sales data per product)
-  const sorted = [...products].sort((a, b) => (b.current_price || 0) - (a.current_price || 0));
+  // Attempt to get real sales data from marketplace APIs
+  const keys = await getUserApiKeys(userId);
+  let hasSalesData = false;
+  let dataSource = 'prices';
 
-  const totalValue = sorted.reduce((sum, p) => sum + (p.current_price || 0), 0);
+  // Map to store revenue per product (from sales API or estimated)
+  const revenueMap = new Map<string, { revenue: number; quantity: number; isReal: boolean }>();
 
+  // Try to fetch real sales data if API keys are available
+  if (keys.ozon || keys.wb) {
+    try {
+      // Calculate date range based on period
+      const now = new Date();
+      let daysBack = 30; // default to month
+      if (args.period === 'week') daysBack = 7;
+      else if (args.period === '3months') daysBack = 90;
+
+      const dateFrom = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
+
+      // Fetch Ozon sales data
+      if (keys.ozon) {
+        try {
+          const ozonRes = await fetchWithRetry('https://api-seller.ozon.ru/v1/analytics/data', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Client-Id': keys.ozon.clientId,
+              'Api-Key': keys.ozon.apiKey,
+            },
+            body: JSON.stringify({
+              date_from: dateFrom.toISOString().split('T')[0],
+              date_to: now.toISOString().split('T')[0],
+              metrics: ['revenue', 'ordered_units'],
+              dimension: ['sku'],
+              limit: 1000,
+            }),
+          });
+
+          if (ozonRes.ok) {
+            const ozonData = await ozonRes.json();
+            const items = ozonData.result?.data || [];
+            for (const item of items) {
+              const sku = item.dimensions?.[0]?.id || item.dimensions?.[0]?.name;
+              const revenue = item.metrics?.[0] || 0;
+              const quantity = item.metrics?.[1] || 0;
+              if (sku && revenue > 0) {
+                revenueMap.set(`ozon-${sku}`, { revenue, quantity, isReal: true });
+                hasSalesData = true;
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Ozon ABC analytics error:', e);
+        }
+      }
+
+      // Fetch WB sales data
+      if (keys.wb) {
+        try {
+          const wbRes = await fetchWithRetry(
+            `https://statistics-api.wildberries.ru/api/v1/supplier/sales?dateFrom=${dateFrom.toISOString().split('T')[0]}`,
+            {
+              method: 'GET',
+              headers: { Authorization: keys.wb },
+            }
+          );
+
+          if (wbRes.ok) {
+            const sales = await wbRes.json();
+            // Aggregate by nmId
+            const wbRevenue = new Map<number, { revenue: number; quantity: number }>();
+
+            for (const sale of sales || []) {
+              if (sale.saleID && !sale.saleID.startsWith('R')) {
+                const nmId = sale.nmId;
+                const price = sale.finishedPrice || sale.priceWithDisc || 0;
+
+                if (nmId && price > 0) {
+                  const existing = wbRevenue.get(nmId) || { revenue: 0, quantity: 0 };
+                  existing.revenue += price;
+                  existing.quantity += 1;
+                  wbRevenue.set(nmId, existing);
+                }
+              }
+            }
+
+            for (const [nmId, data] of wbRevenue) {
+              revenueMap.set(`wb-${nmId}`, { ...data, isReal: true });
+              hasSalesData = true;
+            }
+          }
+        } catch (e) {
+          console.warn('WB ABC analytics error:', e);
+        }
+      }
+
+      if (hasSalesData) {
+        dataSource = 'sales_api';
+      }
+    } catch (e) {
+      console.warn('ABC analysis: Failed to fetch sales data, falling back to price-based', e);
+    }
+  }
+
+  // Prepare products with revenue data
+  interface ProductWithRevenue {
+    product_id: string;
+    title: string;
+    marketplace: string;
+    current_price: number;
+    revenue: number;
+    quantity: number;
+    isRealData: boolean;
+  }
+
+  const productsWithRevenue: ProductWithRevenue[] = products.map(p => {
+    const key = p.product_id;
+    const salesData = revenueMap.get(key);
+
+    return {
+      product_id: p.product_id,
+      title: p.title,
+      marketplace: p.marketplace || 'WB',
+      current_price: p.current_price || 0,
+      // Use real sales data if available, otherwise use price as rough proxy
+      revenue: salesData?.revenue || p.current_price || 0,
+      quantity: salesData?.quantity || 0,
+      isRealData: salesData?.isReal || false,
+    };
+  });
+
+  // Sort by revenue (real or estimated)
+  const sorted = [...productsWithRevenue].sort((a, b) => b.revenue - a.revenue);
+  const totalRevenue = sorted.reduce((sum, p) => sum + p.revenue, 0);
+  const realDataCount = sorted.filter(p => p.isRealData).length;
+  const realDataPercentage = Math.round((realDataCount / sorted.length) * 100);
+
+  // Calculate ABC categories using Pareto principle
   let cumulative = 0;
   const analyzed = sorted.map(p => {
-    cumulative += p.current_price || 0;
-    const percentage = totalValue > 0 ? (cumulative / totalValue) * 100 : 0;
+    cumulative += p.revenue;
+    const percentage = totalRevenue > 0 ? (cumulative / totalRevenue) * 100 : 0;
 
     let category: 'A' | 'B' | 'C';
     if (percentage <= 80) category = 'A';
@@ -789,72 +976,110 @@ export async function executeGetAbcAnalysis(userId: number, rawArgs: unknown): P
     else category = 'C';
 
     return {
+      ...p,
       product: p.title.substring(0, 40),
-      price: p.current_price,
-      marketplace: p.marketplace || 'WB',
       category,
-      recommendation:
-        category === 'A'
-          ? 'Ключевой товар — следить за остатками!'
-          : category === 'B'
-            ? 'Оптимизируй: реклама, описание'
-            : 'Распродай или убери из ассортимента',
+      revenueShare: totalRevenue > 0 ? `${Math.round((p.revenue / totalRevenue) * 100)}%` : '0%',
     };
   });
 
-  // Get top products from each category
+  // Categorize
   const aProducts = analyzed.filter(p => p.category === 'A');
   const bProducts = analyzed.filter(p => p.category === 'B');
   const cProducts = analyzed.filter(p => p.category === 'C');
 
-  // Calculate revenue share for each category
-  const aRevenue = aProducts.reduce((sum, p) => sum + (p.price || 0), 0);
-  const bRevenue = bProducts.reduce((sum, p) => sum + (p.price || 0), 0);
-  const cRevenue = cProducts.reduce((sum, p) => sum + (p.price || 0), 0);
+  const aRevenue = aProducts.reduce((sum, p) => sum + p.revenue, 0);
+  const bRevenue = bProducts.reduce((sum, p) => sum + p.revenue, 0);
+  const cRevenue = cProducts.reduce((sum, p) => sum + p.revenue, 0);
+
+  // Generate honest data quality assessment
+  let dataQuality: {
+    status: 'excellent' | 'good' | 'approximate' | 'poor';
+    message: string;
+    recommendation?: string;
+  };
+
+  if (realDataPercentage >= 80) {
+    dataQuality = {
+      status: 'excellent',
+      message: `✅ Анализ основан на РЕАЛЬНЫХ продажах (${realDataPercentage}% товаров с данными).`,
+    };
+  } else if (realDataPercentage >= 50) {
+    dataQuality = {
+      status: 'good',
+      message: `✓ Частично использованы реальные продажи (${realDataPercentage}% товаров).`,
+      recommendation: 'Синхронизируйте все товары для полной картины.',
+    };
+  } else if (hasSalesData) {
+    dataQuality = {
+      status: 'approximate',
+      message: `⚠️ Мало данных о продажах (${realDataPercentage}%). Большинство оценено по цене.`,
+      recommendation: 'Подождите накопления статистики или проверьте API ключи.',
+    };
+  } else {
+    dataQuality = {
+      status: 'poor',
+      message: '🔴 НЕТ данных о продажах! Анализ основан ТОЛЬКО на ценах товаров.',
+      recommendation:
+        'Это НЕ настоящий ABC-анализ! Подключите Statistics API для получения данных о продажах.',
+    };
+  }
 
   return {
     success: true,
     data: {
+      dataQuality,
+      period: args.period || 'month',
+      dataSource,
       summary: {
         A: {
           count: aProducts.length,
-          revenue: aRevenue,
-          share: totalValue > 0 ? `${Math.round((aRevenue / totalValue) * 100)}%` : '0%',
-          description: 'Ключевые товары — приносят 80% выручки',
+          revenue: Math.round(aRevenue),
+          share: totalRevenue > 0 ? `${Math.round((aRevenue / totalRevenue) * 100)}%` : '0%',
+          description: 'Ключевые товары — генерируют 80% выручки. Следите за остатками!',
         },
         B: {
           count: bProducts.length,
-          revenue: bRevenue,
-          share: totalValue > 0 ? `${Math.round((bRevenue / totalValue) * 100)}%` : '0%',
-          description: 'Стабильные товары — требуют оптимизации',
+          revenue: Math.round(bRevenue),
+          share: totalRevenue > 0 ? `${Math.round((bRevenue / totalRevenue) * 100)}%` : '0%',
+          description: 'Стабильные товары (15% выручки). Оптимизируйте рекламу и описания.',
         },
         C: {
           count: cProducts.length,
-          revenue: cRevenue,
-          share: totalValue > 0 ? `${Math.round((cRevenue / totalValue) * 100)}%` : '0%',
-          description: 'Аутсайдеры — распродавай или убирай',
+          revenue: Math.round(cRevenue),
+          share: totalRevenue > 0 ? `${Math.round((cRevenue / totalRevenue) * 100)}%` : '0%',
+          description: 'Аутсайдеры (5% выручки). Распродайте или выведите из ассортимента.',
         },
       },
-      topA: aProducts.slice(0, 3).map(p => ({
+      topA: aProducts.slice(0, 5).map(p => ({
         title: p.product,
-        price: p.price,
+        revenue: Math.round(p.revenue),
+        quantity: p.quantity,
         marketplace: p.marketplace,
+        isRealData: p.isRealData,
+        action: 'Держите в фокусе! Контролируйте остатки и цены.',
       })),
-      topC: cProducts.slice(0, 3).map(p => ({
+      bottomC: cProducts.slice(-3).map(p => ({
         title: p.product,
-        price: p.price,
+        revenue: Math.round(p.revenue),
+        quantity: p.quantity,
         marketplace: p.marketplace,
-        action: 'Рассмотри снижение цены или вывод из ассортимента',
+        isRealData: p.isRealData,
+        action: 'Рассмотрите снижение цены или вывод из ассортимента.',
       })),
-      totalProducts: products.length,
-      totalValue,
-      note: 'Анализ основан на ценах товаров. Для точного анализа подключите статистику продаж.',
+      stats: {
+        totalProducts: products.length,
+        totalRevenue: Math.round(totalRevenue),
+        productsWithSalesData: realDataCount,
+        salesDataCoverage: `${realDataPercentage}%`,
+      },
     },
   };
 }
 
 /**
  * GET_STOCK_FORECAST — Forecast when products will run out
+ * NOTE: Real implementation requires Statistics API for sales velocity data
  */
 export async function executeGetStockForecast(
   userId: number,
@@ -874,32 +1099,26 @@ export async function executeGetStockForecast(
     return { success: false, error: 'Товары не найдены' };
   }
 
-  // Mock average daily sales (in real implementation, fetch from API)
-  const forecasts = filtered.slice(0, 15).map(p => {
-    const stock = 50; // Would come from real stocks API
-    const avgDailySales = Math.max(1, Math.floor(Math.random() * 5) + 1); // Mock
-    const daysLeft = Math.floor(stock / avgDailySales);
-
-    return {
-      product: p.title.substring(0, 35),
-      currentStock: stock,
-      avgDailySales,
-      daysLeft,
-      status:
-        daysLeft <= 7
-          ? '🔴 СРОЧНО ЗАКАЗАТЬ'
-          : daysLeft <= 14
-            ? '🟡 Скоро закончится'
-            : '🟢 В норме',
-      recommendedOrder: avgDailySales * 30, // 30-day supply
-    };
-  });
+  // ЧЕСТНЫЙ ОТВЕТ: Без реальных данных о продажах нельзя делать прогноз
+  // Показываем список товаров, но без фейковых прогнозов
+  const productsList = filtered.slice(0, 15).map(p => ({
+    product: p.title.substring(0, 40),
+    marketplace: p.marketplace || 'WB',
+    currentPrice: p.current_price,
+    protected: p.min_price > 0,
+  }));
 
   return {
     success: true,
     data: {
-      note: 'Прогноз основан на средних продажах. Подключите Statistics API для точных данных.',
-      forecasts,
+      warning:
+        '⚠️ ФУНКЦИЯ В РАЗРАБОТКЕ: Для точного прогноза остатков необходимо подключить Statistics API маркетплейсов.',
+      explanation:
+        'Прогноз "когда закончится товар" требует данные о скорости продаж (сколько штук в день). Сейчас эти данные недоступны.',
+      recommendation:
+        'Используйте личный кабинет WB/Ozon для просмотра остатков и скорости продаж, или подключите Statistics API.',
+      products: productsList,
+      totalProducts: filtered.length,
     },
   };
 }

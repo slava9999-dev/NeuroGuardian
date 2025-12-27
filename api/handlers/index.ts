@@ -25,3 +25,6 @@ export {
   handleAdminSentinelLogs,
   handleHealth,
 } from './admin.js';
+
+// Chat history handlers
+export { handleGetChatHistory, handleSaveChatHistory, handleClearChatHistory } from './chat.js';

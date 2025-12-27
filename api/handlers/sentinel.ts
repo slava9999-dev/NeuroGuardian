@@ -646,15 +646,22 @@ async function sendSentinelAlert(
       `💡 <i>Если цена упадёт ещё — сработает Сторож.</i>`;
   } else {
     // SUCCESS ALERT (срабатывание защиты)
+    // NOTE: currentPrice is the DETECTED low price, minPrice is our stop-loss threshold
+    // The "saved" amount shows what we protected against
+    const priceDropText =
+      data.currentPrice < data.minPrice
+        ? `📉 Обнаружено: <b>${data.currentPrice}₽</b> (ниже минимума ${data.minPrice}₽)`
+        : `📉 Цена: <b>${data.currentPrice}₽</b> → защита: <b>${data.minPrice}₽</b>`;
+
     msg =
       `🛡️ <b>NeuroGUARDIAN СТОРОЖ</b>\n\n` +
       `⚠️ <b>АТАКА ОБНАРУЖЕНА!</b>\n` +
       `📅 ${date} в ${time}\n\n` +
       `${marketplaceEmoji} <b>${data.marketplace || 'Маркетплейс'}</b>\n` +
       `📦 ${data.title}\n\n` +
-      `📉 Цена упала: <s>${data.minPrice}₽</s> → <b>${data.currentPrice}₽</b>\n` +
+      `${priceDropText}\n` +
       `⚔️ <b>Защита:</b> ${data.defenseAction}\n` +
-      `💰 <b>Спасено:</b> ${data.savedAmount}₽\n\n` +
+      `💰 <b>Спасено:</b> ${Math.abs(data.savedAmount)}₽\n\n` +
       `✅ Ваш товар защищён!`;
   }
 

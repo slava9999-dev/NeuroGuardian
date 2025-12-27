@@ -349,16 +349,22 @@ export async function handleAgentV4Confirm(
         }
 
         // Update Ozon prices
+        // CRITICAL FIX: Ozon key is stored as "clientId:apiKey", must split it
         if (ozonUpdates.length > 0 && user.api_key_ozon) {
-          const ozonApiKey = decryptApiKey(user.api_key_ozon);
-          // Get Ozon client ID from user
-          const ozonClientId = (user as { ozon_client_id?: string }).ozon_client_id || '';
-          if (ozonClientId) {
-            ozonResult = await updateOzonPrices(
-              ozonClientId,
-              ozonApiKey,
-              ozonUpdates.map(u => ({ productId: parseInt(u.product_id), price: u.new_price }))
-            );
+          const decryptedOzonKey = decryptApiKey(user.api_key_ozon);
+          if (decryptedOzonKey && decryptedOzonKey.includes(':')) {
+            const [ozonClientId, ozonApiKey] = decryptedOzonKey.split(':');
+            if (ozonClientId && ozonApiKey) {
+              ozonResult = await updateOzonPrices(
+                ozonClientId,
+                ozonApiKey,
+                ozonUpdates.map(u => ({ productId: parseInt(u.product_id), price: u.new_price }))
+              );
+            } else {
+              console.warn('⚠️ Ozon API key format invalid after split');
+            }
+          } else {
+            console.warn('⚠️ Ozon API key missing or invalid format (expected clientId:apiKey)');
           }
         }
 

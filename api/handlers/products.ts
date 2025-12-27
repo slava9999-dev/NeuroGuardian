@@ -206,7 +206,12 @@ export async function handleSyncProducts(
       );
 
       if (!wbResponse.ok) {
-        return res.status(400).json({ error: `WB API error: ${wbResponse.status}` });
+        const errorBody = await wbResponse.text();
+        console.error(`❌ WB Content API error: ${wbResponse.status}`, errorBody);
+        return res.status(400).json({
+          error: `WB API error: ${wbResponse.status}`,
+          details: errorBody.substring(0, 200),
+        });
       }
 
       const wbData = await wbResponse.json();
