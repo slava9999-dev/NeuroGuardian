@@ -26,6 +26,7 @@ import {
   executeGetAbcAnalysis,
   executeGetStockForecast,
   executeGetMarketplaceInfo,
+  executeGetMarketplaceAccounts,
   executeSearchWeb,
 } from './tool-executors.js';
 import { logger } from '../lib/index.js';
@@ -464,6 +465,8 @@ async function executeTool(
         return await executeGetStockForecast(userId, args);
       case 'get_marketplace_info':
         return executeGetMarketplaceInfo(args);
+      case 'get_marketplace_accounts':
+        return await executeGetMarketplaceAccounts(userId, args);
       case 'search_web':
         return await executeSearchWeb(userId, args);
       default:

@@ -154,15 +154,39 @@ export async function handleAgentV4(
   // 8. Execute V4 Orchestrator (Two-Phase Pipeline)
   const result = await orchestrateV4(message, context, conversationHistory);
 
-  // 9. Save conversation history
-  if (kv && result.message) {
+  // 9. Save conversation history and pending actions
+  if (kv) {
     try {
-      conversationHistory.push({ role: 'user', content: message });
-      conversationHistory.push({ role: 'assistant', content: result.message });
-      const slicedHistory = conversationHistory.slice(-20);
-      await kv.set(historyKey, slicedHistory, { ex: 86400 });
+      // History
+      if (result.message) {
+        conversationHistory.push({ role: 'user', content: message });
+        conversationHistory.push({ role: 'assistant', content: result.message });
+        const slicedHistory = conversationHistory.slice(-20);
+        await kv.set(historyKey, slicedHistory, { ex: 86400 });
+      }
+
+      // Actions for confirmation
+      if (result.actions && result.actions.length > 0) {
+        const action = result.actions[0];
+        const taskId = `task_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+        await kv.set(
+          `pending:v4:${userId}`,
+          {
+            type: action.type,
+            taskId,
+            details: action.details,
+            summary: action.summary,
+            created_at: new Date().toISOString(),
+          },
+          { ex: 3600 }
+        ); // 1 hour TTL
+
+        // Inject taskId into the response actions so UI knows what to confirm
+        (result.actions[0] as any).taskId = taskId;
+      }
     } catch (e) {
-      console.warn('Failed to save chat history:', e);
+      console.warn('Failed to save chat state to KV:', e);
     }
   }
 
@@ -331,32 +355,26 @@ export async function handleAgentV4Confirm(
         let wbResult = { success: true, count: 0 };
         let ozonResult = { success: true, count: 0 };
 
+        // Support account_id if provided
+        const accountId = pendingAction.details.account_id as number | undefined;
+        const { getMarketplaceKeys } = await import('../../src/api-lib/services/marketplace.js');
+        const keys = await getMarketplaceKeys(userId, accountId);
+
         // Update WB prices
-        if (wbUpdates.length > 0 && user.api_key_wb) {
-          const wbApiKey = decryptApiKey(user.api_key_wb);
+        if (wbUpdates.length > 0 && keys.wb) {
           wbResult = await updateWbPrices(
-            wbApiKey,
+            keys.wb,
             wbUpdates.map(u => ({ nmId: u.nm_id!, price: u.new_price }))
           );
         }
 
         // Update Ozon prices
-        // CRITICAL FIX: Use parseOzonApiKey utility for safe parsing
-        if (ozonUpdates.length > 0 && user.api_key_ozon) {
-          const decryptedOzonKey = decryptApiKey(user.api_key_ozon);
-          const { parseOzonApiKey } = await import('../../src/api-lib/lib/validation.js');
-          const ozonKeys = parseOzonApiKey(decryptedOzonKey);
-
-          if (ozonKeys) {
-            ozonResult = await updateOzonPrices(
-              ozonKeys.clientId,
-              ozonKeys.apiKey,
-              ozonUpdates.map(u => ({ productId: parseInt(u.product_id), price: u.new_price }))
-            );
-          } else {
-            console.warn('⚠️ Ozon API key invalid format (expected clientId:apiKey)');
-            ozonResult = { success: false, count: 0 };
-          }
+        if (ozonUpdates.length > 0 && keys.ozon) {
+          ozonResult = await updateOzonPrices(
+            keys.ozon.clientId,
+            keys.ozon.apiKey,
+            ozonUpdates.map(u => ({ productId: parseInt(u.product_id), price: u.new_price }))
+          );
         }
 
         executedCount = wbResult.count + ozonResult.count;

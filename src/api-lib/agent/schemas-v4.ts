@@ -22,6 +22,7 @@ export const ToolNameEnum = z.enum([
   'get_abc_analysis',
   'get_stock_forecast',
   'get_marketplace_info',
+  'get_marketplace_accounts',
   'search_web',
 ]);
 
@@ -332,12 +333,17 @@ export const PLAN_JSON_SCHEMA = {
                 'get_abc_analysis',
                 'get_stock_forecast',
                 'get_marketplace_info',
+                'get_marketplace_accounts',
                 'search_web',
               ],
             },
             args: {
               type: 'object',
               properties: {
+                account_id: {
+                  type: 'integer',
+                  description: 'ID конкретной учетной записи маркетплейса',
+                },
                 marketplace: {
                   type: 'string',
                   enum: ['WB', 'Ozon', 'all'],

@@ -29,6 +29,7 @@ import {
   GetAbcAnalysisArgsSchema,
   GetStockForecastArgsSchema,
   GetMarketplaceInfoArgsSchema,
+  GetMarketplaceAccountsArgsSchema,
   SearchWebArgsSchema,
 } from './validators.js';
 
@@ -52,7 +53,7 @@ export async function executeGetProducts(userId: number, rawArgs: unknown): Prom
   const args = validation.data;
 
   try {
-    const products = await getProductsByUserId(userId);
+    const products = await getProductsByUserId(userId, args.account_id);
 
     const marketplace = args.marketplace === 'all' ? undefined : args.marketplace;
     let filtered = filterProducts(products as any, marketplace);
@@ -102,10 +103,10 @@ export async function executeGetSalesStats(userId: number, rawArgs: unknown): Pr
   const args = validation.data;
 
   console.log(
-    `📊 executeGetSalesStats: userId=${userId}, period=${args.period}, mp=${args.marketplace}`
+    `📊 executeGetSalesStats: userId=${userId}, period=${args.period}, mp=${args.marketplace}, account=${args.account_id}`
   );
 
-  const keys = await getMarketplaceKeys(userId);
+  const keys = await getMarketplaceKeys(userId, args.account_id);
 
   if (!keys.ozon && !keys.wb) {
     return {
@@ -408,7 +409,7 @@ export async function executeGetOrders(userId: number, rawArgs: unknown): Promis
   const validation = validateToolArgs(GetOrdersArgsSchema, rawArgs);
   if (isValidationError(validation)) return { success: false, error: validation.error };
   const args = validation.data;
-  const keys = await getMarketplaceKeys(userId);
+  const keys = await getMarketplaceKeys(userId, args.account_id);
 
   if (!keys.ozon && !keys.wb) {
     return { success: false, error: 'API ключи не подключены.' };
@@ -529,7 +530,7 @@ export async function executeGetWarehouseStocks(
   const validation = validateToolArgs(GetWarehouseStocksArgsSchema, rawArgs);
   if (isValidationError(validation)) return { success: false, error: validation.error };
   const args = validation.data;
-  const keys = await getMarketplaceKeys(userId);
+  const keys = await getMarketplaceKeys(userId, args.account_id);
 
   if (!keys.ozon && !keys.wb) {
     return { success: false, error: 'API ключи не подключены.' };
@@ -655,7 +656,7 @@ export async function executeCalculateUnitEconomics(
   const args = validation.data;
 
   // Get products with cost_price
-  const products = await getProductsByUserId(userId);
+  const products = await getProductsByUserId(userId, args.account_id);
 
   let targetProducts = products;
   if (args.product_id) {
@@ -787,13 +788,15 @@ export async function executeGetAbcAnalysis(userId: number, rawArgs: unknown): P
 
   // 2. Trigger Sync (if keys exist)
   // We do this BEFORE fetching products ensuring data is fresh
-  console.log(`📊 ABC Analysis: Triggering sales sync for user ${userId} (${daysBack} days)`);
-  await syncSalesHistory(userId, daysBack);
+  console.log(
+    `📊 ABC Analysis: Triggering sales sync for user ${userId} (${daysBack} days, account=${args.account_id})`
+  );
+  await syncSalesHistory(userId, daysBack, args.account_id);
 
   // 3. Fetch Data from DB
   const [products, orders] = await Promise.all([
-    getProductsByUserId(userId),
-    getSalesHistory(userId, dateFrom, now),
+    getProductsByUserId(userId, args.account_id),
+    getSalesHistory(userId, dateFrom, now, args.account_id),
   ]);
 
   if (products.length === 0) {
@@ -967,16 +970,18 @@ export async function executeGetStockForecast(
   const args = validation.data;
 
   // 1. Sync recent sales to get accurate velocity
-  console.log(`📊 Stock Forecast: Triggering sales sync for user ${userId}`);
-  await syncSalesHistory(userId, 30); // 30 days history is enough for velocity
+  console.log(
+    `📊 Stock Forecast: Triggering sales sync for user ${userId} (account=${args.account_id})`
+  );
+  await syncSalesHistory(userId, 30, args.account_id); // 30 days history is enough for velocity
 
   const now = new Date();
   const dateFrom = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
   // 2. Fetch Data from DB
   const [products, orders] = await Promise.all([
-    getProductsByUserId(userId),
-    getSalesHistory(userId, dateFrom, now),
+    getProductsByUserId(userId, args.account_id),
+    getSalesHistory(userId, dateFrom, now, args.account_id),
   ]);
 
   let filtered = products;
@@ -1338,5 +1343,45 @@ export async function executeSearchWeb(_userId: number, rawArgs: unknown): Promi
   } catch (error) {
     console.error('Web search error:', error);
     return { success: false, error: 'Ошибка поиска: ' + String(error) };
+  }
+}
+
+/**
+ * GET_MARKETPLACE_ACCOUNTS — List user's connected accounts
+ */
+export async function executeGetMarketplaceAccounts(
+  userId: number,
+  rawArgs: unknown
+): Promise<ToolResult> {
+  const validation = validateToolArgs(GetMarketplaceAccountsArgsSchema, rawArgs);
+  if (isValidationError(validation)) return { success: false, error: validation.error };
+  const args = validation.data;
+
+  try {
+    const { getMarketplaceAccounts } = await import('../services/users.js');
+    const accounts = await getMarketplaceAccounts(userId);
+
+    let filtered = accounts;
+    if (args.marketplace !== 'all') {
+      filtered = accounts.filter(
+        a => a.marketplace.toLowerCase() === args.marketplace.toLowerCase()
+      );
+    }
+
+    return {
+      success: true,
+      data: {
+        total: accounts.length,
+        accounts: filtered.map(a => ({
+          id: a.id,
+          name: a.name,
+          marketplace: a.marketplace,
+          is_active: a.is_active,
+          last_sync: a.last_sync_at,
+        })),
+      },
+    };
+  } catch (error) {
+    return { success: false, error: String(error) };
   }
 }

@@ -56,29 +56,48 @@ export interface MarketplaceApiKeys {
 // API KEY HELPERS
 // ============================================
 
+import { getAccountById } from './users.js';
+
 /**
- * Get decrypted marketplace API keys for a user
+ * Get decrypted marketplace API keys for a user or a specific account
  */
-export async function getMarketplaceKeys(userId: number): Promise<MarketplaceApiKeys> {
+export async function getMarketplaceKeys(
+  userId: number,
+  accountId?: number
+): Promise<MarketplaceApiKeys> {
+  const result: MarketplaceApiKeys = {};
+
+  if (accountId) {
+    const account = await getAccountById(accountId);
+    if (!account) return {};
+
+    if (account.marketplace === 'wb' && account.wb_token) {
+      const decrypted = decryptApiKey(account.wb_token);
+      if (decrypted) result.wb = decrypted;
+    } else if (account.marketplace === 'ozon' && account.ozon_client_id && account.ozon_api_key) {
+      const clientDecrypted = decryptApiKey(account.ozon_client_id);
+      const keyDecrypted = decryptApiKey(account.ozon_api_key);
+      if (clientDecrypted && keyDecrypted) {
+        result.ozon = { clientId: clientDecrypted, apiKey: keyDecrypted };
+      }
+    }
+    return result;
+  }
+
+  // Fallback to legacy user columns
   const user = await getUserById(userId);
   if (!user) return {};
 
-  const result: MarketplaceApiKeys = {};
-
   if (user.api_key_wb) {
     const decrypted = decryptApiKey(user.api_key_wb);
-    if (decrypted) {
-      result.wb = decrypted;
-    }
+    if (decrypted) result.wb = decrypted;
   }
 
   if (user.api_key_ozon) {
     const decrypted = decryptApiKey(user.api_key_ozon);
     if (decrypted) {
       const [clientId, apiKey] = decrypted.split(':');
-      if (clientId && apiKey) {
-        result.ozon = { clientId, apiKey };
-      }
+      if (clientId && apiKey) result.ozon = { clientId, apiKey };
     }
   }
 
@@ -1415,10 +1434,11 @@ export async function getOzonFbsWarehouses(
  */
 export async function syncSalesHistory(
   userId: number,
-  daysBack: number = 30
+  daysBack: number = 30,
+  accountId?: number
 ): Promise<{ success: boolean; imported: number; error?: string }> {
   try {
-    const keys = await getMarketplaceKeys(userId);
+    const keys = await getMarketplaceKeys(userId, accountId);
     let totalImported = 0;
     const orders: MarketplaceOrder[] = [];
 
@@ -1443,6 +1463,7 @@ export async function syncSalesHistory(
           logistics: 0, // TODO: Calculate from report
           cost_price: 0, // Will be filled from products table join later
           region: o.regionName,
+          account_id: accountId || null,
         }));
         orders.push(...mappedWb);
         console.log(`📥 Sync: Fetched ${mappedWb.length} WB orders`);
@@ -1469,6 +1490,7 @@ export async function syncSalesHistory(
           logistics: 0, // Ozon calculates this separately
           cost_price: 0,
           region: o.analytics_data?.region || o.region,
+          account_id: accountId || null,
         }));
         orders.push(...mappedOzon);
         console.log(`📥 Sync: Fetched ${mappedOzon.length} Ozon orders`);

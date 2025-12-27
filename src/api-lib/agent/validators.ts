@@ -16,36 +16,43 @@ export const GetProductsArgsSchema = z.object({
   marketplace: z.enum(['WB', 'Ozon', 'all']).optional().default('all'),
   limit: z.number().int().min(1).max(100).optional().default(20),
   sort_by: z.enum(['price', 'stock', 'name']).optional().default('price'),
+  account_id: z.number().optional(),
 });
 
 export const GetSalesStatsArgsSchema = z.object({
   period: z.enum(['today', 'yesterday', 'week', 'month', '3months']),
   marketplace: z.enum(['WB', 'Ozon', 'all']).optional().default('all'),
+  account_id: z.number().optional(),
 });
 
 export const CalculateUnitEconomicsArgsSchema = z.object({
   product_id: z.string().optional(),
   cost_price: z.number().positive().optional(),
   marketplace: z.enum(['WB', 'Ozon']).optional(),
+  account_id: z.number().optional(),
 });
 
 export const GetAbcAnalysisArgsSchema = z.object({
   period: z.enum(['week', 'month', '3months']).optional().default('month'),
+  account_id: z.number().optional(),
 });
 
 export const GetStockForecastArgsSchema = z.object({
   product_id: z.string().optional(),
+  account_id: z.number().optional(),
 });
 
 export const GetOrdersArgsSchema = z.object({
   period: z.enum(['today', 'yesterday', 'week', 'month']),
   marketplace: z.enum(['WB', 'Ozon', 'all']).optional().default('all'),
   status: z.enum(['all', 'new', 'processing', 'delivered', 'cancelled']).optional().default('all'),
+  account_id: z.number().optional(),
 });
 
 export const GetWarehouseStocksArgsSchema = z.object({
   marketplace: z.enum(['WB', 'Ozon']).optional(),
   low_stock_only: z.boolean().optional().default(false),
+  account_id: z.number().optional(),
 });
 
 export const GetMarketplaceInfoArgsSchema = z.object({
@@ -65,6 +72,10 @@ export const GetMarketplaceInfoArgsSchema = z.object({
 export const SearchWebArgsSchema = z.object({
   query: z.string().min(1, 'Query is required'),
   topic: z.enum(['competitors', 'market', 'news', 'general']).optional().default('general'),
+});
+
+export const GetMarketplaceAccountsArgsSchema = z.object({
+  marketplace: z.enum(['WB', 'Ozon', 'all']).optional().default('all'),
 });
 
 // === WRITE TOOLS (REQUIRE CONFIRMATION) ===
@@ -182,6 +193,7 @@ export type SetStopLossArgs = z.infer<typeof SetStopLossArgsSchema>;
 export type BulkProtectProductsArgs = z.infer<typeof BulkProtectProductsArgsSchema>;
 export type UpdatePricesArgs = z.infer<typeof UpdatePricesArgsSchema>;
 export type UpdateStocksArgs = z.infer<typeof UpdateStocksArgsSchema>;
+export type GetMarketplaceAccountsArgs = z.infer<typeof GetMarketplaceAccountsArgsSchema>;
 
 // Confirmation details types
 export type PriceChangeItem = z.infer<typeof PriceChangeItemSchema>;

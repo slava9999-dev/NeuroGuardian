@@ -3,6 +3,14 @@
 // Re-export all services
 // ============================================
 
+// Users & Accounts
+export {
+  getMarketplaceAccounts,
+  getAccountById,
+  addMarketplaceAccount,
+  getAllUsers,
+} from './users.js';
+
 // Database
 export {
   initializeDatabase,

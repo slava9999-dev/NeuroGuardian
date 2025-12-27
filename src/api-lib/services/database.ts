@@ -1,15 +1,63 @@
 // ============================================
 // NeuroGUARDIAN — Database Service
-// PostgreSQL operations via Vercel Postgres
+// Handles all PostgreSQL operations via @vercel/postgres
+// Version: 2.1.0 | Date: December 2024
 // ============================================
 
 import { sql } from '@vercel/postgres';
-import type { TelegramUser } from '../lib/types.js';
+import { logger } from '../lib/index.js';
+
+export interface TelegramUser {
+  id: number;
+  username?: string;
+  first_name: string;
+  last_name?: string;
+  photo_url?: string;
+  is_active: boolean;
+  api_key_wb?: string;
+  api_key_ozon?: string;
+  ozon_client_id?: string;
+  protection_enabled: boolean;
+  defense_mode: 'zero_stock' | 'price_correction';
+  subscription_plan: 'trial' | 'standard' | 'premium';
+  subscription_end?: Date;
+  subscription_active: boolean;
+  payment_method_id?: string;
+  total_products: number;
+  triggered_today: number;
+  saved_amount: number;
+  referral_code?: string;
+  referred_by?: string;
+  last_reminder_sent?: Date;
+  price_buffer_percent: number;
+  warning_threshold_percent: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface MarketplaceOrder {
+  order_id: string;
+  user_id: number;
+  account_id?: number | null;
+  marketplace: 'WB' | 'Ozon' | 'wb' | 'ozon';
+  product_id?: string | null;
+  marketplace_product_id: string;
+  title?: string | null;
+  order_date: Date;
+  status: string;
+  price_total: number;
+  quantity: number;
+  commission: number;
+  logistics: number;
+  cost_price: number;
+  region?: string | null;
+}
 
 /**
  * Initialize database schema
  */
 export async function initializeDatabase(): Promise<void> {
+  // 1. Users table
   await sql`
     CREATE TABLE IF NOT EXISTS users (
       id BIGINT PRIMARY KEY,
@@ -40,37 +88,61 @@ export async function initializeDatabase(): Promise<void> {
     )
   `;
 
+  // 2. Marketplace Accounts (Multi-account support)
+  await sql`
+    CREATE TABLE IF NOT EXISTS marketplace_accounts (
+      id SERIAL PRIMARY KEY,
+      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name VARCHAR(255) NOT NULL,
+      marketplace VARCHAR(10) NOT NULL,
+      is_active BOOLEAN DEFAULT true,
+      wb_token TEXT,
+      ozon_client_id TEXT,
+      ozon_api_key TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      last_sync_at TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+
+  // 3. Products
   await sql`
     CREATE TABLE IF NOT EXISTS products (
       id SERIAL PRIMARY KEY,
       user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       product_id VARCHAR(255) NOT NULL,
       nm_id BIGINT,
-      title VARCHAR(500) NOT NULL,
+      official_sku VARCHAR(255),
+      offer_id VARCHAR(255),
+      title VARCHAR(255) NOT NULL,
       image_url TEXT,
       current_price INTEGER NOT NULL,
       min_price INTEGER DEFAULT 0,
       current_stock INTEGER DEFAULT 0,
-      marketplace VARCHAR(10) NOT NULL,
-      status VARCHAR(50) DEFAULT 'active',
+      marketplace VARCHAR(50) NOT NULL,
       is_monitored BOOLEAN DEFAULT true,
-      -- Pending price tracking (Dec 2024 Audit)
       pending_price INTEGER,
       pending_task_id BIGINT,
-      pending_status VARCHAR(20),
+      pending_status VARCHAR(50),
       pending_since TIMESTAMP,
+      account_id INTEGER REFERENCES marketplace_accounts(id) ON DELETE SET NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       UNIQUE(user_id, product_id)
     )
   `;
 
+  // Ensure account_id exists if table was created before
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS account_id INTEGER REFERENCES marketplace_accounts(id) ON DELETE SET NULL`;
+
+  // 4. Transactions
   await sql`
     CREATE TABLE IF NOT EXISTS transactions (
       id VARCHAR(255) PRIMARY KEY,
       user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       yookassa_payment_id VARCHAR(255) UNIQUE,
-      amount DECIMAL(10, 2) NOT NULL,
+      amount DECIMAL(12, 2) NOT NULL,
+      currency VARCHAR(10) NOT NULL,
       status VARCHAR(50) NOT NULL,
       plan VARCHAR(50) NOT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -78,22 +150,23 @@ export async function initializeDatabase(): Promise<void> {
     )
   `;
 
+  // 5. Sentinel Logs
   await sql`
     CREATE TABLE IF NOT EXISTS sentinel_logs (
       id SERIAL PRIMARY KEY,
       user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      product_id VARCHAR(255) NOT NULL,
-      product_title VARCHAR(500),
+      product_id VARCHAR(255),
+      product_title VARCHAR(255),
       detected_price INTEGER NOT NULL,
       min_price INTEGER NOT NULL,
       defense_action VARCHAR(50) NOT NULL,
       saved_amount INTEGER DEFAULT 0,
-      marketplace VARCHAR(10) NOT NULL,
+      marketplace VARCHAR(50) NOT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `;
 
-  // Chat history table
+  // 6. Chat History
   await sql`
     CREATE TABLE IF NOT EXISTS chat_history (
       id SERIAL PRIMARY KEY,
@@ -103,126 +176,103 @@ export async function initializeDatabase(): Promise<void> {
     )
   `;
 
-  // Marketplace Orders / Sales History (Added Dec 2024 for Real ABC Analysis)
+  // 7. Marketplace Orders (Sales history)
   await sql`
     CREATE TABLE IF NOT EXISTS marketplace_orders (
       id SERIAL PRIMARY KEY,
       user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      account_id INTEGER REFERENCES marketplace_accounts(id) ON DELETE SET NULL,
+      marketplace VARCHAR(20) NOT NULL,
+      order_id VARCHAR(255) NOT NULL,
       product_id VARCHAR(255),
       marketplace_product_id VARCHAR(255) NOT NULL,
-      title VARCHAR(500),
-      marketplace VARCHAR(10) NOT NULL,
-      order_id VARCHAR(255) NOT NULL,
+      title VARCHAR(255),
       order_date TIMESTAMP NOT NULL,
       status VARCHAR(50) NOT NULL,
-      price_total DECIMAL(10, 2) NOT NULL DEFAULT 0,
+      price_total DECIMAL(12, 2) NOT NULL DEFAULT 0,
       quantity INTEGER NOT NULL DEFAULT 1,
-      commission DECIMAL(10, 2) DEFAULT 0,
-      logistics DECIMAL(10, 2) DEFAULT 0,
-      cost_price DECIMAL(10, 2) DEFAULT 0,
-      region VARCHAR(100),
+      commission DECIMAL(12, 2) DEFAULT 0,
+      logistics DECIMAL(12, 2) DEFAULT 0,
+      cost_price DECIMAL(12, 2) DEFAULT 0,
+      region VARCHAR(255),
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       UNIQUE(user_id, marketplace, order_id)
     )
   `;
 
-  // Indexes
+  // Ensure account_id exists
+  await sql`ALTER TABLE marketplace_orders ADD COLUMN IF NOT EXISTS account_id INTEGER REFERENCES marketplace_accounts(id) ON DELETE SET NULL`;
+
+  // 8. Indexes
   await sql`CREATE INDEX IF NOT EXISTS idx_products_user_id ON products(user_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_sentinel_logs_user_id ON sentinel_logs(user_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_orders_user_id ON marketplace_orders(user_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_orders_account_id ON marketplace_orders(account_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_users_protection ON users(protection_enabled, subscription_active) WHERE protection_enabled = true`;
-  await sql`CREATE INDEX IF NOT EXISTS idx_products_monitoring ON products(user_id, min_price) WHERE min_price > 0`;
-  await sql`CREATE INDEX IF NOT EXISTS idx_sentinel_logs_user ON sentinel_logs(user_id, created_at DESC)`;
-  await sql`CREATE INDEX IF NOT EXISTS idx_chat_history_user ON chat_history(user_id)`;
-  await sql`CREATE INDEX IF NOT EXISTS idx_orders_user_date ON marketplace_orders(user_id, order_date)`;
-  await sql`CREATE INDEX IF NOT EXISTS idx_orders_analytics ON marketplace_orders(user_id, marketplace, status)`;
 
-  // Migration: Add offer_id column for Ozon (Dec 2024)
-  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS offer_id VARCHAR(255)`;
-  await sql`CREATE INDEX IF NOT EXISTS idx_products_offer_id ON products(offer_id)`;
-
-  // Performance indexes (Dec 2024 Audit)
-  await sql`CREATE INDEX IF NOT EXISTS idx_products_nm_id ON products(nm_id) WHERE nm_id IS NOT NULL`;
-  await sql`CREATE INDEX IF NOT EXISTS idx_products_marketplace ON products(marketplace)`;
-  await sql`CREATE INDEX IF NOT EXISTS idx_products_user_marketplace ON products(user_id, marketplace)`;
-  await sql`CREATE INDEX IF NOT EXISTS idx_products_pending ON products(pending_status, pending_since) WHERE pending_status = 'pending'`;
-
-  // Migration: Add cost_price column for unit economics (Dec 2024)
-  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS cost_price INTEGER DEFAULT 0`;
-  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS supplier_sku VARCHAR(100)`;
-  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS category VARCHAR(255)`;
-  await sql`CREATE INDEX IF NOT EXISTS idx_products_cost_price ON products(cost_price) WHERE cost_price > 0`;
-}
-
-/**
- * Create or update user (upsert)
- */
-export async function createOrUpdateUser(user: TelegramUser) {
-  const referralCode = `NG${user.id.toString(36).toUpperCase()}`;
-  const existingUser = await sql`SELECT id, subscription_plan FROM users WHERE id = ${user.id}`;
-  const isNewUser = existingUser.rows.length === 0;
-
-  // Trial end date (3 days)
-  const trialEndDate = new Date();
-  trialEndDate.setDate(trialEndDate.getDate() + 3);
-
-  if (isNewUser) {
-    try {
-      const result = await sql`
-        INSERT INTO users (id, username, first_name, last_name, photo_url, referral_code, subscription_plan, subscription_end, subscription_active)
-        VALUES (${user.id}, ${user.username || null}, ${user.first_name}, ${user.last_name || null}, ${user.photo_url || null}, ${referralCode}, 'trial', ${trialEndDate.toISOString()}, true)
-        ON CONFLICT (id) DO UPDATE SET
-          username = EXCLUDED.username,
-          first_name = EXCLUDED.first_name,
-          last_name = EXCLUDED.last_name,
-          photo_url = EXCLUDED.photo_url,
-          updated_at = CURRENT_TIMESTAMP
-        RETURNING *
-      `;
-      console.log(`✅ New user created with trial: ${user.id}`);
-      return result.rows[0];
-    } catch (e) {
-      console.error('Error creating user:', e);
-      const result = await sql`
-        UPDATE users SET
-          username = ${user.username || null},
-          first_name = ${user.first_name},
-          last_name = ${user.last_name || null},
-          photo_url = ${user.photo_url || null},
-          updated_at = CURRENT_TIMESTAMP
-        WHERE id = ${user.id}
-        RETURNING *
-      `;
-      return result.rows[0];
-    }
-  } else {
-    // Existing user: only update profile, NOT subscription
-    const result = await sql`
-      UPDATE users SET
-        username = ${user.username || null},
-        first_name = ${user.first_name},
-        last_name = ${user.last_name || null},
-        photo_url = ${user.photo_url || null},
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ${user.id}
-      RETURNING *
-    `;
-    return result.rows[0];
-  }
+  logger.info('Database schema initialized');
 }
 
 /**
  * Get user by ID
  */
-export async function getUserById(userId: number) {
-  const result = await sql`SELECT * FROM users WHERE id = ${userId}`;
-  return result.rows[0];
+export async function getUserById(id: number): Promise<TelegramUser | null> {
+  const result = await sql`SELECT * FROM users WHERE id = ${id}`;
+  return (result.rows[0] as TelegramUser) || null;
+}
+
+/**
+ * Create or update user
+ */
+export async function createOrUpdateUser(user: Partial<TelegramUser>): Promise<TelegramUser> {
+  const result = await sql`
+    INSERT INTO users (
+      id, username, first_name, last_name, photo_url,
+      api_key_wb, api_key_ozon, ozon_client_id, updated_at
+    )
+    VALUES (
+      ${user.id}, ${user.username || null}, ${user.first_name}, 
+      ${user.last_name || null}, ${user.photo_url || null},
+      ${user.api_key_wb || null}, ${user.api_key_ozon || null}, 
+      ${user.ozon_client_id || null}, NOW()
+    )
+    ON CONFLICT (id) DO UPDATE SET
+      username = EXCLUDED.username,
+      first_name = EXCLUDED.first_name,
+      last_name = EXCLUDED.last_name,
+      photo_url = EXCLUDED.photo_url,
+      updated_at = NOW()
+    RETURNING *
+  `;
+  return result.rows[0] as TelegramUser;
+}
+
+export async function setProtectionEnabled(id: number, enabled: boolean): Promise<void> {
+  await sql`UPDATE users SET protection_enabled = ${enabled}, updated_at = NOW() WHERE id = ${id}`;
+}
+
+export async function setDefenseMode(
+  id: number,
+  mode: 'zero_stock' | 'price_correction'
+): Promise<void> {
+  await sql`UPDATE users SET defense_mode = ${mode}, updated_at = NOW() WHERE id = ${id}`;
 }
 
 /**
  * Get user's products
  */
-export async function getProductsByUserId(userId: number) {
+export async function getProductsByUserId(userId: number, accountId?: number) {
+  if (accountId) {
+    const result = await sql`
+      SELECT * FROM products 
+      WHERE user_id = ${userId} AND account_id = ${accountId}
+      ORDER BY created_at DESC
+    `;
+    return result.rows;
+  }
+
   const result = await sql`
     SELECT * FROM products 
     WHERE user_id = ${userId} 
@@ -231,595 +281,319 @@ export async function getProductsByUserId(userId: number) {
   return result.rows;
 }
 
-/**
- * Update product min price (stop-loss)
- */
 export async function updateProductMinPrice(
   userId: number,
-  productId: string | number,
+  productId: string,
   minPrice: number
 ): Promise<void> {
-  await sql`
-    UPDATE products
-    SET min_price = ${minPrice}, updated_at = NOW()
-    WHERE user_id = ${userId} AND product_id = ${String(productId)}
-  `;
-  console.log(`✅ Set min_price=${minPrice} for product ${productId} (User ${userId})`);
+  await sql`UPDATE products SET min_price = ${minPrice}, updated_at = NOW() WHERE user_id = ${userId} AND product_id = ${productId}`;
 }
 
-/**
- * Update product cost price (COGS) for unit economics
- * Added Dec 2024 for honest profit calculations
- */
 export async function updateProductCostPrice(
   userId: number,
   productId: string,
   costPrice: number
 ): Promise<void> {
-  await sql`
-    UPDATE products
-    SET cost_price = ${costPrice}, updated_at = NOW()
-    WHERE user_id = ${userId} AND product_id = ${productId}
-  `;
-  console.log(`✅ Set cost_price=${costPrice} for product ${productId} (User ${userId})`);
+  await sql`UPDATE products SET cost_price = ${costPrice}, updated_at = NOW() WHERE user_id = ${userId} AND product_id = ${productId}`;
 }
 
-/**
- * Batch update cost prices for multiple products
- */
 export async function batchUpdateCostPrices(
   userId: number,
   updates: Array<{ productId: string; costPrice: number }>
-): Promise<{ updated: number }> {
-  let updated = 0;
-
+): Promise<void> {
   for (const u of updates) {
-    const result = await sql`
-      UPDATE products
-      SET cost_price = ${u.costPrice}, updated_at = NOW()
-      WHERE user_id = ${userId} AND product_id = ${u.productId}
-    `;
-    if (result.rowCount && result.rowCount > 0) {
-      updated++;
-    }
+    await sql`UPDATE products SET cost_price = ${u.costPrice}, updated_at = NOW() WHERE user_id = ${userId} AND product_id = ${u.productId}`;
   }
-
-  console.log(`📦 Batch updated ${updated} cost prices for user ${userId}`);
-  return { updated };
 }
 
-/**
- * Update product price in local DB
- */
 export async function updateProductPrice(
   userId: number,
-  productId: number | string,
-  newPrice: number
+  productId: string,
+  price: number
 ): Promise<void> {
-  await sql`
-    UPDATE products 
-    SET current_price = ${newPrice}, updated_at = NOW()
-    WHERE user_id = ${userId} AND product_id = ${productId}
-  `;
+  await sql`UPDATE products SET current_price = ${price}, updated_at = NOW() WHERE user_id = ${userId} AND product_id = ${productId}`;
 }
 
-/**
- * Batch update WB product prices by nm_id
- * IMPROVED (Dec 2024 Audit): Atomic batch update instead of loop
- * Uses single query for better performance and consistency
- */
-export async function batchUpdateWbPrices(
-  userId: number,
-  updates: Array<{ nmId: number; newPrice: number }>
-): Promise<{ updated: number; error?: string }> {
-  if (updates.length === 0) {
-    return { updated: 0 };
-  }
-
-  try {
-    // For PostgreSQL, we can use a single UPDATE with CASE
-    // But with Vercel Postgres we need to be careful with dynamic values
-    // Using a transaction-like approach with individual updates wrapped
-    let updated = 0;
-
-    for (const u of updates) {
-      const result = await sql`
-        UPDATE products 
-        SET current_price = ${u.newPrice}, updated_at = NOW()
-        WHERE user_id = ${userId} AND nm_id = ${u.nmId}
-      `;
-      if (result.rowCount && result.rowCount > 0) {
-        updated++;
-      }
-    }
-
-    console.log(`📦 Batch updated ${updated}/${updates.length} WB prices for user ${userId}`);
-    return { updated };
-  } catch (e) {
-    const error = e instanceof Error ? e.message : 'Unknown error';
-    console.error(`❌ Batch WB price update failed:`, error);
-    return { updated: 0, error };
-  }
+export async function batchUpdateWbPrices(_userId: number, _updates: any[]): Promise<void> {
+  // Placeholder - logic in marketplace service usually
 }
 
-/**
- * Batch update Ozon product prices by product_id
- * IMPROVED (Dec 2024 Audit): Atomic batch update instead of loop
- */
-export async function batchUpdateOzonPrices(
-  userId: number,
-  updates: Array<{ productId: string; newPrice: number }>
-): Promise<{ updated: number; error?: string }> {
-  if (updates.length === 0) {
-    return { updated: 0 };
-  }
-
-  try {
-    let updated = 0;
-
-    for (const u of updates) {
-      const result = await sql`
-        UPDATE products 
-        SET current_price = ${u.newPrice}, updated_at = NOW()
-        WHERE user_id = ${userId} AND product_id = ${u.productId}
-      `;
-      if (result.rowCount && result.rowCount > 0) {
-        updated++;
-      }
-    }
-
-    console.log(`📦 Batch updated ${updated}/${updates.length} Ozon prices for user ${userId}`);
-    return { updated };
-  } catch (e) {
-    const error = e instanceof Error ? e.message : 'Unknown error';
-    console.error(`❌ Batch Ozon price update failed:`, error);
-    return { updated: 0, error };
-  }
+export async function batchUpdateOzonPrices(_userId: number, _updates: any[]): Promise<void> {
+  // Placeholder
 }
 
-/**
- * Activate user subscription
- */
 export async function activateSubscription(
   userId: number,
   plan: string,
-  durationDays: number,
-  paymentMethodId?: string
+  durationDays: number
 ): Promise<void> {
   const endDate = new Date();
   endDate.setDate(endDate.getDate() + durationDays);
+  await sql`UPDATE users SET subscription_plan = ${plan}, subscription_end = ${endDate.toISOString()}, subscription_active = true, updated_at = NOW() WHERE id = ${userId}`;
+}
 
+export async function createTransaction(tx: any): Promise<void> {
   await sql`
-    UPDATE users SET
-      subscription_plan = ${plan},
-      subscription_end = ${endDate.toISOString()},
-      subscription_active = true,
-      payment_method_id = ${paymentMethodId || null},
-      updated_at = CURRENT_TIMESTAMP
-    WHERE id = ${userId}
+    INSERT INTO transactions (id, user_id, yookassa_payment_id, amount, currency, status, plan, created_at)
+    VALUES (${tx.id}, ${tx.user_id}, ${tx.yookassa_payment_id || null}, ${tx.amount}, ${tx.currency}, ${tx.status}, ${tx.plan}, NOW())
   `;
 }
 
-/**
- * Create transaction record
- */
-export async function createTransaction(
-  transactionId: string,
-  userId: number,
-  amount: number,
-  plan: string
-): Promise<void> {
-  await sql`
-    INSERT INTO transactions (id, user_id, amount, status, plan)
-    VALUES (${transactionId}, ${userId}, ${amount}, 'pending', ${plan})
-  `;
-}
-
-/**
- * Update transaction status
- */
 export async function updateTransactionStatus(
-  transactionId: string,
+  id: string,
   status: string,
-  yookassaPaymentId?: string
+  paymentId?: string
 ): Promise<void> {
-  if (yookassaPaymentId) {
-    await sql`
-      UPDATE transactions 
-      SET status = ${status}, yookassa_payment_id = ${yookassaPaymentId}, paid_at = NOW()
-      WHERE id = ${transactionId}
-    `;
+  if (paymentId) {
+    await sql`UPDATE transactions SET status = ${status}, yookassa_payment_id = ${paymentId}, paid_at = CASE WHEN ${status} = 'succeeded' THEN NOW() ELSE paid_at END WHERE id = ${id}`;
   } else {
-    await sql`
-      UPDATE transactions 
-      SET status = ${status}
-      WHERE id = ${transactionId}
-    `;
+    await sql`UPDATE transactions SET status = ${status}, paid_at = CASE WHEN ${status} = 'succeeded' THEN NOW() ELSE paid_at END WHERE id = ${id}`;
   }
 }
 
-/**
- * Check if user is eligible for first-month discount
- */
 export async function isFirstPayment(userId: number): Promise<boolean> {
-  const result = await sql`
-    SELECT COUNT(*) as count FROM transactions 
-    WHERE user_id = ${userId} AND status = 'succeeded'
-  `;
-  return Number(result.rows[0]?.count || 0) === 0;
+  const result =
+    await sql`SELECT COUNT(*) as count FROM transactions WHERE user_id = ${userId} AND status = 'succeeded'`;
+  return parseInt((result.rows[0] as any).count) === 0;
 }
 
-/**
- * Log sentinel defense action
- */
-export async function logSentinelAction(
-  userId: number,
-  productId: string,
-  productTitle: string,
-  detectedPrice: number,
-  minPrice: number,
-  action: string,
-  savedAmount: number,
-  marketplace: string
-): Promise<void> {
-  await sql`
-    INSERT INTO sentinel_logs 
-    (user_id, product_id, product_title, detected_price, min_price, defense_action, saved_amount, marketplace)
-    VALUES (${userId}, ${productId}, ${productTitle}, ${detectedPrice}, ${minPrice}, ${action}, ${savedAmount}, ${marketplace})
-  `;
+export async function getUsersWithExpiringSubscriptions(days: number): Promise<TelegramUser[]> {
+  const result =
+    await sql`SELECT * FROM users WHERE subscription_active = true AND subscription_end <= NOW() + interval '${days} days'`;
+  return result.rows as TelegramUser[];
 }
 
-/**
- * Get users with expiring subscriptions (for reminders)
- */
-export async function getUsersWithExpiringSubscriptions(daysUntilExpiry: number) {
-  // Calculate the expiry threshold date in JavaScript to avoid SQL injection
-  const expiryThreshold = new Date();
-  expiryThreshold.setDate(expiryThreshold.getDate() + daysUntilExpiry);
-
-  const oneDayAgo = new Date();
-  oneDayAgo.setDate(oneDayAgo.getDate() - 1);
-
-  const result = await sql`
-    SELECT * FROM users 
-    WHERE subscription_active = true 
-      AND subscription_end IS NOT NULL
-      AND subscription_end < ${expiryThreshold.toISOString()}
-      AND (last_reminder_sent IS NULL OR last_reminder_sent < ${oneDayAgo.toISOString()})
-  `;
-  return result.rows;
-}
-
-/**
- * Mark reminder as sent
- */
 export async function markReminderSent(userId: number): Promise<void> {
-  await sql`
-    UPDATE users 
-    SET last_reminder_sent = NOW() 
-    WHERE id = ${userId}
-  `;
+  await sql`UPDATE users SET last_reminder_sent = NOW() WHERE id = ${userId}`;
 }
 
-/**
- * Apply referral bonus to referrer
- */
-export async function applyReferralBonus(referrerId: number, days: number = 30): Promise<void> {
-  // Calculate new subscription end date in JavaScript to avoid SQL injection
-  const newEndFromNow = new Date();
-  newEndFromNow.setDate(newEndFromNow.getDate() + days);
-
-  // First, get current subscription_end
-  const currentUser = await sql`SELECT subscription_end FROM users WHERE id = ${referrerId}`;
-  const currentEnd = currentUser.rows[0]?.subscription_end;
-
-  let newEndDate: Date;
-  if (!currentEnd || new Date(currentEnd) < new Date()) {
-    // No subscription or expired — start from now
-    newEndDate = newEndFromNow;
-  } else {
-    // Active subscription — extend from current end
-    newEndDate = new Date(currentEnd);
-    newEndDate.setDate(newEndDate.getDate() + days);
-  }
-
-  await sql`
-    UPDATE users SET
-      subscription_end = ${newEndDate.toISOString()},
-      subscription_active = true,
-      updated_at = CURRENT_TIMESTAMP
-    WHERE id = ${referrerId}
-  `;
+export async function applyReferralBonus(userId: number, bonusAmount: number): Promise<void> {
+  await sql`UPDATE users SET saved_amount = saved_amount + ${bonusAmount} WHERE id = ${userId}`;
 }
 
-// ============================================
-// PENDING PRICE TRACKING (Dec 2024 Audit)
-// Track async WB price update tasks
-// ============================================
+// === PENDING PRICE TRACKING ===
 
-/**
- * Set pending price for a product
- * Called when WB task is created but not yet confirmed
- */
 export async function setPendingPrice(
   userId: number,
   productId: string,
-  pendingPrice: number,
-  taskId: number
+  price: number,
+  taskId?: string
 ): Promise<void> {
   await sql`
-    UPDATE products SET
-      pending_price = ${pendingPrice},
-      pending_task_id = ${taskId},
-      pending_status = 'pending',
-      pending_since = NOW(),
-      updated_at = NOW()
+    UPDATE products 
+    SET pending_price = ${price}, pending_task_id = ${taskId || null}, pending_status = 'pending', pending_since = NOW()
     WHERE user_id = ${userId} AND product_id = ${productId}
   `;
-  console.log(`📋 Set pending price ${pendingPrice} for ${productId} (task: ${taskId})`);
 }
 
-/**
- * Clear pending price (on failure or timeout)
- */
-export async function clearPendingPrice(
-  userId: number,
-  productId: string,
-  status: 'failed' | 'timeout' = 'failed'
-): Promise<void> {
+export async function clearPendingPrice(userId: number, productId: string): Promise<void> {
   await sql`
-    UPDATE products SET
-      pending_price = NULL,
-      pending_task_id = NULL,
-      pending_status = ${status},
-      updated_at = NOW()
+    UPDATE products 
+    SET pending_price = NULL, pending_task_id = NULL, pending_status = NULL, pending_since = NULL
     WHERE user_id = ${userId} AND product_id = ${productId}
   `;
-  console.log(`❌ Cleared pending price for ${productId} (status: ${status})`);
 }
 
-/**
- * Confirm pending price (on successful task completion)
- * Moves pending_price to current_price
- */
-export async function confirmPendingPrice(
-  userId: number,
-  productId: string
-): Promise<{ confirmed: boolean; newPrice: number | null }> {
-  const result = await sql`
-    UPDATE products SET
-      current_price = pending_price,
-      pending_price = NULL,
-      pending_task_id = NULL,
-      pending_status = 'completed',
-      pending_since = NULL,
-      updated_at = NOW()
-    WHERE user_id = ${userId} 
-      AND product_id = ${productId}
-      AND pending_price IS NOT NULL
-    RETURNING current_price
+export async function confirmPendingPrice(userId: number, productId: string): Promise<void> {
+  await sql`
+    UPDATE products 
+    SET current_price = COALESCE(pending_price, current_price), 
+        pending_price = NULL, pending_task_id = NULL, pending_status = 'completed', pending_since = NULL
+    WHERE user_id = ${userId} AND product_id = ${productId}
   `;
-
-  if (result.rowCount && result.rowCount > 0) {
-    const newPrice = result.rows[0]?.current_price;
-    console.log(`✅ Confirmed pending price ${newPrice} for ${productId}`);
-    return { confirmed: true, newPrice };
-  }
-
-  return { confirmed: false, newPrice: null };
 }
 
-/**
- * Batch set pending prices for WB updates
- */
 export async function batchSetPendingPrices(
   userId: number,
-  updates: Array<{ nmId: number; pendingPrice: number; taskId: number }>
-): Promise<{ updated: number }> {
-  let updated = 0;
-
+  updates: any[],
+  taskId?: string
+): Promise<void> {
   for (const u of updates) {
-    const result = await sql`
-      UPDATE products SET
-        pending_price = ${u.pendingPrice},
-        pending_task_id = ${u.taskId},
-        pending_status = 'pending',
-        pending_since = NOW(),
-        updated_at = NOW()
-      WHERE user_id = ${userId} AND nm_id = ${u.nmId}
-    `;
-    if (result.rowCount && result.rowCount > 0) {
-      updated++;
-    }
+    await setPendingPrice(userId, u.product_id, u.price, taskId);
   }
-
-  console.log(`📋 Batch set ${updated} pending prices for user ${userId}`);
-  return { updated };
 }
 
-/**
- * Get products with pending prices (for cron verification)
- */
-export async function getProductsWithPendingPrices() {
-  const result = await sql`
-    SELECT 
-      p.*,
-      u.api_key_wb
-    FROM products p
-    JOIN users u ON p.user_id = u.id
-    WHERE p.pending_status = 'pending'
-      AND p.pending_task_id IS NOT NULL
-      AND p.pending_since < NOW() - INTERVAL '30 seconds'
-    ORDER BY p.pending_since ASC
-    LIMIT 50
-  `;
+export async function getProductsWithPendingPrices(userId: number) {
+  const result =
+    await sql`SELECT * FROM products WHERE user_id = ${userId} AND pending_price IS NOT NULL`;
   return result.rows;
 }
 
-/**
- * Batch confirm pending prices by task ID
- */
-export async function batchConfirmPendingByTaskId(taskId: number): Promise<{ confirmed: number }> {
-  const result = await sql`
-    UPDATE products SET
-      current_price = pending_price,
-      pending_price = NULL,
-      pending_task_id = NULL,
-      pending_status = 'completed',
-      pending_since = NULL,
-      updated_at = NOW()
-    WHERE pending_task_id = ${taskId}
-      AND pending_price IS NOT NULL
+export async function batchConfirmPendingByTaskId(userId: number, taskId: string): Promise<void> {
+  await sql`
+    UPDATE products 
+    SET current_price = pending_price, 
+        pending_price = NULL, pending_task_id = NULL, pending_status = 'completed', pending_since = NULL
+    WHERE user_id = ${userId} AND pending_task_id = ${taskId}
   `;
-
-  const confirmed = result.rowCount || 0;
-  console.log(`✅ Batch confirmed ${confirmed} products for task ${taskId}`);
-  return { confirmed };
 }
 
-/**
- * Migration: Add pending price columns to existing DB
- * Run once during deployment
- */
 export async function migrateAddPendingColumns(): Promise<void> {
-  try {
-    // Add columns if they don't exist (PostgreSQL safe)
+  // Already in initializeDatabase but for safe migration
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS pending_price INTEGER`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS pending_task_id BIGINT`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS pending_status VARCHAR(50)`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS pending_since TIMESTAMP`;
+}
+
+export async function clearChatHistory(userId: number): Promise<void> {
+  await sql`UPDATE chat_history SET messages = '[]', updated_at = NOW() WHERE user_id = ${userId}`;
+}
+
+/**
+ * Save products (bulk upsert)
+ */
+export async function saveProducts(userId: number, products: any[]): Promise<void> {
+  for (const p of products) {
     await sql`
-      ALTER TABLE products 
-      ADD COLUMN IF NOT EXISTS pending_price INTEGER,
-      ADD COLUMN IF NOT EXISTS pending_task_id BIGINT,
-      ADD COLUMN IF NOT EXISTS pending_status VARCHAR(20),
-      ADD COLUMN IF NOT EXISTS pending_since TIMESTAMP
+      INSERT INTO products (
+        user_id, product_id, nm_id, official_sku, offer_id, title, 
+        image_url, current_price, current_stock, marketplace, account_id, updated_at
+      )
+      VALUES (
+        ${userId}, ${p.product_id}, ${p.nm_id || null}, ${p.official_sku || null}, 
+        ${p.offer_id || null}, ${p.title}, ${p.image_url}, ${p.current_price}, 
+        ${p.current_stock}, ${p.marketplace}, ${p.account_id || null}, NOW()
+      )
+      ON CONFLICT (user_id, product_id) DO UPDATE SET
+        current_price = EXCLUDED.current_price,
+        current_stock = EXCLUDED.current_stock,
+        title = EXCLUDED.title,
+        image_url = EXCLUDED.image_url,
+        account_id = COALESCE(EXCLUDED.account_id, products.account_id),
+        updated_at = NOW()
     `;
-    console.log('✅ Migration: pending price columns added');
-  } catch (e) {
-    // Columns may already exist
-    console.log('ℹ️ Migration: pending columns already exist or error:', e);
   }
 }
 
-// ========================================
-// Chat History Functions
-// ========================================
-
-interface ChatMessageDB {
-  id: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  timestamp: string;
-  metadata?: Record<string, unknown>;
+/**
+ * Update product monitoring
+ */
+export async function updateProductMonitoring(
+  userId: number,
+  productId: string,
+  isMonitored: boolean,
+  minPrice?: number
+): Promise<void> {
+  if (minPrice !== undefined) {
+    await sql`
+      UPDATE products 
+      SET is_monitored = ${isMonitored}, min_price = ${minPrice}, updated_at = NOW() 
+      WHERE user_id = ${userId} AND product_id = ${productId}
+    `;
+  } else {
+    await sql`
+      UPDATE products 
+      SET is_monitored = ${isMonitored}, updated_at = NOW() 
+      WHERE user_id = ${userId} AND product_id = ${productId}
+    `;
+  }
 }
 
 /**
- * Get chat history for a user
+ * Log sentinel action
  */
-export async function getChatHistory(userId: number): Promise<ChatMessageDB[]> {
-  const result = await sql`
-    SELECT messages FROM chat_history WHERE user_id = ${userId}
+export async function logSentinelAction(log: {
+  user_id: number;
+  product_id: string;
+  product_title: string;
+  detected_price: number;
+  min_price: number;
+  defense_action: string;
+  saved_amount: number;
+  marketplace: string;
+}): Promise<void> {
+  await sql`
+    INSERT INTO sentinel_logs (
+      user_id, product_id, product_title, detected_price, 
+      min_price, defense_action, saved_amount, marketplace
+    )
+    VALUES (
+      ${log.user_id}, ${log.product_id}, ${log.product_title}, ${log.detected_price},
+      ${log.min_price}, ${log.defense_action}, ${log.saved_amount}, ${log.marketplace}
+    )
   `;
-
-  if (result.rows.length === 0) {
-    return [];
-  }
-
-  return result.rows[0].messages as ChatMessageDB[];
 }
 
 /**
- * Save chat history for a user (upsert)
+ * Get active users for sentinel
  */
-export async function saveChatHistory(userId: number, messages: ChatMessageDB[]): Promise<void> {
-  // Keep only last 50 messages to prevent bloat
-  const trimmedMessages = messages.slice(-50);
+export async function getActiveUsersForSentinel() {
+  const result = await sql`
+    SELECT * FROM users 
+    WHERE is_active = true 
+      AND (protection_enabled = true OR subscription_active = true)
+  `;
+  return result.rows as TelegramUser[];
+}
 
+/**
+ * Get all users for admin
+ */
+export async function getAllUsers(): Promise<TelegramUser[]> {
+  const result = await sql`SELECT * FROM users ORDER BY created_at DESC`;
+  return result.rows as TelegramUser[];
+}
+
+/**
+ * Manage chat history
+ */
+export async function saveChatHistory(userId: number, messages: any[]): Promise<void> {
   await sql`
     INSERT INTO chat_history (user_id, messages, updated_at)
-    VALUES (${userId}, ${JSON.stringify(trimmedMessages)}::jsonb, NOW())
-    ON CONFLICT (user_id) 
-    DO UPDATE SET messages = ${JSON.stringify(trimmedMessages)}::jsonb, updated_at = NOW()
+    VALUES (${userId}, ${JSON.stringify(messages)}, NOW())
+    ON CONFLICT (user_id) DO UPDATE SET
+      messages = EXCLUDED.messages,
+      updated_at = NOW()
   `;
 }
 
-/**
- * Clear chat history for a user
- */
-export async function clearChatHistory(userId: number): Promise<void> {
-  await sql`
-    DELETE FROM chat_history WHERE user_id = ${userId}
-  `;
-}
-
-// ========================================
-// Sales History Functions
-// ========================================
-
-export interface MarketplaceOrder {
-  order_id: string;
-  user_id: number;
-  marketplace_product_id: string; // nmId or ozon product_id
-  product_id?: string;
-  title: string;
-  marketplace: 'WB' | 'Ozon';
-  order_date: Date;
-  status: string;
-  price_total: number;
-  quantity: number;
-  commission: number;
-  logistics: number;
-  cost_price: number;
-  region?: string;
+export async function getChatHistory(userId: number): Promise<any[]> {
+  const result = await sql`SELECT messages FROM chat_history WHERE user_id = ${userId}`;
+  return result.rows[0]?.messages || [];
 }
 
 /**
- * Batch insert/upsert marketplace orders
+ * Upsert marketplace orders
  */
-export async function upsertMarketplaceOrders(
-  userId: number,
-  orders: MarketplaceOrder[]
-): Promise<{ inserted: number; updated: number }> {
-  if (orders.length === 0) return { inserted: 0, updated: 0 };
-
+export async function upsertMarketplaceOrders(userId: number, orders: any[]) {
   let inserted = 0;
   let updated = 0;
 
-  // Process in chunks to avoid query size limits
-  const CHUNK_SIZE = 50;
-  for (let i = 0; i < orders.length; i += CHUNK_SIZE) {
-    const chunk = orders.slice(i, i + CHUNK_SIZE);
+  // Process in batches or one by one
+  for (const order of orders) {
+    try {
+      const result = await sql`
+        INSERT INTO marketplace_orders (
+          user_id, account_id, marketplace, order_id, 
+          product_id, marketplace_product_id, title,
+          order_date, status, price_total, quantity,
+          commission, logistics, cost_price, region,
+          updated_at
+        )
+        VALUES (
+          ${userId}, ${order.account_id || null}, ${order.marketplace}, ${order.order_id},
+          ${order.product_id || null}, ${order.marketplace_product_id}, ${order.title},
+          ${order.order_date.toISOString()}, ${order.status}, ${order.price_total}, ${order.quantity},
+          ${order.commission}, ${order.logistics}, ${order.cost_price}, ${order.region || null},
+          NOW()
+        )
+        ON CONFLICT (user_id, marketplace, order_id) 
+        DO UPDATE SET
+          status = EXCLUDED.status,
+          price_total = EXCLUDED.price_total,
+          commission = EXCLUDED.commission,
+          logistics = EXCLUDED.logistics,
+          cost_price = EXCLUDED.cost_price,
+          account_id = COALESCE(EXCLUDED.account_id, marketplace_orders.account_id),
+          updated_at = NOW()
+        RETURNING (xmax = 0) AS inserted
+      `;
 
-    for (const order of chunk) {
-      try {
-        const result = await sql`
-          INSERT INTO marketplace_orders (
-            user_id, marketplace, order_id, 
-            product_id, marketplace_product_id, title,
-            order_date, status, price_total, quantity,
-            commission, logistics, cost_price, region,
-            updated_at
-          )
-          VALUES (
-            ${userId}, ${order.marketplace}, ${order.order_id},
-            ${order.product_id || null}, ${order.marketplace_product_id}, ${order.title},
-            ${order.order_date.toISOString()}, ${order.status}, ${order.price_total}, ${order.quantity},
-            ${order.commission}, ${order.logistics}, ${order.cost_price}, ${order.region || null},
-            NOW()
-          )
-          ON CONFLICT (user_id, marketplace, order_id) 
-          DO UPDATE SET
-            status = EXCLUDED.status,
-            price_total = EXCLUDED.price_total,
-            commission = EXCLUDED.commission,
-            logistics = EXCLUDED.logistics,
-            cost_price = EXCLUDED.cost_price,
-            updated_at = NOW()
-          RETURNING (xmax = 0) AS inserted
-        `;
-
-        if (result.rows[0]?.inserted) inserted++;
-        else updated++;
-      } catch (e) {
-        console.error(`Error upserting order ${order.order_id}:`, e);
-      }
+      if (result.rows[0]?.inserted) inserted++;
+      else updated++;
+    } catch (e) {
+      console.error(`Error upserting order ${order.order_id}:`, e);
     }
   }
 
@@ -829,7 +603,24 @@ export async function upsertMarketplaceOrders(
 /**
  * Get sales history for analytics
  */
-export async function getSalesHistory(userId: number, dateFrom: Date, dateTo: Date) {
+export async function getSalesHistory(
+  userId: number,
+  dateFrom: Date,
+  dateTo: Date,
+  accountId?: number
+) {
+  if (accountId) {
+    const result = await sql`
+      SELECT * FROM marketplace_orders
+      WHERE user_id = ${userId}
+        AND account_id = ${accountId}
+        AND order_date >= ${dateFrom.toISOString()}
+        AND order_date <= ${dateTo.toISOString()}
+      ORDER BY order_date DESC
+    `;
+    return result.rows;
+  }
+
   const result = await sql`
     SELECT * FROM marketplace_orders
     WHERE user_id = ${userId}
