@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "vite build",
+    "typecheck": "tsc -b",
     "lint": "eslint .",
     "preview": "vite preview",
     "prepare": "husky",
@@ -13,7 +14,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "check:regression": "node scripts/check-regression.cjs",
-    "check:all": "npm run lint && npm run build && npm run test && npm run check:regression"
+    "check:all": "npm run lint && npm run typecheck && npm run build && npm run test && npm run check:regression"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.46",
