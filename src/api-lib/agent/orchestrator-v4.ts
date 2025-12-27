@@ -28,6 +28,7 @@ import {
   executeGetMarketplaceInfo,
   executeSearchWeb,
 } from './tool-executors.js';
+import { logger } from '../lib/index.js';
 
 // ============================================
 // LLM PROVIDER CONFIG
@@ -93,7 +94,7 @@ async function callLLMWithFallback(
   for (const provider of providers) {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        console.log(`🤖 Calling ${provider.name} (attempt ${attempt}/${maxRetries})...`);
+        logger.debug('Calling LLM provider', { provider: provider.name, attempt, maxRetries });
 
         const body: Record<string, unknown> = {
           model: options.preferredModel || provider.model,
@@ -131,7 +132,7 @@ async function callLLMWithFallback(
           // Rate limit - wait and retry
           if (response.status === 429) {
             const waitMs = attempt * 2000; // Exponential backoff
-            console.warn(`⏳ Rate limited, waiting ${waitMs}ms...`);
+            logger.warn('Rate limited, waiting', { waitMs });
             await new Promise(r => setTimeout(r, waitMs));
             continue;
           }
@@ -147,11 +148,15 @@ async function callLLMWithFallback(
           throw new Error('Empty response from LLM');
         }
 
-        console.log(`✅ ${provider.name} responded (${tokensUsed} tokens)`);
+        logger.info('LLM provider responded', { provider: provider.name, tokensUsed });
         return { content, tokensUsed, provider: provider.name };
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
-        console.warn(`⚠️ ${provider.name} attempt ${attempt} failed:`, lastError.message);
+        logger.warn('LLM provider attempt failed', {
+          provider: provider.name,
+          attempt,
+          error: lastError.message,
+        });
 
         // Wait before retry
         if (attempt < maxRetries) {
@@ -160,9 +165,10 @@ async function callLLMWithFallback(
       }
     }
 
-    console.warn(
-      `❌ ${provider.name} failed after ${maxRetries} attempts, trying next provider...`
-    );
+    logger.warn('LLM provider failed after retries, trying next', {
+      provider: provider.name,
+      maxRetries,
+    });
   }
 
   throw lastError || new Error('All LLM providers failed');
@@ -240,7 +246,7 @@ export async function orchestrateV4(
   // PHASE 1: PLANNING
   // ========================================
   const planStart = Date.now();
-  console.log('🎯 V4 Phase 1: Planning...');
+  logger.info('V4 Phase 1: Planning');
 
   const planResult = await callPlanner(message, context, conversationHistory);
   const planningTimeMs = Date.now() - planStart;
@@ -260,19 +266,22 @@ export async function orchestrateV4(
   }
 
   const plan = planResult.plan;
-  console.log(`📋 Plan: ${plan.tools.length} tools, confirmation: ${plan.requires_confirmation}`);
+  logger.info('Plan created', {
+    toolsCount: plan.tools.length,
+    requiresConfirmation: plan.requires_confirmation,
+  });
 
   // ========================================
   // PHASE 2: EXECUTION
   // ========================================
   const execStart = Date.now();
-  console.log('⚙️ V4 Phase 2: Executing tools...');
+  logger.info('V4 Phase 2: Executing tools');
 
   const toolResults: ToolResult[] = [];
   const toolsCalled: string[] = [];
 
   for (const plannedTool of plan.tools) {
-    console.log(`  🔧 Executing: ${plannedTool.tool}`);
+    logger.debug('Executing tool', { tool: plannedTool.tool });
     const result = await executeTool(plannedTool.tool, plannedTool.args, context.userId);
 
     // Extract URLs from result for link validation
@@ -289,13 +298,13 @@ export async function orchestrateV4(
   }
 
   const executionTimeMs = Date.now() - execStart;
-  console.log(`✅ Executed ${toolResults.length} tools in ${executionTimeMs}ms`);
+  logger.info('Tools executed', { count: toolResults.length, executionTimeMs });
 
   // ========================================
   // PHASE 3: ANSWERING
   // ========================================
   const answerStart = Date.now();
-  console.log('💬 V4 Phase 3: Generating answer...');
+  logger.info('V4 Phase 3: Generating answer');
 
   const answerResult = await callAnswerer(message, toolResults, context, conversationHistory);
   const answeringTimeMs = Date.now() - answerStart;
@@ -319,20 +328,18 @@ export async function orchestrateV4(
   // ========================================
   // PHASE 4: VALIDATION
   // ========================================
-  console.log('🔍 V4 Phase 4: Validating answer...');
+  logger.info('V4 Phase 4: Validating answer');
 
   // Validate and sanitize links
   const sanitizedAnswer = sanitizeAnswerLinks(answerResult.answer, toolResults);
   const linkValidation = validateAnswerLinks(answerResult.answer, toolResults);
 
   if (!linkValidation.valid) {
-    console.warn(`⚠️ Removed ${linkValidation.invalidLinks.length} hallucinated links`);
+    logger.warn('Removed hallucinated links', { count: linkValidation.invalidLinks.length });
   }
 
   const totalTimeMs = Date.now() - startTime;
-  console.log(
-    `✅ V4 Complete in ${totalTimeMs}ms (plan: ${planningTimeMs}ms, exec: ${executionTimeMs}ms, answer: ${answeringTimeMs}ms)`
-  );
+  logger.info('V4 Complete', { totalTimeMs, planningTimeMs, executionTimeMs, answeringTimeMs });
 
   // Parse data_json if present
   let parsedData: Record<string, unknown> | undefined;
@@ -340,7 +347,7 @@ export async function orchestrateV4(
     try {
       parsedData = JSON.parse(sanitizedAnswer.data_json);
     } catch {
-      console.warn('Failed to parse data_json');
+      logger.warn('Failed to parse data_json');
     }
   }
 
@@ -405,12 +412,9 @@ async function callPlanner(
     try {
       parsed = JSON.parse(result.content);
     } catch (jsonError) {
-      console.error(
-        'Plan JSON parse error:',
-        jsonError,
-        'Content:',
-        result.content.substring(0, 200)
-      );
+      logger.error('Plan JSON parse error', jsonError, {
+        contentPreview: result.content.substring(0, 200),
+      });
       // Try to extract a direct answer if JSON is broken
       return {
         success: false,
@@ -422,13 +426,13 @@ async function callPlanner(
     const validated = PlanSchema.safeParse(parsed);
 
     if (!validated.success) {
-      console.error('Plan validation failed:', validated.error);
+      logger.error('Plan validation failed', validated.error);
       return { success: false, error: 'Некорректный формат плана', tokensUsed: result.tokensUsed };
     }
 
     return { success: true, plan: validated.data, tokensUsed: result.tokensUsed };
   } catch (error) {
-    console.error('Planner error:', error);
+    logger.error('Planner error', error);
     return { success: false, error: 'Ошибка планирования. Попробуйте ещё раз.', tokensUsed: 0 };
   }
 }
@@ -565,9 +569,12 @@ ${JSON.stringify(toolResultsSummary, null, 2)}
 
     const preferredModel = useAdvancedModel ? 'gpt-4o' : 'gpt-4o-mini';
 
-    console.log(
-      `🤖 Answerer model: ${preferredModel} (search=${hasSearchWeb}, analytics=${hasComplexAnalytics}, tools=${toolResults.length})`
-    );
+    logger.info('Answerer model selected', {
+      preferredModel,
+      hasSearchWeb,
+      hasComplexAnalytics,
+      toolsCount: toolResults.length,
+    });
 
     const result = await callLLMWithFallback(messages, {
       temperature: 0.3,
@@ -581,12 +588,9 @@ ${JSON.stringify(toolResultsSummary, null, 2)}
     try {
       parsed = JSON.parse(result.content);
     } catch (jsonError) {
-      console.error(
-        'Answer JSON parse error:',
-        jsonError,
-        'Content:',
-        result.content.substring(0, 200)
-      );
+      logger.error('Answer JSON parse error', jsonError, {
+        contentPreview: result.content.substring(0, 200),
+      });
       // If JSON is broken, try to use the content as-is (it might be plain text)
       const plainTextContent = result.content.replace(/^[{[].*$/gm, '').trim();
       if (plainTextContent.length > 20) {
@@ -606,7 +610,7 @@ ${JSON.stringify(toolResultsSummary, null, 2)}
     const validated = AnswerSchema.safeParse(parsed);
 
     if (!validated.success) {
-      console.error('Answer validation failed:', validated.error);
+      logger.error('Answer validation failed', validated.error);
       // Try to salvage - use message if present
       if (parsed.message) {
         return {
@@ -620,7 +624,7 @@ ${JSON.stringify(toolResultsSummary, null, 2)}
 
     return { success: true, answer: validated.data, tokensUsed: result.tokensUsed };
   } catch (error) {
-    console.error('Answerer error:', error);
+    logger.error('Answerer error', error);
     return { success: false, error: 'Ошибка генерации ответа. Попробуйте ещё раз.', tokensUsed: 0 };
   }
 }
