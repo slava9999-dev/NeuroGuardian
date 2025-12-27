@@ -159,7 +159,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'batch-set-stop-loss':
       case 'sentinel-logs': {
         const auth = extractAnyAuth(req);
-        if (!auth.success) return sendAuthError(res, auth.error, auth.statusCode);
+        if (auth.success === false) {
+          return sendAuthError(res, auth.error, auth.statusCode);
+        }
 
         const handlers: Record<string, typeof handleProducts> = {
           products: handleProducts,
@@ -174,7 +176,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'sync-products': {
         if (req.method !== 'POST') return sendMethodNotAllowed(res);
         const auth = extractAnyAuth(req);
-        if (!auth.success) return sendAuthError(res, auth.error, auth.statusCode);
+        if (auth.success === false) {
+          return sendAuthError(res, auth.error, auth.statusCode);
+        }
         return handleSyncProducts(req, res, auth.context.userId);
       }
 
