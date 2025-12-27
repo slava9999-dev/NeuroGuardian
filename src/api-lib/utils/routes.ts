@@ -3,23 +3,6 @@
 // Declarative route definitions for cleaner router
 // ============================================
 
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-
-// ============================================
-// TYPES
-// ============================================
-
-export type AuthRequirement = 'none' | 'telegram' | 'admin' | 'cron' | 'any';
-
-export interface RouteConfig {
-  handler: (req: VercelRequest, res: VercelResponse, userId?: number) => Promise<VercelResponse>;
-  auth: AuthRequirement;
-  methods?: ('GET' | 'POST')[];
-  description?: string;
-}
-
-export type RouteRegistry = Record<string, RouteConfig>;
-
 // ============================================
 // ROUTE GROUPS
 // For documentation and organization

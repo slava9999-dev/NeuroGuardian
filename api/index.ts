@@ -6,17 +6,16 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-// Middleware
+// Middleware (moved to src/api-lib to avoid Vercel function limit)
 import {
   extractTelegramAuth,
   extractAnyAuth,
-  verifyAdminAccess,
   sendAuthError,
   sendMethodNotAllowed,
-} from './middleware/auth.js';
+} from '../src/api-lib/middleware/auth.js';
 
 // Route registry
-import { AVAILABLE_ACTIONS } from './utils/routes.js';
+import { AVAILABLE_ACTIONS } from '../src/api-lib/utils/routes.js';
 
 // ============================================
 // HANDLERS IMPORT
