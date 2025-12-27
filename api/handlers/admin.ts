@@ -562,7 +562,7 @@ export async function handleAdminTestWb(
     return res.status(400).json({ error: 'apiKey required' });
   }
 
-  console.log('🔍 Testing WB API with key length:', apiKey.length);
+  // SECURITY: Never log API key details (removed length logging)
 
   try {
     const response = await fetch('https://content-api.wildberries.ru/content/v2/get/cards/list', {

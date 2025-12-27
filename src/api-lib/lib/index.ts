@@ -80,3 +80,4 @@ export function getDateFromPeriod(period: string): string {
 }
 export { validateTelegramInitData, extractTelegramUser } from './telegram.js';
 export { checkRateLimit, cleanupExpiredEntries, resetRateLimit } from './rate-limit.js';
+export { logger, createLogger } from './logger.js';
