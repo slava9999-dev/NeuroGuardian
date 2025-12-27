@@ -51,7 +51,7 @@
 | --- | -------------------------------- | ------- | ----------------------------------- |
 | 1   | n8n workflows use hardcoded URLs | ✅ DONE | Env vars confirmed in all workflows |
 | 2   | Rate limiting improvements       | ✅ DONE | KV-backed implementation active     |
-| 3   | E2E tests with Playwright        | ⏳ TODO | Listed in REGRESSION_PREVENTION.md  |
+| 3   | E2E tests with Playwright        | ✅ DONE | Smoke tests for all pages active    |
 | 4   | Chat history persistence         | ✅ DONE | Implemented in previous session     |
 
 ---

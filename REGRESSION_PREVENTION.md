@@ -231,7 +231,23 @@ npm run build && du -sh dist/
 }
 ```
 
-### Git hooks (опционально):
+### 3. E2E Tests (Playwright)
+
+**Goal:** Verify user flows and UI stability.
+
+- **Visuals:** Ensure charts and tables render correctly.
+- **Navigation:** Test page transitions.
+- **Interaction:** Verify agent message sending.
+
+**Run locally:**
+
+```bash
+npm run test:e2e
+```
+
+_Note: This starts the dev server automatically._
+
+### 4. Policy Checks (Consolidated)
 
 ```bash
 # Проверка перед push
