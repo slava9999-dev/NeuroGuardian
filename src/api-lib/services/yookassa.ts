@@ -96,7 +96,15 @@ export async function createYookassaPayment(
     const payment = await response.json();
 
     // Create transaction record
-    await createTransaction(transactionId, userId, plan.price, planId);
+    await createTransaction({
+      id: transactionId,
+      user_id: userId,
+      yookassa_payment_id: payment.id,
+      amount: plan.price,
+      currency: 'RUB',
+      status: 'pending',
+      plan: planId,
+    });
 
     return {
       success: true,

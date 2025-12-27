@@ -31,6 +31,10 @@ import {
   GetMarketplaceInfoArgsSchema,
   GetMarketplaceAccountsArgsSchema,
   SearchWebArgsSchema,
+  UpdatePricesArgsSchema,
+  UpdateStocksArgsSchema,
+  SetStopLossArgsSchema,
+  BulkProtectProductsArgsSchema,
 } from './validators.js';
 
 // Unified product matching
@@ -1379,6 +1383,220 @@ export async function executeGetMarketplaceAccounts(
           is_active: a.is_active,
           last_sync: a.last_sync_at,
         })),
+      },
+    };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * UPDATE_PRICES — Prepare price updates for confirmation
+ */
+export async function executeUpdatePrices(userId: number, rawArgs: unknown): Promise<ToolResult> {
+  const validation = validateToolArgs(UpdatePricesArgsSchema, rawArgs);
+  if (isValidationError(validation)) return { success: false, error: validation.error };
+  const args = validation.data;
+
+  try {
+    const products = await getProductsByUserId(userId, (args as any).account_id);
+    const updates: Array<{
+      product_id: string;
+      nm_id?: number;
+      title: string;
+      marketplace: 'WB' | 'Ozon';
+      currentPrice: number;
+      newPrice: number;
+    }> = [];
+
+    // Case 1: Specific products from array
+    if (args.products && args.products.length > 0) {
+      for (const item of args.products) {
+        const filtered = filterProducts(products as any, args.marketplace, item.product_id);
+        if (filtered.length > 0) {
+          const p = filtered[0];
+          updates.push({
+            product_id: p.product_id,
+            nm_id: p.nm_id || undefined,
+            title: p.title,
+            marketplace: p.marketplace as 'WB' | 'Ozon',
+            currentPrice: p.current_price,
+            newPrice: item.new_price,
+          });
+        }
+      }
+    }
+    // Case 2: Percentage change for all/marketplace
+    else if (args.change_value !== undefined) {
+      const targetMarketplace = args.marketplace === 'all' ? undefined : args.marketplace;
+      const filtered = filterProducts(products as any, targetMarketplace);
+
+      for (const p of filtered) {
+        const diff = Math.round(p.current_price * (args.change_value / 100));
+        updates.push({
+          product_id: p.product_id,
+          nm_id: p.nm_id || undefined,
+          title: p.title,
+          marketplace: p.marketplace as 'WB' | 'Ozon',
+          currentPrice: p.current_price,
+          newPrice: p.current_price + diff,
+        });
+      }
+    }
+
+    if (updates.length === 0) {
+      return { success: false, error: 'Товары для обновления не найдены' };
+    }
+
+    return {
+      success: true,
+      data: {
+        price_updates: updates,
+        marketplace: args.marketplace,
+        account_id: (args as any).account_id,
+      },
+    };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * UPDATE_STOCKS — Prepare stock updates for confirmation (FBS ONLY)
+ */
+export async function executeUpdateStocks(userId: number, rawArgs: unknown): Promise<ToolResult> {
+  const validation = validateToolArgs(UpdateStocksArgsSchema, rawArgs);
+  if (isValidationError(validation)) return { success: false, error: validation.error };
+  const args = validation.data;
+
+  try {
+    const products = await getProductsByUserId(userId, (args as any).account_id);
+    const stockUpdates: Array<{
+      product_id: string;
+      sku?: string;
+      offer_id?: string;
+      title: string;
+      marketplace: 'WB' | 'Ozon';
+      currentStock: number;
+      newStock: number;
+    }> = [];
+
+    for (const item of args.products) {
+      const filtered = filterProducts(products as any, args.marketplace, item.product_id);
+      if (filtered.length > 0) {
+        const p = filtered[0];
+        stockUpdates.push({
+          product_id: p.product_id,
+          sku: String(p.nm_id || p.product_id), // WB uses nm_id as sku
+          offer_id: p.offer_id || p.product_id, // Ozon uses offer_id
+          title: p.title,
+          marketplace: p.marketplace as 'WB' | 'Ozon',
+          currentStock: p.current_stock || 0,
+          newStock: item.new_stock,
+        });
+      }
+    }
+
+    if (stockUpdates.length === 0) {
+      return { success: false, error: 'Товары для обновления остатков не найдены' };
+    }
+
+    return {
+      success: true,
+      data: {
+        stock_updates: stockUpdates,
+        marketplace: args.marketplace,
+        account_id: (args as any).account_id,
+      },
+    };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * SET_STOP_LOSS — Calculate and prepare stop-loss for confirmation
+ */
+export async function executeSetStopLoss(userId: number, rawArgs: unknown): Promise<ToolResult> {
+  const validation = validateToolArgs(SetStopLossArgsSchema, rawArgs);
+  if (isValidationError(validation)) return { success: false, error: validation.error };
+  const args = validation.data;
+
+  try {
+    const products = await getProductsByUserId(userId);
+    const filtered = filterProducts(products as any, undefined, args.product_id);
+
+    if (filtered.length === 0) {
+      return { success: false, error: `Товар "${args.product_id}" не найден` };
+    }
+
+    const p = filtered[0];
+    let minPrice: number;
+
+    if (args.min_price) {
+      minPrice = args.min_price;
+    } else if (args.percentage) {
+      minPrice = Math.round(p.current_price * (1 - args.percentage / 100));
+    } else {
+      // Default: 10% below current
+      minPrice = Math.round(p.current_price * 0.9);
+    }
+
+    return {
+      success: true,
+      data: {
+        product_id: p.product_id,
+        product_title: p.title,
+        marketplace: p.marketplace,
+        current_price: p.current_price,
+        min_price: minPrice,
+      },
+    };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * BULK_PROTECT_PRODUCTS — Prepare bulk protection for confirmation
+ */
+export async function executeBulkProtectProducts(
+  userId: number,
+  rawArgs: unknown
+): Promise<ToolResult> {
+  const validation = validateToolArgs(BulkProtectProductsArgsSchema, rawArgs);
+  if (isValidationError(validation)) return { success: false, error: validation.error };
+  const args = validation.data;
+
+  try {
+    const products = await getProductsByUserId(userId);
+    let targetProducts = products;
+
+    if (args.only_unprotected) {
+      targetProducts = products.filter(p => !p.min_price || p.min_price === 0);
+    }
+
+    if (targetProducts.length === 0) {
+      return {
+        success: false,
+        error: 'Нет товаров для защиты (возможно, все уже защищены)',
+      };
+    }
+
+    const updates = targetProducts.map(p => ({
+      product_id: p.product_id,
+      title: p.title,
+      current_price: p.current_price,
+      min_price: Math.round(p.current_price * (1 - args.percentage / 100)),
+    }));
+
+    return {
+      success: true,
+      data: {
+        percentage: args.percentage,
+        count: updates.length,
+        product_ids: updates.map(u => u.product_id),
+        preview: updates.slice(0, 5),
       },
     };
   } catch (error) {

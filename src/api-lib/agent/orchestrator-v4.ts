@@ -28,6 +28,10 @@ import {
   executeGetMarketplaceInfo,
   executeGetMarketplaceAccounts,
   executeSearchWeb,
+  executeUpdatePrices,
+  executeUpdateStocks,
+  executeSetStopLoss,
+  executeBulkProtectProducts,
 } from './tool-executors.js';
 import { logger } from '../lib/index.js';
 
@@ -469,6 +473,14 @@ async function executeTool(
         return await executeGetMarketplaceAccounts(userId, args);
       case 'search_web':
         return await executeSearchWeb(userId, args);
+      case 'update_prices':
+        return await executeUpdatePrices(userId, args);
+      case 'update_stocks':
+        return await executeUpdateStocks(userId, args);
+      case 'set_stop_loss':
+        return await executeSetStopLoss(userId, args);
+      case 'bulk_protect_products':
+        return await executeBulkProtectProducts(userId, args);
       default:
         return { success: false, error: `Unknown tool: ${toolName}` };
     }

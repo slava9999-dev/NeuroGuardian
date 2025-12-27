@@ -24,6 +24,10 @@ export const ToolNameEnum = z.enum([
   'get_marketplace_info',
   'get_marketplace_accounts',
   'search_web',
+  'update_prices',
+  'update_stocks',
+  'set_stop_loss',
+  'bulk_protect_products',
 ]);
 
 export type ToolName = z.infer<typeof ToolNameEnum>;
@@ -335,6 +339,10 @@ export const PLAN_JSON_SCHEMA = {
                 'get_marketplace_info',
                 'get_marketplace_accounts',
                 'search_web',
+                'update_prices',
+                'update_stocks',
+                'set_stop_loss',
+                'bulk_protect_products',
               ],
             },
             args: {
@@ -370,6 +378,41 @@ export const PLAN_JSON_SCHEMA = {
                 cost_price: {
                   type: 'number',
                   description: 'Cost price in RUB',
+                },
+                new_price: {
+                  type: 'number',
+                  description: 'New price in RUB',
+                },
+                new_stock: {
+                  type: 'integer',
+                  description: 'New stock quantity',
+                },
+                min_price: {
+                  type: 'number',
+                  description: 'Minimum price for stop-loss',
+                },
+                percentage: {
+                  type: 'number',
+                  description: 'Percentage value',
+                },
+                only_unprotected: {
+                  type: 'boolean',
+                  description: 'Only unprotected products',
+                },
+                products: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      product_id: { type: 'string' },
+                      new_price: { type: 'number' },
+                      new_stock: { type: 'integer' },
+                    },
+                  },
+                },
+                change_value: {
+                  type: 'number',
+                  description: 'Percentage change',
                 },
                 topic: {
                   type: 'string',

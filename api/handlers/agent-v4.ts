@@ -40,8 +40,8 @@ interface DBUserRecord {
   api_key_wb?: string;
   api_key_ozon?: string;
   subscription_active: boolean;
-  subscription_end_date?: string;
-  subscription_end?: string; // Alias for compatibility with lib function
+  subscription_end_date?: string | Date;
+  subscription_end?: string | Date; // Alias for compatibility with lib function
 }
 
 // Helper to get KV client
@@ -323,8 +323,13 @@ export async function handleAgentV4Confirm(
   }
 
   // Import marketplace service dynamically for write operations
-  const { updateWbPrices, updateOzonPrices } =
-    await import('../../src/api-lib/services/marketplace.js');
+  const {
+    updateWbPrices,
+    updateOzonPrices,
+    getWbFbsWarehouses,
+    updateWbStockFbs,
+    updateOzonStockFbs,
+  } = await import('../../src/api-lib/services/marketplace.js');
   const { updateProductMinPrice, getProductsByUserId } =
     await import('../../src/api-lib/services/database.js');
 
@@ -447,12 +452,69 @@ export async function handleAgentV4Confirm(
         break;
       }
 
-      // ========================================
-      // UPDATE STOCKS (placeholder)
-      // ========================================
       case 'update_stocks': {
-        // Stock updates require warehouse API integration
-        resultMessage = '⚠️ Обновление остатков пока не поддерживается через агента';
+        const stockUpdates = pendingAction.details.stock_updates as Array<{
+          product_id: string;
+          sku?: string;
+          offer_id?: string;
+          new_stock: number;
+          marketplace: 'WB' | 'Ozon';
+        }>;
+
+        if (!stockUpdates || stockUpdates.length === 0) {
+          throw new Error('Нет данных для обновления остатков');
+        }
+
+        const wbUpdates = stockUpdates.filter(u => u.marketplace === 'WB' && u.sku);
+        const ozonUpdates = stockUpdates.filter(u => u.marketplace === 'Ozon');
+
+        const accountId = pendingAction.details.account_id as number | undefined;
+        const { getMarketplaceKeys } = await import('../../src/api-lib/services/marketplace.js');
+        const keys = await getMarketplaceKeys(userId, accountId);
+
+        let wbResult: { success: boolean; count: number; error?: string } = {
+          success: true,
+          count: 0,
+        };
+        let ozonResult: { success: boolean; count: number; error?: string } = {
+          success: true,
+          count: 0,
+        };
+
+        // 1. Update WB Stocks
+        if (wbUpdates.length > 0 && keys.wb) {
+          const warehouses = await getWbFbsWarehouses(keys.wb);
+          if (warehouses.warehouses.length > 0) {
+            const whId = warehouses.warehouses[0].id; // Pick first warehouse
+            wbResult = await updateWbStockFbs(
+              keys.wb,
+              whId,
+              wbUpdates.map(u => ({ sku: u.sku!, amount: u.new_stock }))
+            );
+          } else {
+            throw new Error('У вас не настроены склады (FBS) на Wildberries');
+          }
+        }
+
+        // 2. Update Ozon Stocks
+        if (ozonUpdates.length > 0 && keys.ozon) {
+          ozonResult = await updateOzonStockFbs(
+            keys.ozon.clientId,
+            keys.ozon.apiKey,
+            ozonUpdates.map(u => ({
+              productId: parseInt(u.product_id),
+              offerId: u.offer_id || u.product_id,
+              stock: u.new_stock,
+            }))
+          );
+        }
+
+        executedCount = wbResult.count + ozonResult.count;
+        resultMessage = `✅ Остатки обновлены: ${executedCount} товаров`;
+
+        if (!wbResult.success || !ozonResult.success) {
+          resultMessage += `\n⚠️ Ошибка: ${wbResult.error || ozonResult.error || 'некоторые товары не обновлены'}`;
+        }
         break;
       }
 

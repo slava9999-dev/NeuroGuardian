@@ -55,6 +55,8 @@ export async function sendExpiryReminders(): Promise<{ sent: number; errors: num
     const users = await getUsersWithExpiringSubscriptions(3);
 
     for (const user of users) {
+      if (!user.subscription_end) continue;
+
       const daysLeft = Math.ceil(
         (new Date(user.subscription_end).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
       );

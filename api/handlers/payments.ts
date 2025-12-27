@@ -79,7 +79,7 @@ export async function handleCreatePayment(
     userId,
     planId as PlanId,
     `${returnUrl}?payment_complete=true`,
-    user?.email
+    undefined // No email in current user schema
   );
 
   if (!result.success) {
@@ -165,7 +165,7 @@ export async function handlePaymentWebhook(
       }
 
       // Activate subscription
-      await activateSubscription(userId, actualPlan, plan.durationDays, payment.payment_method?.id);
+      await activateSubscription(userId, actualPlan, plan.durationDays);
 
       // Update transaction status
       if (metadata.transaction_id) {
@@ -181,7 +181,7 @@ export async function handlePaymentWebhook(
       // Apply referral bonus if eligible
       if (referrerId && isFirst) {
         const { applyReferralBonus } = await import('../../src/api-lib/services/index.js');
-        await applyReferralBonus(referrerId);
+        await applyReferralBonus(referrerId, 500); // Standard 500 RUB bonus
         console.log(`🎁 Referral bonus applied to user ${referrerId}`);
       }
 
