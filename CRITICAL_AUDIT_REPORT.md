@@ -106,3 +106,19 @@ This audit identified critical flaws in the CI/CD pipeline that created a **fals
 > The regression prevention system now provides **real protection**. Tests are executed, checks are consolidated, and the pipeline accurately reflects project health.
 
 **Risk Level:** 🟢 LOW (previously 🔴 HIGH)
+
+---
+
+### 5. ⛔ CRITICAL: Fake Analytics Data
+
+| Aspect         | Before                           | After                                     |
+| -------------- | -------------------------------- | ----------------------------------------- |
+| ABC Analysis   | ⚠️ Price-based estimation (Fake) | ✅ Real orders from DB (True Revenue)     |
+| Stock Forecast | ⚠️ Placeholder mocked data       | ✅ Velocity-based prediction (30-day avg) |
+| Sales History  | ❌ Non-existent                  | ✅ Full sync from WB/Ozon APIs to DB      |
+
+**Resolution:**
+
+- Created `marketplace_orders` table (migration 010)
+- Implemented `syncSalesHistory` for WB (Statistics API) and Ozon (Posting API)
+- Rewrote `executeGetAbcAnalysis` and `executeGetStockForecast` to use real data

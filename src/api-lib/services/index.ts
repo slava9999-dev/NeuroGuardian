@@ -35,6 +35,9 @@ export {
   getChatHistory,
   saveChatHistory,
   clearChatHistory,
+  // Sales History (Dec 2024)
+  getSalesHistory,
+  upsertMarketplaceOrders,
 } from './database.js';
 
 // YooKassa
@@ -79,6 +82,8 @@ export {
   type MarketplacePriceUpdate,
   type MarketplaceSalesStats,
   type MarketplaceApiKeys,
+  // Sales Sync
+  syncSalesHistory,
 } from './marketplace.js';
 
 // Unit Economics (Dec 2024)

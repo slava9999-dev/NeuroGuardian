@@ -103,6 +103,30 @@ export async function initializeDatabase(): Promise<void> {
     )
   `;
 
+  // Marketplace Orders / Sales History (Added Dec 2024 for Real ABC Analysis)
+  await sql`
+    CREATE TABLE IF NOT EXISTS marketplace_orders (
+      id SERIAL PRIMARY KEY,
+      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      product_id VARCHAR(255),
+      marketplace_product_id VARCHAR(255) NOT NULL,
+      title VARCHAR(500),
+      marketplace VARCHAR(10) NOT NULL,
+      order_id VARCHAR(255) NOT NULL,
+      order_date TIMESTAMP NOT NULL,
+      status VARCHAR(50) NOT NULL,
+      price_total DECIMAL(10, 2) NOT NULL DEFAULT 0,
+      quantity INTEGER NOT NULL DEFAULT 1,
+      commission DECIMAL(10, 2) DEFAULT 0,
+      logistics DECIMAL(10, 2) DEFAULT 0,
+      cost_price DECIMAL(10, 2) DEFAULT 0,
+      region VARCHAR(100),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, marketplace, order_id)
+    )
+  `;
+
   // Indexes
   await sql`CREATE INDEX IF NOT EXISTS idx_products_user_id ON products(user_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id)`;
@@ -110,6 +134,8 @@ export async function initializeDatabase(): Promise<void> {
   await sql`CREATE INDEX IF NOT EXISTS idx_products_monitoring ON products(user_id, min_price) WHERE min_price > 0`;
   await sql`CREATE INDEX IF NOT EXISTS idx_sentinel_logs_user ON sentinel_logs(user_id, created_at DESC)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_chat_history_user ON chat_history(user_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_orders_user_date ON marketplace_orders(user_id, order_date)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_orders_analytics ON marketplace_orders(user_id, marketplace, status)`;
 
   // Migration: Add offer_id column for Ozon (Dec 2024)
   await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS offer_id VARCHAR(255)`;
@@ -721,4 +747,95 @@ export async function clearChatHistory(userId: number): Promise<void> {
   await sql`
     DELETE FROM chat_history WHERE user_id = ${userId}
   `;
+}
+
+// ========================================
+// Sales History Functions
+// ========================================
+
+export interface MarketplaceOrder {
+  order_id: string;
+  user_id: number;
+  marketplace_product_id: string; // nmId or ozon product_id
+  product_id?: string;
+  title: string;
+  marketplace: 'WB' | 'Ozon';
+  order_date: Date;
+  status: string;
+  price_total: number;
+  quantity: number;
+  commission: number;
+  logistics: number;
+  cost_price: number;
+  region?: string;
+}
+
+/**
+ * Batch insert/upsert marketplace orders
+ */
+export async function upsertMarketplaceOrders(
+  userId: number,
+  orders: MarketplaceOrder[]
+): Promise<{ inserted: number; updated: number }> {
+  if (orders.length === 0) return { inserted: 0, updated: 0 };
+
+  let inserted = 0;
+  let updated = 0;
+
+  // Process in chunks to avoid query size limits
+  const CHUNK_SIZE = 50;
+  for (let i = 0; i < orders.length; i += CHUNK_SIZE) {
+    const chunk = orders.slice(i, i + CHUNK_SIZE);
+
+    for (const order of chunk) {
+      try {
+        const result = await sql`
+          INSERT INTO marketplace_orders (
+            user_id, marketplace, order_id, 
+            product_id, marketplace_product_id, title,
+            order_date, status, price_total, quantity,
+            commission, logistics, cost_price, region,
+            updated_at
+          )
+          VALUES (
+            ${userId}, ${order.marketplace}, ${order.order_id},
+            ${order.product_id || null}, ${order.marketplace_product_id}, ${order.title},
+            ${order.order_date.toISOString()}, ${order.status}, ${order.price_total}, ${order.quantity},
+            ${order.commission}, ${order.logistics}, ${order.cost_price}, ${order.region || null},
+            NOW()
+          )
+          ON CONFLICT (user_id, marketplace, order_id) 
+          DO UPDATE SET
+            status = EXCLUDED.status,
+            price_total = EXCLUDED.price_total,
+            commission = EXCLUDED.commission,
+            logistics = EXCLUDED.logistics,
+            cost_price = EXCLUDED.cost_price,
+            updated_at = NOW()
+          RETURNING (xmax = 0) AS inserted
+        `;
+
+        if (result.rows[0]?.inserted) inserted++;
+        else updated++;
+      } catch (e) {
+        console.error(`Error upserting order ${order.order_id}:`, e);
+      }
+    }
+  }
+
+  return { inserted, updated };
+}
+
+/**
+ * Get sales history for analytics
+ */
+export async function getSalesHistory(userId: number, dateFrom: Date, dateTo: Date) {
+  const result = await sql`
+    SELECT * FROM marketplace_orders
+    WHERE user_id = ${userId}
+      AND order_date >= ${dateFrom.toISOString()}
+      AND order_date <= ${dateTo.toISOString()}
+    ORDER BY order_date DESC
+  `;
+  return result.rows;
 }

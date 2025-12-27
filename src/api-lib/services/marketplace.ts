@@ -5,7 +5,7 @@
 // ============================================
 
 import { decryptApiKey, fetchWithRetry } from '../lib/index.js';
-import { getUserById } from './database.js';
+import { getUserById, upsertMarketplaceOrders, type MarketplaceOrder } from './database.js';
 import type {
   WbCard,
   WbGoodsItem,
@@ -1403,4 +1403,179 @@ export async function getOzonFbsWarehouses(
   } catch (e) {
     return { warehouses: [], error: e instanceof Error ? e.message : 'Unknown error' };
   }
+}
+
+// ============================================
+// SALES HISTORY SYNC (Dec 2024)
+// ============================================
+
+/**
+ * Sync sales history from marketplaces to local DB
+ * Creates a permanent record of orders for accurate analytics
+ */
+export async function syncSalesHistory(
+  userId: number,
+  daysBack: number = 30
+): Promise<{ success: boolean; imported: number; error?: string }> {
+  try {
+    const keys = await getMarketplaceKeys(userId);
+    let totalImported = 0;
+    const orders: MarketplaceOrder[] = [];
+
+    const dateFrom = new Date();
+    dateFrom.setDate(dateFrom.getDate() - daysBack);
+
+    // 1. Fetch WB Orders
+    if (keys.wb) {
+      try {
+        const wbOrders = await fetchWbOrders(keys.wb, dateFrom);
+        const mappedWb = wbOrders.map(o => ({
+          order_id: o.srid || o.saleID, // Unique sale ID
+          user_id: userId,
+          marketplace_product_id: String(o.nmId),
+          title: o.subject || `Товар ${o.nmId}`,
+          marketplace: 'WB' as const,
+          order_date: new Date(o.date),
+          status: (o.saleID && o.saleID.startsWith('R')) || o.isStorned ? 'returned' : 'delivered',
+          price_total: o.finishedPrice || o.priceWithDisc || 0,
+          quantity: 1, // Sales API returns single items
+          commission: 0, // TODO: Calculate from report or use defaults
+          logistics: 0, // TODO: Calculate from report
+          cost_price: 0, // Will be filled from products table join later
+          region: o.regionName,
+        }));
+        orders.push(...mappedWb);
+        console.log(`📥 Sync: Fetched ${mappedWb.length} WB orders`);
+      } catch (e) {
+        console.warn('⚠️ Sync: Failed to fetch WB orders:', e);
+      }
+    }
+
+    // 2. Fetch Ozon Orders (FBO + FBS)
+    if (keys.ozon) {
+      try {
+        const ozonOrders = await fetchOzonOrders(keys.ozon.clientId, keys.ozon.apiKey, dateFrom);
+        const mappedOzon = ozonOrders.map(o => ({
+          order_id: o.posting_number,
+          user_id: userId,
+          marketplace_product_id: String(o.products?.[0]?.sku || o.products?.[0]?.offer_id),
+          title: o.products?.[0]?.name || 'Ozon Product',
+          marketplace: 'Ozon' as const,
+          order_date: new Date(o.in_process_at || o.created_at),
+          status: o.status,
+          price_total: parseFloat(o.financial_data?.products?.[0]?.price || '0'),
+          quantity: o.products?.[0]?.quantity || 1,
+          commission: parseFloat(o.financial_data?.products?.[0]?.commission_amount || '0'),
+          logistics: 0, // Ozon calculates this separately
+          cost_price: 0,
+          region: o.analytics_data?.region || o.region,
+        }));
+        orders.push(...mappedOzon);
+        console.log(`📥 Sync: Fetched ${mappedOzon.length} Ozon orders`);
+      } catch (e) {
+        console.warn('⚠️ Sync: Failed to fetch Ozon orders:', e);
+      }
+    }
+
+    // 3. Save to DB
+    if (orders.length > 0) {
+      const result = await upsertMarketplaceOrders(userId, orders);
+      totalImported = result.inserted + result.updated;
+      console.log(
+        `💾 Sync: Saved ${totalImported} orders to history (Date > ${dateFrom.toISOString()})`
+      );
+    }
+
+    return { success: true, imported: totalImported };
+  } catch (e) {
+    console.error('❌ Sync Sales History Failed:', e);
+    return { success: false, imported: 0, error: e instanceof Error ? e.message : 'Unknown error' };
+  }
+}
+
+/**
+ * Fetch raw WB sales data
+ */
+async function fetchWbOrders(apiKey: string, dateFrom: Date) {
+  const response = await fetchWithRetry(
+    `https://statistics-api.wildberries.ru/api/v1/supplier/sales?dateFrom=${dateFrom.toISOString().split('T')[0]}`,
+    {
+      method: 'GET',
+      headers: { Authorization: apiKey },
+    }
+  );
+
+  if (response.ok) {
+    const data = await response.json();
+    if (Array.isArray(data)) {
+      return data;
+    }
+  } else {
+    const txt = await response.text();
+    console.warn(`WB Statistics API error: ${response.status} ${txt}`);
+  }
+
+  return [];
+}
+
+/**
+ * Fetch raw Ozon orders (FBO + FBS)
+ */
+async function fetchOzonOrders(clientId: string, apiKey: string, dateFrom: Date) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const allOrders: any[] = [];
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'Client-Id': clientId,
+    'Api-Key': apiKey,
+  };
+
+  // 1. Fetch FBO Orders
+  try {
+    const fboRes = await fetchWithRetry('https://api-seller.ozon.ru/v2/posting/fbo/list', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        dir: 'ASC',
+        filter: {
+          since: dateFrom.toISOString(),
+          status: 'delivered',
+        },
+        limit: 1000,
+      }),
+    });
+
+    if (fboRes.ok) {
+      const data = await fboRes.json();
+      allOrders.push(...(data.result || []));
+    }
+  } catch (e) {
+    console.warn('Ozon FBO fetch error:', e);
+  }
+
+  // 2. Fetch FBS Orders (delivered only for sales history)
+  try {
+    const fbsRes = await fetchWithRetry('https://api-seller.ozon.ru/v3/posting/fbs/list', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        dir: 'ASC',
+        filter: {
+          since: dateFrom.toISOString(),
+          status: 'delivered',
+        },
+        limit: 1000,
+      }),
+    });
+
+    if (fbsRes.ok) {
+      const data = await fbsRes.json();
+      allOrders.push(...(data.result?.postings || []));
+    }
+  } catch (e) {
+    console.warn('Ozon FBS fetch error:', e);
+  }
+
+  return allOrders;
 }

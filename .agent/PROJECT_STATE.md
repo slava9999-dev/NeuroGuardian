@@ -38,21 +38,21 @@
 
 ## 🔴 Critical TODO (P0)
 
-| #   | Issue                   | Status  | Notes                                             |
-| --- | ----------------------- | ------- | ------------------------------------------------- |
-| 1   | Analytics use fake data | ⏳ TODO | `executeGetAbcAnalysis` needs real implementation |
-| 2   | Stock forecast is mock  | ⏳ TODO | `executeGetStockForecast` needs real data         |
+| #   | Issue                   | Status  | Notes                                    |
+| --- | ----------------------- | ------- | ---------------------------------------- |
+| 1   | Analytics use fake data | ✅ DONE | Real implementation with DB history sync |
+| 2   | Stock forecast is mock  | ✅ DONE | Uses 30-day sales velocity from DB       |
 
 ---
 
 ## 🟡 Important TODO (P1)
 
-| #   | Issue                            | Status  | Notes                              |
-| --- | -------------------------------- | ------- | ---------------------------------- |
-| 1   | n8n workflows use hardcoded URLs | ⏳ TODO | Need to use env variables          |
-| 2   | Rate limiting improvements       | ⏳ TODO | Current implementation is basic    |
-| 3   | E2E tests with Playwright        | ⏳ TODO | Listed in REGRESSION_PREVENTION.md |
-| 4   | Chat history persistence         | ✅ DONE | Implemented in previous session    |
+| #   | Issue                            | Status  | Notes                               |
+| --- | -------------------------------- | ------- | ----------------------------------- |
+| 1   | n8n workflows use hardcoded URLs | ✅ DONE | Env vars confirmed in all workflows |
+| 2   | Rate limiting improvements       | ✅ DONE | KV-backed implementation active     |
+| 3   | E2E tests with Playwright        | ⏳ TODO | Listed in REGRESSION_PREVENTION.md  |
+| 4   | Chat history persistence         | ✅ DONE | Implemented in previous session     |
 
 ---
 
