@@ -92,6 +92,7 @@ export {
   LOGISTICS_COSTS,
   STORAGE_COSTS,
   SPP_RATES,
+  ACQUIRING_RATES,
   type UnitEconomicsInput,
   type UnitEconomicsResult,
 } from './unit-economics.js';

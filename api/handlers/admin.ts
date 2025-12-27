@@ -36,11 +36,23 @@ export async function handleInitDb(
 
 /**
  * Handle reset-db action (dangerous!)
+ * SECURITY FIX (Dec 2024): Completely disabled in production
  */
 export async function handleResetDb(
   req: VercelRequest,
   res: VercelResponse
 ): Promise<VercelResponse> {
+  // CRITICAL SECURITY: Block in production to prevent catastrophic data loss
+  const isProduction =
+    process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
+  if (isProduction) {
+    console.error('🚨 SECURITY: Attempted database reset in PRODUCTION blocked!');
+    return res.status(403).json({
+      error: 'Database reset is PERMANENTLY DISABLED in production',
+      hint: 'This endpoint only works in development/staging environments',
+    });
+  }
+
   if (!validateAdminAccess(req)) {
     return res.status(403).json({ error: 'Admin access required' });
   }

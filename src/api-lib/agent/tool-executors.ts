@@ -6,7 +6,16 @@
 
 // Database operations are handled through services
 import { decryptApiKey, fetchWithRetry } from '../lib/index.js';
-import { getUserById, getProductsByUserId } from '../services/index.js';
+import {
+  getUserById,
+  getProductsByUserId,
+  // Unit Economics service (removes hardcoded commissions)
+  getCommissionRate,
+  LOGISTICS_COSTS,
+  STORAGE_COSTS,
+  SPP_RATES,
+  ACQUIRING_RATES,
+} from '../services/index.js';
 
 // Zod validation schemas
 import {
@@ -708,22 +717,9 @@ export async function executeCalculateUnitEconomics(
     return { success: false, error: 'Товары не найдены' };
   }
 
-  // Marketplace commission rates (UPDATED JAN 2025)
-  // These are average rates - actual rates vary by category
-  const COMMISSIONS = {
-    WB: {
-      base: 0.2, // Updated: 20% avg (was 15%), range 8-34.5% depending on category
-      logistics: 35, // Updated: ~35₽ avg for 0.001-1L (was 70₽)
-      storage: 0.08, // Updated: 0.08₽/L/day (was 5₽/item/day)
-      spp_avg: 0.08, // SPP (Seller's Price Reduction) averages 8%
-    },
-    Ozon: {
-      base: 0.15, // Updated: 15% avg (was 12%), range 4-24%
-      logistics: 46, // Updated: 46₽/L for FBO (was 80₽)
-      processing: 30, // Order processing
-      acquiring: 0.015, // 1.5% acquiring fee (NEW!)
-    },
-  };
+  // Marketplace commission rates - NOW USES CENTRALIZED SERVICE
+  // Removed hardcoded constants (Dec 2024 Audit fix)
+  // getCommissionRate() returns category-specific rates from unit-economics.ts
 
   // Count products with real cost data
   const productsWithCost = targetProducts.filter((p: any) => p.cost_price && p.cost_price > 0);
@@ -733,7 +729,10 @@ export async function executeCalculateUnitEconomics(
     const price = p.current_price || 0;
     const mp = (p.marketplace || 'WB') as 'WB' | 'Ozon';
     const isWB = mp === 'WB';
-    const comm = isWB ? COMMISSIONS.WB : COMMISSIONS.Ozon;
+
+    // Get commission rate from centralized service (category-aware)
+    const commissionRate = getCommissionRate(mp, p.category);
+    const logistics = isWB ? LOGISTICS_COSTS.WB.fbo : LOGISTICS_COSTS.Ozon.fbo;
 
     // Use real cost_price if available in DB, then from args, then estimate
     let costPrice: number;
@@ -751,15 +750,18 @@ export async function executeCalculateUnitEconomics(
       costSource = '⚠️ оценка 30%';
     }
 
-    const commission = Math.round(price * comm.base);
-    const logistics = comm.logistics;
+    const commission = Math.round(price * commissionRate);
 
-    // Fixed storage calculation: 30 days at correct daily rate
+    // Fixed storage calculation: 30 days at correct daily rate + SPP/acquiring
+    const storageDaily = isWB ? STORAGE_COSTS.WB : STORAGE_COSTS.Ozon;
+    const sppRate = isWB ? SPP_RATES.WB : SPP_RATES.Ozon;
+    const acquiringRate = isWB ? ACQUIRING_RATES.WB : ACQUIRING_RATES.Ozon;
+
     const otherCosts = isWB
-      ? Math.round(COMMISSIONS.WB.storage * 30) + Math.round(price * COMMISSIONS.WB.spp_avg)
-      : // WB: 0.08₽/day * 30 days = 2.4₽ + SPP
-        COMMISSIONS.Ozon.processing + Math.round(price * COMMISSIONS.Ozon.acquiring);
-    // Ozon: processing + acquiring
+      ? Math.round(storageDaily * 30) + Math.round(price * sppRate)
+      : // WB: storage + SPP
+        Math.round(storageDaily * 30) + Math.round(price * acquiringRate);
+    // Ozon: storage + acquiring
 
     const profit = price - costPrice - commission - logistics - otherCosts;
     const margin = price > 0 ? Math.round((profit / price) * 100) : 0;
@@ -772,6 +774,7 @@ export async function executeCalculateUnitEconomics(
       costPrice,
       costSource,
       commission,
+      commissionRate: `${Math.round(commissionRate * 100)}%`,
       logistics,
       otherCosts,
       profit: Math.round(profit),

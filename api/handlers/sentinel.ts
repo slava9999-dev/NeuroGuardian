@@ -17,6 +17,7 @@ import {
   fetchWbPrices,
   setWbZeroStock,
   setWbDefensePrice,
+  fetchOzonCurrentPrices,
 } from '../../src/api-lib/services/index.js';
 
 // ============================================
@@ -274,20 +275,36 @@ async function processOzonDefense(
 
   if (monitoredProducts.length === 0) return;
 
-  // WORKAROUND: Ozon Prices API returns 404 for all endpoints
-  // Use current_price from DB (updated by sync) instead
-  console.log(`📊 Ozon: Using DB prices (Prices API unavailable)`);
+  // CRITICAL FIX (Dec 2024): Fetch LIVE prices from Ozon API
+  // Previously used stale DB prices which caused "blind" Sentinel
+  const productIds = monitoredProducts
+    .map(p => parseInt(p.product_id.replace('ozon-', '')))
+    .filter(id => !isNaN(id));
+
+  console.log(`📡 Ozon: Fetching LIVE prices for ${productIds.length} products...`);
+  const livePriceMap = await fetchOzonCurrentPrices(clientId, apiKey, productIds);
+  console.log(`💰 Ozon: Got ${livePriceMap.size} live prices from API`);
 
   // Check for violations
   for (const dbProduct of monitoredProducts) {
     const ozonId = parseInt(dbProduct.product_id.replace('ozon-', ''));
 
-    // Use current_price and offer_id from DB (updated by sync)
-    const currentPrice = dbProduct.current_price || 0;
+    // LIVE price from API (with DB fallback for edge cases)
+    const livePrice = livePriceMap.get(ozonId);
+    const currentPrice = livePrice ?? dbProduct.current_price ?? 0;
     const offerId = dbProduct.offer_id || ''; // offer_id from sync
 
+    // Log price source for debugging
+    if (livePrice) {
+      console.log(`📊 Ozon ${ozonId}: LIVE price = ${livePrice}₽`);
+    } else if (dbProduct.current_price) {
+      console.warn(
+        `⚠️ Ozon ${ozonId}: No LIVE price, using DB fallback = ${dbProduct.current_price}₽`
+      );
+    }
+
     if (currentPrice === 0) {
-      console.warn(`⚠️ No price in DB for Ozon product ${ozonId} - run sync first`);
+      console.warn(`⚠️ No price for Ozon product ${ozonId} - run sync first`);
       continue;
     }
 
