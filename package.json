@@ -1,7 +1,7 @@
 {
   "name": "neuroguardian",
   "private": true,
-  "version": "2.10.0",
+  "version": "2.11.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,7 +11,9 @@
     "prepare": "husky",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "check:regression": "node scripts/check-regression.cjs",
+    "check:all": "npm run lint && npm run build && npm run test && npm run check:regression"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.46",

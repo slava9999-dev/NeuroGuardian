@@ -1,1 +1,32 @@
+#!/usr/bin/env bash
+# ============================================
+# Pre-commit hook - Regression Prevention
+# ============================================
+
+# Run lint-staged first (existing behavior)
 npx lint-staged
+
+# Then run regression checks
+echo "🔍 Running regression checks..."
+
+# Check critical files
+CRITICAL_FILES=("src/api-lib/lib/logger.ts" "api/handlers/admin.ts" ".gitignore")
+for file in "${CRITICAL_FILES[@]}"; do
+  if [ ! -f "$file" ]; then
+    echo "❌ REGRESSION: Critical file missing: $file"
+    exit 1
+  fi
+done
+
+# Check security fixes
+if grep -q "console\.log.*key.*length" api/handlers/admin.ts 2>/dev/null; then
+  echo "❌ REGRESSION: API key logging detected!"
+  exit 1
+fi
+
+if ! grep -q "^\.env$" .gitignore; then
+  echo "❌ REGRESSION: .env not in .gitignore!"
+  exit 1
+fi
+
+echo "✅ Regression checks passed"
