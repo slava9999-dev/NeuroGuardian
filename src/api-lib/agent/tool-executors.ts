@@ -708,20 +708,20 @@ export async function executeCalculateUnitEconomics(
     return { success: false, error: 'Товары не найдены' };
   }
 
-  // Marketplace commission rates (Dec 2024)
+  // Marketplace commission rates (UPDATED JAN 2025)
   // These are average rates - actual rates vary by category
   const COMMISSIONS = {
     WB: {
-      base: 0.15, // 15% avg commission (5-25% depending on category)
-      logistics: 70, // ~70 RUB per item avg (depends on weight/size)
-      storage: 5, // ~5 RUB per item per day
-      spp_avg: 0.1, // SPP (Seller's Price Reduction) averages 10%
+      base: 0.2, // Updated: 20% avg (was 15%), range 8-34.5% depending on category
+      logistics: 35, // Updated: ~35₽ avg for 0.001-1L (was 70₽)
+      storage: 0.08, // Updated: 0.08₽/L/day (was 5₽/item/day)
+      spp_avg: 0.08, // SPP (Seller's Price Reduction) averages 8%
     },
     Ozon: {
-      base: 0.12, // 12% avg commission
-      logistics: 80, // includes last mile
-      processing: 30, // order processing
-      acquiring: 0.015, // 1.5% built into commission
+      base: 0.15, // Updated: 15% avg (was 12%), range 4-24%
+      logistics: 46, // Updated: 46₽/L for FBO (was 80₽)
+      processing: 30, // Order processing
+      acquiring: 0.015, // 1.5% acquiring fee (NEW!)
     },
   };
 
@@ -753,9 +753,13 @@ export async function executeCalculateUnitEconomics(
 
     const commission = Math.round(price * comm.base);
     const logistics = comm.logistics;
+
+    // Fixed storage calculation: 30 days at correct daily rate
     const otherCosts = isWB
-      ? COMMISSIONS.WB.storage * 5 + Math.round(price * COMMISSIONS.WB.spp_avg)
-      : COMMISSIONS.Ozon.processing;
+      ? Math.round(COMMISSIONS.WB.storage * 30) + Math.round(price * COMMISSIONS.WB.spp_avg)
+      : // WB: 0.08₽/day * 30 days = 2.4₽ + SPP
+        COMMISSIONS.Ozon.processing + Math.round(price * COMMISSIONS.Ozon.acquiring);
+    // Ozon: processing + acquiring
 
     const profit = price - costPrice - commission - logistics - otherCosts;
     const margin = price > 0 ? Math.round((profit / price) * 100) : 0;
@@ -801,8 +805,8 @@ export async function executeCalculateUnitEconomics(
       },
       commissionRates: {
         note: 'Комиссии усредненные. Реальные зависят от категории товара.',
-        WB: 'Комиссия 5-25%, логистика 50-200₽, СПП до 25%',
-        Ozon: 'Комиссия 5-20%, логистика 70-150₽',
+        WB: 'Комиссия 8-34.5% (среднее 20%), логистика 23-46₽, СПП до 25%, хранение 0.08₽/л/день',
+        Ozon: 'Комиссия 4-24% (среднее 15%), логистика FBO 46₽, FBS 80₽, эквайринг 1.5%',
       },
       products: calculations,
     },

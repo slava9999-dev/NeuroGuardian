@@ -42,7 +42,10 @@ const CONFIG = {
   workflows: [
     'sentinel-workflow.json',
     'sync-workflow.json',
-    'monitoring-workflow.json'
+    'analytics-workflow.json',
+    'monitoring-workflow.json',
+    'notifications-workflow.json',
+    'agent-dashboard-workflow.json'
   ]
 };
 

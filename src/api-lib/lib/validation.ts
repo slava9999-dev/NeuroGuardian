@@ -93,3 +93,35 @@ export function parsePeriod(period: string): { valid: boolean; days: number } {
 
   return { valid: false, days: 7 }; // Default to 7 days
 }
+
+/**
+ * Parse and validate Ozon API key format (clientId:apiKey)
+ * @returns Object with clientId and apiKey, or null if invalid
+ */
+export function parseOzonApiKey(apiKey: string): { clientId: string; apiKey: string } | null {
+  if (!apiKey || typeof apiKey !== 'string') {
+    return null;
+  }
+
+  // Ozon API key must be in format "clientId:apiKey"
+  if (!apiKey.includes(':')) {
+    console.warn('⚠️ Ozon API key missing colon separator (expected clientId:apiKey)');
+    return null;
+  }
+
+  const parts = apiKey.split(':');
+  if (parts.length !== 2) {
+    console.warn('⚠️ Ozon API key has invalid format (expected exactly one colon)');
+    return null;
+  }
+
+  const [clientId, key] = parts;
+
+  // Validate both parts are non-empty
+  if (!clientId || !key || clientId.trim() === '' || key.trim() === '') {
+    console.warn('⚠️ Ozon API key has empty clientId or apiKey');
+    return null;
+  }
+
+  return { clientId: clientId.trim(), apiKey: key.trim() };
+}

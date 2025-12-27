@@ -11,6 +11,7 @@ import {
   sanitizeInput,
   decryptApiKey,
   checkRateLimit,
+  isSubscriptionActive,
 } from '../../src/api-lib/lib/index.js';
 
 import { getUserById, getProductsByUserId } from '../../src/api-lib/services/index.js';
@@ -40,6 +41,7 @@ interface DBUserRecord {
   api_key_ozon?: string;
   subscription_active: boolean;
   subscription_end_date?: string;
+  subscription_end?: string; // Alias for compatibility with lib function
 }
 
 // Helper to get KV client
@@ -51,16 +53,6 @@ function getKVClient() {
     });
   }
   return null;
-}
-
-// Check Subscription
-function isSubscriptionActive(user: DBUserRecord | null): boolean {
-  if (!user) return false;
-  if (process.env.TEST_MODE === 'true') return true;
-  if (user.role === 'admin') return true;
-  if (!user.subscription_active) return false;
-  if (!user.subscription_end_date) return false;
-  return new Date(user.subscription_end_date) > new Date();
 }
 
 /**
@@ -349,22 +341,21 @@ export async function handleAgentV4Confirm(
         }
 
         // Update Ozon prices
-        // CRITICAL FIX: Ozon key is stored as "clientId:apiKey", must split it
+        // CRITICAL FIX: Use parseOzonApiKey utility for safe parsing
         if (ozonUpdates.length > 0 && user.api_key_ozon) {
           const decryptedOzonKey = decryptApiKey(user.api_key_ozon);
-          if (decryptedOzonKey && decryptedOzonKey.includes(':')) {
-            const [ozonClientId, ozonApiKey] = decryptedOzonKey.split(':');
-            if (ozonClientId && ozonApiKey) {
-              ozonResult = await updateOzonPrices(
-                ozonClientId,
-                ozonApiKey,
-                ozonUpdates.map(u => ({ productId: parseInt(u.product_id), price: u.new_price }))
-              );
-            } else {
-              console.warn('⚠️ Ozon API key format invalid after split');
-            }
+          const { parseOzonApiKey } = await import('../../src/api-lib/lib/validation.js');
+          const ozonKeys = parseOzonApiKey(decryptedOzonKey);
+
+          if (ozonKeys) {
+            ozonResult = await updateOzonPrices(
+              ozonKeys.clientId,
+              ozonKeys.apiKey,
+              ozonUpdates.map(u => ({ productId: parseInt(u.product_id), price: u.new_price }))
+            );
           } else {
-            console.warn('⚠️ Ozon API key missing or invalid format (expected clientId:apiKey)');
+            console.warn('⚠️ Ozon API key invalid format (expected clientId:apiKey)');
+            ozonResult = { success: false, count: 0 };
           }
         }
 

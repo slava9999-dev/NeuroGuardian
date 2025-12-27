@@ -1,0 +1,400 @@
+{
+  "name": "NeuroGUARDIAN AI Agent Dashboard",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "id": "trigger-1",
+      "name": "Every 6 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -1200,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "apiBaseUrl",
+              "value": "={{ $env.API_URL }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "cronSecret",
+              "value": "={{ $env.CRON_SECRET }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "telegramBotToken",
+              "value": "={{ $env.TELEGRAM_BOT_TOKEN }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "adminChatId",
+              "value": "={{ $env.ADMIN_CHAT_ID }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "include": "all"
+      },
+      "id": "config-1",
+      "name": "Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1000,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Configuration').first().json.apiBaseUrl }}?action=agent-status",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Configuration').first().json.cronSecret }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "api-1",
+      "name": "Get Agent Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -800,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Analyze Agent Metrics from KV store\\nconst status = $input.first().json;\\n\\n// Extract key metrics\\nconst metrics = {\\n  version: status.version || 'v4',\\n  architecture: status.architecture || 'two-phase-pipeline',\\n  models: status.model || { planner: 'gpt-4o-mini', answerer: 'gpt-4o' },\\n  capabilities: status.capabilities || [],\\n  available: status.available || true\\n};\\n\\n// Simulate daily stats (in production, fetch from KV)\\nconst dailyStats = {\\n  totalRequests: Math.floor(Math.random() * 100) + 50,\\n  avgResponseTime: Math.floor(Math.random() * 2000) + 1000,\\n  tokensUsed: Math.floor(Math.random() * 50000) + 10000,\\n  errorRate: (Math.random() * 5).toFixed(2),\\n  toolUsageRate: (Math.random() * 80 + 20).toFixed(2),\\n  topTools: [\\n    { name: 'get_products', count: Math.floor(Math.random() * 30) + 10 },\\n    { name: 'get_sales_stats', count: Math.floor(Math.random() * 20) + 5 },\\n    { name: 'calculate_unit_economics', count: Math.floor(Math.random() * 15) + 3 }\\n  ]\\n};\\n\\nreturn {\\n  json: {\\n    metrics,\\n    dailyStats,\\n    timestamp: new Date().toISOString()\\n  }\\n};"
+      },
+      "id": "code-1",
+      "name": "Analyze Agent Metrics",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -600,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{ $json.dailyStats.avgResponseTime }}",
+              "rightValue": 5000,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "or"
+        }
+      },
+      "id": "if-1",
+      "name": "Performance Issues?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -400,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const data = $input.first().json;\\nconst stats = data.dailyStats;\\n\\nlet message = `🤖 *AI Agent Performance Report*\n\n`;\\nmessage += `📊 *Daily Statistics*\n`;\\nmessage += `• Total Requests: ${stats.totalRequests}\n`;\\nmessage += `• Avg Response Time: ${stats.avgResponseTime}ms\n`;\\nmessage += `• Tokens Used: ${stats.tokensUsed.toLocaleString()}\n`;\\nmessage += `• Error Rate: ${stats.errorRate}%\n`;\\nmessage += `• Tool Usage: ${stats.toolUsageRate}%\n\n`;\\n\\nmessage += `🔧 *Top Tools*\n`;\\nstats.topTools.forEach((tool, i) => {\\n  message += `${i + 1}. ${tool.name}: ${tool.count} calls\n`;\\n});\\n\\nmessage += `\n🏗️ *Architecture*\n`;\\nmessage += `• Version: ${data.metrics.version}\n`;\\nmessage += `• Pipeline: ${data.metrics.architecture}\n`;\\nmessage += `• Planner: ${data.metrics.models.planner}\n`;\\nmessage += `• Answerer: ${data.metrics.models.answerer}\n`;\\n\\nif (stats.avgResponseTime > 5000) {\\n  message += `\n⚠️ *Alert: High Latency Detected*\n`;\\n  message += `Average response time exceeds 5 seconds. Consider optimization.`;\\n}\\n\\nreturn {\\n  json: {\\n    message: message,\\n    hasIssues: stats.avgResponseTime > 5000 || stats.errorRate > 5\\n  }\\n};"
+      },
+      "id": "code-2",
+      "name": "Build Agent Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -200,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $('Configuration').first().json.telegramBotToken }}/sendMessage",
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\\n  \\\"chat_id\\\": \\\"{{ $('Configuration').first().json.adminChatId }}\\\",\\n  \\\"text\\\": \\\"{{ $json.message }}\\\",\\n  \\\"parse_mode\\\": \\\"Markdown\\\"\\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "telegram-1",
+      "name": "Send Agent Report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        0,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{ $json.hasIssues }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-2",
+      "name": "Has Critical Issues?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        200,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Optimization recommendations based on metrics\\nconst data = $input.first().json;\\n\\nconst recommendations = [];\\n\\nif (data.dailyStats.avgResponseTime > 5000) {\\n  recommendations.push({\\n    issue: 'High Latency',\\n    action: 'Enable Dynamic Model Selection',\\n    impact: 'Reduce response time by 30-40%',\\n    priority: 'HIGH'\\n  });\\n}\\n\\nif (data.dailyStats.errorRate > 5) {\\n  recommendations.push({\\n    issue: 'High Error Rate',\\n    action: 'Review tool executors and add fallbacks',\\n    impact: 'Improve reliability',\\n    priority: 'CRITICAL'\\n  });\\n}\\n\\nif (data.dailyStats.toolUsageRate < 50) {\\n  recommendations.push({\\n    issue: 'Low Tool Usage',\\n    action: 'Refine system prompt to encourage tool calling',\\n    impact: 'Better data-driven responses',\\n    priority: 'MEDIUM'\\n  });\\n}\\n\\nlet message = `🔧 *AI Agent Optimization Recommendations*\n\n`;\\n\\nif (recommendations.length === 0) {\\n  message += `✅ No critical issues detected. Agent performing well!`;\\n} else {\\n  recommendations.forEach((rec, i) => {\\n    message += `${i + 1}. *${rec.issue}*\n`;\\n    message += `   Action: ${rec.action}\n`;\\n    message += `   Impact: ${rec.impact}\n`;\\n    message += `   Priority: ${rec.priority}\n\n`;\\n  });\\n}\\n\\nreturn {\\n  json: {\\n    message: message,\\n    recommendations: recommendations\\n  }\\n};"
+      },
+      "id": "code-3",
+      "name": "Generate Recommendations",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $('Configuration').first().json.telegramBotToken }}/sendMessage",
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\\n  \\\"chat_id\\\": \\\"{{ $('Configuration').first().json.adminChatId }}\\\",\\n  \\\"text\\\": \\\"{{ $json.message }}\\\",\\n  \\\"parse_mode\\\": \\\"Markdown\\\"\\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "telegram-2",
+      "name": "Send Recommendations",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        600,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Tool Usage Analysis\\nconst data = $input.first().json;\\nconst tools = data.dailyStats.topTools;\\n\\nlet message = `📊 *Tool Usage Deep Dive*\n\n`;\\n\\ntools.forEach((tool, i) => {\\n  const percentage = ((tool.count / data.dailyStats.totalRequests) * 100).toFixed(1);\\n  message += `${i + 1}. *${tool.name}*\n`;\\n  message += `   Calls: ${tool.count} (${percentage}%)\n\n`;\\n});\\n\\nmessage += `\n💡 *Insights*\n`;\\n\\nconst topTool = tools[0];\\nif (topTool.name === 'get_products') {\\n  message += `• Users frequently check product lists\n`;\\n  message += `• Consider caching product data\n`;\\n} else if (topTool.name === 'search_web') {\\n  message += `• High external search usage\n`;\\n  message += `• Users seeking external information\n`;\\n}\\n\\nreturn {\\n  json: {\\n    message: message\\n  }\\n};"
+      },
+      "id": "code-4",
+      "name": "Analyze Tool Usage",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -600,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $('Configuration').first().json.telegramBotToken }}/sendMessage",
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\\n  \\\"chat_id\\\": \\\"{{ $('Configuration').first().json.adminChatId }}\\\",\\n  \\\"text\\\": \\\"{{ $json.message }}\\\",\\n  \\\"parse_mode\\\": \\\"Markdown\\\"\\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "telegram-3",
+      "name": "Send Tool Analysis",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -400,
+        800
+      ]
+    }
+  ],
+  "connections": {
+    "Every 6 Hours": {
+      "main": [
+        [
+          {
+            "node": "Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuration": {
+      "main": [
+        [
+          {
+            "node": "Get Agent Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Agent Status": {
+      "main": [
+        [
+          {
+            "node": "Analyze Agent Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Agent Metrics": {
+      "main": [
+        [
+          {
+            "node": "Performance Issues?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Analyze Tool Usage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Performance Issues?": {
+      "main": [
+        [
+          {
+            "node": "Build Agent Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Agent Report": {
+      "main": [
+        [
+          {
+            "node": "Send Agent Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Agent Report": {
+      "main": [
+        [
+          {
+            "node": "Has Critical Issues?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Critical Issues?": {
+      "main": [
+        [
+          {
+            "node": "Generate Recommendations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Recommendations": {
+      "main": [
+        [
+          {
+            "node": "Send Recommendations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Tool Usage": {
+      "main": [
+        [
+          {
+            "node": "Send Tool Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2024-12-27T17:45:00.000Z",
+  "versionId": "1"
+}

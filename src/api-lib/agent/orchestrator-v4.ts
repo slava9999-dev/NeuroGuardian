@@ -297,7 +297,7 @@ export async function orchestrateV4(
   const answerStart = Date.now();
   console.log('💬 V4 Phase 3: Generating answer...');
 
-  const answerResult = await callAnswerer(message, toolResults, context);
+  const answerResult = await callAnswerer(message, toolResults, context, conversationHistory);
   const answeringTimeMs = Date.now() - answerStart;
   tokensUsed += answerResult.tokensUsed;
 
@@ -514,7 +514,8 @@ function extractUrlsFromResult(result: { success: boolean; data?: unknown }): st
 async function callAnswerer(
   originalMessage: string,
   toolResults: ToolResult[],
-  _context: UserContext
+  _context: UserContext,
+  conversationHistory?: Array<{ role: string; content: string }>
 ): Promise<{ success: boolean; answer?: Answer; error?: string; tokensUsed: number }> {
   const systemPrompt = buildAnswererPrompt();
 
@@ -527,7 +528,14 @@ async function callAnswerer(
     available_urls: tr.urls,
   }));
 
-  const userMessage = `Пользователь спросил: "${originalMessage}"
+  // Include last 3 messages for context (if available)
+  const recentHistory = conversationHistory?.slice(-6) || []; // Last 3 exchanges (user + assistant)
+  const historyContext =
+    recentHistory.length > 0
+      ? `\n\nПредыдущий контекст беседы:\n${recentHistory.map(h => `${h.role === 'user' ? 'Пользователь' : 'Ассистент'}: ${h.content}`).join('\n')}`
+      : '';
+
+  const userMessage = `Пользователь спросил: "${originalMessage}"${historyContext}
 
 Результаты выполнения инструментов:
 ${JSON.stringify(toolResultsSummary, null, 2)}
@@ -540,11 +548,32 @@ ${JSON.stringify(toolResultsSummary, null, 2)}
   ];
 
   try {
+    // OPTIMIZATION: Choose model based on complexity
+    // Use gpt-4o-mini for simple queries (faster, cheaper)
+    // Use gpt-4o for complex queries requiring synthesis
+    const hasSearchWeb = toolResults.some(tr => tr.tool === 'search_web');
+    const hasComplexAnalytics = toolResults.some(tr =>
+      ['get_abc_analysis', 'calculate_unit_economics', 'get_stock_forecast'].includes(tr.tool)
+    );
+    const hasMultipleTools = toolResults.length > 2;
+
+    // Use gpt-4o for:
+    // - Web search results (need to synthesize external data)
+    // - Complex analytics (need to explain nuanced business insights)
+    // - Multiple tool results (need to combine data from different sources)
+    const useAdvancedModel = hasSearchWeb || hasComplexAnalytics || hasMultipleTools;
+
+    const preferredModel = useAdvancedModel ? 'gpt-4o' : 'gpt-4o-mini';
+
+    console.log(
+      `🤖 Answerer model: ${preferredModel} (search=${hasSearchWeb}, analytics=${hasComplexAnalytics}, tools=${toolResults.length})`
+    );
+
     const result = await callLLMWithFallback(messages, {
       temperature: 0.3,
       maxTokens: 1500,
       jsonSchema: ANSWER_JSON_SCHEMA,
-      preferredModel: 'gpt-4o', // Better model for final answer
+      preferredModel,
     });
 
     // Safe JSON parse with fallback

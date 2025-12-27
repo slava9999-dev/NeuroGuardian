@@ -22,6 +22,7 @@ export {
   isValidPercentage,
   isValidEmail,
   parsePeriod,
+  parseOzonApiKey,
 } from './validation.js';
 
 /**

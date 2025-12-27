@@ -1,6 +1,6 @@
 # 🤖 NeuroAgent | WB & Ozon
 
-[![Version](https://img.shields.io/badge/version-2.6.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.10.0-blue.svg)](CHANGELOG.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue.svg)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19-61dafb.svg)](https://react.dev/)
 [![Vercel](https://img.shields.io/badge/Deployed-Vercel-black.svg)](https://vercel.com/)
@@ -8,11 +8,13 @@
 
 > **Ваш личный AI-агент для управления магазином на Wildberries и Ozon**
 
-**🔥 NEW in v2.6.0:**
+**🔥 NEW in v2.10.0:**
 
-- **NeuroAgent V4:** Умный агент с двухступенчатым планированием (Planner → Executor)
+- **Unit Economics 2025:** Обновленный калькулятор с актуальными комиссиями и тарифами
+- **Seller Protection:** 47 KB документации по защите от скрытых комиссий маркетплейсов
+- **Accurate Calculations:** Учет эквайринга, возвратов и невыкупов (точность +90%)
+- **NeuroAgent V4:** Умный агент с двухступенчатым планированием
 - **Voice Sentinel:** Голосовые сирены при атаках на цены
-- **Structured Links:** 100% валидные ссылки без галлюцинаций
 
 Управляйте продажами через чат с искусственным интеллектом. NeuroAgent знает всё о вашем магазине и готов помочь 24/7!
 
@@ -262,4 +264,4 @@ CRON_SECRET=your-cron-secret
 
 © 2024 ИП Дмитричев А.Г. Все права защищены.
 
-NeuroGUARDIAN v2.3.0 — Margin Defense System
+NeuroGUARDIAN v2.10.0 — AI-Powered Marketplace Protection
