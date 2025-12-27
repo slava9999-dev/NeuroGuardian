@@ -346,22 +346,22 @@ export function AgentPage() {
               <QuickActionButton
                 icon="📦"
                 label="Товары"
-                onClick={() => handleSendMessage('покажи мои товары')}
+                onClick={() => handleSendMessage('покажи все мои товары')}
               />
               <QuickActionButton
                 icon="📊"
                 label="Продажи"
-                onClick={() => handleSendMessage('покажи продажи за неделю')}
+                onClick={() => handleSendMessage('покажи статистику продаж за последнюю неделю')}
               />
               <QuickActionButton
                 icon="🛡️"
                 label="Защита"
-                onClick={() => handleSendMessage('защити все товары')}
+                onClick={() => handleSendMessage('защити все мои товары от демпинга')}
               />
               <QuickActionButton
                 icon="💰"
                 label="Экономика"
-                onClick={() => handleSendMessage('рассчитай юнит-экономику')}
+                onClick={() => handleSendMessage('рассчитай юнит-экономику для всех товаров')}
               />
             </motion.div>
           </motion.div>
