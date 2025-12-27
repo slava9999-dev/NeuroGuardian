@@ -7,7 +7,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql } from '@vercel/postgres';
 
-import { validateTelegramInitData } from '../../src/api-lib/lib/index.js';
+import { validateTelegramInitData, logger } from '../../src/api-lib/lib/index.js';
 
 import {
   getUserById,
