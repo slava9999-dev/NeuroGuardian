@@ -47,19 +47,17 @@ export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
 
       // REAL: Save API key to database
       await settingsApi.saveApiKey(selectedMarketplace!, fullKey, clientId);
-      console.log('✅ API key saved successfully');
 
       setStep('sync');
 
       // REAL: Sync products from marketplace
       const syncResult = await productsApi.syncProducts(selectedMarketplace!);
-      console.log('✅ Products synced:', syncResult);
 
       setSyncedCount(syncResult.count || 0);
       hapticFeedback('success');
       setStep('complete');
     } catch (err: unknown) {
-      console.error('❌ Error:', err);
+      // Error handling without logging sensitive context
       const errorMessage = err instanceof Error ? err.message : 'Ошибка сохранения ключа';
       const apiError = err as { response?: { data?: { error?: string } } };
       setError(apiError.response?.data?.error || errorMessage);
