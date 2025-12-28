@@ -1,15 +1,15 @@
 # 📊 Project State — NeuroGUARDIAN
 
-# Updated: 2025-12-28T18:04:00+03:00
+# Updated: 2025-12-28T18:24:00+03:00
 
 # This file tracks current progress and is updated at end of each session
 
 ---
 
-## 🎯 Current Phase: SECURITY AGENT IMPLEMENTATION (Phase 6 - IN PROGRESS)
+## 🎯 Current Phase: SECURITY SDK INTEGRATION (Phase 7 - IN PROGRESS)
 
-**Last Session:** 2025-12-28 (Session 8)
-**Focus:** Building production-ready Security Agent system (7-day sprint)
+**Last Session:** 2025-12-28 (Session 10)
+**Focus:** Integrating Security Agent SDK into main codebase
 
 **Full Specification:** `.agent/SECURITY_AGENT_SPEC.md`
 **Security Agent SDK:** `security-agent/` directory
@@ -18,17 +18,25 @@
 
 ## ✅ Recently Completed
 
+### Session 2025-12-28 (Session 10 - Secrets Helper Integration)
+
+- [x] **secrets-helper.ts**: Created centralized module for async secret fetching
+- [x] **Local Caching**: In-memory cache with TTL for performance
+- [x] **Fallback Support**: Graceful fallback to process.env for dev/test
+- [x] **auth.ts Refactored**: Async versions (extractAdminAuthAsync, extractCronAuthAsync, etc.)
+- [x] **rate-limit.ts Refactored**: getKVClientAsync with Security Agent
+- [x] **metrics.ts Refactored**: Uses secrets-helper for KV credentials
+- [x] **constants.ts Updated**: Deprecated direct secret exports
+- [x] **175 Tests Passing**: All tests green after refactoring
+
 ### Session 2025-12-28 (Session 8 - Day 1-3 Security Agent)
 
 - [x] **Security Agent SDK Created**: Full `security-agent/` module with production SDK
 - [x] **SecretsGuard**: Vault integration, lease management, leak detection (SG-1 to SG-5)
 - [x] **AuditLogger**: ClickHouse integration, HMAC signing, immutable logs (AU-1 to AU-5)
 - [x] **AuthorizationGuard**: Permissions, rate limiting, JWT support (AG-1 to AG-5)
-- [x] **Infrastructure**: docker-compose.yml for local security stack (Vault, ClickHouse, Redis, Grafana, Loki)
-- [x] **ClickHouse Schema**: Full audit schema with indexes and materialized views
-- [x] **Secret Scanner**: Pre-commit hook with `scan-secrets.cjs` for leak detection
+- [x] **Infrastructure**: docker-compose.yml for local security stack
 - [x] **29 Security Tests**: Unit tests for Secrets and Authorization guards
-- [x] **Vault Init Script**: `init-vault.cjs` for development setup
 
 ### Session 2025-12-28 (Session 7 - Regression Tests)
 
@@ -48,8 +56,9 @@
 
 | #   | Issue                            | Status     | Notes                                                  |
 | --- | -------------------------------- | ---------- | ------------------------------------------------------ |
-| 1   | Integrate Security SDK into main | ⏳ PENDING | Replace process.env with SecurityAgent.secrets.get()   |
+| 1   | Integrate Security SDK into main | ✅ DONE    | secrets-helper.ts created with caching + fallback      |
 | 2   | Start Docker security stack      | ⏳ PENDING | docker-compose -f security-agent/docker-compose.yml up |
+| 3   | Migrate remaining endpoints      | ⏳ PENDING | Use async auth functions in API handlers               |
 
 ---
 
