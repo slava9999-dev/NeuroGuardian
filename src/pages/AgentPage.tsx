@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAppStore, useChatStore, type ChatMessage } from '../stores';
 import { hapticFeedback, openExternalLink } from '../lib/telegram';
 import { agentApi, type AgentMessage, type AgentResponse } from '../lib/agentApi';
+import DOMPurify from 'dompurify';
 
 export function AgentPage() {
   const user = useAppStore(state => state.user);
@@ -659,7 +660,10 @@ function MessageBubble({ message, onConfirm }: MessageBubbleProps) {
             }
           }}
           dangerouslySetInnerHTML={{
-            __html: formatMessage(message.content),
+            __html: DOMPurify.sanitize(formatMessage(message.content), {
+              ALLOWED_TAGS: ['a', 'span', 'code', 'br', 'strong', 'em'],
+              ALLOWED_ATTR: ['href', 'target', 'rel', 'class'],
+            }),
           }}
         />
 

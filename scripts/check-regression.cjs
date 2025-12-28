@@ -166,6 +166,169 @@ if (!packageJson.version) {
 }
 
 // ============================================
+// Check 5: SQL Injection Prevention
+// ============================================
+info('Checking for SQL injection patterns...');
+
+// NOTE: @vercel/postgres uses tagged template literals (sql`...${value}...`)
+// which are SAFE - they automatically parameterize queries.
+// We only warn about genuine unsafe patterns like string concatenation.
+
+const unsafeSqlPatterns = [
+  // String concatenation in SQL (genuinely dangerous)
+  /\.query\s*\(\s*['"`].*\+/,  // .query('SELECT...' + variable)
+  /\.execute\s*\(\s*['"`].*\+/,  // .execute('SELECT...' + variable)
+  // String interpolation in regular strings (not tagged templates)
+  /['"]SELECT[^'"`]*\$\{/,  // 'SELECT...${' (untagged string)
+  /['"]INSERT[^'"`]*\$\{/,
+  /['"]UPDATE[^'"`]*\$\{/,
+  /['"]DELETE[^'"`]*\$\{/,
+];
+
+const serviceFiles = fs.existsSync('src/api-lib/services') 
+  ? scanDirectory('src/api-lib/services', ['.ts']) 
+  : [];
+
+let sqlWarnings = 0;
+serviceFiles.forEach(file => {
+  const content = fs.readFileSync(file, 'utf-8');
+  
+  unsafeSqlPatterns.forEach((pattern) => {
+    const lines = content.split('\n');
+    
+    lines.forEach((line, lineNum) => {
+      if (pattern.test(line) && !line.trim().startsWith('//') && !line.trim().startsWith('*')) {
+        // Skip if using tagged template (sql`...`) - this is safe
+        if (line.includes('sql`') || line.includes('await sql`')) {
+          return; // Safe - @vercel/postgres parameterizes these
+        }
+        warning(`Potential SQL injection vector in ${file}:${lineNum + 1}`);
+        sqlWarnings++;
+      }
+    });
+  });
+});
+
+if (sqlWarnings === 0) {
+  success('No SQL injection vulnerabilities detected');
+} else {
+  success('SQL injection check completed');
+}
+
+
+// ============================================
+// Check 6: XSS Prevention in Agent Responses
+// ============================================
+info('Checking for XSS prevention...');
+
+const agentFiles = [
+  'src/api-lib/agent/orchestrator-v4.ts',
+  'src/pages/AgentPage.tsx',
+].filter(f => fs.existsSync(f));
+
+agentFiles.forEach(file => {
+  const content = fs.readFileSync(file, 'utf-8');
+  
+  // Check for dangerous innerHTML usage
+  if (/dangerouslySetInnerHTML/.test(content) && !/DOMPurify|sanitize/i.test(content)) {
+    warning(`dangerouslySetInnerHTML without sanitization in ${file}`);
+  }
+});
+
+success('XSS prevention check completed');
+
+// ============================================
+// Check 7: CI Pipeline Integrity
+// ============================================
+info('Checking CI pipeline integrity...');
+
+const ciPath = '.github/workflows/ci.yml';
+if (fs.existsSync(ciPath)) {
+  const ciContent = fs.readFileSync(ciPath, 'utf-8');
+  
+  // ✅ Must run tests
+  if (!/npm test/.test(ciContent)) {
+    error('REGRESSION: CI pipeline does not run tests!');
+    hasErrors = true;
+  }
+  
+  // ✅ Must run typecheck
+  if (!/typecheck/.test(ciContent)) {
+    error('REGRESSION: CI pipeline does not run typecheck!');
+    hasErrors = true;
+  }
+  
+  // ✅ Must run lint
+  if (!/npm run lint/.test(ciContent)) {
+    error('REGRESSION: CI pipeline does not run lint!');
+    hasErrors = true;
+  }
+  
+  // ✅ Must run build
+  if (!/npm run build/.test(ciContent)) {
+    error('REGRESSION: CI pipeline does not run build!');
+    hasErrors = true;
+  }
+  
+  if (!hasErrors) {
+    success('CI pipeline integrity verified');
+  }
+} else {
+  error('REGRESSION: CI pipeline file missing!');
+  hasErrors = true;
+}
+
+// ============================================
+// Check 8: Rate Limiting Presence
+// ============================================
+info('Checking for rate limiting implementation...');
+
+const rateLimitingFiles = [
+  'api/handlers/agent-v4.ts',
+  'src/api-lib/lib/rate-limiter.ts',
+  'src/api-lib/services/rate-limiter.ts',
+];
+
+let hasRateLimiting = false;
+rateLimitingFiles.forEach(file => {
+  if (fs.existsSync(file)) {
+    const content = fs.readFileSync(file, 'utf-8');
+    if (/rateLimit|rate[_-]?limit|throttle/i.test(content)) {
+      hasRateLimiting = true;
+    }
+  }
+});
+
+if (!hasRateLimiting) {
+  warning('No rate limiting implementation detected - consider adding for production');
+} else {
+  success('Rate limiting implementation found');
+}
+
+// ============================================
+// Check 9: Test Files Exist for Critical Functions
+// ============================================
+info('Checking test coverage for critical functions...');
+
+const criticalTestFiles = [
+  'tests/agent/orchestrator-v4.test.ts',
+  'tests/agent/tools.test.ts',
+  'tests/sentinel/sentinel-logic.test.ts',
+];
+
+let missingTests = false;
+criticalTestFiles.forEach(file => {
+  if (!fs.existsSync(file)) {
+    warning(`Missing test file: ${file}`);
+    missingTests = true;
+  }
+});
+
+if (!missingTests) {
+  success('Critical test files present');
+}
+
+// ============================================
 // Final result
 // ============================================
 console.log('');

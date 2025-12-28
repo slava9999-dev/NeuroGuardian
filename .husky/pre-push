@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# ============================================
+# Pre-push hook - Full Verification Before Push
+# ============================================
+# Runs ALL checks before pushing to remote
+# This is the last line of defense before CI
+# ============================================
+
+echo ""
+echo "🚀 Pre-push verification starting..."
+echo "============================================"
+
+# Step 1: TypeScript check
+echo ""
+echo "📝 Step 1/4: TypeScript type checking..."
+npm run typecheck || {
+    echo ""
+    echo "❌ TypeScript errors found!"
+    echo "Fix type errors before pushing."
+    exit 1
+}
+echo "✅ TypeScript check passed"
+
+# Step 2: Build check
+echo ""
+echo "🔨 Step 2/4: Production build check..."
+npm run build || {
+    echo ""
+    echo "❌ Build failed!"
+    echo "Fix build errors before pushing."
+    exit 1
+}
+echo "✅ Build check passed"
+
+# Step 3: Run tests
+echo ""
+echo "🧪 Step 3/4: Running test suite..."
+npm test || {
+    echo ""
+    echo "❌ Tests failed!"
+    echo "Fix failing tests before pushing."
+    exit 1
+}
+echo "✅ All tests passed"
+
+# Step 4: Regression checks
+echo ""
+echo "🔍 Step 4/4: Running regression checks..."
+npm run check:regression || {
+    echo ""
+    echo "❌ Regression checks failed!"
+    echo "Fix regression issues before pushing."
+    exit 1
+}
+echo "✅ Regression checks passed"
+
+# All passed
+echo ""
+echo "============================================"
+echo "🎉 All pre-push checks PASSED!"
+echo "Safe to push to remote."
+echo "============================================"
