@@ -42,19 +42,23 @@ import {
   handleAdminCloneUser,
   handleSendReminders,
   handleReferral,
-} from './handlers/admin.js';
+} from '../src/api-lib/handlers/admin.js';
 
 // Auth handlers
-import { handleAuth, handleSettings, handlePlans } from './handlers/auth.js';
+import { handleAuth, handleSettings, handlePlans } from '../src/api-lib/handlers/auth.js';
 
 // Product handlers
-import { handleProducts, handleSyncProducts, handleBatchSetStopLoss } from './handlers/products.js';
+import {
+  handleProducts,
+  handleSyncProducts,
+  handleBatchSetStopLoss,
+} from '../src/api-lib/handlers/products.js';
 
 // Payment handlers
-import { handleCreatePayment, handlePaymentWebhook } from './handlers/payments.js';
+import { handleCreatePayment, handlePaymentWebhook } from '../src/api-lib/handlers/payments.js';
 
 // Sentinel handlers
-import { handleCheckPrices } from './handlers/sentinel.js';
+import { handleCheckPrices } from '../src/api-lib/handlers/sentinel.js';
 import {
   handleSentinelStatus,
   handleDefenseHistory,
@@ -62,30 +66,34 @@ import {
   handleUpdateSentinelStatus,
   handleLogDefense,
   handleBulkLogDefense,
-} from './handlers/sentinel-status.js';
+} from '../src/api-lib/handlers/sentinel-status.js';
 
 // Agent handlers (V4 only)
 import {
   handleAgentV4Secure,
   handleAgentV4Status,
   handleAgentV4ConfirmSecure,
-} from './handlers/agent-v4.js';
+} from '../src/api-lib/handlers/agent-v4.js';
 
 // Chat handlers
 import {
   handleGetChatHistory,
   handleSaveChatHistory,
   handleClearChatHistory,
-} from './handlers/chat.js';
+} from '../src/api-lib/handlers/chat.js';
 
 // Analytics handlers
-import { handleGetAnalytics, handleGetSystemMetrics } from './handlers/analytics.js';
+import { handleGetAnalytics, handleGetSystemMetrics } from '../src/api-lib/handlers/analytics.js';
 
 // Ops Panel handlers
-import { handleOpsEvents, handleOpsAudit, handleOpsDashboard } from './handlers/ops.js';
+import {
+  handleOpsEvents,
+  handleOpsAudit,
+  handleOpsDashboard,
+} from '../src/api-lib/handlers/ops.js';
 
 // Marketplace Accounts
-import { handleMarketplaceAccounts } from './handlers/marketplace-accounts.js';
+import { handleMarketplaceAccounts } from '../src/api-lib/handlers/marketplace-accounts.js';
 
 // Utilities
 import {

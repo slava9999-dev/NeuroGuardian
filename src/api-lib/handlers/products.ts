@@ -12,13 +12,13 @@ import {
   sanitizeInput,
   isSubscriptionActive,
   getProductLimit,
-} from '../../src/api-lib/lib/index.js';
+} from '../lib/index.js';
 import {
   getUserById,
   getProductsByUserId,
   updateProductMinPrice,
   fetchWbStocks,
-} from '../../src/api-lib/services/index.js';
+} from '../services/index.js';
 
 // fetchWithRetry moved to api-lib/lib/index.js
 

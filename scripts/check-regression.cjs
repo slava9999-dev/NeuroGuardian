@@ -45,8 +45,8 @@ info('Checking critical files...');
 
 const criticalFiles = [
   'src/api-lib/lib/logger.ts',
-  'api/handlers/admin.ts',
-  'api/handlers/sentinel.ts',
+  'src/api-lib/handlers/admin.ts',
+  'src/api-lib/handlers/sentinel.ts',
   '.gitignore',
   'package.json',
   'tsconfig.json',
@@ -69,7 +69,7 @@ if (!hasErrors) {
 info('Verifying security fixes...');
 
 // Check for API key logging
-const adminContent = fs.readFileSync('api/handlers/admin.ts', 'utf-8');
+const adminContent = fs.readFileSync('src/api-lib/handlers/admin.ts', 'utf-8');
 if (/console\.log.*key.*length/i.test(adminContent)) {
   error('REGRESSION: API key length logging detected in admin.ts!');
   hasErrors = true;
@@ -284,7 +284,7 @@ if (fs.existsSync(ciPath)) {
 info('Checking for rate limiting implementation...');
 
 const rateLimitingFiles = [
-  'api/handlers/agent-v4.ts',
+  'src/api-lib/handlers/agent-v4.ts',
   'src/api-lib/lib/rate-limiter.ts',
   'src/api-lib/services/rate-limiter.ts',
 ];

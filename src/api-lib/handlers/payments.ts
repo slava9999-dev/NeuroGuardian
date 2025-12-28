@@ -7,14 +7,14 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql } from '@vercel/postgres';
 
 // Import from modular library
-import { SUBSCRIPTION_PLANS, type PlanId } from '../../src/api-lib/lib/index.js';
+import { SUBSCRIPTION_PLANS, type PlanId } from '../lib/index.js';
 import {
   createYookassaPayment,
   activateSubscription,
   updateTransactionStatus,
   getUserById,
-} from '../../src/api-lib/services/index.js';
-import { sendTelegramNotification } from '../../src/api-lib/services/notifications.js';
+} from '../services/index.js';
+import { sendTelegramNotification } from '../services/notifications.js';
 import { getSecurityAgent } from '@neuroguardian/security-agent';
 
 /**
@@ -186,7 +186,7 @@ export async function handlePaymentWebhook(
       // Because isFirstPayment checks for existing 'succeeded' transactions
       let isFirst = false;
       if (referrerId) {
-        const { isFirstPayment } = await import('../../src/api-lib/services/index.js');
+        const { isFirstPayment } = await import('../services/index.js');
         isFirst = await isFirstPayment(userId);
       }
 
@@ -206,7 +206,7 @@ export async function handlePaymentWebhook(
 
       // Apply referral bonus if eligible
       if (referrerId && isFirst) {
-        const { applyReferralBonus } = await import('../../src/api-lib/services/index.js');
+        const { applyReferralBonus } = await import('../services/index.js');
         await applyReferralBonus(referrerId, 500); // Standard 500 RUB bonus
         console.log(`🎁 Referral bonus applied to user ${referrerId}`);
       }

@@ -6,8 +6,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql } from '@vercel/postgres';
 import { createClient } from '@vercel/kv';
-import { validateTelegramInitData, getSecret } from '../../src/api-lib/lib/index.js';
-import { extractCronAuthAsync, extractAdminAuthAsync } from '../../src/api-lib/middleware/auth.js';
+import { validateTelegramInitData, getSecret } from '../lib/index.js';
+import { extractCronAuthAsync, extractAdminAuthAsync } from '../middleware/auth.js';
 
 // ============================================
 // TYPES

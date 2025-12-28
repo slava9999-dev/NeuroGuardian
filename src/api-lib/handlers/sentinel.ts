@@ -7,9 +7,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql } from '@vercel/postgres';
 
-import { validateTelegramInitData, getSecret } from '../../src/api-lib/lib/index.js';
+import { validateTelegramInitData, getSecret } from '../lib/index.js';
 import { getSecurityAgent } from '@neuroguardian/security-agent';
-import { verifyAdminAccessAsync, extractTelegramAuth } from '../../src/api-lib/middleware/auth.js';
+import { verifyAdminAccessAsync, extractTelegramAuth } from '../middleware/auth.js';
 
 import {
   getUserById,
@@ -20,7 +20,7 @@ import {
   setWbZeroStock,
   setWbDefensePrice,
   fetchOzonCurrentPrices,
-} from '../../src/api-lib/services/index.js';
+} from '../services/index.js';
 
 // ============================================
 // TYPES

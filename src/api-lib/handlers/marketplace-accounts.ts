@@ -4,9 +4,9 @@ import {
   addMarketplaceAccount,
   updateMarketplaceAccount,
   deleteMarketplaceAccount,
-} from '../../src/api-lib/services/users.js';
-import { encryptApiKey } from '../../src/api-lib/lib/crypto.js';
-import { sanitizeInput } from '../../src/api-lib/lib/index.js';
+} from '../services/users.js';
+import { encryptApiKey } from '../lib/crypto.js';
+import { sanitizeInput } from '../lib/index.js';
 
 /**
  * Handle marketplace accounts management

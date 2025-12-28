@@ -13,25 +13,17 @@ import {
   checkRateLimit,
   isSubscriptionActive,
   getSecret,
-} from '../../src/api-lib/lib/index.js';
+} from '../lib/index.js';
 
-import { getUserById, getProductsByUserId } from '../../src/api-lib/services/index.js';
+import { getUserById, getProductsByUserId } from '../services/index.js';
 
 // Metrics & Analytics
-import {
-  createAgentMetrics,
-  logAgentMetrics,
-  formatMetricsForLog,
-} from '../../src/api-lib/agent/metrics.js';
+import { createAgentMetrics, logAgentMetrics, formatMetricsForLog } from '../agent/metrics.js';
 
 // V4 Architecture: Two-Phase Pipeline with Structured Output
-import { orchestrateV4, type UserContext } from '../../src/api-lib/agent/orchestrator-v4.js';
+import { orchestrateV4, type UserContext } from '../agent/orchestrator-v4.js';
 import { getSecurityAgent, securityMiddleware } from '@neuroguardian/security-agent';
-import {
-  verifyAdminAccessAsync,
-  extractTelegramAuth,
-  AuthResult,
-} from '../../src/api-lib/middleware/auth.js';
+import { verifyAdminAccessAsync, extractTelegramAuth, AuthResult } from '../middleware/auth.js';
 
 // ============================================
 // TYPE DEFINITIONS
@@ -342,9 +334,8 @@ export async function handleAgentV4Confirm(
     getWbFbsWarehouses,
     updateWbStockFbs,
     updateOzonStockFbs,
-  } = await import('../../src/api-lib/services/marketplace.js');
-  const { updateProductMinPrice, getProductsByUserId } =
-    await import('../../src/api-lib/services/database.js');
+  } = await import('../services/marketplace.js');
+  const { updateProductMinPrice, getProductsByUserId } = await import('../services/database.js');
 
   try {
     let resultMessage = '';
@@ -375,7 +366,7 @@ export async function handleAgentV4Confirm(
 
         // Support account_id if provided
         const accountId = pendingAction.details.account_id as number | undefined;
-        const { getMarketplaceKeys } = await import('../../src/api-lib/services/marketplace.js');
+        const { getMarketplaceKeys } = await import('../services/marketplace.js');
         const keys = await getMarketplaceKeys(userId, accountId);
 
         // Update WB prices
@@ -482,7 +473,7 @@ export async function handleAgentV4Confirm(
         const ozonUpdates = stockUpdates.filter(u => u.marketplace === 'Ozon');
 
         const accountId = pendingAction.details.account_id as number | undefined;
-        const { getMarketplaceKeys } = await import('../../src/api-lib/services/marketplace.js');
+        const { getMarketplaceKeys } = await import('../services/marketplace.js');
         const keys = await getMarketplaceKeys(userId, accountId);
 
         let wbResult: { success: boolean; count: number; error?: string } = {

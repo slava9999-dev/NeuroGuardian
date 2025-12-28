@@ -8,9 +8,9 @@ import { sql } from '@vercel/postgres';
 import { timingSafeEqual } from 'crypto';
 import { getSecurityAgent } from '@neuroguardian/security-agent';
 
-import { getUserById, initializeDatabase } from '../../src/api-lib/services/index.js';
-import { getSecret } from '../../src/api-lib/lib/index.js';
-import { verifyAdminAccessAsync } from '../../src/api-lib/middleware/auth.js';
+import { getUserById, initializeDatabase } from '../services/index.js';
+import { getSecret } from '../lib/index.js';
+import { verifyAdminAccessAsync } from '../middleware/auth.js';
 
 /**
  * Helper to get Telegram secrets
@@ -834,9 +834,8 @@ export async function handleReferral(
   }
 
   // Import validation
-  const { validateTelegramInitData, sanitizeInput } =
-    await import('../../src/api-lib/lib/index.js');
-  const { getUserById } = await import('../../src/api-lib/services/index.js');
+  const { validateTelegramInitData, sanitizeInput } = await import('../lib/index.js');
+  const { getUserById } = await import('../services/index.js');
 
   const initData = sanitizeInput(
     (req.headers['x-init-data'] as string) || req.body?.initData || ''

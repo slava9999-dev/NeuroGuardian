@@ -7,9 +7,9 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql } from '@vercel/postgres';
 
 // Import from modular library
-import { SUBSCRIPTION_PLANS } from '../../src/api-lib/lib/index.js';
+import { SUBSCRIPTION_PLANS } from '../lib/index.js';
 
-import { getUserById } from '../../src/api-lib/services/index.js';
+import { getUserById } from '../services/index.js';
 
 /**
  * Handle authentication action
@@ -22,8 +22,8 @@ export async function handleAuth(
   res: VercelResponse,
   initData: string
 ): Promise<VercelResponse> {
-  const { validateTelegramInitData } = await import('../../src/api-lib/lib/index.js');
-  const { createOrUpdateUser, getUserById } = await import('../../src/api-lib/services/index.js');
+  const { validateTelegramInitData } = await import('../lib/index.js');
+  const { createOrUpdateUser, getUserById } = await import('../services/index.js');
 
   const validation = validateTelegramInitData(initData);
   if (!validation.valid || !validation.user) {
@@ -103,7 +103,7 @@ export async function handleSettings(
   userId: number
 ): Promise<VercelResponse> {
   // Import crypto for API key encryption
-  const { encryptApiKey } = await import('../../src/api-lib/lib/crypto.js');
+  const { encryptApiKey } = await import('../lib/crypto.js');
 
   if (req.method === 'GET') {
     const user = await getUserById(userId);
@@ -198,7 +198,7 @@ export async function handlePlans(
   userId: number
 ): Promise<VercelResponse> {
   // Import isFirstPayment from database
-  const { isFirstPayment } = await import('../../src/api-lib/services/database.js');
+  const { isFirstPayment } = await import('../services/database.js');
 
   const showDiscount = await isFirstPayment(userId);
 

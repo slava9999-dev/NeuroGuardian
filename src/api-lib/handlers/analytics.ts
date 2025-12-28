@@ -6,7 +6,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql } from '@vercel/postgres';
 
-import { extractCronAuthAsync, extractAdminAuthAsync } from '../../src/api-lib/middleware/auth.js';
+import { extractCronAuthAsync, extractAdminAuthAsync } from '../middleware/auth.js';
 
 /**
  * Handle get-analytics action

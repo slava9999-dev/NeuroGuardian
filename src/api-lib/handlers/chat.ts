@@ -4,12 +4,8 @@
 // ============================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { validateTelegramInitData, sanitizeInput } from '../../src/api-lib/lib/index.js';
-import {
-  getChatHistory,
-  saveChatHistory,
-  clearChatHistory,
-} from '../../src/api-lib/services/database.js';
+import { validateTelegramInitData, sanitizeInput } from '../lib/index.js';
+import { getChatHistory, saveChatHistory, clearChatHistory } from '../services/database.js';
 
 /**
  * GET CHAT HISTORY

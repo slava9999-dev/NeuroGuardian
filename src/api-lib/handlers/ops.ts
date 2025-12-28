@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { verifyAdminAccessAsync } from '../../src/api-lib/middleware/auth.js';
-import { OpsLogger } from '../../src/api-lib/services/ops-logger.js';
-import { sendAuthError } from '../../src/api-lib/middleware/auth.js';
+import { verifyAdminAccessAsync } from '../middleware/auth.js';
+import { OpsLogger } from '../services/ops-logger.js';
+import { sendAuthError } from '../middleware/auth.js';
 import { sql } from '@vercel/postgres';
 
 export async function handleOpsEvents(req: VercelRequest, res: VercelResponse) {
