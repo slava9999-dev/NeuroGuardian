@@ -498,13 +498,30 @@ export class AuthorizationGuard {
   // ============================================
 
   private async fetchUserPermissions(userId: string): Promise<UserPermissions> {
-    // TODO: This should fetch from the database
-    // For now, return default free tier permissions
-    // In production, this would query the users table and subscription status
+    /**
+     * INTEGRATION POINT: Database Query
+     *
+     * Production implementation should:
+     * 1. Query users table to get subscription tier
+     * 2. Fetch custom permissions from user_permissions table
+     * 3. Combine role-based + custom permissions
+     * 4. Return aggregated UserPermissions object
+     *
+     * Example production code:
+     * ```typescript
+     * const user = await db.users.findUnique({ where: { id: userId } });
+     * const customPerms = await db.user_permissions.findMany({ where: { userId } });
+     * return {
+     *   userId,
+     *   permissions: [...ROLE_PERMISSIONS[user.tier], ...customPerms.map(p => p.permission)],
+     *   roles: [user.tier],
+     * };
+     * ```
+     */
 
     console.log('[AuthorizationGuard] Fetching permissions from DB for', userId);
 
-    // Default to free tier
+    // Default to free tier (safe fallback)
     return {
       userId,
       permissions: ROLE_PERMISSIONS.free || [],

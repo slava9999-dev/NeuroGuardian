@@ -50,19 +50,25 @@ async function getKVClient() {
   const agent = getSecurityAgent();
   if (!agent.isInitialized()) await agent.initialize();
 
-  const url = (await agent.secrets.get({
-    userId: 'system',
-    key: 'kv_rest_api_url',
-    purpose: 'kv_client_init',
-    ttl: 300
-  })).value || process.env.KV_REST_API_URL;
+  const url =
+    (
+      await agent.secrets.get({
+        userId: 'system',
+        key: 'kv_rest_api_url',
+        purpose: 'kv_client_init',
+        ttl: 300,
+      })
+    ).value || process.env.KV_REST_API_URL;
 
-  const token = (await agent.secrets.get({
-    userId: 'system',
-    key: 'kv_rest_api_token',
-    purpose: 'kv_client_init',
-    ttl: 300
-  })).value || process.env.KV_REST_API_TOKEN;
+  const token =
+    (
+      await agent.secrets.get({
+        userId: 'system',
+        key: 'kv_rest_api_token',
+        purpose: 'kv_client_init',
+        ttl: 300,
+      })
+    ).value || process.env.KV_REST_API_TOKEN;
 
   if (url && token) {
     return createClient({
@@ -93,7 +99,7 @@ export async function handleAgentV4(
   // 1. Authentication
   // Support admin API key for testing (bypasses Telegram validation)
   const authHeader = req.headers['authorization'] as string;
-  
+
   const agent = getSecurityAgent();
   if (!agent.isInitialized()) {
     await agent.initialize();
@@ -101,13 +107,13 @@ export async function handleAgentV4(
 
   let adminApiKey: string | undefined;
   try {
-     const resp = await agent.secrets.get({
-        userId: 'system', 
-        key: 'admin_api_key',
-        purpose: 'agent_v4_test_bypass',
-        ttl: 60
-     });
-     adminApiKey = resp.value;
+    const resp = await agent.secrets.get({
+      userId: 'system',
+      key: 'admin_api_key',
+      purpose: 'agent_v4_test_bypass',
+      ttl: 60,
+    });
+    adminApiKey = resp.value;
   } catch {
     // Fallback or ignore if not configured
   }
@@ -118,14 +124,14 @@ export async function handleAgentV4(
     // Admin bypass for testing
     userId = parseInt(req.body.telegramId);
     console.log(`🔑 Admin API access for agent: user ${userId}`);
-    
+
     // Audit this bypass
     await agent.audit.log({
-        event: 'auth.bypass.admin_key',
-        category: 'auth',
-        severity: 'warning',
-        userId: userId.toString(),
-        metadata: { mechanism: 'admin_api_key' }
+      event: 'auth.bypass.admin_key',
+      category: 'auth',
+      severity: 'warning',
+      userId: userId.toString(),
+      metadata: { mechanism: 'admin_api_key' },
     });
   } else {
     // Normal Telegram authentication
@@ -228,7 +234,7 @@ export async function handleAgentV4(
         ); // 1 hour TTL
 
         // Inject taskId into the response actions so UI knows what to confirm
-        (result.actions[0] as any).taskId = taskId;
+        (result.actions[0] as Record<string, unknown>).taskId = taskId;
       }
     } catch (e) {
       console.warn('Failed to save chat state to KV:', e);

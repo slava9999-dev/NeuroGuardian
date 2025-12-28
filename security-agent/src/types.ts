@@ -44,7 +44,16 @@ export interface SecretMetadata {
 
 export const AuditEventSchema = z.object({
   event: z.string().min(1),
-  category: z.enum(['security', 'data', 'auth', 'admin', 'workflow']),
+  category: z.enum([
+    'security',
+    'data',
+    'auth',
+    'admin',
+    'workflow',
+    'quality',
+    'deployment',
+    'reporting',
+  ]),
   severity: z.enum(['info', 'warning', 'critical']).default('info'),
   userId: z.string().min(1),
   before: z.record(z.unknown()).optional(),

@@ -12,6 +12,10 @@
 import { SecretsGuard, createEnvProxy } from './secrets.js';
 import { AuditLogger, createAuditContext } from './audit.js';
 import { AuthorizationGuard } from './authz.js';
+import { N8nGuardian } from './n8n.js';
+import { RegressionShield } from './regression.js';
+import { AIAgentGuard } from './ai-guard.js';
+import { EmergencyResponse } from './emergency.js';
 import type { SecurityAgentConfig } from './types.js';
 
 // Re-export all types
@@ -21,6 +25,10 @@ export * from './types.js';
 export { SecretsGuard, createEnvProxy, generateSignature, verifySignature } from './secrets.js';
 export { AuditLogger, createAuditContext } from './audit.js';
 export { AuthorizationGuard, extractPermissionsFromJWT, verifyJWT } from './authz.js';
+export { N8nGuardian, getN8nGuardian } from './n8n.js';
+export { RegressionShield, getRegressionShield } from './regression.js';
+export { AIAgentGuard, getAIAgentGuard } from './ai-guard.js';
+export { EmergencyResponse, getEmergencyResponse } from './emergency.js';
 
 /**
  * Main Security Agent class
@@ -30,6 +38,10 @@ export class SecurityAgent {
   public readonly secrets: SecretsGuard;
   public readonly audit: AuditLogger;
   public readonly authz: AuthorizationGuard;
+  public readonly n8n: N8nGuardian;
+  public readonly regression: RegressionShield;
+  public readonly aiGuard: AIAgentGuard;
+  public readonly emergency: EmergencyResponse;
 
   private initialized = false;
 
@@ -37,9 +49,25 @@ export class SecurityAgent {
     this.secrets = new SecretsGuard(config);
     this.audit = new AuditLogger(config);
     this.authz = new AuthorizationGuard(config);
+    this.n8n = new N8nGuardian();
+    this.regression = new RegressionShield();
+    this.aiGuard = new AIAgentGuard();
+    this.emergency = new EmergencyResponse();
 
     // Connect authz to audit for logging
     this.authz.setAuditLogger(this.audit);
+
+    // Connect n8n to secrets and audit
+    this.n8n.setDependencies(this.secrets, this.audit);
+
+    // Connect regression to audit
+    this.regression.setDependencies(this.audit);
+
+    // Connect AI guard to audit
+    this.aiGuard.setDependencies(this.audit);
+
+    // Connect emergency response to audit
+    this.emergency.setDependencies(this.audit);
   }
 
   /**
@@ -54,6 +82,10 @@ export class SecurityAgent {
       this.secrets.initialize(),
       this.audit.initialize(),
       this.authz.initialize(),
+      this.n8n.initialize(),
+      this.regression.initialize(),
+      this.aiGuard.initialize(),
+      this.emergency.initialize(),
     ]);
 
     this.initialized = true;
@@ -263,7 +295,6 @@ export function enableSecureEnv(allowedVars: string[] = []): void {
   const proxy = createEnvProxy(agent.secrets, allowedVars);
 
   // This is a dangerous operation - only use in production!
-  // @ts-ignore - Intentionally replacing process.env which might cause issues in some environments
   process.env = proxy;
 
   console.log('[SecurityAgent] Secure environment enabled');

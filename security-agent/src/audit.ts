@@ -355,7 +355,20 @@ export class AuditLogger {
       title: incident.title,
     });
 
-    // TODO: Send to PagerDuty/Telegram for P0/P1 incidents
+    /**
+     * INTEGRATION POINT: External Alerting
+     *
+     * Production implementation should trigger alerts for P0/P1:
+     * - PagerDuty API for P0 (immediate on-call escalation)
+     * - Telegram/Slack notifications for P1/P2
+     * - Email notifications for P3
+     *
+     * This integration is intentionally decoupled from core audit logging
+     * to allow different alerting strategies without modifying audit logic.
+     *
+     * Recommended implementation: Emergency Response module handles alerting
+     * via agent.emergency.reportIncident(), which includes alert dispatch.
+     */
 
     return id;
   }

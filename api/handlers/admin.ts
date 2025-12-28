@@ -17,19 +17,27 @@ async function getTelegramSecrets() {
   const agent = getSecurityAgent();
   if (!agent.isInitialized()) await agent.initialize();
 
-  const token = (await agent.secrets.get({
-    userId: 'system',
-    key: 'telegram_bot_token',
-    purpose: 'telegram_api_call',
-    ttl: 300
-  })).value || process.env.TELEGRAM_BOT_TOKEN;
+  const token =
+    (
+      await agent.secrets.get({
+        userId: 'system',
+        key: 'telegram_bot_token',
+        purpose: 'telegram_api_call',
+        ttl: 300,
+      })
+    ).value || process.env.TELEGRAM_BOT_TOKEN;
 
-  const username = (await agent.secrets.get({
-    userId: 'system',
-    key: 'telegram_bot_username',
-    purpose: 'referral_link_generation',
-    ttl: 3600
-  })).value || process.env.TELEGRAM_BOT_USERNAME || 'NeuroGuardianBot';
+  const username =
+    (
+      await agent.secrets.get({
+        userId: 'system',
+        key: 'telegram_bot_username',
+        purpose: 'referral_link_generation',
+        ttl: 3600,
+      })
+    ).value ||
+    process.env.TELEGRAM_BOT_USERNAME ||
+    'NeuroGuardianBot';
 
   return { token, username };
 }
@@ -41,12 +49,15 @@ async function getCronSecrets() {
   const agent = getSecurityAgent();
   if (!agent.isInitialized()) await agent.initialize();
 
-  const cronSecret = (await agent.secrets.get({
-    userId: 'system',
-    key: 'cron_secret',
-    purpose: 'cron_auth',
-    ttl: 300
-  })).value || process.env.CRON_SECRET;
+  const cronSecret =
+    (
+      await agent.secrets.get({
+        userId: 'system',
+        key: 'cron_secret',
+        purpose: 'cron_auth',
+        ttl: 300,
+      })
+    ).value || process.env.CRON_SECRET;
 
   return { cronSecret };
 }
@@ -105,8 +116,8 @@ export async function validateAdminAccess(req: VercelRequest): Promise<boolean> 
       userId: 'system',
       metadata: {
         ip: req.headers['x-forwarded-for'] || 'unknown',
-        userAgent: req.headers['user-agent']
-      }
+        userAgent: req.headers['user-agent'],
+      },
     });
 
     return isValid;
@@ -162,13 +173,16 @@ export async function handleResetDb(
   // Uses Security Agent to check env config
   const agent = getSecurityAgent();
   await agent.initialize(); // Ensure initialized for later calls
-  
-  const dangerousOpsEnabled = (await agent.secrets.get({
-    userId: 'system',
-    key: 'dangerous_operations_enabled',
-    purpose: 'feature_flag_check',
-    ttl: 300
-  })).value || process.env.DANGEROUS_OPERATIONS_ENABLED;
+
+  const dangerousOpsEnabled =
+    (
+      await agent.secrets.get({
+        userId: 'system',
+        key: 'dangerous_operations_enabled',
+        purpose: 'feature_flag_check',
+        ttl: 300,
+      })
+    ).value || process.env.DANGEROUS_OPERATIONS_ENABLED;
 
   if (dangerousOpsEnabled !== 'true') {
     console.warn(
@@ -195,11 +209,13 @@ export async function handleResetDb(
       userId: 'system',
       key: 'admin_secret_key', // Ensure this exists in Vault or allow fail
       purpose: 'db_reset_verification',
-      ttl: 60
+      ttl: 60,
     });
     expectedSecret = resp.value;
-  } catch (e) {
-    console.warn('Could not retrieve admin_secret_key, falling back to process.env for dev compatibility');
+  } catch {
+    console.warn(
+      'Could not retrieve admin_secret_key, falling back to process.env for dev compatibility'
+    );
     expectedSecret = process.env.ADMIN_SECRET_KEY;
   }
 
@@ -239,7 +255,7 @@ export async function handleRunMigration(
   req: VercelRequest,
   res: VercelResponse
 ): Promise<VercelResponse> {
-  if (!await validateAdminAccess(req)) {
+  if (!(await validateAdminAccess(req))) {
     return res.status(403).json({ error: 'Admin access required' });
   }
 
@@ -287,7 +303,7 @@ export async function handleAdminActivateTrial(
   req: VercelRequest,
   res: VercelResponse
 ): Promise<VercelResponse> {
-  if (!await validateAdminAccess(req)) {
+  if (!(await validateAdminAccess(req))) {
     return res.status(403).json({ error: 'Admin access required' });
   }
 
@@ -323,7 +339,7 @@ export async function handleAdminCheckUser(
   req: VercelRequest,
   res: VercelResponse
 ): Promise<VercelResponse> {
-  if (!await validateAdminAccess(req)) {
+  if (!(await validateAdminAccess(req))) {
     return res.status(403).json({ error: 'Admin access required' });
   }
 
@@ -369,7 +385,7 @@ export async function handleAdminListUsers(
   req: VercelRequest,
   res: VercelResponse
 ): Promise<VercelResponse> {
-  if (!await validateAdminAccess(req)) {
+  if (!(await validateAdminAccess(req))) {
     return res.status(403).json({ error: 'Admin access required' });
   }
 
@@ -395,7 +411,7 @@ export async function handleAdminListProducts(
   req: VercelRequest,
   res: VercelResponse
 ): Promise<VercelResponse> {
-  if (!await validateAdminAccess(req)) {
+  if (!(await validateAdminAccess(req))) {
     return res.status(403).json({ error: 'Admin access required' });
   }
 
@@ -490,7 +506,7 @@ export async function handleAdminSentinelLogs(
   req: VercelRequest,
   res: VercelResponse
 ): Promise<VercelResponse> {
-  if (!await validateAdminAccess(req)) {
+  if (!(await validateAdminAccess(req))) {
     return res.status(403).json({ error: 'Admin access required' });
   }
 
@@ -545,7 +561,7 @@ export async function handleAdminSetProtection(
   req: VercelRequest,
   res: VercelResponse
 ): Promise<VercelResponse> {
-  if (!await validateAdminAccess(req)) {
+  if (!(await validateAdminAccess(req))) {
     return res.status(403).json({ error: 'Admin access required' });
   }
 
@@ -574,7 +590,7 @@ export async function handleAdminResetStatuses(
   req: VercelRequest,
   res: VercelResponse
 ): Promise<VercelResponse> {
-  if (!await validateAdminAccess(req)) {
+  if (!(await validateAdminAccess(req))) {
     return res.status(403).json({ error: 'Admin access required' });
   }
 
@@ -595,7 +611,7 @@ export async function handleAdminSetDefenseMode(
   req: VercelRequest,
   res: VercelResponse
 ): Promise<VercelResponse> {
-  if (!await validateAdminAccess(req)) {
+  if (!(await validateAdminAccess(req))) {
     return res.status(403).json({ error: 'Admin access required' });
   }
 
@@ -624,7 +640,7 @@ export async function handleAdminTestTelegram(
   req: VercelRequest,
   res: VercelResponse
 ): Promise<VercelResponse> {
-  if (!await validateAdminAccess(req)) {
+  if (!(await validateAdminAccess(req))) {
     return res.status(403).json({ error: 'Admin access required' });
   }
 
@@ -667,7 +683,7 @@ export async function handleAdminTestOzon(
   req: VercelRequest,
   res: VercelResponse
 ): Promise<VercelResponse> {
-  if (!await validateAdminAccess(req)) {
+  if (!(await validateAdminAccess(req))) {
     return res.status(403).json({ error: 'Admin access required' });
   }
 
@@ -709,7 +725,7 @@ export async function handleAdminTestWb(
   req: VercelRequest,
   res: VercelResponse
 ): Promise<VercelResponse> {
-  if (!await validateAdminAccess(req)) {
+  if (!(await validateAdminAccess(req))) {
     return res.status(403).json({ error: 'Admin access required' });
   }
 
@@ -769,7 +785,7 @@ export async function handleAdminCloneUser(
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  if (!await validateAdminAccess(req)) {
+  if (!(await validateAdminAccess(req))) {
     return res.status(403).json({ error: 'Admin access required' });
   }
 

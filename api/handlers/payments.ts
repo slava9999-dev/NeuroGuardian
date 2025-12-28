@@ -37,26 +37,36 @@ export async function handleCreatePayment(
   }
 
   // Get user email if exists
-  const user = await getUserById(userId);
+  await getUserById(userId);
 
   // PRODUCTION: YooKassa must be configured
   // PRODUCTION: YooKassa must be configured
   const agent = getSecurityAgent();
   if (!agent.isInitialized()) await agent.initialize();
 
-  const SHOP_ID = (await agent.secrets.get({
-    userId: 'system',
-    key: 'yookassa_shop_id',
-    purpose: 'payment_handler_check',
-    ttl: 300
-  })).value || process.env.YOOKASSA_SHOP_ID || '';
+  const SHOP_ID =
+    (
+      await agent.secrets.get({
+        userId: 'system',
+        key: 'yookassa_shop_id',
+        purpose: 'payment_handler_check',
+        ttl: 300,
+      })
+    ).value ||
+    process.env.YOOKASSA_SHOP_ID ||
+    '';
 
-  const SECRET_KEY = (await agent.secrets.get({
-    userId: 'system',
-    key: 'yookassa_secret_key',
-    purpose: 'payment_handler_check',
-    ttl: 300
-  })).value || process.env.YOOKASSA_SECRET_KEY || '';
+  const SECRET_KEY =
+    (
+      await agent.secrets.get({
+        userId: 'system',
+        key: 'yookassa_secret_key',
+        purpose: 'payment_handler_check',
+        ttl: 300,
+      })
+    ).value ||
+    process.env.YOOKASSA_SECRET_KEY ||
+    '';
   const IS_PRODUCTION =
     process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
 

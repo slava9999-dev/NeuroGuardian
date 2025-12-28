@@ -7,7 +7,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql } from '@vercel/postgres';
 
-import { validateTelegramInitData, logger } from '../../src/api-lib/lib/index.js';
+import { validateTelegramInitData } from '../../src/api-lib/lib/index.js';
 import { getSecurityAgent } from '@neuroguardian/security-agent';
 
 import {
@@ -69,21 +69,29 @@ export async function handleCheckPrices(
   if (!agent.isInitialized()) {
     await agent.initialize();
   }
-  
-  // Fetch secrets
-  const cronSecret = (await agent.secrets.get({
-    userId: 'system',
-    key: 'cron_secret',
-    purpose: 'sentinel_cron_auth',
-    ttl: 60
-  }).catch(() => ({ value: process.env.CRON_SECRET }))).value;
 
-  const adminApiKey = (await agent.secrets.get({
-    userId: 'system',
-    key: 'admin_api_key',
-    purpose: 'sentinel_admin_auth',
-    ttl: 60
-  }).catch(() => ({ value: process.env.ADMIN_API_KEY }))).value;
+  // Fetch secrets
+  const cronSecret = (
+    await agent.secrets
+      .get({
+        userId: 'system',
+        key: 'cron_secret',
+        purpose: 'sentinel_cron_auth',
+        ttl: 60,
+      })
+      .catch(() => ({ value: process.env.CRON_SECRET }))
+  ).value;
+
+  const adminApiKey = (
+    await agent.secrets
+      .get({
+        userId: 'system',
+        key: 'admin_api_key',
+        purpose: 'sentinel_admin_auth',
+        ttl: 60,
+      })
+      .catch(() => ({ value: process.env.ADMIN_API_KEY }))
+  ).value;
 
   // Check for cron authorization (Bearer header OR query parameter)
   const isCron =
@@ -648,16 +656,16 @@ async function sendSentinelAlert(
 
   let token: string | undefined;
   try {
-     const resp = await agent.secrets.get({
-         userId: userId.toString(), 
-         key: 'telegram_bot_token', 
-         purpose: 'send_telegram_alert',
-         ttl: 60
-     });
-     token = resp.value;
+    const resp = await agent.secrets.get({
+      userId: userId.toString(),
+      key: 'telegram_bot_token',
+      purpose: 'send_telegram_alert',
+      ttl: 60,
+    });
+    token = resp.value;
   } catch {
-     // Fallback
-     token = process.env.TELEGRAM_BOT_TOKEN;
+    // Fallback
+    token = process.env.TELEGRAM_BOT_TOKEN;
   }
 
   if (!token) {
