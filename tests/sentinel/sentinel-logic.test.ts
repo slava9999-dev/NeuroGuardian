@@ -25,15 +25,19 @@ vi.mock('../../src/api-lib/services/index.js', () => ({
   fetchOzonCurrentPrices: vi.fn(),
 }));
 
-vi.mock('../../src/api-lib/lib/index.js', () => ({
-  validateTelegramInitData: vi.fn(),
-  logger: {
-    info: vi.fn(),
-    error: vi.fn(),
-    warn: vi.fn(),
-    debug: vi.fn(),
-  },
-}));
+vi.mock('../../src/api-lib/lib/index.js', async importOriginal => {
+  const actual = await importOriginal<typeof import('../../src/api-lib/lib/index.js')>();
+  return {
+    ...actual,
+    validateTelegramInitData: vi.fn(() => ({ valid: false })),
+    logger: {
+      info: vi.fn(),
+      error: vi.fn(),
+      warn: vi.fn(),
+      debug: vi.fn(),
+    },
+  };
+});
 
 // Mock SecurityAgent to avoid Vault connection in tests
 vi.mock('../../security-agent/src/index.js', () => ({
