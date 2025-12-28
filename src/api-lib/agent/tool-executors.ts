@@ -5,10 +5,17 @@
 // ============================================
 
 // Database operations are handled through services
-import { getMarketplaceKeys, syncSalesHistory } from '../services/marketplace.js';
+import { syncSalesHistory } from '../services/marketplace.js';
 import {
   getProductsByUserId,
   getSalesHistory,
+  // Marketplace service functions
+  getMarketplaceKeys,
+  fetchWbOrders,
+  fetchOzonFbsUnfulfilledOrders,
+  fetchOzonAnalytics,
+  fetchWbStocks,
+  fetchOzonStocksV3,
   // Unit Economics service (removes hardcoded commissions)
   getCommissionRate,
   LOGISTICS_COSTS,
@@ -168,181 +175,117 @@ export async function executeGetSalesStats(userId: number, rawArgs: unknown): Pr
     let periodRevenue = 0;
     let periodReturns = 0;
 
-    // Parallel execution for Ozon and WB
-    const tasks: Promise<void>[] = [];
+    const fromStr = from.toISOString().split('T')[0];
+    const toStr = to.toISOString().split('T')[0];
 
-    // Ozon Task
+    // Ozon Stats
     if (
       keys.ozon &&
       (!args.marketplace || args.marketplace === 'Ozon' || args.marketplace === 'all')
     ) {
-      tasks.push(
-        (async () => {
-          try {
-            const ozonRes = await fetch('https://api-seller.ozon.ru/v1/analytics/data', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Client-Id': keys.ozon!.clientId,
-                'Api-Key': keys.ozon!.apiKey,
-              },
-              body: JSON.stringify({
-                date_from: from.toISOString().split('T')[0],
-                date_to: to.toISOString().split('T')[0],
-                metrics: ['revenue', 'ordered_units', 'returns'],
-                dimension: ['day'],
-                limit: 1000,
-              }),
-            });
-
-            if (ozonRes.ok) {
-              const ozonData = await ozonRes.json();
-              const result = ozonData.result?.data || [];
-              for (const row of result) {
-                periodRevenue += row.metrics?.[0] || 0;
-                periodOrders += row.metrics?.[1] || 0;
-                periodReturns += row.metrics?.[2] || 0;
-              }
-            }
-          } catch (e) {
-            console.error('Ozon stats error:', e);
-          }
-        })()
-      );
+      try {
+        const rows = await fetchOzonAnalytics(keys.ozon.clientId, keys.ozon.apiKey, fromStr, toStr);
+        for (const row of rows) {
+          periodRevenue += row.metrics?.[0] || 0;
+          periodOrders += row.metrics?.[1] || 0;
+          periodReturns += row.metrics?.[2] || 0;
+        }
+      } catch (e) {
+        console.error('Ozon stats error:', e);
+      }
     }
 
-    // WB Task
+    // WB Stats
     if (keys.wb && (!args.marketplace || args.marketplace === 'WB' || args.marketplace === 'all')) {
-      tasks.push(
-        (async () => {
-          try {
-            const wbRes = await fetch(
-              `https://statistics-api.wildberries.ru/api/v1/supplier/sales?dateFrom=${from.toISOString().split('T')[0]}`,
-              {
-                method: 'GET',
-                headers: {
-                  Authorization: keys.wb!,
-                },
-              }
-            );
+      try {
+        const wbOrders = await fetchWbOrders(keys.wb, from);
+        const filtered = wbOrders.filter((s: any) => {
+          const saleDate = new Date(s.date);
+          return saleDate >= from && saleDate <= to;
+        });
 
-            if (wbRes.ok) {
-              const wbData = await wbRes.json();
-              const sales = (wbData || []).filter((s: { date: string }) => {
-                const saleDate = new Date(s.date);
-                return saleDate >= from && saleDate <= to;
-              });
-
-              for (const sale of sales) {
-                if (sale.saleID && !sale.saleID.startsWith('R')) {
-                  periodOrders++;
-                  periodRevenue += sale.finishedPrice || sale.priceWithDisc || 0;
-                } else if (sale.saleID?.startsWith('R')) {
-                  periodReturns++;
-                }
-              }
-            }
-          } catch (e) {
-            console.error('WB stats error:', e);
+        for (const sale of filtered) {
+          if (sale.saleID && !sale.saleID.startsWith('R')) {
+            periodOrders++;
+            periodRevenue += sale.finishedPrice || sale.priceWithDisc || 0;
+          } else if (sale.saleID?.startsWith('R')) {
+            periodReturns++;
           }
-        })()
-      );
+        }
+      } catch (e) {
+        console.error('WB stats error:', e);
+      }
     }
 
-    await Promise.all(tasks);
-
-    return { orders: periodOrders, revenue: Math.round(periodRevenue), returns: periodReturns };
+    return {
+      orders: periodOrders,
+      revenue: Math.round(periodRevenue),
+      returns: periodReturns,
+      avgOrder: periodOrders > 0 ? Math.round(periodRevenue / periodOrders) : 0,
+    };
   }
 
-  // Fetch current period
-  const currentStats = await fetchPeriodStats(dateFrom, now);
+  // Fetch current and previous period
+  const [currentStats, prevStats] = await Promise.all([
+    fetchPeriodStats(dateFrom, now),
+    fetchPeriodStats(datePrevFrom, dateFrom),
+  ]);
 
-  // Fetch previous period for comparison
-  const prevStats = await fetchPeriodStats(datePrevFrom, dateFrom);
-
-  // Populate stats
+  // Fill breakdown for current period
   if (
     keys.ozon &&
     (!args.marketplace || args.marketplace === 'Ozon' || args.marketplace === 'all')
   ) {
-    // Re-fetch Ozon separately for breakdown
     try {
-      const ozonRes = await fetch('https://api-seller.ozon.ru/v1/analytics/data', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Client-Id': keys.ozon.clientId,
-          'Api-Key': keys.ozon.apiKey,
-        },
-        body: JSON.stringify({
-          date_from: dateFrom.toISOString().split('T')[0],
-          date_to: now.toISOString().split('T')[0],
-          metrics: ['revenue', 'ordered_units', 'returns'],
-          dimension: ['day'],
-          limit: 1000,
-        }),
-      });
+      const fromStr = dateFrom.toISOString().split('T')[0];
+      const toStr = now.toISOString().split('T')[0];
+      const rows = await fetchOzonAnalytics(keys.ozon.clientId, keys.ozon.apiKey, fromStr, toStr);
 
-      if (ozonRes.ok) {
-        const ozonData = await ozonRes.json();
-        const result = ozonData.result?.data || [];
-
-        let revenue = 0,
-          orders = 0,
-          returns = 0;
-        for (const row of result) {
-          revenue += row.metrics?.[0] || 0;
-          orders += row.metrics?.[1] || 0;
-          returns += row.metrics?.[2] || 0;
-        }
-
-        const avgOrder = orders > 0 ? Math.round(revenue / orders) : 0;
-        stats.ozon = { orders, revenue: Math.round(revenue), returns, avgOrder };
-        stats.total.orders += orders;
-        stats.total.revenue += Math.round(revenue);
-        stats.total.returns += returns;
+      let revenue = 0,
+        orders = 0,
+        returns = 0;
+      for (const row of rows) {
+        revenue += row.metrics?.[0] || 0;
+        orders += row.metrics?.[1] || 0;
+        returns += row.metrics?.[2] || 0;
       }
+      stats.ozon = {
+        orders,
+        revenue: Math.round(revenue),
+        returns,
+        avgOrder: orders > 0 ? Math.round(revenue / orders) : 0,
+      };
     } catch (e) {
-      console.error('Ozon stats error:', e);
+      console.error('Ozon breakdown error:', e);
     }
   }
 
   if (keys.wb && (!args.marketplace || args.marketplace === 'WB' || args.marketplace === 'all')) {
     try {
-      const wbRes = await fetch(
-        `https://statistics-api.wildberries.ru/api/v1/supplier/sales?dateFrom=${dateFrom.toISOString().split('T')[0]}`,
-        {
-          method: 'GET',
-          headers: { Authorization: keys.wb },
+      const wbOrders = await fetchWbOrders(keys.wb, dateFrom);
+      let revenue = 0,
+        orders = 0,
+        returns = 0;
+      for (const sale of wbOrders) {
+        if (sale.saleID && !sale.saleID.startsWith('R')) {
+          orders++;
+          revenue += sale.finishedPrice || sale.priceWithDisc || 0;
+        } else if (sale.saleID?.startsWith('R')) {
+          returns++;
         }
-      );
-
-      if (wbRes.ok) {
-        const wbData = await wbRes.json();
-        const sales = wbData || [];
-
-        let revenue = 0,
-          orders = 0,
-          returns = 0;
-        for (const sale of sales) {
-          if (sale.saleID && !sale.saleID.startsWith('R')) {
-            orders++;
-            revenue += sale.finishedPrice || sale.priceWithDisc || 0;
-          } else if (sale.saleID?.startsWith('R')) {
-            returns++;
-          }
-        }
-
-        const avgOrder = orders > 0 ? Math.round(revenue / orders) : 0;
-        stats.wb = { orders, revenue: Math.round(revenue), returns, avgOrder };
-        stats.total.orders += orders;
-        stats.total.revenue += Math.round(revenue);
-        stats.total.returns += returns;
       }
+      stats.wb = {
+        orders,
+        revenue: Math.round(revenue),
+        returns,
+        avgOrder: orders > 0 ? Math.round(revenue / orders) : 0,
+      };
     } catch (e) {
-      console.error('WB stats error:', e);
+      console.error('WB breakdown error:', e);
     }
   }
+
+  stats.total = currentStats;
 
   // Calculate average order value
   stats.total.avgOrder =
@@ -438,45 +381,18 @@ export async function executeGetOrders(userId: number, rawArgs: unknown): Promis
   }> = [];
 
   // Fetch Ozon orders
-  if (
-    keys.ozon &&
-    (!args.marketplace || args.marketplace === 'Ozon' || args.marketplace === 'all')
-  ) {
+  if (keys.ozon && (!args.marketplace || args.marketplace === 'Ozon')) {
     try {
-      const ozonRes = await fetch('https://api-seller.ozon.ru/v3/posting/fbs/list', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Client-Id': keys.ozon.clientId,
-          'Api-Key': keys.ozon.apiKey,
-        },
-        body: JSON.stringify({
-          dir: 'DESC',
-          filter: {
-            since: dateFrom.toISOString(),
-            to: now.toISOString(),
-          },
-          limit: 50,
-          offset: 0,
-        }),
-      });
-
-      if (ozonRes.ok) {
-        const ozonData = await ozonRes.json();
-        const postings = ozonData.result?.postings || [];
-
-        for (const posting of postings) {
-          for (const product of posting.products || []) {
-            orders.push({
-              id: posting.posting_number,
-              date: posting.in_process_at || posting.created_at,
-              product: product.name,
-              price: parseFloat(product.price) * product.quantity,
-              status: posting.status,
-              marketplace: 'Ozon',
-            });
-          }
-        }
+      const postings = await fetchOzonFbsUnfulfilledOrders(keys.ozon.clientId, keys.ozon.apiKey);
+      for (const posting of postings) {
+        orders.push({
+          id: posting.posting_number,
+          date: posting.in_process_at || posting.created_at,
+          product: posting.products?.[0]?.name || 'Товар Ozon',
+          price: parseFloat(posting.financial_data?.products?.[0]?.price || '0'),
+          status: posting.status,
+          marketplace: 'Ozon',
+        });
       }
     } catch (e) {
       console.error('Ozon orders error:', e);
@@ -484,21 +400,13 @@ export async function executeGetOrders(userId: number, rawArgs: unknown): Promis
   }
 
   // Fetch WB orders
-  if (keys.wb && (!args.marketplace || args.marketplace === 'WB' || args.marketplace === 'all')) {
+  if (keys.wb && (!args.marketplace || args.marketplace === 'WB')) {
     try {
-      const wbRes = await fetch(
-        `https://statistics-api.wildberries.ru/api/v1/supplier/orders?dateFrom=${dateFrom.toISOString().split('T')[0]}`,
-        {
-          method: 'GET',
-          headers: { Authorization: keys.wb },
-        }
-      );
-
-      if (wbRes.ok) {
-        const wbData = await wbRes.json();
-        for (const order of wbData || []) {
+      const wbOrders = await fetchWbOrders(keys.wb, dateFrom);
+      for (const order of wbOrders) {
+        if (args.status === 'new' || (order.saleID && !order.saleID.startsWith('R'))) {
           orders.push({
-            id: order.srid || order.odid,
+            id: order.srid || order.saleID,
             date: order.date,
             product: order.subject || order.brand,
             price: order.finishedPrice || order.priceWithDisc || 0,
@@ -551,38 +459,19 @@ export async function executeGetWarehouseStocks(
   // Fetch Ozon stocks
   if (keys.ozon && (!args.marketplace || args.marketplace === 'Ozon')) {
     try {
-      const ozonRes = await fetch('https://api-seller.ozon.ru/v3/product/info/stocks', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Client-Id': keys.ozon.clientId,
-          'Api-Key': keys.ozon.apiKey,
-        },
-        body: JSON.stringify({
-          filter: { visibility: 'ALL' },
-          limit: 100,
-        }),
-      });
+      const items = await fetchOzonStocksV3(keys.ozon.clientId, keys.ozon.apiKey);
 
-      if (ozonRes.ok) {
-        const ozonData = await ozonRes.json();
-        const items = ozonData.result?.items || [];
+      for (const item of items) {
+        const totalStock =
+          item.stocks?.reduce((sum: number, s: any) => sum + (s.present || 0), 0) || 0;
 
-        for (const item of items) {
-          const totalStock =
-            item.stocks?.reduce(
-              (sum: number, s: { present: number }) => sum + (s.present || 0),
-              0
-            ) || 0;
-
-          if (!args.low_stock_only || totalStock < 10) {
-            stocks.push({
-              product: item.offer_id,
-              sku: item.product_id?.toString() || item.offer_id,
-              stock: totalStock,
-              marketplace: 'Ozon',
-            });
-          }
+        if (!args.low_stock_only || totalStock < 10) {
+          stocks.push({
+            product: item.offer_id,
+            sku: item.product_id?.toString() || item.offer_id,
+            stock: totalStock,
+            marketplace: 'Ozon',
+          });
         }
       }
     } catch (e) {
@@ -593,44 +482,22 @@ export async function executeGetWarehouseStocks(
   // Fetch WB stocks
   if (keys.wb && (!args.marketplace || args.marketplace === 'WB')) {
     try {
-      // First get warehouses
-      const whRes = await fetch('https://marketplace-api.wildberries.ru/api/v3/warehouses', {
-        method: 'GET',
-        headers: { Authorization: keys.wb },
-      });
+      // Use existing fetchWbStocks helper which does FBO+FBS
+      const wbStocks = await fetchWbStocks(keys.wb, []);
 
-      if (whRes.ok) {
-        const warehouses = await whRes.json();
-
-        for (const wh of warehouses || []) {
-          const stockRes = await fetch(
-            `https://marketplace-api.wildberries.ru/api/v3/stocks/${wh.id}`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: keys.wb,
-              },
-              body: JSON.stringify({ skus: [] }), // Empty = all
-            }
-          );
-
-          if (stockRes.ok) {
-            const stockData = await stockRes.json();
-            for (const item of stockData.stocks || []) {
-              if (!args.low_stock_only || item.amount < 10) {
-                stocks.push({
-                  product: item.sku,
-                  sku: item.sku,
-                  stock: item.amount,
-                  marketplace: 'WB',
-                  warehouse: wh.name,
-                });
-              }
-            }
-          }
+      // In this tool we want detailed stocks by SKU if possible,
+      // but fetchWbStocks returns a summary map nmId -> stock.
+      // We can iterate the map.
+      wbStocks.forEach((stock, nmId) => {
+        if (!args.low_stock_only || stock < 10) {
+          stocks.push({
+            product: `Товар ${nmId}`,
+            sku: String(nmId),
+            stock: stock,
+            marketplace: 'WB',
+          });
         }
-      }
+      });
     } catch (e) {
       console.error('WB stocks error:', e);
     }

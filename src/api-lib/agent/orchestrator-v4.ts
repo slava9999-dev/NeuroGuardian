@@ -235,16 +235,7 @@ export async function orchestrateV4(
   // Check for simple intents that don't need tools
   const simpleResponse = await handleSimpleIntent(message);
   if (simpleResponse) {
-    return {
-      success: true,
-      message: simpleResponse,
-      planningTimeMs: 0,
-      executionTimeMs: 0,
-      answeringTimeMs: Date.now() - startTime,
-      totalTimeMs: Date.now() - startTime,
-      tokensUsed: 0,
-      toolsCalled: [],
-    };
+    return createSimpleResult(simpleResponse, startTime);
   }
 
   // ========================================
@@ -258,16 +249,12 @@ export async function orchestrateV4(
   tokensUsed += planResult.tokensUsed;
 
   if (!planResult.success || !planResult.plan) {
-    return {
-      success: false,
-      message: planResult.error || 'Не удалось составить план выполнения',
+    return createErrorResult(
+      planResult.error || 'Не удалось составить план выполнения',
+      startTime,
       planningTimeMs,
-      executionTimeMs: 0,
-      answeringTimeMs: 0,
-      totalTimeMs: Date.now() - startTime,
-      tokensUsed,
-      toolsCalled: [],
-    };
+      tokensUsed
+    );
   }
 
   const plan = planResult.plan;
@@ -282,6 +269,54 @@ export async function orchestrateV4(
   const execStart = Date.now();
   logger.info('V4 Phase 2: Executing tools');
 
+  const { toolResults, toolsCalled } = await executePlanSteps(plan, context);
+  const executionTimeMs = Date.now() - execStart;
+
+  // ========================================
+  // PHASE 3: ANSWERING
+  // ========================================
+  const answerStart = Date.now();
+  logger.info('V4 Phase 3: Generating answer');
+
+  const answerResult = await callAnswerer(message, toolResults, context, conversationHistory);
+  const answeringTimeMs = Date.now() - answerStart;
+  tokensUsed += answerResult.tokensUsed;
+
+  if (!answerResult.success || !answerResult.answer) {
+    return createAnswerErrorResult(
+      answerResult.error,
+      startTime,
+      planningTimeMs,
+      executionTimeMs,
+      answeringTimeMs,
+      tokensUsed,
+      toolsCalled,
+      plan,
+      toolResults
+    );
+  }
+
+  // ========================================
+  // PHASE 4: VALIDATION & FORMATTING
+  // ========================================
+  return processAndValidateAnswer(answerResult.answer, toolResults, {
+    planningTimeMs,
+    executionTimeMs,
+    answeringTimeMs,
+    tokensUsed,
+    toolsCalled,
+    plan,
+    startTime,
+  });
+}
+
+/**
+ * Execute all steps defined in the plan
+ */
+async function executePlanSteps(
+  plan: Plan,
+  context: UserContext
+): Promise<{ toolResults: ToolResult[]; toolsCalled: string[] }> {
   const toolResults: ToolResult[] = [];
   const toolsCalled: string[] = [];
 
@@ -302,49 +337,36 @@ export async function orchestrateV4(
     toolsCalled.push(plannedTool.tool);
   }
 
-  const executionTimeMs = Date.now() - execStart;
-  logger.info('Tools executed', { count: toolResults.length, executionTimeMs });
+  return { toolResults, toolsCalled };
+}
 
-  // ========================================
-  // PHASE 3: ANSWERING
-  // ========================================
-  const answerStart = Date.now();
-  logger.info('V4 Phase 3: Generating answer');
-
-  const answerResult = await callAnswerer(message, toolResults, context, conversationHistory);
-  const answeringTimeMs = Date.now() - answerStart;
-  tokensUsed += answerResult.tokensUsed;
-
-  if (!answerResult.success || !answerResult.answer) {
-    return {
-      success: false,
-      message: answerResult.error || 'Не удалось сформировать ответ',
-      planningTimeMs,
-      executionTimeMs,
-      answeringTimeMs,
-      totalTimeMs: Date.now() - startTime,
-      tokensUsed,
-      toolsCalled,
-      plan,
-      toolResults,
-    };
+/**
+ * Process, sanitize and validate the final answer
+ */
+function processAndValidateAnswer(
+  answer: Answer,
+  toolResults: ToolResult[],
+  metrics: {
+    planningTimeMs: number;
+    executionTimeMs: number;
+    answeringTimeMs: number;
+    tokensUsed: number;
+    toolsCalled: string[];
+    plan: Plan;
+    startTime: number;
   }
-
-  // ========================================
-  // PHASE 4: VALIDATION
-  // ========================================
+): OrchestratorV4Result {
   logger.info('V4 Phase 4: Validating answer');
 
   // Validate and sanitize links
-  const sanitizedAnswer = sanitizeAnswerLinks(answerResult.answer, toolResults);
-  const linkValidation = validateAnswerLinks(answerResult.answer, toolResults);
+  const sanitizedAnswer = sanitizeAnswerLinks(answer, toolResults);
+  const linkValidation = validateAnswerLinks(answer, toolResults);
 
   if (!linkValidation.valid) {
     logger.warn('Removed hallucinated links', { count: linkValidation.invalidLinks.length });
   }
 
-  const totalTimeMs = Date.now() - startTime;
-  logger.info('V4 Complete', { totalTimeMs, planningTimeMs, executionTimeMs, answeringTimeMs });
+  const totalTimeMs = Date.now() - metrics.startTime;
 
   // Parse data_json if present
   let parsedData: Record<string, unknown> | undefined;
@@ -370,10 +392,69 @@ export async function orchestrateV4(
     links: sanitizedAnswer.links,
     actions: parsedActions,
     data: parsedData,
+    planningTimeMs: metrics.planningTimeMs,
+    executionTimeMs: metrics.executionTimeMs,
+    answeringTimeMs: metrics.answeringTimeMs,
+    totalTimeMs,
+    tokensUsed: metrics.tokensUsed,
+    toolsCalled: metrics.toolsCalled,
+    plan: metrics.plan,
+    toolResults,
+  };
+}
+
+// Helper functions for common result structures
+
+function createSimpleResult(message: string, startTime: number): OrchestratorV4Result {
+  const duration = Date.now() - startTime;
+  return {
+    success: true,
+    message,
+    planningTimeMs: 0,
+    executionTimeMs: 0,
+    answeringTimeMs: duration,
+    totalTimeMs: duration,
+    tokensUsed: 0,
+    toolsCalled: [],
+  };
+}
+
+function createErrorResult(
+  error: string,
+  startTime: number,
+  planningTimeMs: number,
+  tokensUsed: number
+): OrchestratorV4Result {
+  return {
+    success: false,
+    message: error,
+    planningTimeMs,
+    executionTimeMs: 0,
+    answeringTimeMs: 0,
+    totalTimeMs: Date.now() - startTime,
+    tokensUsed,
+    toolsCalled: [],
+  };
+}
+
+function createAnswerErrorResult(
+  error: string | undefined,
+  startTime: number,
+  planningTimeMs: number,
+  executionTimeMs: number,
+  answeringTimeMs: number,
+  tokensUsed: number,
+  toolsCalled: string[],
+  plan: Plan,
+  toolResults: ToolResult[]
+): OrchestratorV4Result {
+  return {
+    success: false,
+    message: error || 'Не удалось сформировать ответ',
     planningTimeMs,
     executionTimeMs,
     answeringTimeMs,
-    totalTimeMs,
+    totalTimeMs: Date.now() - startTime,
     tokensUsed,
     toolsCalled,
     plan,

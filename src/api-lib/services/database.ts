@@ -358,8 +358,17 @@ export async function isFirstPayment(userId: number): Promise<boolean> {
 }
 
 export async function getUsersWithExpiringSubscriptions(days: number): Promise<TelegramUser[]> {
-  const result =
-    await sql`SELECT * FROM users WHERE subscription_active = true AND subscription_end <= NOW() + interval '${days} days'`;
+  // Validate input to prevent SQL injection
+  if (!Number.isInteger(days) || days < 0 || days > 365) {
+    throw new Error('Invalid days parameter: must be integer between 0 and 365');
+  }
+
+  // Use parameterized query with safe interval construction
+  const result = await sql`
+    SELECT * FROM users 
+    WHERE subscription_active = true 
+      AND subscription_end <= NOW() + (${days} || ' days')::interval
+  `;
   return result.rows as TelegramUser[];
 }
 

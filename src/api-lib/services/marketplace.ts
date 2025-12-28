@@ -1518,7 +1518,7 @@ export async function syncSalesHistory(
 /**
  * Fetch raw WB sales data
  */
-async function fetchWbOrders(apiKey: string, dateFrom: Date) {
+export async function fetchWbOrders(apiKey: string, dateFrom: Date) {
   const response = await fetchWithRetry(
     `https://statistics-api.wildberries.ru/api/v1/supplier/sales?dateFrom=${dateFrom.toISOString().split('T')[0]}`,
     {
@@ -1543,7 +1543,7 @@ async function fetchWbOrders(apiKey: string, dateFrom: Date) {
 /**
  * Fetch raw Ozon orders (FBO + FBS)
  */
-async function fetchOzonOrders(clientId: string, apiKey: string, dateFrom: Date) {
+export async function fetchOzonOrders(clientId: string, apiKey: string, dateFrom: Date) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const allOrders: any[] = [];
 
@@ -1600,4 +1600,105 @@ async function fetchOzonOrders(clientId: string, apiKey: string, dateFrom: Date)
   }
 
   return allOrders;
+}
+
+/**
+ * Fetch raw Ozon FBS UNFULFILLED orders
+ */
+export async function fetchOzonFbsUnfulfilledOrders(clientId: string, apiKey: string) {
+  try {
+    const response = await fetchWithRetry(
+      'https://api-seller.ozon.ru/v3/posting/fbs/unfulfilled/list',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Client-Id': clientId,
+          'Api-Key': apiKey,
+        },
+        body: JSON.stringify({
+          dir: 'ASC',
+          filter: {
+            cutoff_from: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+            cutoff_to: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          },
+          limit: 100,
+          with: { analytics_data: true, financial_data: true },
+        }),
+      }
+    );
+
+    if (response.ok) {
+      const data = await response.json();
+      return data.result?.postings || [];
+    }
+  } catch (e) {
+    console.error('Ozon unfulfilled error:', e);
+  }
+  return [];
+}
+
+/**
+ * Fetch Ozon stocks using v3 API (Warehouse stocks)
+ */
+export async function fetchOzonStocksV3(clientId: string, apiKey: string, limit = 100) {
+  try {
+    const response = await fetchWithRetry('https://api-seller.ozon.ru/v3/product/info/stocks', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Client-Id': clientId,
+        'Api-Key': apiKey,
+      },
+      body: JSON.stringify({
+        filter: { visibility: 'ALL' },
+        limit,
+      }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      return data.result?.items || [];
+    }
+  } catch (e) {
+    console.error('Ozon V3 stocks error:', e);
+  }
+  return [];
+}
+
+/**
+ * Fetch Ozon analytics data
+ */
+export async function fetchOzonAnalytics(
+  clientId: string,
+  apiKey: string,
+  dateFrom: string,
+  dateTo: string,
+  metrics: string[] = ['revenue', 'ordered_units', 'returns']
+) {
+  try {
+    const response = await fetchWithRetry('https://api-seller.ozon.ru/v1/analytics/data', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Client-Id': clientId,
+        'Api-Key': apiKey,
+      },
+      body: JSON.stringify({
+        date_from: dateFrom,
+        date_to: dateTo,
+        metrics,
+        dimension: ['day'],
+        limit: 1000,
+      }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      return data.result?.data || [];
+    }
+  } catch (e) {
+    console.error('Ozon analytics error:', e);
+  }
+  return [];
 }

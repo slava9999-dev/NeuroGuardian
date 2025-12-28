@@ -5,17 +5,40 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql } from '@vercel/postgres';
+import { timingSafeEqual } from 'crypto';
 
 import { getUserById, initializeDatabase } from '../../src/api-lib/services/index.js';
 
 const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 
 /**
- * Validate admin access
+ * Validate admin access with timing-safe comparison
+ * SECURITY FIX (Dec 2024): Prevents timing attacks on admin key
  */
 export function validateAdminAccess(req: VercelRequest): boolean {
   const adminKey = req.headers['x-admin-key'] as string;
-  return !!ADMIN_API_KEY && adminKey === ADMIN_API_KEY;
+
+  // Early return if no key provided or configured
+  if (!adminKey || !ADMIN_API_KEY) {
+    return false;
+  }
+
+  // Length check before timing-safe comparison
+  if (adminKey.length !== ADMIN_API_KEY.length) {
+    return false;
+  }
+
+  try {
+    // Use constant-time comparison to prevent timing attacks
+    const adminKeyBuffer = Buffer.from(adminKey, 'utf8');
+    const expectedKeyBuffer = Buffer.from(ADMIN_API_KEY, 'utf8');
+
+    return timingSafeEqual(adminKeyBuffer, expectedKeyBuffer);
+  } catch (error) {
+    // If comparison fails (e.g., encoding issues), deny access
+    console.error('Admin key validation error:', error);
+    return false;
+  }
 }
 
 /**
@@ -37,34 +60,66 @@ export async function handleInitDb(
 /**
  * Handle reset-db action (dangerous!)
  * SECURITY FIX (Dec 2024): Completely disabled in production
+ * SECURITY ENHANCEMENT (Dec 2024): Added "Double-blind confirmation" and environment guards
  */
 export async function handleResetDb(
   req: VercelRequest,
   res: VercelResponse
 ): Promise<VercelResponse> {
+  const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0] || 'unknown';
+
   // CRITICAL SECURITY: Block in production to prevent catastrophic data loss
   const isProduction =
     process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
+
   if (isProduction) {
-    console.error('🚨 SECURITY: Attempted database reset in PRODUCTION blocked!');
+    console.error(
+      `🚨 SECURITY ALERT: Database reset ATTEMPTED in PRODUCTION from IP: ${clientIp}!`
+    );
     return res.status(403).json({
       error: 'Database reset is PERMANENTLY DISABLED in production',
       hint: 'This endpoint only works in development/staging environments',
     });
   }
 
+  // SECONDARY GUARD: Explicitly enabled dangerous operations
+  if (process.env.DANGEROUS_OPERATIONS_ENABLED !== 'true') {
+    console.warn(
+      `🚨 SECURITY: Reset DB attempted but DANGEROUS_OPERATIONS_ENABLED is not true. IP: ${clientIp}`
+    );
+    return res.status(403).json({
+      error: 'Dangerous operations are disabled',
+      hint: 'Set DANGEROUS_OPERATIONS_ENABLED=true in environment variables to enable this',
+    });
+  }
+
   if (!validateAdminAccess(req)) {
+    console.warn(`🚨 SECURITY: Unauthorized Reset DB attempt from IP: ${clientIp}`);
     return res.status(403).json({ error: 'Admin access required' });
   }
 
-  // This is intentionally verbose and requires explicit confirmation
-  const { confirm } = req.body || {};
+  // DOUBLE-BLIND: Requires both the main admin key and a secondary secret key
+  const { confirm, adminSecret } = req.body || {};
+
+  const expectedSecret = process.env.ADMIN_SECRET_KEY;
+  if (!expectedSecret || adminSecret !== expectedSecret) {
+    console.warn(
+      `🚨 SECURITY: Reset DB attempted with invalid or missing adminSecret. IP: ${clientIp}`
+    );
+    return res.status(403).json({
+      error: 'Secondary secret required',
+      message: 'This dangerous operation requires an additional ADMIN_SECRET_KEY',
+    });
+  }
+
   if (confirm !== 'RESET_ALL_DATA') {
     return res.status(400).json({
       error: 'Confirmation required',
-      message: 'Send { "confirm": "RESET_ALL_DATA" } to proceed',
+      message: 'Send { "confirm": "RESET_ALL_DATA", "adminSecret": "..." } to proceed',
     });
   }
+
+  console.warn(`🔥 SECURITY: DATABASE RESET INITIATED by IP: ${clientIp}`);
 
   await sql`DROP TABLE IF EXISTS sentinel_logs CASCADE`;
   await sql`DROP TABLE IF EXISTS transactions CASCADE`;

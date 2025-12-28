@@ -81,6 +81,10 @@ import { handleGetAnalytics, handleGetSystemMetrics } from './handlers/analytics
 import {
   sanitizeInput,
   checkRateLimit,
+  checkRateLimitV2,
+  RateLimitPresets,
+  getRequestIdentifier,
+  getRateLimitHeaders,
   RATE_LIMIT,
   IS_PRODUCTION,
   ALLOWED_ORIGINS,
@@ -108,6 +112,69 @@ function setCorsHeaders(req: VercelRequest, res: VercelResponse) {
 }
 
 // ============================================
+// RATE LIMITING HELPER
+// ============================================
+
+/**
+ * Apply rate limiting based on endpoint type
+ */
+async function applyRateLimit(
+  req: VercelRequest,
+  res: VercelResponse,
+  action: string
+): Promise<boolean> {
+  const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0] || 'unknown';
+
+  // Determine rate limit preset based on action
+  let limit: number = RateLimitPresets.API.limit;
+  let windowSeconds: number = RateLimitPresets.API.windowSeconds;
+  let namespace = 'api';
+
+  if (action.startsWith('admin-') || action === 'init-db' || action === 'reset-db') {
+    limit = RateLimitPresets.ADMIN.limit;
+    windowSeconds = RateLimitPresets.ADMIN.windowSeconds;
+    namespace = 'admin';
+  } else if (action === 'agent' || action === 'agent-v4' || action === 'agent-confirm') {
+    limit = RateLimitPresets.AGENT.limit;
+    windowSeconds = RateLimitPresets.AGENT.windowSeconds;
+    namespace = 'agent';
+  } else if (action === 'check-prices') {
+    limit = RateLimitPresets.SENTINEL.limit;
+    windowSeconds = RateLimitPresets.SENTINEL.windowSeconds;
+    namespace = 'sentinel';
+  } else if (action === 'auth') {
+    limit = RateLimitPresets.AUTH.limit;
+    windowSeconds = RateLimitPresets.AUTH.windowSeconds;
+    namespace = 'auth';
+  }
+
+  const identifier = getRequestIdentifier(undefined, clientIp);
+
+  const result = await checkRateLimitV2({
+    limit,
+    windowSeconds,
+    identifier,
+    namespace,
+  });
+
+  // Set rate limit headers
+  const headers = getRateLimitHeaders(result);
+  Object.entries(headers).forEach(([key, value]) => {
+    res.setHeader(key, value);
+  });
+
+  if (!result.allowed) {
+    res.status(429).json({
+      error: 'Too many requests',
+      retryAfter: Math.ceil((result.reset - Date.now()) / 1000),
+    });
+    return false;
+  }
+
+  return true;
+}
+
+// ============================================
 // MAIN HANDLER
 // ============================================
 
@@ -119,18 +186,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   setCorsHeaders(req, res);
 
-  // Rate limiting
-  const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0] || 'unknown';
-  const rateLimit = await checkRateLimit(clientIp);
-  res.setHeader('X-RateLimit-Limit', RATE_LIMIT.toString());
-  res.setHeader('X-RateLimit-Remaining', rateLimit.remaining.toString());
-
-  if (!rateLimit.allowed) {
-    return res.status(429).json({ error: 'Too many requests' });
-  }
-
   // Parse action
   const action = sanitizeInput((req.query.action as string) || req.body?.action);
+
+  // Apply rate limiting based on action type
+  const rateLimitPassed = await applyRateLimit(req, res, action);
+  if (!rateLimitPassed) {
+    return; // Response already sent by applyRateLimit
+  }
 
   try {
     switch (action) {

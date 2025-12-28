@@ -77,6 +77,11 @@ export {
   // Sentinel defense operations
   fetchOzonCurrentPrices,
   fetchOzonProductInfo,
+  fetchOzonStocksV3,
+  fetchOzonAnalytics,
+  fetchWbOrders,
+  fetchOzonOrders,
+  fetchOzonFbsUnfulfilledOrders,
   setOzonZeroStock,
   setOzonDefensePrice,
   setWbZeroStock,
