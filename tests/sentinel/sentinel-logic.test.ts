@@ -63,7 +63,7 @@ global.fetch = vi.fn(() =>
 ) as any;
 
 // Now import the functions to test (using relative path from test file)
-import { handleCheckPrices } from '../../api/handlers/sentinel.js';
+import { handleCheckPrices } from '../../src/api-lib/handlers/sentinel.js';
 import * as dbService from '../../src/api-lib/services/index.js';
 import { sql } from '@vercel/postgres';
 

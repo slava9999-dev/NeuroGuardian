@@ -11,7 +11,7 @@ import { execSync } from 'child_process';
 describe('Security Fixes Regression Tests', () => {
   describe('API Key Logging Prevention', () => {
     it('should not log API key length in admin.ts', () => {
-      const adminPath = path.resolve('api/handlers/admin.ts');
+      const adminPath = path.resolve('src/api-lib/handlers/admin.ts');
       const content = fs.readFileSync(adminPath, 'utf-8');
 
       // This was a real bug: console.log(`API key length: ${key.length}`)
@@ -20,9 +20,9 @@ describe('Security Fixes Regression Tests', () => {
 
     it('should not have console.log with sensitive patterns', () => {
       const filesToCheck = [
-        'api/handlers/admin.ts',
-        'api/handlers/agent-v4.ts',
-        'api/handlers/sentinel.ts',
+        'src/api-lib/handlers/admin.ts',
+        'src/api-lib/handlers/agent-v4.ts',
+        'src/api-lib/handlers/sentinel.ts',
       ];
 
       for (const file of filesToCheck) {
@@ -73,7 +73,7 @@ describe('Security Fixes Regression Tests', () => {
 
   describe('Production Safety Guards', () => {
     it('should have production guard in handleResetDb', () => {
-      const adminPath = path.resolve('api/handlers/admin.ts');
+      const adminPath = path.resolve('src/api-lib/handlers/admin.ts');
       const content = fs.readFileSync(adminPath, 'utf-8');
 
       // Critical: handleResetDb must check for production environment
@@ -84,7 +84,7 @@ describe('Security Fixes Regression Tests', () => {
     });
 
     it('should define isProduction check', () => {
-      const adminPath = path.resolve('api/handlers/admin.ts');
+      const adminPath = path.resolve('src/api-lib/handlers/admin.ts');
       const content = fs.readFileSync(adminPath, 'utf-8');
 
       // Must have production environment detection
@@ -119,9 +119,9 @@ describe('Security Fixes Regression Tests', () => {
   describe('Critical Files Presence', () => {
     const criticalFiles = [
       'src/api-lib/lib/logger.ts',
-      'api/handlers/admin.ts',
-      'api/handlers/sentinel.ts',
-      'api/handlers/agent-v4.ts',
+      'src/api-lib/handlers/admin.ts',
+      'src/api-lib/handlers/sentinel.ts',
+      'src/api-lib/handlers/agent-v4.ts',
       '.gitignore',
       'package.json',
       'tsconfig.json',
@@ -147,9 +147,9 @@ describe('Security Fixes Regression Tests', () => {
       ];
 
       const sourceFiles = [
-        'api/handlers/admin.ts',
-        'api/handlers/agent-v4.ts',
-        'api/handlers/sentinel.ts',
+        'src/api-lib/handlers/admin.ts',
+        'src/api-lib/handlers/agent-v4.ts',
+        'src/api-lib/handlers/sentinel.ts',
         'src/api-lib/agent/orchestrator-v4.ts',
       ];
 
