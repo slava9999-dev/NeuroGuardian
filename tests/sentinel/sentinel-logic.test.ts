@@ -4,6 +4,9 @@
 // Version: 1.0.0 | Date: December 2024
 // ============================================
 
+// Set NODE_ENV before any imports to enable fallback mode in SecurityAgent
+process.env.NODE_ENV = 'test';
+
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mocks MUST be defined before importing the module under test
@@ -30,6 +33,20 @@ vi.mock('../../src/api-lib/lib/index.js', () => ({
     warn: vi.fn(),
     debug: vi.fn(),
   },
+}));
+
+// Mock SecurityAgent to avoid Vault connection in tests
+vi.mock('../../security-agent/src/index.js', () => ({
+  getSecurityAgent: vi.fn(() => ({
+    isInitialized: vi.fn(() => true),
+    initialize: vi.fn(() => Promise.resolve()),
+    secrets: {
+      get: vi.fn(() => Promise.resolve({ value: 'test-secret' })),
+    },
+    audit: {
+      log: vi.fn(() => Promise.resolve('log-id')),
+    },
+  })),
 }));
 
 // Mock fetch globally for Telegram alerts
