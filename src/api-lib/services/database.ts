@@ -162,9 +162,15 @@ export async function initializeDatabase(): Promise<void> {
       defense_action VARCHAR(50) NOT NULL,
       saved_amount INTEGER DEFAULT 0,
       marketplace VARCHAR(50) NOT NULL,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      threat_type VARCHAR(50),
+      success BOOLEAN DEFAULT true
     )
   `;
+
+  // Ensure new columns exist
+  await sql`ALTER TABLE sentinel_logs ADD COLUMN IF NOT EXISTS threat_type VARCHAR(50)`;
+  await sql`ALTER TABLE sentinel_logs ADD COLUMN IF NOT EXISTS success BOOLEAN DEFAULT true`;
 
   // 6. Chat History
   await sql`
@@ -367,7 +373,7 @@ export async function getUsersWithExpiringSubscriptions(days: number): Promise<T
   const result = await sql`
     SELECT * FROM users 
     WHERE subscription_active = true 
-      AND subscription_end <= NOW() + (${days} || ' days')::interval
+    AND subscription_end <= NOW() + (${days} || ' days')::interval
   `;
   return result.rows as TelegramUser[];
 }
@@ -511,15 +517,18 @@ export async function logSentinelAction(log: {
   defense_action: string;
   saved_amount: number;
   marketplace: string;
+  threat_type?: string;
+  success?: boolean;
 }): Promise<void> {
   await sql`
     INSERT INTO sentinel_logs (
       user_id, product_id, product_title, detected_price, 
-      min_price, defense_action, saved_amount, marketplace
+      min_price, defense_action, saved_amount, marketplace, threat_type, success
     )
     VALUES (
       ${log.user_id}, ${log.product_id}, ${log.product_title}, ${log.detected_price},
-      ${log.min_price}, ${log.defense_action}, ${log.saved_amount}, ${log.marketplace}
+      ${log.min_price}, ${log.defense_action}, ${log.saved_amount}, ${log.marketplace},
+      ${log.threat_type || null}, ${log.success !== undefined ? log.success : true}
     )
   `;
 }

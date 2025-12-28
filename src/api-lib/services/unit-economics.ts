@@ -155,6 +155,10 @@ export const DEFAULT_RATES = {
 // CALCULATION FUNCTIONS
 // ============================================
 
+// ============================================
+// CALCULATION FUNCTIONS
+// ============================================
+
 export interface UnitEconomicsInput {
   price: number;
   costPrice: number;
@@ -166,7 +170,16 @@ export interface UnitEconomicsInput {
   includeSpp?: boolean;
   returnRate?: number; // % of orders returned (default 10%)
   cancelRate?: number; // % of orders cancelled/not picked up (default 5%)
-  useOzonCard?: boolean; // NEW: Whether to account for Ozon Card 5% discount
+  useOzonCard?: boolean; // Whether to account for Ozon Card 5% discount
+  packagingCost?: number; // Cost of packaging per unit (default 15 RUB)
+  targetMarginPercent?: number; // Desired margin for recommended price (default 20%)
+}
+
+export interface EconomicsWarning {
+  type: 'critical' | 'warning' | 'info';
+  code: string;
+  message: string;
+  impact: number; // Impact in RUB
 }
 
 export interface UnitEconomicsResult {
@@ -177,15 +190,22 @@ export interface UnitEconomicsResult {
   logistics: number;
   storage: number;
   spp: number;
-  acquiring: number; // NEW: Payment processing fees
-  returnCosts: number; // NEW: Costs for logistics both ways
-  cancelCosts: number; // NEW: Costs for cancellations
-  ozonCardCosts: number; // NEW: Costs for Ozon Card discount (seller-funded)
+  acquiring: number;
+  returnCosts: number;
+  cancelCosts: number;
+  ozonCardCosts: number;
+  packagingCost: number; // NEW
   totalCosts: number;
 
   profit: number;
   margin: number;
   roi: number;
+
+  // Safety & Recommendations
+  minSafePrice: number; // Break-even price (margin = 0)
+  recommendedMinPrice: number; // Price to achieve target margin
+  warnings: EconomicsWarning[]; // Risk alerts
+
   breakdownPercent: {
     costPrice: number;
     commission: number;
@@ -196,6 +216,7 @@ export interface UnitEconomicsResult {
     returnCosts: number;
     cancelCosts: number;
     ozonCardCosts: number;
+    packagingCost: number;
     profit: number;
   };
 }
@@ -224,7 +245,7 @@ export function getCommissionRate(marketplace: 'WB' | 'Ozon', category?: string)
 
 /**
  * Calculate unit economics for a product
- * UPDATED: Includes acquiring, returns, and cancellations (2025)
+ * UPDATED: Includes full v2.0 Spec features (Safe Prices, Warnings)
  */
 export function calculateUnitEconomics(input: UnitEconomicsInput): UnitEconomicsResult {
   const {
@@ -237,8 +258,12 @@ export function calculateUnitEconomics(input: UnitEconomicsInput): UnitEconomics
     includeSpp = true,
     returnRate = DEFAULT_RATES.returnRate,
     cancelRate = DEFAULT_RATES.cancelRate,
-    useOzonCard = true, // Default to true as most Ozon sellers have it
+    useOzonCard = true,
+    packagingCost = 15, // Default 15 RUB
+    targetMarginPercent = 20, // Default 20%
   } = input;
+
+  const warnings: EconomicsWarning[] = [];
 
   // Revenue
   const revenue = price;
@@ -251,35 +276,50 @@ export function calculateUnitEconomics(input: UnitEconomicsInput): UnitEconomics
   const logisticsCosts = LOGISTICS_COSTS[marketplace];
   let logistics = logisticsCosts[fulfillmentType] || logisticsCosts.fbo;
 
-  // WB variable logistics: base price + extra for each liter > 1L (simplified for 2025)
+  // WB variable logistics
   if (marketplace === 'WB' && input.volumeLiters && input.volumeLiters > 1) {
-    logistics += (input.volumeLiters - 1) * 7; // ~7₽ per extra liter
+    logistics += (input.volumeLiters - 1) * 7;
   }
 
-  // Storage (calculated per liter per day as per TZ 2.0)
-  const volume = input.volumeLiters || 1; // Default to 1L if not specified
+  // Storage
+  const volume = input.volumeLiters || 1;
   const storageCostPerDay = STORAGE_COSTS[marketplace] * volume;
   const storage = Math.round(storageCostPerDay * avgStorageDays);
 
-  // SPP (promotional fees)
+  // SPP
   const sppRate = includeSpp ? SPP_RATES[marketplace] : 0;
   const spp = Math.round(price * sppRate);
 
-  // Acquiring (payment processing) - NEW!
+  // Acquiring
   const acquiringRate = ACQUIRING_RATES[marketplace];
   const acquiring = Math.round(price * acquiringRate);
 
-  // Return costs (logistics both ways) - NEW!
-  // When customer returns, seller pays logistics to customer and back
+  // Return costs (logistics both ways)
   const returnCosts = Math.round(logistics * 2 * returnRate);
 
-  // Cancellation costs ("last mile" for Ozon since March 2025) - NEW!
-  // Ozon now charges seller for "last mile" delivery on cancelled/not picked up orders
+  // Cancellation costs
   const cancelCosts = marketplace === 'Ozon' ? Math.round(logistics * cancelRate) : 0;
 
-  // Ozon Card Discount (Seller-funded) - NEW!
-  const ozonCardCosts =
-    marketplace === 'Ozon' && useOzonCard ? Math.round(price * OZON_CARD_RATE) : 0;
+  // Ozon Card Discount (Seller-funded)
+  // Spec says: ~40% of orders are paid with Ozon Card
+  // Cost = Price * 5% * 0.4
+  const OZON_CARD_USAGE_RATE = 0.4;
+  let ozonCardCosts = 0;
+
+  if (marketplace === 'Ozon' && useOzonCard) {
+    const fullDiscount = price * OZON_CARD_RATE;
+    ozonCardCosts = Math.round(fullDiscount * OZON_CARD_USAGE_RATE);
+
+    // Warning if Ozon Card impact is high (>2% of total price)
+    if (ozonCardCosts > price * 0.02) {
+      warnings.push({
+        type: 'warning',
+        code: 'OZON_CARD_IMPACT',
+        message: 'Скидка Ozon Card снижает маржу более чем на 2%',
+        impact: ozonCardCosts,
+      });
+    }
+  }
 
   // Total costs
   const totalCosts =
@@ -291,7 +331,8 @@ export function calculateUnitEconomics(input: UnitEconomicsInput): UnitEconomics
     acquiring +
     returnCosts +
     cancelCosts +
-    ozonCardCosts;
+    ozonCardCosts +
+    packagingCost;
 
   // Profit
   const profit = revenue - totalCosts;
@@ -302,19 +343,38 @@ export function calculateUnitEconomics(input: UnitEconomicsInput): UnitEconomics
   // ROI (% of investment)
   const roi = costPrice > 0 ? Math.round((profit / costPrice) * 100) : 0;
 
-  // Breakdown as percentages of revenue
-  const breakdownPercent = {
-    costPrice: revenue > 0 ? Math.round((costPrice / revenue) * 100) : 0,
-    commission: revenue > 0 ? Math.round((commission / revenue) * 100) : 0,
-    logistics: revenue > 0 ? Math.round((logistics / revenue) * 100) : 0,
-    storage: revenue > 0 ? Math.round((storage / revenue) * 100) : 0,
-    spp: revenue > 0 ? Math.round((spp / revenue) * 100) : 0,
-    acquiring: revenue > 0 ? Math.round((acquiring / revenue) * 100) : 0,
-    returnCosts: revenue > 0 ? Math.round((returnCosts / revenue) * 100) : 0,
-    cancelCosts: revenue > 0 ? Math.round((cancelCosts / revenue) * 100) : 0,
-    ozonCardCosts: revenue > 0 ? Math.round((ozonCardCosts / revenue) * 100) : 0,
-    profit: margin,
-  };
+  // Check Negative Profit
+  if (profit < 0) {
+    warnings.push({
+      type: 'critical',
+      code: 'NEGATIVE_PROFIT',
+      message: 'Товар продается в убыток (отрицательная прибыль)',
+      impact: profit,
+    });
+  }
+
+  // --- Safe Price Calculation ---
+  // Formula: Price = (FixedCosts) / (1 - VariableRate)
+  // Variable Rate components: Commission + Acquiring + SPP + OzonCardAvg
+
+  const variableRate =
+    commissionRate +
+    sppRate +
+    acquiringRate +
+    (marketplace === 'Ozon' && useOzonCard ? OZON_CARD_RATE * OZON_CARD_USAGE_RATE : 0);
+
+  const fixedCosts = costPrice + logistics + storage + returnCosts + cancelCosts + packagingCost;
+
+  // 1. Break-even Price (Profit = 0)
+  // Price * (1 - Variable) - Fixed = 0  =>  Price = Fixed / (1 - Variable)
+  const minSafePrice = Math.ceil(fixedCosts / (1 - variableRate));
+
+  // 2. Recommended Price (Profit = TargetMargin * Price)
+  // Price * (1 - Variable) - Fixed = Target * Price
+  // Price * (1 - Variable - Target) = Fixed
+  // Price = Fixed / (1 - Variable - Target)
+  const targetRate = targetMarginPercent / 100;
+  const recommendedMinPrice = Math.ceil(fixedCosts / (1 - variableRate - targetRate));
 
   return {
     revenue,
@@ -328,12 +388,30 @@ export function calculateUnitEconomics(input: UnitEconomicsInput): UnitEconomics
     returnCosts,
     cancelCosts,
     ozonCardCosts,
+    packagingCost,
     totalCosts,
 
     profit,
     margin,
     roi,
-    breakdownPercent,
+
+    minSafePrice,
+    recommendedMinPrice,
+    warnings,
+
+    breakdownPercent: {
+      costPrice: revenue > 0 ? Math.round((costPrice / revenue) * 100) : 0,
+      commission: revenue > 0 ? Math.round((commission / revenue) * 100) : 0,
+      logistics: revenue > 0 ? Math.round((logistics / revenue) * 100) : 0,
+      storage: revenue > 0 ? Math.round((storage / revenue) * 100) : 0,
+      spp: revenue > 0 ? Math.round((spp / revenue) * 100) : 0,
+      acquiring: revenue > 0 ? Math.round((acquiring / revenue) * 100) : 0,
+      returnCosts: revenue > 0 ? Math.round((returnCosts / revenue) * 100) : 0,
+      cancelCosts: revenue > 0 ? Math.round((cancelCosts / revenue) * 100) : 0,
+      ozonCardCosts: revenue > 0 ? Math.round((ozonCardCosts / revenue) * 100) : 0,
+      packagingCost: revenue > 0 ? Math.round((packagingCost / revenue) * 100) : 0,
+      profit: margin,
+    },
   };
 }
 
@@ -346,31 +424,4 @@ export function estimateCostPrice(price: number): { costPrice: number; isEstimat
     costPrice: Math.round(price * 0.3),
     isEstimated: true,
   };
-}
-
-/**
- * Calculate break-even price (minimum price to cover costs)
- * UPDATED: Includes acquiring and uses 2025 rates
- */
-export function calculateBreakEvenPrice(
-  costPrice: number,
-  marketplace: 'WB' | 'Ozon',
-  category?: string
-): number {
-  const commissionRate = getCommissionRate(marketplace, category);
-  const sppRate = SPP_RATES[marketplace];
-  const acquiringRate = ACQUIRING_RATES[marketplace];
-  const logistics = LOGISTICS_COSTS[marketplace].fbo;
-  const storage = STORAGE_COSTS[marketplace] * 30; // 30 days
-
-  // Account for returns and cancellations
-  const returnCosts = logistics * 2 * DEFAULT_RATES.returnRate;
-  const cancelCosts = marketplace === 'Ozon' ? logistics * DEFAULT_RATES.cancelRate : 0;
-
-  // Price = (costPrice + logistics + storage + returnCosts + cancelCosts) / (1 - commission - spp - acquiring - ozonCard)
-  const ozonCardRate = marketplace === 'Ozon' ? OZON_CARD_RATE : 0;
-  const fixedCosts = costPrice + logistics + storage + returnCosts + cancelCosts;
-  const variableRate = 1 - commissionRate - sppRate - acquiringRate - ozonCardRate;
-
-  return Math.ceil(fixedCosts / variableRate);
 }

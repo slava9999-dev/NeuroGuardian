@@ -3,11 +3,11 @@ import { describe, test, expect, beforeAll } from 'vitest';
 
 describe('Knowledge Base', () => {
   beforeAll(async () => {
-    await knowledgeBase.loadDocuments();
+    await knowledgeBase.initialize();
   });
 
   test('should verify valid state', async () => {
-    const verification = await knowledgeBase.verifyKnowledge();
+    const verification = await knowledgeBase.verifyDocumentation();
     // In test env might be empty DB, so just check structure
     expect(verification).toHaveProperty('totalDocuments');
   });

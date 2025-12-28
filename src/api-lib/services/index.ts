@@ -48,6 +48,7 @@ export {
   // Sales History (Dec 2024)
   getSalesHistory,
   upsertMarketplaceOrders,
+  saveProducts,
 } from './database.js';
 
 // YooKassa
@@ -109,7 +110,6 @@ export {
   calculateUnitEconomics,
   getCommissionRate,
   estimateCostPrice,
-  calculateBreakEvenPrice,
   WB_COMMISSIONS,
   OZON_COMMISSIONS,
   LOGISTICS_COSTS,

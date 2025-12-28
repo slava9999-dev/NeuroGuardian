@@ -20,8 +20,16 @@ interface SentinelStatus {
   violations_today: number;
   actions_today: number;
   saved_today: number;
+  erosion_today: number;
+  commission_growth_today: number;
   defense_mode: 'zero_stock' | 'price_correction';
   cron_interval_minutes: number;
+  products_stats: {
+    total: number;
+    marketplace_counts: { marketplace: string; count: number }[];
+  };
+  event_counts: { event_type: string; count: number }[];
+  alerts_count: number;
 }
 
 interface DefenseLog {
@@ -41,7 +49,6 @@ interface DefenseLog {
 // HELPER: Get KV Client
 // ============================================
 
-// Helper to get KV client with secrets
 async function getKVClient() {
   const [url, token] = await Promise.all([
     getSecret('kv_rest_api_url', 'kv_client_init'),
@@ -93,8 +100,13 @@ export async function handleSentinelStatus(
         violations_today: 0,
         actions_today: 0,
         saved_today: 0,
+        erosion_today: 0,
+        commission_growth_today: 0,
         defense_mode: 'zero_stock',
         cron_interval_minutes: 5,
+        products_stats: { total: 0, marketplace_counts: [] },
+        event_counts: [],
+        alerts_count: 0,
       });
     }
 
@@ -119,13 +131,47 @@ export async function handleSentinelStatus(
     const logsRes = await sql`
       SELECT 
         COUNT(*) as violations,
-        COALESCE(SUM(saved_amount), 0) as saved
+        COALESCE(SUM(saved_amount), 0) as saved,
+        COUNT(*) FILTER (WHERE threat_type = 'ozon_card_erosion') as erosion,
+        COUNT(*) FILTER (WHERE threat_type = 'commission_increase') as commission
       FROM sentinel_logs 
       WHERE user_id = ${userId}
       AND created_at >= CURRENT_DATE
     `;
 
-    const stats = logsRes.rows[0] || { violations: 0, saved: 0 };
+    // Product stats
+    const productsRes = await sql`
+      SELECT 
+        COUNT(*) as total,
+        marketplace
+      FROM products
+      WHERE user_id = ${userId}
+      GROUP BY marketplace
+    `;
+
+    const marketplaceCounts = productsRes.rows.map(row => ({
+      marketplace: row.marketplace,
+      count: parseInt(row.total),
+    }));
+    const totalProducts = marketplaceCounts.reduce((acc, curr) => acc + curr.count, 0);
+
+    // Event counts (last 24h)
+    const eventsRes = await sql`
+      SELECT 
+        defense_action as event_type,
+        COUNT(*) as count
+      FROM sentinel_logs
+      WHERE user_id = ${userId}
+      AND created_at >= NOW() - INTERVAL '24 hours'
+      GROUP BY defense_action
+    `;
+
+    const eventCounts = eventsRes.rows.map(row => ({
+      event_type: row.event_type || 'unknown',
+      count: parseInt(row.count),
+    }));
+
+    const stats = logsRes.rows[0] || { violations: 0, saved: 0, erosion: 0, commission: 0 };
 
     const status: SentinelStatus = {
       is_active: user.protection_enabled && user.subscription_active,
@@ -134,8 +180,16 @@ export async function handleSentinelStatus(
       violations_today: parseInt(stats.violations) || 0,
       actions_today: user.triggered_today || 0,
       saved_today: parseFloat(stats.saved) || 0,
+      erosion_today: parseInt(stats.erosion) || 0,
+      commission_growth_today: parseInt(stats.commission) || 0,
       defense_mode: user.defense_mode || 'zero_stock',
       cron_interval_minutes: 5,
+      products_stats: {
+        total: totalProducts,
+        marketplace_counts: marketplaceCounts,
+      },
+      event_counts: eventCounts,
+      alerts_count: parseInt(stats.erosion) + parseInt(stats.commission),
     };
 
     return res.json(status);

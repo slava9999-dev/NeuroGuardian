@@ -8,43 +8,41 @@ interface StatusCardProps {
   highlight?: boolean;
 }
 
-interface EventItem {
-  event_type: string;
-  count: string | number;
-}
-
-interface ProductStat {
-  marketplace: string;
-  count: string | number;
-}
-
-interface DashboardData {
-  products: ProductStat[];
-  eventsLast24h: EventItem[];
-  pendingAlerts: number;
-}
-
-interface AgentStatusData {
-  lastRun: { created_at: string; payload: any } | null;
-  systemHealth: { status: string; checks: any };
-  nextScheduledRun: string;
+interface SentinelStatus {
+  is_active: boolean;
+  last_check: string | null;
+  next_check: string | null;
+  violations_today: number;
+  actions_today: number;
+  saved_today: number;
+  erosion_today: number;
+  commission_growth_today: number;
+  defense_mode: 'zero_stock' | 'price_correction';
+  cron_interval_minutes: number;
+  products_stats: {
+    total: number;
+    marketplace_counts: { marketplace: string; count: number }[];
+  };
+  event_counts: { event_type: string; count: number }[];
+  alerts_count: number;
 }
 
 export function DashboardPage() {
-  const [overview, setOverview] = React.useState<DashboardData | null>(null);
-  const [agentStatus, setAgentStatus] = React.useState<AgentStatusData | null>(null);
+  const [sentinelStatus, setSentinelStatus] = React.useState<SentinelStatus | null>(null);
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
     const fetchData = async () => {
       try {
-        const [overviewRes, statusRes] = await Promise.all([
-          fetch('/api/dashboard/overview'),
-          fetch('/api/dashboard/agent-status'),
-        ]);
+        const initData = (window as any).Telegram?.WebApp?.initData || '';
+        const headers = {
+          'Content-Type': 'application/json',
+          'X-Init-Data': initData,
+        };
 
-        if (overviewRes.ok) setOverview(await overviewRes.json());
-        if (statusRes.ok) setAgentStatus(await statusRes.json());
+        const res = await fetch('/api/index?action=sentinel-status', { headers });
+
+        if (res.ok) setSentinelStatus(await res.json());
       } catch (e) {
         console.error('Failed to fetch dashboard data', e);
       } finally {
@@ -68,20 +66,30 @@ export function DashboardPage() {
       {/* System Status Section */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatusCard
-          title="Статус агента"
-          value={agentStatus?.systemHealth?.status === 'ok' ? '✅ Активен' : '⚠️ Проблемы'}
-          subtitle={`Посл. запуск: ${formatTime(agentStatus?.lastRun?.created_at)}`}
+          title="Sentinel 2.0"
+          value={sentinelStatus?.is_active ? '🛡️ Активен' : '⏸️ Пауза'}
+          subtitle={`Посл. проверка: ${formatTime(sentinelStatus?.last_check)}`}
+          highlight={!sentinelStatus?.is_active}
         />
         <StatusCard
           title="Товары под защитой"
-          value={overview?.products?.reduce((sum, p) => sum + Number(p.count), 0) || 0}
-          subtitle={overview?.products?.map(p => `${p.marketplace}: ${p.count}`).join(', ')}
+          value={sentinelStatus?.products_stats?.total || 0}
+          subtitle={sentinelStatus?.products_stats?.marketplace_counts
+            .map(p => `${p.marketplace}: ${p.count}`)
+            .join(', ')}
         />
         <StatusCard
-          title="Активные уведомления"
-          value={overview?.pendingAlerts || 0}
-          subtitle="Требуют внимания"
-          highlight={(overview?.pendingAlerts || 0) > 0}
+          title="Сэкономлено сегодня"
+          value={`${formatMoney(sentinelStatus?.saved_today || 0)} ₽`}
+          subtitle={`Действий защиты: ${sentinelStatus?.actions_today || 0}`}
+        />
+        <StatusCard
+          title="Финансовые угрозы"
+          value={
+            (sentinelStatus?.erosion_today || 0) + (sentinelStatus?.commission_growth_today || 0)
+          }
+          subtitle={`Эрозия: ${sentinelStatus?.erosion_today || 0} | Комисии: ${sentinelStatus?.commission_growth_today || 0}`}
+          highlight={(sentinelStatus?.erosion_today || 0) > 0}
         />
       </section>
 
@@ -89,7 +97,7 @@ export function DashboardPage() {
       <section>
         <h2 className="text-xl font-semibold mb-4">Активность (24ч)</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {overview?.eventsLast24h?.map((event: EventItem) => (
+          {sentinelStatus?.event_counts?.map((event: { event_type: string; count: number }) => (
             <div
               key={event.event_type}
               className="bg-white p-4 rounded-lg shadow border border-gray-100"
@@ -98,7 +106,7 @@ export function DashboardPage() {
               <div className="text-gray-500 text-sm">{formatEventType(event.event_type)}</div>
             </div>
           ))}
-          {(!overview?.eventsLast24h || overview.eventsLast24h.length === 0) && (
+          {(!sentinelStatus?.event_counts || sentinelStatus.event_counts.length === 0) && (
             <div className="text-gray-400 p-4">Нет недавней активности</div>
           )}
         </div>
@@ -126,19 +134,25 @@ function StatusCard({ title, value, subtitle, highlight = false }: StatusCardPro
       className={`bg-white p-4 rounded-lg shadow border ${highlight ? 'border-orange-500 bg-orange-50' : 'border-gray-100'}`}
     >
       <div className="text-gray-500 text-sm font-medium">{title}</div>
-      <div className="text-2xl font-bold mt-1">{value}</div>
+      <div className="text-xl font-bold mt-1 truncate" title={String(value)}>
+        {value}
+      </div>
       {subtitle && <div className="text-gray-400 text-xs mt-1">{subtitle}</div>}
     </div>
   );
 }
 
 function formatTime(isoString: string | undefined | null): string {
-  if (!isoString) return 'Никогда';
+  if (!isoString) return 'Ждем...';
   try {
-    return new Date(isoString).toLocaleString('ru-RU');
+    return new Date(isoString).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
   } catch {
-    return 'Ошибка даты';
+    return '---';
   }
+}
+
+function formatMoney(amount: number): string {
+  return new Intl.NumberFormat('ru-RU').format(Math.round(amount));
 }
 
 function formatEventType(type: string): string {

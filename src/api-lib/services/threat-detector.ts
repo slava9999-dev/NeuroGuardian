@@ -61,19 +61,34 @@ export function scanProductThreats(
       costPrice: product.cost_price,
       category: product.category,
       marketplace,
-      useOzonCard: true, // Always account for this as it's the most common erosion
+      useOzonCard: true,
     });
 
-    if (economics.profit <= 0) {
+    // Map Economics Warnings to Threats
+    for (const warning of economics.warnings) {
+      let threatType: ThreatType = ThreatType.MARGIN_BELOW_ZERO;
+      let severity: 'low' | 'medium' | 'high' | 'critical' = 'medium';
+
+      if (warning.code === 'NEGATIVE_PROFIT') {
+        threatType = ThreatType.MARGIN_BELOW_ZERO;
+        severity = 'critical';
+      } else if (warning.code === 'OZON_CARD_IMPACT') {
+        threatType = ThreatType.OZON_CARD_EROSION;
+        severity = 'high';
+      }
+
       threats.push({
-        type: ThreatType.MARGIN_BELOW_ZERO,
-        severity: 'critical',
+        type: threatType,
+        severity,
         productId: product.product_id,
         nmId: product.nm_id,
-        message: `Товар в убытке! Прибыль: ${economics.profit}₽, Маржа: ${economics.margin}%`,
-        data: economics,
+        message: warning.message,
+        data: { ...economics, warningDetails: warning },
       });
-    } else if (economics.margin < 10) {
+    }
+
+    // Additional low-margin check (if not already negative)
+    if (economics.profit > 0 && economics.margin < 10) {
       threats.push({
         type: ThreatType.MARGIN_BELOW_ZERO,
         severity: 'high',
@@ -82,20 +97,6 @@ export function scanProductThreats(
         message: `Низкая маржинальность (${economics.margin}%).`,
         data: economics,
       });
-    }
-
-    // Ozon Card specific threat
-    if (marketplace === 'Ozon' && economics.ozonCardCosts > 0) {
-      // If profit is thin, Ozon Card might be the reason for erosion
-      if (economics.profit < economics.ozonCardCosts) {
-        threats.push({
-          type: ThreatType.OZON_CARD_EROSION,
-          severity: 'high',
-          productId: product.product_id,
-          message: `Скидка по Ozon Card (${economics.ozonCardCosts}₽) съедает всю прибыль.`,
-          data: { ozonCardCosts: economics.ozonCardCosts, profit: economics.profit },
-        });
-      }
     }
   }
 

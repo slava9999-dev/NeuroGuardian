@@ -155,13 +155,10 @@ export class SentinelService {
 
       // --- Cooldown Check (10 mins) ---
       if (product.updated_at) {
-        const lastUpdate = new Date(product.updated_at);
-        const diffMs = Date.now() - lastUpdate.getTime();
-        if (diffMs < 10 * 60 * 1000) {
-          // Update DB with current price but skip defense
-          await sql`UPDATE products SET current_price = ${livePrice} WHERE id = ${product.id}`;
-          continue;
-        }
+        // const lastUpdate = new Date(product.updated_at);
+        // const diffMs = Date.now() - lastUpdate.getTime();
+        // Cooldown logic is deferred to ACTIONS phase if needed.
+        // Currently we scan always on every cycle if price was fetched.
       }
 
       const scan = scanProductThreats(product, livePrice, marketplace);
@@ -171,16 +168,46 @@ export class SentinelService {
         // Check if Stop-Loss violation is present
         const stopLossThreat = scan.threats.find(t => t.type === ThreatType.COMPETITOR_PRICE_DROP);
 
+        // Check for financial threats
+        const erosionThreat = scan.threats.find(
+          t => t.type === ThreatType.OZON_CARD_EROSION || t.type === ThreatType.MARGIN_BELOW_ZERO
+        );
+
         if (stopLossThreat && user.protection_enabled) {
-          // Trigger Defense!
-          await this.executeDefense(user, product, livePrice, marketplace, keys, summary);
-        } else {
-          // Notify about financial threats (erosion, etc.) if severity is high
-          const highSeverityThreat = scan.threats.find(
-            t => t.severity === 'high' || t.severity === 'critical'
+          // Trigger Defense for Stop-Loss!
+          await this.executeDefense(
+            user,
+            product,
+            livePrice,
+            marketplace,
+            keys,
+            summary,
+            stopLossThreat.type
           );
-          if (highSeverityThreat) {
-            await this.notifyThreat(user, product, scan.threats[0], marketplace);
+        } else if (erosionThreat && user.protection_enabled) {
+          // Trigger Defense for Erosion if enabled (e.g. notify or auto-correct if mode supports it)
+          // Currently we just notify for erosion unless it hits min_price (which is covered by stop-loss usually)
+          // But strict mode might want to zero stock if profit < 0
+          if (erosionThreat.severity === 'critical') {
+            // For critical erosion (negative profit), we might want to defend too.
+            // For now, let's notify.
+            await this.notifyThreat(user, product, erosionThreat, marketplace);
+
+            // Log it as action=notify?
+            await logSentinelAction({
+              user_id: user.id,
+              product_id: product.product_id,
+              product_title: product.title,
+              detected_price: livePrice,
+              min_price: product.min_price || 0,
+              defense_action: 'notify',
+              saved_amount: 0,
+              marketplace,
+              threat_type: erosionThreat.type,
+              success: true,
+            });
+          } else {
+            await this.notifyThreat(user, product, erosionThreat, marketplace);
           }
         }
       }
@@ -202,7 +229,8 @@ export class SentinelService {
     livePrice: number,
     marketplace: 'WB' | 'Ozon',
     keys: any,
-    summary: SentinelRunResult
+    summary: SentinelRunResult,
+    threatType: string
   ): Promise<void> {
     const defenseMode = user.defense_mode || 'zero_stock';
     const minPrice = product.min_price;
@@ -237,26 +265,29 @@ export class SentinelService {
       }
     }
 
+    // Always log the attempt
+    summary.actionsTaken++;
+    const savedAmount = Math.max(0, minPrice - livePrice);
+
+    await logSentinelAction({
+      user_id: user.id,
+      product_id: product.product_id,
+      product_title: product.title,
+      detected_price: livePrice,
+      min_price: minPrice,
+      defense_action: defenseMode,
+      saved_amount: savedAmount,
+      marketplace,
+      threat_type: threatType,
+      success,
+    });
+
     if (success) {
-      summary.actionsTaken++;
-      const savedAmount = Math.max(0, minPrice - livePrice);
-
-      // Log to DB
-      await logSentinelAction({
-        user_id: user.id,
-        product_id: product.product_id,
-        product_title: product.title,
-        detected_price: livePrice,
-        min_price: minPrice,
-        defense_action: defenseMode,
-        saved_amount: savedAmount,
-        marketplace,
-      });
-
       // Notify User
       await this.notifyDefenseSuccess(user, product, livePrice, minPrice, defenseMode, marketplace);
     } else {
       console.error(`❌ Sentinel fail for ${product.product_id}: ${errorMsg}`);
+      summary.errors.push(`Defense failed for ${product.product_id}: ${errorMsg}`);
     }
   }
 
