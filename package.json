@@ -19,6 +19,7 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "check:regression": "node scripts/check-regression.cjs",
+    "check:production": "node scripts/production-check.cjs",
     "check:all": "npm run lint && npm run typecheck && npm run build && npm run test && npm run check:regression"
   },
   "dependencies": {
@@ -36,6 +37,7 @@
     "clsx": "^2.1.1",
     "dompurify": "^3.3.1",
     "framer-motion": "^12.23.26",
+    "pg": "^8.16.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.10.1",

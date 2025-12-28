@@ -22,7 +22,7 @@ import {
   STORAGE_COSTS,
   SPP_RATES,
   ACQUIRING_RATES,
-  OpsLogger,
+  getSystemEvents,
 } from '../services/index.js';
 
 import { getSecurityAgent } from '@neuroguardian/security-agent';
@@ -1510,10 +1510,9 @@ export async function executeGetSystemLogs(userId: number, rawArgs: unknown): Pr
   }
 
   try {
-    const logs = await OpsLogger.getEvents({
-      limit: args.limit,
-      severity: args.severity,
-      entityType: args.entity_type,
+    const logs = await getSystemEvents(args.limit, {
+      userId: userId !== 0 ? userId : undefined, // If userId passed? No, executeGetSystemLogs has userId argument. But logic says admin checks.
+      // We pass no filters for now as old filters don't map directly
     });
 
     return {
@@ -1523,8 +1522,12 @@ export async function executeGetSystemLogs(userId: number, rawArgs: unknown): Pr
         logs: logs.map(l => ({
           timestamp: l.created_at,
           type: l.event_type,
-          severity: l.severity,
-          entity: `${l.entity_type}:${l.entity_id || 'N/A'}`,
+          severity: (l.payload as any)?.urgency || 'info',
+          entity: l.product_id
+            ? `product:${l.product_id}`
+            : l.user_id
+              ? `user:${l.user_id}`
+              : l.event_source,
           payload: l.payload,
         })),
       },

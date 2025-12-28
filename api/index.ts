@@ -90,10 +90,22 @@ import {
   handleOpsEvents,
   handleOpsAudit,
   handleOpsDashboard,
+  handleOpsOverview,
+  handleOpsClients,
+  handleOpsAction,
 } from '../src/api-lib/handlers/ops.js';
 
 // Marketplace Accounts
 import { handleMarketplaceAccounts } from '../src/api-lib/handlers/marketplace-accounts.js';
+
+// n8n Webhooks
+import {
+  handleN8nPriceCheck,
+  handleN8nSyncProducts,
+  handleN8nHealth,
+  handleN8nSendReport,
+  handleN8nGetStats,
+} from '../src/api-lib/handlers/n8n-webhooks.js';
 
 // Utilities
 import {
@@ -371,6 +383,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'referral':
         return handleReferral(req, res);
 
+      // ========== N8N WEBHOOKS ==========
+      case 'n8n-price-check':
+        return handleN8nPriceCheck(req, res);
+
+      case 'n8n-sync-products':
+        return handleN8nSyncProducts(req, res);
+
+      case 'n8n-health':
+        return handleN8nHealth(req, res);
+
+      case 'n8n-send-report':
+        return handleN8nSendReport(req, res);
+
+      case 'n8n-get-stats':
+        return handleN8nGetStats(req, res);
+
       // ========== OPS PANEL ENDPOINTS ==========
       case 'ops-events':
         return handleOpsEvents(req, res);
@@ -380,6 +408,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       case 'ops-dashboard':
         return handleOpsDashboard(req, res);
+
+      case 'ops-overview':
+        return handleOpsOverview(req, res);
+
+      case 'ops-clients':
+        return handleOpsClients(req, res);
+
+      case 'ops-action':
+        return handleOpsAction(req, res);
 
       // ========== DEFAULT ==========
       default:

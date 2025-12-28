@@ -55,6 +55,11 @@ jobs:
         run: npm audit --audit-level=high
         continue-on-error: true
 
+      - name: Production Readiness Check
+        run: npm run check:production
+        env:
+          CI: true
+
   # ============================================
   # Job 2: Static Policy Checks (Regression Prevention)
   # Uses consolidated script to avoid DRY violations

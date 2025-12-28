@@ -9,6 +9,8 @@ export {
   getAccountById,
   addMarketplaceAccount,
   getAllUsers,
+  getUsersStats,
+  getUsersPaginated,
 } from './users.js';
 
 // Database
@@ -57,10 +59,13 @@ export {
 } from './yookassa.js';
 
 // Notifications
+// Notifications
 export {
+  notificationService,
+  sendAlert,
+  sendAlertToAdmin,
+  sendAlertToUser,
   sendTelegramNotification,
-  sendExpiryReminders,
-  sendProtectionAlert,
 } from './notifications.js';
 
 // Marketplace (WB & Ozon unified API)
@@ -116,4 +121,20 @@ export {
 } from './unit-economics.js';
 
 // Ops Panel (Dec 2024)
-export { OpsLogger, type OpsEventInput, type OpsAuditInput } from './ops-logger.js';
+// Ops Panel (Dec 2024)
+export {
+  logOpsEvent,
+  logAudit,
+  getSystemEvents,
+  type OpsEvent,
+  type AuditEntry,
+} from './ops-logger.js';
+
+// n8n Client
+export {
+  triggerN8nWorkflow,
+  triggerSyncProducts,
+  triggerRetryOnboarding,
+  getN8nSystemHealth,
+  type N8nActionPayload,
+} from './n8n-client.js';

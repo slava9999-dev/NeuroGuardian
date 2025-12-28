@@ -1,122 +1,390 @@
+// ============================================
+// NeuroGUARDIAN — Operations Logger Service
+// Enhanced logging for ops_events and ops_audit tables
+// ============================================
+
 import { sql } from '@vercel/postgres';
 
-export type OpsSeverity = 'info' | 'warning' | 'error' | 'critical';
-export type OpsEntityType = 'user' | 'product' | 'system' | 'n8n' | 'security' | 'integration';
+// ============================================
+// TYPES
+// ============================================
 
-export interface OpsEventPayload {
-  [key: string]: any;
+export type EventType =
+  | 'price_check'
+  | 'price_update_started'
+  | 'price_update_completed'
+  | 'price_update_failed'
+  | 'price_alert'
+  | 'price_protection_run'
+  | 'sync_products'
+  | 'sync_completed'
+  | 'sentinel_check'
+  | 'sentinel_alert'
+  | 'sentinel_action'
+  | 'agent_action'
+  | 'notification_sent'
+  | 'system_error'
+  | 'auth_failed'
+  | 'n8n_webhook'
+  | 'n8n_trigger_success'
+  | 'n8n_trigger_error';
+
+export type EventSource =
+  | 'agent'
+  | 'sentinel'
+  | 'price_protection'
+  | 'n8n'
+  | 'manual'
+  | 'system'
+  | 'marketplace_service';
+
+export type ActorType = 'user' | 'agent' | 'system' | 'n8n' | 'sentinel';
+
+export type AuditAction =
+  | 'create'
+  | 'update'
+  | 'delete'
+  | 'execute'
+  | 'login'
+  | 'price_change'
+  | 'api_call'
+  | 'settings_change';
+
+export type ResourceType =
+  | 'product'
+  | 'price'
+  | 'settings'
+  | 'user'
+  | 'api_key'
+  | 'subscription'
+  | 'price_rule';
+
+export interface OpsEvent {
+  eventType: EventType;
+  eventSource: EventSource;
+  userId?: number;
+  productId?: number;
+  payload?: Record<string, unknown>;
+  oldPrice?: number;
+  newPrice?: number;
+  competitorPrice?: number;
+  actionTaken?: string;
+  marketplace?: 'wildberries' | 'ozon';
+  externalId?: string;
 }
 
-export interface OpsEventInput {
-  eventType: string;
-  severity: OpsSeverity;
-  entityType: OpsEntityType;
-  entityId?: string;
-  payload?: OpsEventPayload;
-}
-
-export interface OpsAuditInput {
-  actorId?: number;
-  actorRole?: string;
-  action: string;
-  targetId?: string;
-  details?: any;
+export interface AuditEntry {
+  actorType: ActorType;
+  actorId?: string;
+  action: AuditAction;
+  resourceType: ResourceType;
+  resourceId?: string;
+  oldValue?: Record<string, unknown>;
+  newValue?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
   ipAddress?: string;
+  userAgent?: string;
+  requestId?: string;
+  success?: boolean;
+  errorMessage?: string;
 }
 
-export class OpsLogger {
-  /**
-   * Log a system event to the event bus (ops_events table)
-   */
-  static async logEvent(input: OpsEventInput) {
-    try {
-      // Basic PII masking could be added here if needed,
-      // but we assume caller handles sensitive data for now or we rely on DB policies.
-      const payload = JSON.stringify(input.payload || {});
+// ============================================
+// OPS EVENTS LOGGER
+// ============================================
 
-      await sql`
-        INSERT INTO ops_events (event_type, severity, entity_type, entity_id, payload)
-        VALUES (
-          ${input.eventType}, 
-          ${input.severity}, 
-          ${input.entityType}, 
-          ${input.entityId || null}, 
-          ${payload}::jsonb
-        )
-      `;
-    } catch (error) {
-      console.error('Failed to log ops event:', error);
-      // Fail-safe: don't crash main thread if logger fails
-    }
-  }
-
-  /**
-   * Log an operator action to the audit log (ops_audit table)
-   */
-  static async logAudit(input: OpsAuditInput) {
-    try {
-      const details = JSON.stringify(input.details || {});
-
-      await sql`
-        INSERT INTO ops_audit (actor_id, actor_role, action, target_id, details, ip_address)
-        VALUES (
-          ${input.actorId || null}, 
-          ${input.actorRole || 'system'}, 
-          ${input.action}, 
-          ${input.targetId || null}, 
-          ${details}::jsonb,
-          ${input.ipAddress || null}
-        )
-      `;
-    } catch (error) {
-      console.error('Failed to log audit entry:', error);
-    }
-  }
-
-  /**
-   * Retrieve recent events for the dashboard feed
-   */
-  /**
-   * Retrieve recent events with optional filtering
-   */
-  static async getEvents(options: { limit?: number; severity?: string; entityType?: string } = {}) {
-    const limit = options.limit || 50;
-    const severity = options.severity || null;
-    const entityType = options.entityType || null;
+/**
+ * Log an operational event to ops_events table
+ */
+export async function logOpsEvent(event: OpsEvent): Promise<number | null> {
+  try {
+    const userId = event.userId ?? null;
+    const productId = event.productId ?? null;
+    const payload = JSON.stringify(event.payload || {});
+    const oldPrice = event.oldPrice ?? null;
+    const newPrice = event.newPrice ?? null;
+    const competitorPrice = event.competitorPrice ?? null;
+    const actionTaken = event.actionTaken ?? null;
+    const marketplace = event.marketplace ?? null;
+    const externalId = event.externalId ?? null;
 
     const result = await sql`
-      SELECT * FROM ops_events 
-      WHERE (${severity}::text IS NULL OR severity = ${severity})
-      AND (${entityType}::text IS NULL OR entity_type = ${entityType})
-      ORDER BY created_at DESC 
+      INSERT INTO ops_events (
+        event_type, event_source, user_id, product_id,
+        payload, old_price, new_price, competitor_price,
+        action_taken, marketplace, external_id
+      ) VALUES (
+        ${event.eventType}, ${event.eventSource}, ${userId}, ${productId},
+        ${payload}, ${oldPrice}, ${newPrice}, ${competitorPrice},
+        ${actionTaken}, ${marketplace}, ${externalId}
+      )
+      RETURNING id
+    `;
+
+    return result.rows[0]?.id || null;
+  } catch (error) {
+    console.error('Failed to log ops event:', error);
+    // Don't throw - logging should not break main flow
+    return null;
+  }
+}
+
+/**
+ * Mark an event as processed
+ */
+export async function markEventProcessed(
+  eventId: number,
+  result: Record<string, unknown>
+): Promise<void> {
+  try {
+    const resultJson = JSON.stringify(result);
+    await sql`
+      UPDATE ops_events 
+      SET processed_at = NOW(), processing_result = ${resultJson}
+      WHERE id = ${eventId}
+    `;
+  } catch (error) {
+    console.error('Failed to mark event processed:', error);
+  }
+}
+
+/**
+ * Get pending events for processing
+ */
+export async function getPendingEvents(
+  eventType?: EventType,
+  limit = 100
+): Promise<Array<{ id: number; payload: Record<string, unknown>; created_at: Date }>> {
+  try {
+    // Note: sql template literals logic for optional params
+    const type = eventType || null;
+
+    // We used to do ($1::text IS NULL OR event_type = $1)
+    // With tagged templates we pass the value.
+    const result = await sql`
+      SELECT id, payload, created_at 
+      FROM ops_events 
+      WHERE processed_at IS NULL
+        AND (${type}::text IS NULL OR event_type = ${type})
+      ORDER BY created_at ASC
+      LIMIT ${limit}
+    `;
+    return result.rows as Array<{ id: number; payload: Record<string, unknown>; created_at: Date }>;
+  } catch (error) {
+    console.error('Failed to get pending events:', error);
+    return [];
+  }
+}
+
+/**
+ * Get events for a user (for dashboard)
+ */
+export async function getUserEvents(
+  userId: number,
+  hours = 24,
+  limit = 50
+): Promise<Array<Record<string, unknown>>> {
+  try {
+    // Calculate timestamp for interval manually to be safe with interpolation
+    // Or use interval syntax parameterization if supported.
+    // simpler: WHERE created_at > NOW() - make_interval(hours => ${hours})
+
+    const result = await sql`
+      SELECT event_type, event_source, payload, 
+             old_price, new_price, action_taken, 
+             marketplace, external_id, created_at
+      FROM ops_events 
+      WHERE user_id = ${userId} 
+        AND created_at > NOW() - (${hours} || ' hours')::interval
+      ORDER BY created_at DESC
       LIMIT ${limit}
     `;
     return result.rows;
+  } catch (error) {
+    console.error('Failed to get user events:', error);
+    return [];
   }
+}
 
-  // Alias for backward compatibility
-  static async getRecentEvents(limit = 50) {
-    return this.getEvents({ limit });
-  }
+/**
+ * Get event statistics for dashboard
+ */
+export async function getEventStats(userId?: number, hours = 24): Promise<Record<string, number>> {
+  try {
+    const uid = userId || null;
 
-  /**
-   * Retrieve audit logs with optional filters
-   */
-  static async getAuditLogs(limit = 50, actorId?: number) {
-    if (actorId) {
-      const result = await sql`
-        SELECT * FROM ops_audit 
-        WHERE actor_id = ${actorId}
-        ORDER BY created_at DESC 
-        LIMIT ${limit}
-      `;
-      return result.rows;
-    }
     const result = await sql`
-      SELECT * FROM ops_audit 
-      ORDER BY created_at DESC 
+      SELECT event_type, COUNT(*) as count
+      FROM ops_events 
+      WHERE created_at > NOW() - (${hours} || ' hours')::interval
+        AND (${uid}::int IS NULL OR user_id = ${uid})
+      GROUP BY event_type
+    `;
+
+    const stats: Record<string, number> = {};
+    for (const row of result.rows) {
+      stats[row.event_type] = parseInt(row.count);
+    }
+    return stats;
+  } catch (error) {
+    console.error('Failed to get event stats:', error);
+    return {};
+  }
+}
+
+// ... (existing getEventStats)
+
+/**
+ * Get system events (for admin dashboard logs)
+ */
+export async function getSystemEvents(
+  limit = 100,
+  filters?: { eventType?: string; source?: string; userId?: number }
+): Promise<Array<Record<string, unknown>>> {
+  try {
+    const fType = filters?.eventType || null;
+    const fSource = filters?.source || null;
+    const fUser = filters?.userId || null;
+
+    const result = await sql`
+      SELECT *
+      FROM ops_events 
+      WHERE (${fType}::text IS NULL OR event_type = ${fType})
+        AND (${fSource}::text IS NULL OR event_source = ${fSource})
+        AND (${fUser}::int IS NULL OR user_id = ${fUser})
+      ORDER BY created_at DESC
       LIMIT ${limit}
     `;
     return result.rows;
+  } catch (error) {
+    console.error('Failed to get system events:', error);
+    return [];
+  }
+}
+
+// ============================================
+// AUDIT LOGGER
+// ============================================
+
+/**
+ * Log an audit entry to ops_audit table
+ * This is an immutable record - cannot be updated or deleted
+ */
+export async function logAudit(entry: AuditEntry): Promise<number | null> {
+  try {
+    const actorId = entry.actorId ?? null;
+    const resourceId = entry.resourceId ?? null;
+    const oldValue = entry.oldValue ? JSON.stringify(entry.oldValue) : null;
+    const newValue = entry.newValue ? JSON.stringify(entry.newValue) : null;
+    const metadata = JSON.stringify(entry.metadata || {});
+    const ipAddress = entry.ipAddress ?? null;
+    const userAgent = entry.userAgent ?? null;
+    const requestId = entry.requestId ?? null;
+    const success = entry.success !== false; // Default to true
+    const errorMessage = entry.errorMessage ?? null;
+
+    const result = await sql`
+      INSERT INTO ops_audit (
+        actor_type, actor_id, action, resource_type, resource_id,
+        old_value, new_value, metadata,
+        ip_address, user_agent, request_id,
+        success, error_message
+      ) VALUES (
+        ${entry.actorType}, ${actorId}, ${entry.action}, ${entry.resourceType}, ${resourceId},
+        ${oldValue}, ${newValue}, ${metadata},
+        ${ipAddress}, ${userAgent}, ${requestId},
+        ${success}, ${errorMessage}
+      )
+      RETURNING id
+    `;
+
+    return result.rows[0]?.id || null;
+  } catch (error) {
+    console.error('Failed to log audit entry:', error);
+    // Don't throw - audit logging should not break main flow
+    return null;
+  }
+}
+
+/**
+ * Log a price change with full audit trail
+ */
+export async function logPriceChange(params: {
+  actorType: ActorType;
+  actorId?: string;
+  productId: string;
+  marketplace: 'wildberries' | 'ozon';
+  oldPrice: number;
+  newPrice: number;
+  reason: string;
+  requestId?: string;
+}): Promise<void> {
+  await logAudit({
+    actorType: params.actorType,
+    actorId: params.actorId,
+    action: 'price_change',
+    resourceType: 'price',
+    resourceId: params.productId,
+    oldValue: { price: params.oldPrice, marketplace: params.marketplace },
+    newValue: { price: params.newPrice, marketplace: params.marketplace },
+    metadata: { reason: params.reason },
+    requestId: params.requestId,
+    success: true,
+  });
+
+  await logOpsEvent({
+    eventType: 'price_update_completed',
+    eventSource: params.actorType === 'agent' ? 'agent' : 'system',
+    oldPrice: params.oldPrice,
+    newPrice: params.newPrice,
+    actionTaken: 'price_updated',
+    marketplace: params.marketplace,
+    externalId: params.productId,
+    payload: { reason: params.reason },
+  });
+}
+
+/**
+ * Get audit trail for a resource
+ */
+export async function getAuditTrail(
+  resourceType: ResourceType,
+  resourceId: string,
+  limit = 50
+): Promise<Array<Record<string, unknown>>> {
+  try {
+    const result = await sql`
+      SELECT actor_type, actor_id, action, 
+             old_value, new_value, metadata,
+             success, error_message, created_at
+      FROM ops_audit 
+      WHERE resource_type = ${resourceType} AND resource_id = ${resourceId}
+      ORDER BY created_at DESC
+      LIMIT ${limit}
+    `;
+    return result.rows;
+  } catch (error) {
+    console.error('Failed to get audit trail:', error);
+    return [];
+  }
+}
+
+/**
+ * Get recent audit entries (for admin dashboard)
+ */
+export async function getRecentAuditEntries(limit = 100): Promise<Array<Record<string, unknown>>> {
+  try {
+    const result = await sql`
+      SELECT actor_type, actor_id, action, 
+             resource_type, resource_id,
+             success, created_at
+      FROM ops_audit 
+      ORDER BY created_at DESC
+      LIMIT ${limit}
+    `;
+    return result.rows;
+  } catch (error) {
+    console.error('Failed to get recent audit entries:', error);
+    return [];
   }
 }

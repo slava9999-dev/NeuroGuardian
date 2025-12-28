@@ -7,7 +7,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { validateTelegramInitData, sanitizeInput } from '../lib/index.js';
 import { getSecret, getSecretSync } from '../lib/secrets-helper.js';
-import { OpsLogger } from '../services/ops-logger.js';
+import { logOpsEvent } from '../services/ops-logger.js';
 
 // ============================================
 // TYPES
@@ -62,11 +62,11 @@ export async function extractAdminAuthAsync(req: VercelRequest): Promise<AuthRes
 
   const expectedAdminKey = await getSecret('admin_api_key', 'admin_auth');
 
-  if (adminKey && expectedAdminKey && adminKey === expectedAdminKey && adminUserId) {
+  if (adminKey && expectedAdminKey && adminKey === expectedAdminKey) {
     return {
       success: true,
       context: {
-        userId: parseInt(adminUserId),
+        userId: adminUserId ? parseInt(adminUserId) : 0, // 0 = System Admin
         authMethod: 'admin',
       },
     };
@@ -89,11 +89,11 @@ export function extractAdminAuth(req: VercelRequest): AuthResult {
 
   const expectedAdminKey = getSecretSync('admin_api_key');
 
-  if (adminKey && expectedAdminKey && adminKey === expectedAdminKey && adminUserId) {
+  if (adminKey && expectedAdminKey && adminKey === expectedAdminKey) {
     return {
       success: true,
       context: {
-        userId: parseInt(adminUserId),
+        userId: adminUserId ? parseInt(adminUserId) : 0, // 0 = System Admin
         authMethod: 'admin',
       },
     };
@@ -254,15 +254,16 @@ export function sendAuthError(
   req?: VercelRequest
 ) {
   if (req) {
-    OpsLogger.logEvent({
-      eventType: 'security.auth_failed',
-      severity: 'warning',
-      entityType: 'user', // or system
+    logOpsEvent({
+      eventType: 'auth_failed',
+      eventSource: 'system',
       payload: {
         error,
         path: req.url,
         method: req.method,
         ip: (req.headers['x-forwarded-for'] as string)?.split(',')[0],
+        severity: 'warning',
+        entityType: 'user',
       },
     });
   }

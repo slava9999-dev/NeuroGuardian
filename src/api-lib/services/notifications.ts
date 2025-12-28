@@ -1,117 +1,376 @@
 // ============================================
 // NeuroGUARDIAN — Notification Service
-// Telegram notifications and reminders
+// Telegram notifications for alerts and reports
 // ============================================
 
-import { TELEGRAM_BOT_TOKEN } from '../lib/constants.js';
-import { getUsersWithExpiringSubscriptions, markReminderSent } from './database.js';
+import { sql } from '@vercel/postgres';
+import { logOpsEvent } from './ops-logger.js';
 
-const TELEGRAM_API = 'https://api.telegram.org';
+// ============================================
+// TYPES
+// ============================================
+
+export type AlertUrgency = 'low' | 'medium' | 'high' | 'critical';
+
+export type AlertType =
+  | 'price_protection'
+  | 'sentinel_alert'
+  | 'system_error'
+  | 'sync_completed'
+  | 'daily_report'
+  | 'hourly_report'
+  | 'subscription_expired'
+  | 'welcome';
+
+export interface Alert {
+  type: AlertType;
+  urgency: AlertUrgency;
+  message?: string;
+  product?: {
+    name: string;
+    marketplace: string;
+    externalId: string;
+    userId?: number;
+  };
+  analysis?: {
+    currentPrice: number;
+    recommendedPrice: number;
+    reason: string;
+    action: string;
+  };
+  data?: Record<string, unknown>;
+}
+
+export interface HourlyReport {
+  productsSynced: number;
+  priceChecks: number;
+  autoUpdates: number;
+  alertsSent: number;
+  errors?: string[];
+}
+
+// ============================================
+// TELEGRAM HELPERS
+// ============================================
+
+const TELEGRAM_API = 'https://api.telegram.org/bot';
+
+function getBotToken(): string {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) {
+    throw new Error('TELEGRAM_BOT_TOKEN not configured');
+  }
+  return token;
+}
+
+function getAdminChatId(): string {
+  const chatId = process.env.ADMIN_CHAT_ID;
+  if (!chatId) {
+    console.warn('ADMIN_CHAT_ID not configured, notifications will be skipped');
+    return '';
+  }
+  return chatId;
+}
 
 /**
- * Send Telegram notification to user
+ * Send a message via Telegram Bot API
  */
-export async function sendTelegramNotification(userId: number, message: string): Promise<boolean> {
-  if (!TELEGRAM_BOT_TOKEN) {
-    console.warn('⚠️ TELEGRAM_BOT_TOKEN not configured, skipping notification');
+async function sendTelegramMessage(
+  chatId: string,
+  text: string,
+  options?: {
+    parseMode?: 'Markdown' | 'HTML';
+    disableNotification?: boolean;
+    replyMarkup?: Record<string, unknown>;
+  }
+): Promise<boolean> {
+  if (!chatId) {
+    console.warn('No chat ID provided, skipping notification');
     return false;
   }
 
   try {
-    const response = await fetch(`${TELEGRAM_API}/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+    const token = getBotToken();
+    const response = await fetch(`${TELEGRAM_API}${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        chat_id: userId,
-        text: message,
-        parse_mode: 'Markdown',
+        chat_id: chatId,
+        text,
+        parse_mode: options?.parseMode || 'Markdown',
+        disable_notification: options?.disableNotification || false,
+        reply_markup: options?.replyMarkup,
       }),
     });
 
     if (!response.ok) {
       const error = await response.text();
-      console.error(`Failed to send notification to ${userId}:`, error);
+      console.error('Telegram API error:', error);
       return false;
     }
 
-    console.log(`✅ Notification sent to ${userId}`);
     return true;
   } catch (error) {
-    console.error(`Error sending notification to ${userId}:`, error);
+    console.error('Failed to send Telegram message:', error);
     return false;
   }
 }
 
 /**
- * Send subscription expiry reminders
- * Called by cron job
+ * Get user's Telegram chat ID from database
  */
-export async function sendExpiryReminders(): Promise<{ sent: number; errors: number }> {
-  let sent = 0;
-  let errors = 0;
-
+async function getUserChatId(userId: number): Promise<string | null> {
   try {
-    // Get users with subscriptions expiring in 3 days
-    const users = await getUsersWithExpiringSubscriptions(3);
-
-    for (const user of users) {
-      if (!user.subscription_end) continue;
-
-      const daysLeft = Math.ceil(
-        (new Date(user.subscription_end).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-      );
-
-      const message =
-        daysLeft <= 0
-          ? `⚠️ *Ваша подписка NeuroGUARDIAN истекла!*\n\nЗащита ваших товаров отключена. Продлите подписку, чтобы продолжить защищать маржу.`
-          : `⏰ *Напоминание: подписка истекает через ${daysLeft} ${getDaysWord(daysLeft)}*\n\nПродлите подписку NeuroGUARDIAN, чтобы защита работала непрерывно.`;
-
-      const success = await sendTelegramNotification(user.id, message);
-
-      if (success) {
-        sent++;
-        await markReminderSent(user.id);
-      } else {
-        errors++;
-      }
-    }
+    const result = await sql`SELECT id FROM users WHERE id = ${userId}`;
+    return result.rows[0]?.id?.toString() || null;
   } catch (error) {
-    console.error('Error sending expiry reminders:', error);
-    errors++;
+    console.error('Failed to get user chat ID:', error);
+    return null;
+  }
+}
+
+// ============================================
+// ALERT FORMATTING
+// ============================================
+
+const URGENCY_EMOJI: Record<AlertUrgency, string> = {
+  low: 'ℹ️',
+  medium: '⚠️',
+  high: '🔶',
+  critical: '🚨',
+};
+
+function formatAlert(alert: Alert): string {
+  const emoji = URGENCY_EMOJI[alert.urgency];
+
+  // Price protection alert
+  if (alert.type === 'price_protection' && alert.analysis && alert.product) {
+    return [
+      `${emoji} *Price Alert: ${escapeMarkdown(alert.product.name)}*`,
+      ``,
+      `📍 Маркетплейс: ${alert.product.marketplace}`,
+      `💰 Текущая цена: ${alert.analysis.currentPrice}₽`,
+      `📊 Рекомендация: ${alert.analysis.recommendedPrice}₽`,
+      ``,
+      `📝 Причина: ${escapeMarkdown(alert.analysis.reason)}`,
+      `🎯 Действие: ${alert.analysis.action}`,
+    ].join('\n');
   }
 
-  return { sent, errors };
+  // Sentinel alert
+  if (alert.type === 'sentinel_alert' && alert.product) {
+    return [
+      `${emoji} *Sentinel Alert*`,
+      ``,
+      `📦 ${escapeMarkdown(alert.product.name)}`,
+      `📍 ${alert.product.marketplace}`,
+      ``,
+      alert.message || 'Обнаружена нежелательная акция',
+    ].join('\n');
+  }
+
+  // System error
+  if (alert.type === 'system_error') {
+    return [`${emoji} *System Error*`, ``, alert.message || 'Произошла системная ошибка'].join(
+      '\n'
+    );
+  }
+
+  // Default format
+  return `${emoji} *${alert.type}*\n\n${alert.message || 'No details'}`;
+}
+
+function escapeMarkdown(text: string): string {
+  return text.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
+}
+
+// ============================================
+// NOTIFICATION SERVICE
+// ============================================
+
+/**
+ * Send alert to admin
+ */
+export async function sendAlertToAdmin(alert: Alert): Promise<boolean> {
+  const adminChatId = getAdminChatId();
+  if (!adminChatId) return false;
+
+  const message = formatAlert(alert);
+  const success = await sendTelegramMessage(adminChatId, message);
+
+  // Log notification
+  await logOpsEvent({
+    eventType: 'notification_sent',
+    eventSource: 'system',
+    payload: {
+      alertType: alert.type,
+      urgency: alert.urgency,
+      success,
+      recipient: 'admin',
+    },
+  });
+
+  return success;
 }
 
 /**
- * Send protection trigger notification
+ * Send alert to user
  */
-export async function sendProtectionAlert(
-  userId: number,
-  productTitle: string,
-  detectedPrice: number,
-  minPrice: number,
-  action: 'zero_stock' | 'price_correction',
-  savedAmount: number
-): Promise<boolean> {
-  const actionText = action === 'zero_stock' ? '🛑 Товар снят с продажи' : '🔄 Цена восстановлена';
+export async function sendAlertToUser(userId: number, alert: Alert): Promise<boolean> {
+  const chatId = await getUserChatId(userId);
+  if (!chatId) {
+    console.warn(`No chat ID for user ${userId}, skipping notification`);
+    return false;
+  }
 
-  const message =
-    `🛡️ *SENTINEL ЗАЩИТА СРАБОТАЛА*\n\n` +
-    `📦 ${productTitle}\n` +
-    `💰 Обнаружена цена: ${detectedPrice}₽\n` +
-    `⚡ Минимум Stop-Loss: ${minPrice}₽\n\n` +
-    `${actionText}\n` +
-    `💵 Сохранено: ${savedAmount}₽`;
+  const message = formatAlert(alert);
+  const success = await sendTelegramMessage(chatId, message);
 
-  return sendTelegramNotification(userId, message);
+  // Log notification
+  await logOpsEvent({
+    eventType: 'notification_sent',
+    eventSource: 'system',
+    userId,
+    payload: {
+      alertType: alert.type,
+      urgency: alert.urgency,
+      success,
+    },
+  });
+
+  return success;
 }
 
 /**
- * Helper: get correct Russian word for days
+ * Send alert - routes to admin for critical, user for others
  */
-function getDaysWord(days: number): string {
-  if (days === 1) return 'день';
-  if (days >= 2 && days <= 4) return 'дня';
-  return 'дней';
+export async function sendAlert(alert: Alert): Promise<boolean> {
+  // Critical alerts always go to admin
+  if (alert.urgency === 'critical' || alert.urgency === 'high') {
+    await sendAlertToAdmin(alert);
+  }
+
+  // Also send to user if applicable
+  if (alert.product?.userId) {
+    return await sendAlertToUser(alert.product.userId, alert);
+  }
+
+  // Default to admin
+  return await sendAlertToAdmin(alert);
 }
+
+/**
+ * Send hourly report to admin
+ */
+export async function sendHourlyReport(report: HourlyReport): Promise<boolean> {
+  const adminChatId = getAdminChatId();
+  if (!adminChatId) return false;
+
+  const hasErrors = report.errors && report.errors.length > 0;
+  const emoji = hasErrors ? '⚠️' : '📊';
+
+  const message = [
+    `${emoji} *Hourly Report*`,
+    ``,
+    `⏰ ${new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })}`,
+    ``,
+    `📦 Products synced: ${report.productsSynced}`,
+    `✅ Price checks: ${report.priceChecks}`,
+    `✏️ Auto-updates: ${report.autoUpdates}`,
+    `⚠️ Alerts sent: ${report.alertsSent}`,
+    ``,
+    hasErrors ? `❌ Errors: ${report.errors!.length}` : `✅ No errors`,
+  ].join('\n');
+
+  const success = await sendTelegramMessage(adminChatId, message);
+
+  await logOpsEvent({
+    eventType: 'notification_sent',
+    eventSource: 'system',
+    payload: {
+      reportType: 'hourly',
+      success,
+      ...report,
+    },
+  });
+
+  return success;
+}
+
+/**
+ * Send daily report to admin
+ */
+export async function sendDailyReport(stats: {
+  totalProducts: number;
+  totalPriceChanges: number;
+  totalAlerts: number;
+  totalErrors: number;
+  topProducts?: Array<{ name: string; changes: number }>;
+}): Promise<boolean> {
+  const adminChatId = getAdminChatId();
+  if (!adminChatId) return false;
+
+  const message = [
+    `📈 *Daily Report*`,
+    ``,
+    `📅 ${new Date().toLocaleDateString('ru-RU')}`,
+    ``,
+    `📦 Total products: ${stats.totalProducts}`,
+    `✏️ Price changes: ${stats.totalPriceChanges}`,
+    `⚠️ Alerts: ${stats.totalAlerts}`,
+    `❌ Errors: ${stats.totalErrors}`,
+    ``,
+    stats.topProducts && stats.topProducts.length > 0
+      ? `🏆 *Top Products (by changes):*\n${stats.topProducts.map((p, i) => `${i + 1}. ${escapeMarkdown(p.name)}: ${p.changes}`).join('\n')}`
+      : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  return await sendTelegramMessage(adminChatId, message);
+}
+
+/**
+ * Send welcome message to new user
+ */
+export async function sendWelcomeMessage(userId: number, userName: string): Promise<boolean> {
+  const chatId = await getUserChatId(userId);
+  if (!chatId) return false;
+
+  const message = [
+    `👋 *Добро пожаловать в NeuroGUARDIAN!*`,
+    ``,
+    `Привет, ${escapeMarkdown(userName)}!`,
+    ``,
+    `🧠 AI-агент готов помочь вам управлять товарами на маркетплейсах.`,
+    ``,
+    `🚀 Начните с добавления API-ключей в настройках.`,
+  ].join('\n');
+
+  return await sendTelegramMessage(chatId, message);
+}
+
+// ============================================
+// EXPORT
+// ============================================
+
+export const notificationService = {
+  sendAlert,
+  sendAlertToAdmin,
+  sendAlertToUser,
+  sendHourlyReport,
+  sendDailyReport,
+  sendWelcomeMessage,
+  sendTelegramNotification,
+};
+
+/**
+ * Legacy compatibility wrapper (simple text message)
+ */
+export async function sendTelegramNotification(userId: number, message: string): Promise<boolean> {
+  const chatId = await getUserChatId(userId);
+  if (!chatId) return false;
+  return sendTelegramMessage(chatId, message, { parseMode: 'HTML' });
+}
+
+export default notificationService;

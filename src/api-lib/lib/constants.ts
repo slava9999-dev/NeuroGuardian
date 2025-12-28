@@ -86,7 +86,19 @@ export const RATE_WINDOW = 60 * 1000; // 1 minute
 export const IS_PRODUCTION =
   process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
 
-export const TEST_MODE = process.env.TEST_MODE === 'true';
+// CRITICAL: TEST_MODE is ALWAYS false in production, regardless of env variable
+// This prevents accidental bypass of payment requirements (AUDIT-2025-12-28)
+const _rawTestMode = process.env.TEST_MODE === 'true';
+export const TEST_MODE = IS_PRODUCTION ? false : _rawTestMode;
+
+// Log warning if someone tries to enable TEST_MODE in production
+if (IS_PRODUCTION && _rawTestMode) {
+  console.error(
+    '🚨 SECURITY WARNING: TEST_MODE=true was set in production environment. ' +
+      'This has been automatically disabled for safety. ' +
+      'Remove TEST_MODE from production environment variables.'
+  );
+}
 
 // ============================================
 // SECRETS — DEPRECATED EXPORTS

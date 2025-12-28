@@ -72,7 +72,72 @@ export async function deleteMarketplaceAccount(
   return (result.rowCount ?? 0) > 0;
 }
 
-export async function getAllUsers(): Promise<Array<{ telegram_id: number }>> {
-  const { rows } = await sql`SELECT id as telegram_id FROM users`;
-  return rows as Array<{ telegram_id: number }>;
+export async function getAllUsers(): Promise<Array<{ id: number; telegram_id: number }>> {
+  const { rows } = await sql`SELECT id, id as telegram_id FROM users WHERE is_active = true`;
+  return rows as Array<{ id: number; telegram_id: number }>;
+}
+
+export async function getUsersStats() {
+  const total = await sql`SELECT COUNT(*) as count FROM users`;
+  const active = await sql`SELECT COUNT(*) as count FROM users WHERE is_active = true`;
+  const newToday =
+    await sql`SELECT COUNT(*) as count FROM users WHERE created_at > NOW() - INTERVAL '24 hours'`;
+
+  return {
+    total: parseInt(total.rows[0].count),
+    active: parseInt(active.rows[0].count),
+    newToday: parseInt(newToday.rows[0].count),
+  };
+}
+
+export interface UserSummary {
+  id: number;
+  first_name: string;
+  last_name?: string;
+  username?: string;
+  is_active: boolean;
+  created_at: string;
+  subscription_plan: string;
+  total_products: number;
+  platforms: string[];
+}
+
+export async function getUsersPaginated(limit: number, offset: number, search?: string) {
+  let query;
+
+  if (search) {
+    const searchPattern = `%${search}%`;
+    query = sql`
+      SELECT id, first_name, last_name, username, is_active, created_at, subscription_plan, total_products, api_key_wb, api_key_ozon
+      FROM users 
+      WHERE 
+        first_name ILIKE ${searchPattern} OR 
+        last_name ILIKE ${searchPattern} OR 
+        username ILIKE ${searchPattern} OR
+        CAST(id AS TEXT) ILIKE ${searchPattern}
+      ORDER BY created_at DESC 
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+  } else {
+    query = sql`
+      SELECT id, first_name, last_name, username, is_active, created_at, subscription_plan, total_products, api_key_wb, api_key_ozon
+      FROM users 
+      ORDER BY created_at DESC 
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+  }
+
+  const { rows } = await query;
+
+  return rows.map((row: any) => ({
+    id: row.id,
+    first_name: row.first_name,
+    last_name: row.last_name,
+    username: row.username,
+    is_active: row.is_active,
+    created_at: row.created_at,
+    subscription_plan: row.subscription_plan,
+    total_products: row.total_products,
+    platforms: [row.api_key_wb ? 'wb' : null, row.api_key_ozon ? 'ozon' : null].filter(Boolean),
+  }));
 }
