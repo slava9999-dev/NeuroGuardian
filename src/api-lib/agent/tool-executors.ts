@@ -22,6 +22,7 @@ import {
   STORAGE_COSTS,
   SPP_RATES,
   ACQUIRING_RATES,
+  OpsLogger,
 } from '../services/index.js';
 
 import { getSecurityAgent } from '@neuroguardian/security-agent';
@@ -44,6 +45,7 @@ import {
   UpdateStocksArgsSchema,
   SetStopLossArgsSchema,
   BulkProtectProductsArgsSchema,
+  GetSystemLogsArgsSchema,
 } from './validators.js';
 
 // Unified product matching
@@ -1087,14 +1089,16 @@ export async function executeSearchWeb(_userId: number, rawArgs: unknown): Promi
 
   let apiKey: string | undefined;
   try {
-     apiKey = (await agent.secrets.get({
-         userId: 'system',
-         key: 'serper_api_key',
-         purpose: 'web_search',
-         ttl: 300
-     })).value;
+    apiKey = (
+      await agent.secrets.get({
+        userId: 'system',
+        key: 'serper_api_key',
+        purpose: 'web_search',
+        ttl: 300,
+      })
+    ).value;
   } catch {
-     apiKey = process.env.SERPER_API_KEY;
+    apiKey = process.env.SERPER_API_KEY;
   }
 
   if (!apiKey) {
@@ -1479,6 +1483,50 @@ export async function executeBulkProtectProducts(
         count: updates.length,
         product_ids: updates.map(u => u.product_id),
         preview: updates.slice(0, 5),
+      },
+    };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * GET_SYSTEM_LOGS — Admin only: Retrieve system events
+ */
+export async function executeGetSystemLogs(userId: number, rawArgs: unknown): Promise<ToolResult> {
+  const validation = validateToolArgs(GetSystemLogsArgsSchema, rawArgs);
+  if (isValidationError(validation)) return { success: false, error: validation.error };
+  const args = validation.data;
+
+  // Authorization check
+  const { getUserById } = await import('../services/index.js');
+  const user = await getUserById(userId);
+  const adminId = process.env.ADMIN_TELEGRAM_ID;
+  const isAdmin =
+    (user as any)?.role === 'admin' || (adminId && String(userId) === String(adminId));
+
+  if (!isAdmin) {
+    return { success: false, error: '⛔ Access Denied: Admin rights required for system logs.' };
+  }
+
+  try {
+    const logs = await OpsLogger.getEvents({
+      limit: args.limit,
+      severity: args.severity,
+      entityType: args.entity_type,
+    });
+
+    return {
+      success: true,
+      data: {
+        count: logs.length,
+        logs: logs.map(l => ({
+          timestamp: l.created_at,
+          type: l.event_type,
+          severity: l.severity,
+          entity: `${l.entity_type}:${l.entity_id || 'N/A'}`,
+          payload: l.payload,
+        })),
       },
     };
   } catch (error) {

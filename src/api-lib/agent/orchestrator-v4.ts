@@ -32,6 +32,7 @@ import {
   executeUpdateStocks,
   executeSetStopLoss,
   executeBulkProtectProducts,
+  executeGetSystemLogs,
 } from './tool-executors.js';
 // ============================================
 // LLM PROVIDER CONFIG
@@ -566,6 +567,8 @@ async function executeTool(
         return await executeSetStopLoss(userId, args);
       case 'bulk_protect_products':
         return await executeBulkProtectProducts(userId, args);
+      case 'get_system_logs':
+        return await executeGetSystemLogs(userId, args);
       default:
         return { success: false, error: `Unknown tool: ${toolName}` };
     }

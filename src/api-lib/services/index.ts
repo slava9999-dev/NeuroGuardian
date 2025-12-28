@@ -114,3 +114,6 @@ export {
   type UnitEconomicsInput,
   type UnitEconomicsResult,
 } from './unit-economics.js';
+
+// Ops Panel (Dec 2024)
+export { OpsLogger, type OpsEventInput, type OpsAuditInput } from './ops-logger.js';

@@ -28,6 +28,7 @@ export const ToolNameEnum = z.enum([
   'update_stocks',
   'set_stop_loss',
   'bulk_protect_products',
+  'get_system_logs',
 ]);
 
 export type ToolName = z.infer<typeof ToolNameEnum>;
@@ -343,6 +344,7 @@ export const PLAN_JSON_SCHEMA = {
                 'update_stocks',
                 'set_stop_loss',
                 'bulk_protect_products',
+                'get_system_logs',
               ],
             },
             args: {
@@ -440,6 +442,15 @@ export const PLAN_JSON_SCHEMA = {
                 low_stock_only: {
                   type: 'boolean',
                   description: 'Only low stock items',
+                },
+                severity: {
+                  type: 'string',
+                  enum: ['info', 'warning', 'error', 'critical'],
+                  description: 'Log severity level',
+                },
+                entity_type: {
+                  type: 'string',
+                  description: 'Entity type filter (e.g. user, product)',
                 },
               },
               required: [], // All args are optional

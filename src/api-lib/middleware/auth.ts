@@ -7,6 +7,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { validateTelegramInitData, sanitizeInput } from '../lib/index.js';
 import { getSecret, getSecretSync } from '../lib/secrets-helper.js';
+import { OpsLogger } from '../services/ops-logger.js';
 
 // ============================================
 // TYPES
@@ -246,7 +247,25 @@ export function verifyAdminAccess(req: VercelRequest): boolean {
 // RESPONSE HELPERS
 // ============================================
 
-export function sendAuthError(res: VercelResponse, error: string, statusCode = 401) {
+export function sendAuthError(
+  res: VercelResponse,
+  error: string,
+  statusCode = 401,
+  req?: VercelRequest
+) {
+  if (req) {
+    OpsLogger.logEvent({
+      eventType: 'security.auth_failed',
+      severity: 'warning',
+      entityType: 'user', // or system
+      payload: {
+        error,
+        path: req.url,
+        method: req.method,
+        ip: (req.headers['x-forwarded-for'] as string)?.split(',')[0],
+      },
+    });
+  }
   return res.status(statusCode).json({ error, code: 'AUTH_FAILED' });
 }
 

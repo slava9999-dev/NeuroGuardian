@@ -45,6 +45,7 @@ export const ROUTE_GROUPS = {
     'send-reminders',
     'referral',
   ],
+  ops: ['ops-events', 'ops-audit', 'ops-dashboard'],
 } as const;
 
 // ============================================
@@ -60,4 +61,5 @@ export const AVAILABLE_ACTIONS = [
   ...ROUTE_GROUPS.chat,
   ...ROUTE_GROUPS.analytics,
   ...ROUTE_GROUPS.admin,
+  ...ROUTE_GROUPS.ops,
 ];

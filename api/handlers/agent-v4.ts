@@ -107,7 +107,7 @@ export async function handleAgentV4(
   const user = (await getUserById(userId)) as DBUserRecord | null;
 
   // 2. Check subscription
-  if (!isSubscriptionActive(user)) {
+  if (!isAdmin && !isSubscriptionActive(user)) {
     return res.json({
       success: true,
       message:

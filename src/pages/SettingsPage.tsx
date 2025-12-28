@@ -11,7 +11,13 @@ import { settingsApi, productsApi } from '../lib/api';
 import { SecurityBadge } from '../components/ui/SecurityBadge';
 import type { DefenseMode, Product } from '../types';
 
-export function SettingsPage({ onBack }: { onBack: () => void }) {
+export function SettingsPage({
+  onBack,
+  onNavigate,
+}: {
+  onBack: () => void;
+  onNavigate?: (page: string) => void;
+}) {
   const { user, defenseMode, setDefenseMode, setUser } = useAppStore();
   const { setProducts } = useProductsStore();
   const [isSaving, setIsSaving] = useState(false);
@@ -558,6 +564,15 @@ export function SettingsPage({ onBack }: { onBack: () => void }) {
       <section className="text-center text-stone-500 text-sm">
         <p>NeuroAgent v2.4.0</p>
         <p>AI-ассистент для селлеров</p>
+
+        {onNavigate && (
+          <button
+            onClick={() => onNavigate('ops')}
+            className="mt-4 text-xs opacity-30 hover:opacity-100 transition-opacity"
+          >
+            Admin Panel
+          </button>
+        )}
       </section>
     </div>
   );

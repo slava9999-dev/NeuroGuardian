@@ -81,6 +81,9 @@ import {
 // Analytics handlers
 import { handleGetAnalytics, handleGetSystemMetrics } from './handlers/analytics.js';
 
+// Ops Panel handlers
+import { handleOpsEvents, handleOpsAudit, handleOpsDashboard } from './handlers/ops.js';
+
 // Utilities
 import {
   sanitizeInput,
@@ -351,6 +354,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       case 'referral':
         return handleReferral(req, res);
+
+      // ========== OPS PANEL ENDPOINTS ==========
+      case 'ops-events':
+        return handleOpsEvents(req, res);
+
+      case 'ops-audit':
+        return handleOpsAudit(req, res);
+
+      case 'ops-dashboard':
+        return handleOpsDashboard(req, res);
 
       // ========== DEFAULT ==========
       default:

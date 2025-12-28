@@ -78,6 +78,12 @@ export const GetMarketplaceAccountsArgsSchema = z.object({
   marketplace: z.enum(['WB', 'Ozon', 'all']).optional().default('all'),
 });
 
+export const GetSystemLogsArgsSchema = z.object({
+  limit: z.number().int().min(1).max(100).optional().default(50),
+  severity: z.enum(['info', 'warning', 'error', 'critical']).optional(),
+  entity_type: z.string().optional(),
+});
+
 // === WRITE TOOLS (REQUIRE CONFIRMATION) ===
 
 export const SetStopLossArgsSchema = z.object({
@@ -194,6 +200,7 @@ export type BulkProtectProductsArgs = z.infer<typeof BulkProtectProductsArgsSche
 export type UpdatePricesArgs = z.infer<typeof UpdatePricesArgsSchema>;
 export type UpdateStocksArgs = z.infer<typeof UpdateStocksArgsSchema>;
 export type GetMarketplaceAccountsArgs = z.infer<typeof GetMarketplaceAccountsArgsSchema>;
+export type GetSystemLogsArgs = z.infer<typeof GetSystemLogsArgsSchema>;
 
 // Confirmation details types
 export type PriceChangeItem = z.infer<typeof PriceChangeItemSchema>;

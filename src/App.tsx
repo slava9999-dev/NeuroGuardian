@@ -11,6 +11,7 @@ import { authApi, productsApi } from './lib/api';
 import './index.css';
 
 // Lazy load pages for better initial bundle size
+// Lazy load pages for better initial bundle size
 const AgentPage = lazy(() => import('./pages/AgentPage').then(m => ({ default: m.AgentPage })));
 const ProductsPage = lazy(() =>
   import('./pages/ProductsPage').then(m => ({ default: m.ProductsPage }))
@@ -19,6 +20,9 @@ const SettingsPage = lazy(() =>
   import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage }))
 );
 const LegalPage = lazy(() => import('./pages/LegalPage').then(m => ({ default: m.LegalPage })));
+const OpsPanelPage = lazy(() =>
+  import('./pages/OpsPanelPage').then(m => ({ default: m.OpsPanelPage }))
+);
 
 // Loading screen with agent branding
 function LoadingScreen() {
@@ -80,7 +84,7 @@ const MOCK_USER = {
 };
 
 // Pages enum - Agent is first!
-type Page = 'agent' | 'products' | 'settings' | 'info';
+type Page = 'agent' | 'products' | 'settings' | 'info' | 'ops';
 
 function App() {
   const setUser = useAppStore(state => state.setUser);
@@ -156,6 +160,7 @@ function App() {
   const goToProducts = () => setCurrentPage('products');
   const goToSettings = () => setCurrentPage('settings');
   const goToInfo = () => setCurrentPage('info');
+  const goToOps = () => setCurrentPage('ops');
 
   if (!isInitialized || isLoading) {
     return <LoadingScreen />;
@@ -167,8 +172,11 @@ function App() {
       <Suspense fallback={<LoadingScreen />}>
         {currentPage === 'agent' && <AgentPage />}
         {currentPage === 'products' && <ProductsPage onBack={goToAgent} />}
-        {currentPage === 'settings' && <SettingsPage onBack={goToAgent} />}
+        {currentPage === 'settings' && (
+          <SettingsPage onBack={goToAgent} onNavigate={p => (p === 'ops' ? goToOps() : null)} />
+        )}
         {currentPage === 'info' && <LegalPage onBack={goToAgent} />}
+        {currentPage === 'ops' && <OpsPanelPage onBack={goToAgent} />}
       </Suspense>
 
       {/* Bottom Tab Bar - Simplified */}
