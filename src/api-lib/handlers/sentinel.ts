@@ -7,7 +7,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql } from '@vercel/postgres';
 
-import { validateTelegramInitData, getSecret } from '../lib/index.js';
+import { getSecret } from '../lib/index.js';
 import { getSecurityAgent } from '@neuroguardian/security-agent';
 import { verifyAdminAccessAsync, extractTelegramAuth } from '../middleware/auth.js';
 

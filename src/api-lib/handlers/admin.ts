@@ -5,8 +5,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql } from '@vercel/postgres';
-import { timingSafeEqual } from 'crypto';
-import { getSecurityAgent } from '@neuroguardian/security-agent';
+// Imports removed
 
 import { getUserById, initializeDatabase } from '../services/index.js';
 import { getSecret } from '../lib/index.js';

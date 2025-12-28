@@ -18,7 +18,7 @@ import { getUserById } from '../services/index.js';
  * Handle authentication action (Synced with index.ts logic)
  */
 export async function handleAuth(
-  req: VercelRequest,
+  _req: VercelRequest,
   res: VercelResponse,
   initData: string
 ): Promise<VercelResponse> {

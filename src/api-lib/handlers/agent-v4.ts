@@ -7,7 +7,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@vercel/kv';
 import {
-  validateTelegramInitData,
   sanitizeInput,
   decryptApiKey,
   checkRateLimit,
@@ -23,7 +22,7 @@ import { createAgentMetrics, logAgentMetrics, formatMetricsForLog } from '../age
 // V4 Architecture: Two-Phase Pipeline with Structured Output
 import { orchestrateV4, type UserContext } from '../agent/orchestrator-v4.js';
 import { getSecurityAgent, securityMiddleware } from '@neuroguardian/security-agent';
-import { verifyAdminAccessAsync, extractTelegramAuth, AuthResult } from '../middleware/auth.js';
+import { verifyAdminAccessAsync, extractTelegramAuth } from '../middleware/auth.js';
 
 // ============================================
 // TYPE DEFINITIONS
