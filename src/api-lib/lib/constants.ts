@@ -88,10 +88,28 @@ export const IS_PRODUCTION =
 
 export const TEST_MODE = process.env.TEST_MODE === 'true';
 
+// ============================================
+// SECRETS — DEPRECATED EXPORTS
+// ============================================
+// These are deprecated and will be removed in future versions.
+// Use getSecret() from './secrets-helper.js' instead.
+// Example:
+//   import { getSecret } from './secrets-helper.js';
+//   const token = await getSecret('telegram_bot_token', 'my_purpose');
+
+/**
+ * @deprecated Use getSecret('telegram_bot_token') instead
+ */
 export const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 
+/**
+ * @deprecated Use getSecret('api_key_encryption_key') instead
+ */
 export const API_KEY_ENCRYPTION_KEY = process.env.API_KEY_ENCRYPTION_KEY || '';
 
+/**
+ * @deprecated Use getSecret('openai_api_key') instead
+ */
 export const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 
 export const ALLOWED_ORIGINS = [

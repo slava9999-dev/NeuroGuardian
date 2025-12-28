@@ -1,11 +1,13 @@
 // ============================================
 // NeuroGUARDIAN — Rate Limiting
 // KV-backed rate limiting with in-memory fallback
+// Refactored: Uses Security Agent for KV credentials
 // ============================================
 
 import { createClient, type VercelKV } from '@vercel/kv';
 import type { RateLimitResult } from './types.js';
 import { RATE_LIMIT, RATE_LIMIT_STRICT, RATE_WINDOW } from './constants.js';
+import { getSecret, getSecretSync } from './secrets-helper.js';
 
 // In-memory fallback store
 const inMemoryRateLimit = new Map<string, { count: number; resetAt: number }>();
@@ -14,13 +16,43 @@ const inMemoryRateLimit = new Map<string, { count: number; resetAt: number }>();
 let kvClient: VercelKV | null = null;
 
 /**
- * Get KV client (lazy initialization)
+ * Get KV client (async version with Security Agent)
+ * Exported for future async rate-limiting implementations
+ */
+export async function getKVClientAsync(): Promise<VercelKV | null> {
+  if (kvClient) return kvClient;
+
+  const [kvUrl, kvToken] = await Promise.all([
+    getSecret('kv_rest_api_url', 'rate_limit'),
+    getSecret('kv_rest_api_token', 'rate_limit'),
+  ]);
+
+  if (kvUrl && kvToken) {
+    try {
+      kvClient = createClient({
+        url: kvUrl,
+        token: kvToken,
+      });
+      console.log('✅ KV client initialized via Security Agent');
+      return kvClient;
+    } catch {
+      console.warn('⚠️ Failed to create KV client, using in-memory fallback');
+      return null;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Get KV client (sync version with fallback to env)
+ * @deprecated Use getKVClientAsync for new code
  */
 function getKVClient(): VercelKV | null {
   if (kvClient) return kvClient;
 
-  const kvUrl = process.env.KV_REST_API_URL;
-  const kvToken = process.env.KV_REST_API_TOKEN;
+  const kvUrl = getSecretSync('kv_rest_api_url') || process.env.KV_REST_API_URL;
+  const kvToken = getSecretSync('kv_rest_api_token') || process.env.KV_REST_API_TOKEN;
 
   if (kvUrl && kvToken) {
     try {

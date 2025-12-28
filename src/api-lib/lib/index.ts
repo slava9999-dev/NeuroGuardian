@@ -89,3 +89,9 @@ export {
   type RateLimitResult as RateLimitResultV2,
 } from './rateLimit.js';
 export { logger, createLogger } from './logger.js';
+export {
+  getSecret,
+  getSecretSync,
+  warmupSecretsCache,
+  clearSecretsCache,
+} from './secrets-helper.js';

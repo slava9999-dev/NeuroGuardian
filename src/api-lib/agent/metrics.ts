@@ -149,14 +149,20 @@ export function generateSessionId(): string {
   return `sess_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 }
 
+import { getSecretSync } from '../lib/secrets-helper.js';
+
 /**
  * Get KV client for metrics storage
+ * Uses Security Agent secrets with fallback to process.env
  */
 function getKVClient() {
-  if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+  const kvUrl = getSecretSync('kv_rest_api_url') || process.env.KV_REST_API_URL;
+  const kvToken = getSecretSync('kv_rest_api_token') || process.env.KV_REST_API_TOKEN;
+
+  if (kvUrl && kvToken) {
     return createClient({
-      url: process.env.KV_REST_API_URL,
-      token: process.env.KV_REST_API_TOKEN,
+      url: kvUrl,
+      token: kvToken,
     });
   }
   return null;
