@@ -12,10 +12,10 @@
 
 import { createHmac, randomUUID } from 'crypto';
 import {
-  SecretAccessRequest,
+  type SecretAccessRequest,
   SecretAccessRequestSchema,
-  SecretAccessResponse,
-  SecretMetadata,
+  type SecretAccessResponse,
+  type SecretMetadata,
   SecretAccessDeniedError,
   SecretLeakDetectedError,
   SecurityAgentError,
@@ -57,7 +57,11 @@ export class SecretsGuard {
     /-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----/, // Private keys
   ];
 
-  constructor(private readonly config: SecurityAgentConfig) {}
+  private readonly config: SecurityAgentConfig;
+
+  constructor(config: SecurityAgentConfig) {
+    this.config = config;
+  }
 
   /**
    * Initialize connection to Vault

@@ -6,7 +6,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql } from '@vercel/postgres';
 import { createClient } from '@vercel/kv';
-import { validateTelegramInitData } from '../../src/api-lib/lib/index.js';
+import { validateTelegramInitData, getSecret } from '../../src/api-lib/lib/index.js';
+import { extractCronAuthAsync, extractAdminAuthAsync } from '../../src/api-lib/middleware/auth.js';
 
 // ============================================
 // TYPES
@@ -40,59 +41,18 @@ interface DefenseLog {
 // HELPER: Get KV Client
 // ============================================
 
-// Helper to get secrets
-import { getSecurityAgent } from '@neuroguardian/security-agent';
-
-async function getAuthSecrets() {
-  const agent = getSecurityAgent();
-  if (!agent.isInitialized()) await agent.initialize();
-
-  const cronSecret = (await agent.secrets.get({
-    userId: 'system',
-    key: 'cron_secret',
-    purpose: 'sentinel_status_cron_auth',
-    ttl: 300
-  })).value || process.env.CRON_SECRET;
-
-  const adminApiKey = (await agent.secrets.get({
-    userId: 'system',
-    key: 'admin_api_key',
-    purpose: 'sentinel_status_admin_auth',
-    ttl: 300
-  })).value || process.env.ADMIN_API_KEY;
-
-  return { cronSecret, adminApiKey };
-}
-
 // Helper to get KV client with secrets
 async function getKVClient() {
-  const agent = getSecurityAgent();
-  if (!agent.isInitialized()) await agent.initialize();
-
-  const url = (await agent.secrets.get({
-      userId: 'system',
-      key: 'kv_rest_api_url',
-      purpose: 'kv_client_init',
-      ttl: 300
-  })).value || process.env.KV_REST_API_URL;
-  
-  const token = (await agent.secrets.get({
-      userId: 'system',
-      key: 'kv_rest_api_token',
-      purpose: 'kv_client_init',
-      ttl: 300
-  })).value || process.env.KV_REST_API_TOKEN;
+  const [url, token] = await Promise.all([
+    getSecret('kv_rest_api_url', 'kv_client_init'),
+    getSecret('kv_rest_api_token', 'kv_client_init'),
+  ]);
 
   if (url && token) {
-    return createClient({
-      url,
-      token,
-    });
+    return createClient({ url, token });
   }
   return null;
 }
-
-// ... existing code ...
 
 // ============================================
 // GET SENTINEL STATUS
@@ -184,7 +144,6 @@ export async function handleSentinelStatus(
     return res.status(500).json({ error: 'Failed to get sentinel status' });
   }
 }
-
 
 // ============================================
 // GET DEFENSE HISTORY
@@ -343,11 +302,10 @@ export async function handleUpdateSentinelStatus(
   }
 
   // Auth: Only cron/admin
-  const cronSecret = req.headers['x-cron-secret'] as string;
-  const adminKey = req.headers['x-admin-key'] as string;
-  const { cronSecret: secretCron, adminApiKey: secretAdmin } = await getAuthSecrets();
+  const isCron = await extractCronAuthAsync(req);
+  const isAdmin = await extractAdminAuthAsync(req);
 
-  if (cronSecret !== secretCron && adminKey !== secretAdmin) {
+  if (!isCron && !isAdmin) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
@@ -399,11 +357,10 @@ export async function handleLogDefense(
   }
 
   // Auth: Only cron/admin
-  const cronSecret = req.headers['x-cron-secret'] as string;
-  const adminKey = req.headers['x-admin-key'] as string;
-  const { cronSecret: secretCron, adminApiKey: secretAdmin } = await getAuthSecrets();
+  const isCron = await extractCronAuthAsync(req);
+  const isAdmin = await extractAdminAuthAsync(req);
 
-  if (cronSecret !== secretCron && adminKey !== secretAdmin) {
+  if (!isCron && !isAdmin) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
@@ -443,11 +400,10 @@ export async function handleBulkLogDefense(
   }
 
   // Auth: Only cron/admin
-  const cronSecret = req.headers['x-cron-secret'] as string;
-  const adminKey = req.headers['x-admin-key'] as string;
-  const { cronSecret: secretCron, adminApiKey: secretAdmin } = await getAuthSecrets();
+  const isCron = await extractCronAuthAsync(req);
+  const isAdmin = await extractAdminAuthAsync(req);
 
-  if (cronSecret !== secretCron && adminKey !== secretAdmin) {
+  if (!isCron && !isAdmin) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 

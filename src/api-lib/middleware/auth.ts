@@ -86,7 +86,7 @@ export function extractAdminAuth(req: VercelRequest): AuthResult {
   const adminKey = (req.headers['x-admin-key'] as string) || '';
   const adminUserId = req.body?.userId || req.body?.telegramId;
 
-  const expectedAdminKey = getSecretSync('admin_api_key') || process.env.ADMIN_API_KEY;
+  const expectedAdminKey = getSecretSync('admin_api_key');
 
   if (adminKey && expectedAdminKey && adminKey === expectedAdminKey && adminUserId) {
     return {
@@ -232,8 +232,8 @@ export function verifyAdminAccess(req: VercelRequest): boolean {
   const authHeader = req.headers.authorization || '';
   const adminKey = (req.headers['x-admin-key'] as string) || (req.query.key as string) || '';
 
-  const cronSecret = getSecretSync('cron_secret') || process.env.CRON_SECRET;
-  const expectedAdminKey = getSecretSync('admin_api_key') || process.env.ADMIN_API_KEY;
+  const cronSecret = getSecretSync('cron_secret');
+  const expectedAdminKey = getSecretSync('admin_api_key');
 
   return !!(
     (cronSecret && authHeader === `Bearer ${cronSecret}`) ||

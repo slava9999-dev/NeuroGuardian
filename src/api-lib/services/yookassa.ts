@@ -14,20 +14,30 @@ import { getSecurityAgent } from '@neuroguardian/security-agent';
 async function getYookassaSecrets() {
   const agent = getSecurityAgent();
   if (!agent.isInitialized()) await agent.initialize();
-  
-  const shopId = (await agent.secrets.get({
-    userId: 'system',
-    key: 'yookassa_shop_id',
-    purpose: 'payment_processing',
-    ttl: 300
-  })).value || process.env.YOOKASSA_SHOP_ID || '';
 
-  const secretKey = (await agent.secrets.get({
-    userId: 'system',
-    key: 'yookassa_secret_key',
-    purpose: 'payment_processing',
-    ttl: 300
-  })).value || process.env.YOOKASSA_SECRET_KEY || '';
+  const shopId =
+    (
+      await agent.secrets.get({
+        userId: 'system',
+        key: 'yookassa_shop_id',
+        purpose: 'payment_processing',
+        ttl: 300,
+      })
+    ).value ||
+    process.env.YOOKASSA_SHOP_ID ||
+    '';
+
+  const secretKey =
+    (
+      await agent.secrets.get({
+        userId: 'system',
+        key: 'yookassa_secret_key',
+        purpose: 'payment_processing',
+        ttl: 300,
+      })
+    ).value ||
+    process.env.YOOKASSA_SECRET_KEY ||
+    '';
 
   return { shopId, secretKey };
 }
@@ -45,7 +55,7 @@ export interface PaymentResult {
     price: number;
     durationDays: number;
   };
-}/**
+} /**
  * Create YooKassa payment
  */
 export async function createYookassaPayment(
@@ -114,7 +124,7 @@ export async function createYookassaPayment(
       return { success: false, error: 'Payment creation failed' };
     }
 
-    const payment = await response.json();
+    const payment = (await response.json()) as any;
 
     // Create transaction record
     await createTransaction({
@@ -176,7 +186,7 @@ export async function getPaymentStatus(paymentId: string): Promise<{
       return null;
     }
 
-    const payment = await response.json();
+    const payment = (await response.json()) as any;
     return {
       status: payment.status,
       paid: payment.paid === true,

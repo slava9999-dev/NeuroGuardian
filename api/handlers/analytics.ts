@@ -6,29 +6,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql } from '@vercel/postgres';
 
-// Helper to get auth secrets
-import { getSecurityAgent } from '@neuroguardian/security-agent';
-
-async function getAuthSecrets() {
-  const agent = getSecurityAgent();
-  if (!agent.isInitialized()) await agent.initialize();
-
-  const cronSecret = (await agent.secrets.get({
-    userId: 'system',
-    key: 'cron_secret',
-    purpose: 'analytics_cron_auth',
-    ttl: 300
-  })).value || process.env.CRON_SECRET;
-
-  const adminApiKey = (await agent.secrets.get({
-    userId: 'system',
-    key: 'admin_api_key',
-    purpose: 'analytics_admin_auth',
-    ttl: 300
-  })).value || process.env.ADMIN_API_KEY;
-
-  return { cronSecret, adminApiKey };
-}
+import { extractCronAuthAsync, extractAdminAuthAsync } from '../../src/api-lib/middleware/auth.js';
 
 /**
  * Handle get-analytics action
@@ -39,12 +17,8 @@ export async function handleGetAnalytics(
   res: VercelResponse
 ): Promise<VercelResponse> {
   // Authorization check
-  const authHeader = req.headers.authorization;
-  const adminKey = req.headers['x-admin-key'] as string;
-  const { cronSecret, adminApiKey } = await getAuthSecrets();
-
-  const isCron = authHeader === `Bearer ${cronSecret}`;
-  const isAdmin = !!(adminKey && adminApiKey && adminKey === adminApiKey);
+  const isCron = await extractCronAuthAsync(req);
+  const isAdmin = await extractAdminAuthAsync(req);
 
   if (!isCron && !isAdmin) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -169,12 +143,8 @@ export async function handleGetSystemMetrics(
   res: VercelResponse
 ): Promise<VercelResponse> {
   // Authorization check
-  const authHeader = req.headers.authorization;
-  const adminKey = req.headers['x-admin-key'] as string;
-  const { cronSecret, adminApiKey } = await getAuthSecrets();
-
-  const isCron = authHeader === `Bearer ${cronSecret}`;
-  const isAdmin = !!(adminKey && adminApiKey && adminKey === adminApiKey);
+  const isCron = await extractCronAuthAsync(req);
+  const isAdmin = await extractAdminAuthAsync(req);
 
   if (!isCron && !isAdmin) {
     return res.status(401).json({ error: 'Unauthorized' });

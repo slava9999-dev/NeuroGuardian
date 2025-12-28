@@ -9,123 +9,37 @@ import { timingSafeEqual } from 'crypto';
 import { getSecurityAgent } from '@neuroguardian/security-agent';
 
 import { getUserById, initializeDatabase } from '../../src/api-lib/services/index.js';
+import { getSecret } from '../../src/api-lib/lib/index.js';
+import { verifyAdminAccessAsync } from '../../src/api-lib/middleware/auth.js';
 
 /**
  * Helper to get Telegram secrets
  */
 async function getTelegramSecrets() {
-  const agent = getSecurityAgent();
-  if (!agent.isInitialized()) await agent.initialize();
+  const [token, username] = await Promise.all([
+    getSecret('telegram_bot_token', 'telegram_api_call'),
+    getSecret('telegram_bot_username', 'referral_link_generation'),
+  ]);
 
-  const token =
-    (
-      await agent.secrets.get({
-        userId: 'system',
-        key: 'telegram_bot_token',
-        purpose: 'telegram_api_call',
-        ttl: 300,
-      })
-    ).value || process.env.TELEGRAM_BOT_TOKEN;
-
-  const username =
-    (
-      await agent.secrets.get({
-        userId: 'system',
-        key: 'telegram_bot_username',
-        purpose: 'referral_link_generation',
-        ttl: 3600,
-      })
-    ).value ||
-    process.env.TELEGRAM_BOT_USERNAME ||
-    'NeuroGuardianBot';
-
-  return { token, username };
+  return {
+    token: token || process.env.TELEGRAM_BOT_TOKEN,
+    username: username || process.env.TELEGRAM_BOT_USERNAME || 'NeuroGuardianBot',
+  };
 }
 
 /**
  * Helper to get Cron secrets
  */
 async function getCronSecrets() {
-  const agent = getSecurityAgent();
-  if (!agent.isInitialized()) await agent.initialize();
-
-  const cronSecret =
-    (
-      await agent.secrets.get({
-        userId: 'system',
-        key: 'cron_secret',
-        purpose: 'cron_auth',
-        ttl: 300,
-      })
-    ).value || process.env.CRON_SECRET;
-
-  return { cronSecret };
+  const cronSecret = await getSecret('cron_secret', 'cron_auth');
+  return { cronSecret: cronSecret || process.env.CRON_SECRET };
 }
 
 /**
- * Validate admin access with timing-safe comparison
- * SECURITY FIX (Dec 2024): Prevents timing attacks on admin key
- * SECURITY UPDATE (Dec 2024): Uses Security Agent for secret retrieval
+ * Validate admin access
+ * @deprecated Use verifyAdminAccessAsync instead
  */
-export async function validateAdminAccess(req: VercelRequest): Promise<boolean> {
-  const adminKey = req.headers['x-admin-key'] as string;
-  const agent = getSecurityAgent();
-
-  if (!agent.isInitialized()) {
-    await agent.initialize();
-  }
-
-  // Get admin key from Vault (cached)
-  let configuredKey: string | undefined;
-  try {
-    const response = await agent.secrets.get({
-      userId: 'system',
-      key: 'admin_api_key',
-      purpose: 'validate_admin_access',
-      ttl: 60,
-    });
-    configuredKey = response.value;
-  } catch (error) {
-    console.warn('Failed to retrieve admin_api_key from Vault:', error);
-    // Fallback? Or fail closed? Fail closed is safer.
-    return false;
-  }
-
-  // Early return if no key provided or configured
-  if (!adminKey || !configuredKey) {
-    return false;
-  }
-
-  // Length check before timing-safe comparison
-  if (adminKey.length !== configuredKey.length) {
-    return false;
-  }
-
-  try {
-    // Use constant-time comparison to prevent timing attacks
-    const adminKeyBuffer = Buffer.from(adminKey, 'utf8');
-    const expectedKeyBuffer = Buffer.from(configuredKey, 'utf8');
-
-    const isValid = timingSafeEqual(adminKeyBuffer, expectedKeyBuffer);
-
-    // Audit the access attempt
-    await agent.audit.log({
-      event: isValid ? 'admin.access.granted' : 'admin.access.denied',
-      category: 'admin',
-      severity: isValid ? 'info' : 'warning',
-      userId: 'system',
-      metadata: {
-        ip: req.headers['x-forwarded-for'] || 'unknown',
-        userAgent: req.headers['user-agent'],
-      },
-    });
-
-    return isValid;
-  } catch (error) {
-    console.error('Admin key validation error:', error);
-    return false;
-  }
-}
+export const validateAdminAccess = verifyAdminAccessAsync;
 
 /**
  * Handle init-db action
@@ -170,21 +84,9 @@ export async function handleResetDb(
   }
 
   // SECONDARY GUARD: Explicitly enabled dangerous operations
-  // Uses Security Agent to check env config
-  const agent = getSecurityAgent();
-  await agent.initialize(); // Ensure initialized for later calls
+  const dangerousOpsEnabled = await getSecret('dangerous_operations_enabled', 'feature_flag_check');
 
-  const dangerousOpsEnabled =
-    (
-      await agent.secrets.get({
-        userId: 'system',
-        key: 'dangerous_operations_enabled',
-        purpose: 'feature_flag_check',
-        ttl: 300,
-      })
-    ).value || process.env.DANGEROUS_OPERATIONS_ENABLED;
-
-  if (dangerousOpsEnabled !== 'true') {
+  if (dangerousOpsEnabled !== 'true' && process.env.DANGEROUS_OPERATIONS_ENABLED !== 'true') {
     console.warn(
       `🚨 SECURITY: Reset DB attempted but DANGEROUS_OPERATIONS_ENABLED is not true. IP: ${clientIp}`
     );
@@ -202,22 +104,7 @@ export async function handleResetDb(
 
   // DOUBLE-BLIND: Requires both the main admin key and a secondary secret key
   const { confirm, adminSecret } = req.body || {};
-
-  let expectedSecret: string | undefined;
-  try {
-    const resp = await agent.secrets.get({
-      userId: 'system',
-      key: 'admin_secret_key', // Ensure this exists in Vault or allow fail
-      purpose: 'db_reset_verification',
-      ttl: 60,
-    });
-    expectedSecret = resp.value;
-  } catch {
-    console.warn(
-      'Could not retrieve admin_secret_key, falling back to process.env for dev compatibility'
-    );
-    expectedSecret = process.env.ADMIN_SECRET_KEY;
-  }
+  const expectedSecret = await getSecret('admin_secret_key', 'db_reset_verification');
 
   if (!expectedSecret || adminSecret !== expectedSecret) {
     console.warn(
@@ -664,7 +551,7 @@ export async function handleAdminTestTelegram(
         parse_mode: 'HTML',
       }),
     });
-    const tgData = await tgRes.json();
+    const tgData = (await tgRes.json()) as any;
     return res.json({
       success: tgRes.ok,
       telegram_response: tgData,
@@ -703,7 +590,7 @@ export async function handleAdminTestOzon(
       body: JSON.stringify({ filter: {}, last_id: '', limit: 5 }),
     });
 
-    const data = await response.json();
+    const data = (await response.json()) as any;
 
     return res.json({
       status: response.status,

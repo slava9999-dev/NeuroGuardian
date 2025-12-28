@@ -142,7 +142,7 @@ export async function handleSyncProducts(
           .json({ error: `Ozon API error: ${listResponse.status}`, details: errorText });
       }
 
-      const listData = await listResponse.json();
+      const listData = (await listResponse.json()) as any;
       const items = listData.result?.items || [];
 
       if (items.length > 0) {
@@ -159,7 +159,7 @@ export async function handleSyncProducts(
         });
 
         if (detailResponse.ok) {
-          const detailData = await detailResponse.json();
+          const detailData = (await detailResponse.json()) as any;
           const detailItems = detailData.result?.items || detailData.items || [];
 
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -214,7 +214,7 @@ export async function handleSyncProducts(
         });
       }
 
-      const wbData = await wbResponse.json();
+      const wbData = (await wbResponse.json()) as any;
       const cards = wbData.cards || [];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const nmIds = cards.map((card: any) => card.nmID);
@@ -252,7 +252,7 @@ export async function handleSyncProducts(
           });
 
           if (pricesResponse.ok) {
-            const pricesData = await pricesResponse.json();
+            const pricesData = (await pricesResponse.json()) as any;
             const goods = pricesData.data?.listGoods || [];
 
             console.log(`📦 WB Prices API: received ${goods.length} goods`);

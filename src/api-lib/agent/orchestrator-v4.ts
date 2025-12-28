@@ -33,8 +33,6 @@ import {
   executeSetStopLoss,
   executeBulkProtectProducts,
 } from './tool-executors.js';
-import { logger } from '../lib/index.js';
-
 // ============================================
 // LLM PROVIDER CONFIG
 // ============================================
@@ -47,25 +45,16 @@ interface LLMProvider {
   supportsStructuredOutput: boolean;
 }
 
-import { getSecurityAgent } from '@neuroguardian/security-agent';
+import { logger, getSecret } from '../lib/index.js';
 
 async function getAvailableProviders(): Promise<LLMProvider[]> {
   const providers: LLMProvider[] = [];
-  const agent = getSecurityAgent();
-  if (!agent.isInitialized()) await agent.initialize();
 
-  // Primary: OpenAI
-  let openaiKey: string | undefined;
-  try {
-    openaiKey = (await agent.secrets.get({
-        userId: 'system',
-        key: 'openai_api_key',
-        purpose: 'llm_inference',
-        ttl: 300 // 5 min cache
-    })).value;
-  } catch {
-    openaiKey = process.env.OPENAI_API_KEY;
-  }
+  // Fetch keys via Security Agent helper
+  const [openaiKey, groqKey] = await Promise.all([
+    getSecret('openai_api_key', 'llm_inference'),
+    getSecret('groq_api_key', 'llm_inference'),
+  ]);
 
   if (openaiKey) {
     providers.push({
@@ -75,19 +64,6 @@ async function getAvailableProviders(): Promise<LLMProvider[]> {
       model: 'gpt-4o-mini',
       supportsStructuredOutput: true,
     });
-  }
-
-  // Fallback: Groq
-  let groqKey: string | undefined;
-  try {
-    groqKey = (await agent.secrets.get({
-        userId: 'system',
-        key: 'groq_api_key',
-        purpose: 'llm_inference',
-        ttl: 300
-    })).value;
-  } catch {
-    groqKey = process.env.GROQ_API_KEY;
   }
 
   if (groqKey) {
@@ -173,7 +149,7 @@ async function callLLMWithFallback(
           throw new Error(`${provider.name} API error: ${response.status} - ${errorText}`);
         }
 
-        const data = await response.json();
+        const data = (await response.json()) as any;
         const content = data.choices[0]?.message?.content;
         const tokensUsed = data.usage?.total_tokens || 0;
 

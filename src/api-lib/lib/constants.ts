@@ -107,11 +107,6 @@ export const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
  */
 export const API_KEY_ENCRYPTION_KEY = process.env.API_KEY_ENCRYPTION_KEY || '';
 
-/**
- * @deprecated Use getSecret('openai_api_key') instead
- */
-export const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
-
 export const ALLOWED_ORIGINS = [
   'https://neuro-guardian.vercel.app',
   'https://neuro-guardian-sos.vercel.app',

@@ -6,7 +6,7 @@
 
 import { ROUTER_PROMPT, fastRoute, extractMarketplace } from './prompts/router.js';
 import { RouterResultSchema, type RouterResult } from './schemas-v4.js';
-import { getSecurityAgent } from '@neuroguardian/security-agent';
+import { getSecret } from '../lib/index.js';
 
 /**
  * Router configuration
@@ -100,20 +100,7 @@ export async function routeMessage(
   }
 
   // Step 2: Use LLM for complex classification
-  const agent = getSecurityAgent();
-  if (!agent.isInitialized()) await agent.initialize();
-
-  let openaiKey: string | undefined;
-  try {
-     openaiKey = (await agent.secrets.get({
-        userId: 'system',
-        key: 'openai_api_key',
-        purpose: 'router_llm_inference',
-        ttl: 300
-     })).value;
-  } catch {
-    openaiKey = process.env.OPENAI_API_KEY;
-  }
+  const openaiKey = await getSecret('openai_api_key', 'router_llm_inference');
 
   if (!openaiKey) {
     console.warn('⚠️ No OpenAI key, falling back to general');
@@ -160,7 +147,7 @@ export async function routeMessage(
       throw new Error(`Router API error: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as any;
     const content = data.choices[0]?.message?.content;
 
     if (!content) {

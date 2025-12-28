@@ -12,6 +12,7 @@ import {
   decryptApiKey,
   checkRateLimit,
   isSubscriptionActive,
+  getSecret,
 } from '../../src/api-lib/lib/index.js';
 
 import { getUserById, getProductsByUserId } from '../../src/api-lib/services/index.js';
@@ -25,7 +26,12 @@ import {
 
 // V4 Architecture: Two-Phase Pipeline with Structured Output
 import { orchestrateV4, type UserContext } from '../../src/api-lib/agent/orchestrator-v4.js';
-import { getSecurityAgent } from '@neuroguardian/security-agent';
+import { getSecurityAgent, securityMiddleware } from '@neuroguardian/security-agent';
+import {
+  verifyAdminAccessAsync,
+  extractTelegramAuth,
+  AuthResult,
+} from '../../src/api-lib/middleware/auth.js';
 
 // ============================================
 // TYPE DEFINITIONS
@@ -47,46 +53,19 @@ interface DBUserRecord {
 
 // Helper to get KV client
 async function getKVClient() {
-  const agent = getSecurityAgent();
-  if (!agent.isInitialized()) await agent.initialize();
-
-  const url =
-    (
-      await agent.secrets.get({
-        userId: 'system',
-        key: 'kv_rest_api_url',
-        purpose: 'kv_client_init',
-        ttl: 300,
-      })
-    ).value || process.env.KV_REST_API_URL;
-
-  const token =
-    (
-      await agent.secrets.get({
-        userId: 'system',
-        key: 'kv_rest_api_token',
-        purpose: 'kv_client_init',
-        ttl: 300,
-      })
-    ).value || process.env.KV_REST_API_TOKEN;
+  const [url, token] = await Promise.all([
+    getSecret('kv_rest_api_url', 'kv_client_init'),
+    getSecret('kv_rest_api_token', 'kv_client_init'),
+  ]);
 
   if (url && token) {
-    return createClient({
-      url,
-      token,
-    });
+    return createClient({ url, token });
   }
   return null;
 }
 
 /**
  * V4 Agent Handler - Two-Phase Pipeline
- *
- * Key improvements:
- * - Structured Output (JSON Schema)
- * - Links only from tool results
- * - Minimal system prompt
- * - Better link validation
  */
 export async function handleAgentV4(
   req: VercelRequest,
@@ -97,35 +76,17 @@ export async function handleAgentV4(
   }
 
   // 1. Authentication
-  // Support admin API key for testing (bypasses Telegram validation)
-  const authHeader = req.headers['authorization'] as string;
-
-  const agent = getSecurityAgent();
-  if (!agent.isInitialized()) {
-    await agent.initialize();
-  }
-
-  let adminApiKey: string | undefined;
-  try {
-    const resp = await agent.secrets.get({
-      userId: 'system',
-      key: 'admin_api_key',
-      purpose: 'agent_v4_test_bypass',
-      ttl: 60,
-    });
-    adminApiKey = resp.value;
-  } catch {
-    // Fallback or ignore if not configured
-  }
-
   let userId: number;
 
-  if (adminApiKey && authHeader === `Bearer ${adminApiKey}` && req.body?.telegramId) {
+  const isAdmin = await verifyAdminAccessAsync(req);
+  if (isAdmin && req.body?.telegramId) {
     // Admin bypass for testing
     userId = parseInt(req.body.telegramId);
-    console.log(`🔑 Admin API access for agent: user ${userId}`);
+    console.log(`🔑 Admin API access: user ${userId}`);
 
     // Audit this bypass
+    const agent = getSecurityAgent();
+    if (!agent.isInitialized()) await agent.initialize();
     await agent.audit.log({
       event: 'auth.bypass.admin_key',
       category: 'auth',
@@ -135,15 +96,12 @@ export async function handleAgentV4(
     });
   } else {
     // Normal Telegram authentication
-    const initData = sanitizeInput(
-      (req.headers['x-init-data'] as string) || req.body?.initData || ''
-    );
-
-    const validation = validateTelegramInitData(initData);
-    if (!validation.valid || !validation.user) {
-      return res.status(401).json({ error: 'Unauthorized', code: 'AUTH_FAILED' });
+    const auth = extractTelegramAuth(req);
+    if (auth.success === false) {
+      const authFail = auth as { success: false; error: string; statusCode: number };
+      return res.status(authFail.statusCode).json({ error: authFail.error, code: 'AUTH_FAILED' });
     }
-    userId = validation.user.id;
+    userId = auth.context.userId;
   }
 
   const user = (await getUserById(userId)) as DBUserRecord | null;
@@ -324,13 +282,17 @@ export async function handleAgentV4Confirm(
   }
 
   // Auth
-  const initData = (req.headers['x-init-data'] as string) || req.body?.initData || '';
-  const validation = validateTelegramInitData(initData);
-  if (!validation.valid || !validation.user) {
-    return res.status(401).json({ error: 'Unauthorized' });
+  const auth = extractTelegramAuth(req);
+  if (!auth.success) {
+    // Also try admin auth for confirmation
+    const isAdmin = await verifyAdminAccessAsync(req);
+    if (!isAdmin || !req.body?.telegramId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    // Fallback if admin
   }
 
-  const userId = validation.user.id;
+  const userId = auth.success ? auth.context.userId : parseInt(req.body.telegramId);
   const kv = await getKVClient();
 
   if (!kv) {
@@ -598,3 +560,24 @@ export async function handleAgentV4Confirm(
     });
   }
 }
+
+/**
+ * Secure version of handleAgentV4 with audit logging and policy enforcement
+ */
+export const handleAgentV4Secure = securityMiddleware(
+  {
+    auditEvent: 'agent.v4.execute',
+    rateLimit: { limit: 20, windowSeconds: 60 },
+  },
+  ((req: any, res: any) => handleAgentV4(req, res)) as any
+);
+
+/**
+ * Secure version of handleAgentV4Confirm
+ */
+export const handleAgentV4ConfirmSecure = securityMiddleware(
+  {
+    auditEvent: 'agent.v4.confirm',
+  },
+  ((req: any, res: any) => handleAgentV4Confirm(req, res)) as any
+);

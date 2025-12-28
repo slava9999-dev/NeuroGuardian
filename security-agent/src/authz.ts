@@ -12,18 +12,19 @@
 
 import { createHmac } from 'crypto';
 import {
-  AuthzCheckRequest,
+  type AuthzCheckRequest,
   AuthzCheckRequestSchema,
-  AuthzCheckResponse,
-  Permission,
-  UserPermissions,
-  RateLimitConfig,
-  RateLimitResult,
+  type AuthzCheckResponse,
+  type Permission,
+  type UserPermissions,
+  type RateLimitConfig,
+  type RateLimitResult,
   AuthorizationError,
   RateLimitError,
   SecurityAgentError,
   type SecurityAgentConfig,
 } from './types.js';
+
 import { AuditLogger } from './audit.js';
 
 // Redis client interface
@@ -117,7 +118,11 @@ export class AuthorizationGuard {
   // Cache TTL in seconds
   private readonly CACHE_TTL = 300; // 5 minutes
 
-  constructor(private readonly config: SecurityAgentConfig) {}
+  private readonly config: SecurityAgentConfig;
+
+  constructor(config: SecurityAgentConfig) {
+    this.config = config;
+  }
 
   /**
    * Set the audit logger for integration

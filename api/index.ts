@@ -65,7 +65,11 @@ import {
 } from './handlers/sentinel-status.js';
 
 // Agent handlers (V4 only)
-import { handleAgentV4, handleAgentV4Status, handleAgentV4Confirm } from './handlers/agent-v4.js';
+import {
+  handleAgentV4Secure,
+  handleAgentV4Status,
+  handleAgentV4ConfirmSecure,
+} from './handlers/agent-v4.js';
 
 // Chat handlers
 import {
@@ -270,10 +274,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // ========== AI AGENT ENDPOINTS ==========
       case 'agent':
       case 'agent-v4':
-        return handleAgentV4(req, res);
+        return handleAgentV4Secure(req, res);
 
       case 'agent-confirm':
-        return handleAgentV4Confirm(req, res);
+        return handleAgentV4ConfirmSecure(req, res);
 
       case 'agent-status':
       case 'agent-v4-status':

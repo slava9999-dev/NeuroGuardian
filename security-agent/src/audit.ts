@@ -12,13 +12,13 @@
 
 import { createHmac, randomUUID } from 'crypto';
 import {
-  AuditEvent,
+  type AuditEvent,
   AuditEventSchema,
-  AuditLogEntry,
-  AuditQueryOptions,
+  type AuditLogEntry,
+  type AuditQueryOptions,
   SecurityAgentError,
   type SecurityAgentConfig,
-  SecurityIncident,
+  type SecurityIncident,
 } from './types.js';
 
 // ClickHouse client interface
@@ -48,6 +48,7 @@ export class AuditLogger {
   private buffer: AuditLogEntry[] = [];
   private flushInterval: ReturnType<typeof setInterval> | null = null;
   private initialized = false;
+  private readonly config: SecurityAgentConfig;
 
   // Buffer settings
   private readonly BUFFER_SIZE = 100;
@@ -56,7 +57,9 @@ export class AuditLogger {
   // Signature version for schema migrations
   private readonly SIGNATURE_VERSION = 1;
 
-  constructor(private readonly config: SecurityAgentConfig) {}
+  constructor(config: SecurityAgentConfig) {
+    this.config = config;
+  }
 
   /**
    * Initialize connection to ClickHouse

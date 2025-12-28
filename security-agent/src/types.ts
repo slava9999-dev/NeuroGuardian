@@ -279,14 +279,21 @@ export interface SecurityAgentConfig {
 // ============================================
 
 export class SecurityAgentError extends Error {
+  public readonly code: string;
+  public readonly statusCode: number;
+  public readonly details?: Record<string, unknown> | undefined;
+
   constructor(
     message: string,
-    public readonly code: string,
-    public readonly statusCode: number = 500,
-    public readonly details?: Record<string, unknown>
+    code: string,
+    statusCode: number = 500,
+    details?: Record<string, unknown>
   ) {
     super(message);
     this.name = 'SecurityAgentError';
+    this.code = code;
+    this.statusCode = statusCode;
+    this.details = details;
   }
 }
 
