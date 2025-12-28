@@ -25,6 +25,7 @@
     "noUncheckedSideEffectImports": true,
     "baseUrl": ".",
     "paths": {
+      "@/*": ["src/*"],
       "@neuroguardian/security-agent": ["./security-agent/src/index.ts"]
     }
   },

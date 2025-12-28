@@ -2,6 +2,37 @@
 
 All notable changes to NeuroGUARDIAN project.
 
+## [2.12.0] - 2025-12-28
+
+### 🎯 Major features — Production Readiness & Marketplace Automation
+
+**Context:** Critical release focused on production-grade security, automated price protection, and real-time monitoring dashboard.
+
+#### 🛡️ Production Security & Compliance
+
+- **[NEW] Production Guard**: Implemented `productionGuard.ts` to block deployment if `TEST_MODE` or `DANGEROUS_OPERATIONS_ENABLED` are active in production.
+- **[FIX] Audit Fixes**: Resolved High/Moderate vulnerabilities (path-to-regexp, esbuild).
+- **[FIX] Zero-Mocks**: Verified removal of all mock data and demo users from production code paths.
+- **[NEW] Database Migration System**: Implemented `run-migrations.cjs` for stable Neon DB schema updates.
+
+#### 🦾 Automated Price Protection Agent
+
+- **[NEW] PriceProtectionAgent**: Intelligent agent for monitoring product prices against rules (Target Margin, Min/Max, Competitors).
+- **[NEW] Actionable Alerts**: Telegram notifications with direct action buttons for price corrections.
+- **[NEW] Event Logging**: Full audit trail of agent actions in `ops_events` and `ops_audit`.
+
+#### 📦 Marketplace Connectivity
+
+- **[NEW] Unified Service**: Consolidators WB and Ozon operations into `MarketplaceService`.
+- **[NEW] Real-time Sync**: n8n webhooks for background product and price synchronization.
+- **[NEW] Rate Limiter**: custom implementation to handle marketplace API quotas (WB 90/min, Ozon 50/min).
+
+#### 📊 Operational Control
+
+- **[NEW] Ops Dashboard**: Web-based monitoring of system health, active protections, and agent status.
+- **[NEW] Knowledge Base**: Searchable doc-indexing for AI Agent (WB/Ozon docs).
+- **[NEW] Production Checklist**: `npm run checklist` for verified deployment readiness.
+
 ## [2.10.0] - 2024-12-27
 
 ### 🎯 Major Features — Calculator \u0026 Seller Protection

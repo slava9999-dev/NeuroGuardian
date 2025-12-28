@@ -1,6 +1,6 @@
 # 🤖 NeuroAgent | WB & Ozon
 
-[![Version](https://img.shields.io/badge/version-2.10.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.12.0-blue.svg)](CHANGELOG.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue.svg)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19-61dafb.svg)](https://react.dev/)
 [![Vercel](https://img.shields.io/badge/Deployed-Vercel-black.svg)](https://vercel.com/)
@@ -8,17 +8,17 @@
 
 > **Ваш личный AI-агент для управления магазином на Wildberries и Ozon**
 
-**🔥 NEW in v2.10.0:**
+**🔥 NEW in v2.12.0:**
 
-- **Unit Economics 2025:** Обновленный калькулятор с актуальными комиссиями и тарифами
-- **Seller Protection:** 47 KB документации по защите от скрытых комиссий маркетплейсов
-- **Accurate Calculations:** Учет эквайринга, возвратов и невыкупов (точность +90%)
-- **NeuroAgent V4:** Умный агент с двухступенчатым планированием
-- **Voice Sentinel:** Голосовые сирены при атаках на цены
+- **Price Protection Agent:** Умный мониторинг цен с авто-коррекцией и алертами (Margin/Competitor tracking)
+- **Unified Marketplace API:** Единый слой интеграции с WB и Ozon с контролем квот
+- **Ops Dashboard:** Панель управления состоянием системы и мониторинга агентов
+- **Production Readiness:** Полное отсутствие моков, встроенный аудит безопасности и гид по миграциям
+- **Knowledge Base:** AI-агент теперь имеет доступ к базе знаний по документации маркетплейсов
 
 Управляйте продажами через чат с искусственным интеллектом. NeuroAgent знает всё о вашем магазине и готов помочь 24/7!
 
-📚 **Документация:** [CHANGELOG](CHANGELOG.md) | [AUDIT](AUDIT_FINAL_2024-12-21.md) | [NeuroAgent](NEUROAGENT_PROGRESS.md) | [Telegram Setup](TELEGRAM_QUICK_SETUP.md)
+📚 **Документация:** [CHANGELOG](CHANGELOG.md) | [AUDIT](AUDIT_REPORT.md) | [NeuroAgent](NEUROAGENT_PROGRESS.md) | [Telegram Setup](TELEGRAM_QUICK_SETUP.md)
 
 ---
 

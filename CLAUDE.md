@@ -9,6 +9,7 @@
 ## 🎯 Project Identity
 
 **Name:** NeuroGUARDIAN (NeuroAgent)
+**Version:** v2.12.0 (Production Ready)
 **Type:** AI-powered marketplace management assistant
 **Platforms:** Wildberries, Ozon
 **Stack:** React 19, TypeScript, Vite, Vercel (serverless), PostgreSQL, n8n
@@ -78,9 +79,8 @@
 
 ## 🔴 ACTIVE TASK: SECURITY AGENT (CRITICAL PRIORITY)
 
-**Full Spec:** `.agent/SECURITY_AGENT_SPEC.md`
-
-**Дедлайн:** 7 дней до MVP
+**Дедлайн:** Сдано 2025-12-28 (v2.12.0)
+**Status:** PRODUCTION READY - All blockers resolved.
 
 **Модули:**
 
@@ -118,12 +118,16 @@
 3. Acknowledge understanding of context
 4. Ask for today's task or continue from TODO
 
-### `/neuro end` — End of session
+# Development
 
-1. Summarize what was accomplished
-2. Update `.agent/PROJECT_STATE.md` with new status
-3. List any new issues discovered
-4. Commit documentation changes
+npm run dev / vitest run
+
+# Quality & Production Checks
+
+npm run lint && npm run typecheck
+npm run checklist # PRODUCTION READINESS CHECK (CRITICAL)
+npm run test # RUN ALL TESTS (180+)
+npm run db:migrate # APPLY DATABASE MIGRATIONS
 
 ---
 
