@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:security-agent": "cd security-agent && npm run build",
+    "vercel-build": "npm run build:security-agent && npm run build",
+    "postinstall": "cd security-agent && npm install && npm run build || true",
     "typecheck": "tsc -b",
     "lint": "eslint .",
     "preview": "vite preview",
