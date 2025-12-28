@@ -141,7 +141,7 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
   };
 
   const handleAction = async (action: string, userId: number) => {
-    if (!confirm(`Are you sure you want to trigger ${action} for user #${userId}?`)) return;
+    if (!confirm(`Вы уверены, что хотите запустить ${action} для пользователя #${userId}?`)) return;
 
     setActionLoading(userId);
     try {
@@ -156,10 +156,10 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
         console.log(`Success: ${data.message}`);
       } else {
         console.error(`Error: ${data.error}`);
-        alert(`Failed: ${data.error}`);
+        alert(`Ошибка: ${data.error}`);
       }
     } catch (e) {
-      alert('Network Error');
+      alert('Ошибка сети или сервера');
     } finally {
       setActionLoading(null);
     }
@@ -179,7 +179,7 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
         >
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent mb-2">
-              Ops Portal
+              Админ Панель
             </h1>
             <p className="text-stone-500 text-sm">Вход только для авторизованных операторов</p>
           </div>
@@ -196,14 +196,14 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
               type="submit"
               className="bg-violet-600 p-3 rounded-xl font-bold hover:bg-violet-500 transition-colors shadow-lg shadow-violet-900/20"
             >
-              Access Console
+              Войти в консоль
             </button>
           </form>
           <button
             onClick={onBack}
             className="mt-6 w-full text-stone-600 hover:text-stone-400 text-sm"
           >
-            ← Back to Application
+            ← Вернуться в приложение
           </button>
         </motion.div>
       </div>
@@ -222,9 +222,9 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center font-bold text-white">
             N
           </div>
-          <h1 className="text-lg font-bold text-stone-200">Ops Portal</h1>
+          <h1 className="text-lg font-bold text-stone-200">Админ Панель</h1>
           <span className="px-2 py-0.5 rounded-full bg-emerald-900/30 text-emerald-400 text-xs border border-emerald-800">
-            • Live
+            • Онлайн
           </span>
         </div>
         <div className="flex gap-2">
@@ -256,19 +256,19 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
             active={activeTab === 'overview'}
             onClick={() => setActiveTab('overview')}
             icon="📊"
-            label="Overview"
+            label="Обзор"
           />
           <TabButton
             active={activeTab === 'clients'}
             onClick={() => setActiveTab('clients')}
             icon="👥"
-            label="Clients"
+            label="Клиенты"
           />
           <TabButton
             active={activeTab === 'audit'}
             onClick={() => setActiveTab('audit')}
             icon="🛡️"
-            label="Deep Dive"
+            label="Аудит"
           />
           <TabButton
             active={activeTab === 'n8n'}
@@ -294,41 +294,41 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
               {/* Top Stats Grid */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard
-                  label="Total Clients"
+                  label="Всего клиентов"
                   value={overview.clients.total}
                   trend={`+${overview.clients.newToday}`}
                   trendUp={true}
                 />
                 <StatCard
-                  label="Active Clients"
+                  label="Активных"
                   value={overview.clients.active}
-                  subvalue={`${Math.round((overview.clients.active / overview.clients.total) * 100)}% active`}
+                  subvalue={`${Math.round((overview.clients.active / overview.clients.total) * 100)}% активны`}
                   color="purple"
                 />
                 <StatusCard
-                  label="Integrations"
+                  label="Интеграции"
                   status={overview.integrations.wb.status === 'ok' ? 'healthy' : 'warning'}
                   detail={`WB ${overview.integrations.wb.latency}ms`}
                 />
                 <StatusCard
-                  label="n8n Engine"
+                  label="Движок n8n"
                   status={overview.integrations.n8n.status === 'active' ? 'healthy' : 'error'}
-                  detail={`${overview.integrations.n8n.workflows_active} workflows`}
+                  detail={`${overview.integrations.n8n.workflows_active} сценариев`}
                 />
               </div>
 
               {/* Recent Activity Feed */}
               <div className="bg-stone-900/50 rounded-2xl border border-stone-800 overflow-hidden">
                 <div className="p-4 border-b border-stone-800 flex justify-between items-center">
-                  <h3 className="font-bold text-stone-300">Operations Feed</h3>
-                  <span className="text-xs text-stone-500">Last 5 events</span>
+                  <h3 className="font-bold text-stone-300">Лента операций</h3>
+                  <span className="text-xs text-stone-500">Последние 5</span>
                 </div>
                 <div className="divide-y divide-stone-800">
                   {overview.recent_events.map(evt => (
                     <EventRow key={evt.id} event={evt} compact />
                   ))}
                   {overview.recent_events.length === 0 && (
-                    <div className="p-8 text-center text-stone-600 text-sm">No recent events</div>
+                    <div className="p-8 text-center text-stone-600 text-sm">Нет событий</div>
                   )}
                 </div>
               </div>
@@ -348,12 +348,12 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-stone-900 text-stone-500 text-xs uppercase tracking-wider">
-                        <th className="p-4 font-medium">Shop Name / User</th>
-                        <th className="p-4 font-medium">Status</th>
-                        <th className="p-4 font-medium">Platforms</th>
-                        <th className="p-4 font-medium">Sub</th>
-                        <th className="p-4 font-medium">Products</th>
-                        <th className="p-4 font-medium">Actions</th>
+                        <th className="p-4 font-medium">Магазин / Клиент</th>
+                        <th className="p-4 font-medium">Статус</th>
+                        <th className="p-4 font-medium">Платформы</th>
+                        <th className="p-4 font-medium">Подписка</th>
+                        <th className="p-4 font-medium">Товары</th>
+                        <th className="p-4 font-medium">Действия</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-stone-800 text-sm">
@@ -383,14 +383,14 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
                                 disabled={actionLoading === client.id}
                                 className="px-3 py-1 bg-violet-600/20 text-violet-300 hover:bg-violet-600/30 rounded text-xs font-medium transition-colors disabled:opacity-50"
                               >
-                                {actionLoading === client.id ? '...' : 'Sync'}
+                                {actionLoading === client.id ? '...' : 'Синк'}
                               </button>
                               <button
                                 onClick={() => handleAction('retry_onboarding', client.id)}
                                 disabled={actionLoading === client.id}
                                 className="px-3 py-1 bg-stone-800 text-stone-400 hover:bg-stone-700 rounded text-xs font-medium transition-colors"
                               >
-                                Retry
+                                Повтор
                               </button>
                             </div>
                           </td>
@@ -408,7 +408,7 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
                   >
                     ←
                   </button>
-                  <span className="sc-stone-500 text-sm py-1">Page {clientsPage}</span>
+                  <span className="sc-stone-500 text-sm py-1">Стр. {clientsPage}</span>
                   <button
                     onClick={() => setClientsPage(p => p + 1)}
                     className="px-3 py-1 bg-stone-800 rounded"
@@ -430,8 +430,8 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
               className="space-y-4"
             >
               <div className="flex justify-between items-center mb-2">
-                <h2 className="text-xl font-bold">Audit Log</h2>
-                <span className="text-xs text-stone-500">Immutable record</span>
+                <h2 className="text-xl font-bold">Журнал Аудита</h2>
+                <span className="text-xs text-stone-500">Неизменяемая запись</span>
               </div>
               <div className="space-y-2">
                 {events.map(event => (
@@ -450,20 +450,20 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
               className="flex flex-col items-center justify-center p-12 text-center"
             >
               <div className="text-6xl mb-4">⚡</div>
-              <h2 className="text-2xl font-bold text-white mb-2">n8n Orchestrator</h2>
+              <h2 className="text-2xl font-bold text-white mb-2">Оркестратор n8n</h2>
               <div className="bg-stone-900 p-6 rounded-xl border border-stone-800 max-w-md w-full">
                 <div className="flex justify-between mb-2">
-                  <span className="text-stone-400">Status</span>
-                  <span className="text-emerald-400 font-bold">Active</span>
+                  <span className="text-stone-400">Статус</span>
+                  <span className="text-emerald-400 font-bold">Активен</span>
                 </div>
                 <div className="flex justify-between mb-2">
-                  <span className="text-stone-400">Webhook Base</span>
+                  <span className="text-stone-400">Вебхук</span>
                   <span className="text-stone-200 font-mono text-xs max-w-[200px] truncate">
                     {overview?.integrations.n8n.status}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-stone-400">Workflows active</span>
+                  <span className="text-stone-400">Активные сценарии</span>
                   <span className="text-stone-200">3</span>
                 </div>
               </div>
@@ -531,7 +531,7 @@ function StatusCard({ label, status, detail }: any) {
           className={`w-2.5 h-2.5 rounded-full ${isHealthy ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-amber-500'}`}
         />
         <div className={`text-lg font-bold ${isHealthy ? 'text-emerald-400' : 'text-amber-400'}`}>
-          {isHealthy ? 'Healthy' : 'Issues'}
+          {isHealthy ? 'Норма' : 'Проблемы'}
         </div>
       </div>
       <div className="text-stone-600 text-xs font-mono">{detail}</div>
