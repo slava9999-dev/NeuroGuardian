@@ -76,6 +76,30 @@
 
 ---
 
+## 🔴 ACTIVE TASK: SECURITY AGENT (CRITICAL PRIORITY)
+
+**Full Spec:** `.agent/SECURITY_AGENT_SPEC.md`
+
+**Дедлайн:** 7 дней до MVP
+
+**Модули:**
+
+1. **Secrets Guard** — Vault integration, no process.env
+2. **Authorization Guard** — Permissions, JWT, Rate Limiting
+3. **Audit & Immutability** — ClickHouse, HMAC signing
+4. **Regression Prevention** — SAST, Canary, Auto-rollback
+5. **n8n Guardian** — Workflow signing, credential injection
+6. **AI Agent Guard** — LLMGuard, prompt validation
+7. **Emergency Response** — Lockdown, playbooks
+
+**⚠️ ПРАВИЛА:**
+
+- Никаких mock/demo реализаций
+- Каждый модуль должен быть production-ready
+- Следовать acceptance criteria строго
+
+---
+
 ## 🚨 Known Issues & Tech Debt
 
 1. **Analytics are partially mock** — `executeGetAbcAnalysis` uses fake data

@@ -1,0 +1,100 @@
+# Security Agent Local Development Stack
+# ========================================
+# Run: docker-compose -f security-agent/docker-compose.yml up -d
+
+version: '3.8'
+
+services:
+  # HashiCorp Vault - Secrets Management
+  vault:
+    image: hashicorp/vault:1.15
+    container_name: neuroguardian-vault
+    ports:
+      - "8200:8200"
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: "dev-only-token"
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+      VAULT_ADDR: "http://127.0.0.1:8200"
+    cap_add:
+      - IPC_LOCK
+    command: server -dev
+    volumes:
+      - vault-data:/vault/data
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ClickHouse - Audit Logs Storage
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.12
+    container_name: neuroguardian-clickhouse
+    ports:
+      - "8123:8123"  # HTTP interface
+      - "9000:9000"  # Native interface
+    environment:
+      CLICKHOUSE_DB: security_audit
+      CLICKHOUSE_USER: security_agent
+      CLICKHOUSE_PASSWORD: secure_password_change_me
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Redis - Policy Decision Cache
+  redis:
+    image: redis:7-alpine
+    container_name: neuroguardian-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass "redis_password_change_me"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redis_password_change_me", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Grafana - Monitoring Dashboard
+  grafana:
+    image: grafana/grafana:10.2.3
+    container_name: neuroguardian-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin_password_change_me
+      GF_USERS_ALLOW_SIGN_UP: false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - clickhouse
+
+  # Loki - Log Aggregation (for n8n logs)
+  loki:
+    image: grafana/loki:2.9.3
+    container_name: neuroguardian-loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - loki-data:/loki
+
+volumes:
+  vault-data:
+  clickhouse-data:
+  redis-data:
+  grafana-data:
+  loki-data:
+
+networks:
+  default:
+    name: security-agent-network
