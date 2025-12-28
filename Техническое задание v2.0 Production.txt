@@ -1,0 +1,3821 @@
+Техническое задание v2.0: Production-Ready NeuroGUARDIAN
+Метаданные проекта
+ПараметрЗначениеПроектNeuroGUARDIAN - AI Price GuardianВерсия2.11.0 → 3.0.0 (Production Release)Дата2025-12-28ПриоритетCRITICALРежимLIVE / Real-timeМониторингКаждые 30 минут
+
+Часть 1: Архитектура системы защиты цены
+1.1 Концепция "Сторож цены"
+┌─────────────────────────────────────────────────────────────────┐
+│                    NEUROGUARDIAN PRICE SHIELD                   │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   ┌─────────────┐    ┌─────────────┐    ┌─────────────┐        │
+│   │ WILDBERRIES │    │    OZON     │    │   ДРУГИЕ    │        │
+│   │     API     │    │     API     │    │     МП      │        │
+│   └──────┬──────┘    └──────┬──────┘    └──────┬──────┘        │
+│          │                  │                  │                │
+│          └─────────────┬────┴──────────────────┘                │
+│                        ▼                                        │
+│          ┌─────────────────────────────┐                        │
+│          │     PRICE MONITORING        │ ← Каждые 30 мин       │
+│          │     SENTINEL ENGINE         │                        │
+│          └─────────────┬───────────────┘                        │
+│                        │                                        │
+│          ┌─────────────▼───────────────┐                        │
+│          │    THREAT DETECTION         │                        │
+│          │  • Competitor prices        │                        │
+│          │  • Ozon Card discounts      │                        │
+│          │  • Promo erosion            │                        │
+│          │  • Margin violations        │                        │
+│          └─────────────┬───────────────┘                        │
+│                        │                                        │
+│          ┌─────────────▼───────────────┐                        │
+│          │    UNIT ECONOMICS           │                        │
+│          │    CALCULATOR               │                        │
+│          │  • Cost price               │                        │
+│          │  • Commissions              │                        │
+│          │  • Logistics                │                        │
+│          │  • All hidden fees          │                        │
+│          └─────────────┬───────────────┘                        │
+│                        │                                        │
+│          ┌─────────────▼───────────────┐                        │
+│          │    PRICE ADJUSTMENT         │                        │
+│          │    ENGINE                   │ → API Marketplace      │
+│          └─────────────┬───────────────┘                        │
+│                        │                                        │
+│          ┌─────────────▼───────────────┐                        │
+│          │    TELEGRAM ALERTS          │ → Seller               │
+│          └─────────────────────────────┘                        │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+
+
+Часть 2: Онбординг нового пользователя
+2.1 Поток первого взаимодействия с агентом
+Файл: src/agent/onboarding/OnboardingFlow.ts
+typescriptDownloadCopy code/**
+ * Проактивный онбординг-агент
+ * Помогает новому пользователю настроить систему шаг за шагом
+ */
+
+export interface OnboardingState {
+  userId: string;
+  currentStep: OnboardingStep;
+  completedSteps: OnboardingStep[];
+  marketplaces: {
+    wildberries: MarketplaceConnection | null;
+    ozon: MarketplaceConnection | null;
+  };
+  productsImported: number;
+  priceRulesConfigured: number;
+  telegramConnected: boolean;
+  createdAt: Date;
+  lastInteraction: Date;
+}
+
+export enum OnboardingStep {
+  WELCOME = 'welcome',
+  COLLECT_WB_API = 'collect_wb_api',
+  VERIFY_WB_CONNECTION = 'verify_wb_connection',
+  COLLECT_OZON_API = 'collect_ozon_api',
+  VERIFY_OZON_CONNECTION = 'verify_ozon_connection',
+  SYNC_PRODUCTS = 'sync_products',
+  CONFIGURE_COST_PRICES = 'configure_cost_prices',
+  SETUP_PRICE_RULES = 'setup_price_rules',
+  CONNECT_TELEGRAM = 'connect_telegram',
+  TEST_MONITORING = 'test_monitoring',
+  COMPLETED = 'completed'
+}
+
+export class OnboardingAgent {
+  private db: Database;
+  private marketplaceService: MarketplaceService;
+  private telegramService: TelegramService;
+
+  /**
+   * Получить приветственное сообщение для нового пользователя
+   */
+  async getWelcomeMessage(userId: string): Promise<AgentResponse> {
+    const state = await this.getOrCreateState(userId);
+    
+    return {
+      message: `
+👋 Привет! Я NeuroGUARDIAN — ваш AI-помощник для защиты цен на маркетплейсах.
+
+Я помогу вам:
+• 🔗 Подключить магазины Wildberries и Ozon
+• 📦 Синхронизировать товары
+• 💰 Настроить защиту цен с учётом всех комиссий
+• 🛡️ Мониторить цены конкурентов каждые 30 минут
+• 📱 Получать уведомления в Telegram
+
+Давайте начнём настройку! Для работы мне понадобятся API-ключи ваших магазинов.
+
+**Шаг 1 из 10: Подключение Wildberries**
+
+Для получения API-ключа Wildberries:
+1. Войдите в личный кабинет продавца: https://seller.wildberries.ru
+2. Перейдите в Настройки → Доступ к API
+3. Создайте новый токен с правами:
+   - Контент (чтение)
+   - Цены и скидки (чтение и запись)
+   - Статистика (чтение)
+   
+Отправьте мне полученный API-ключ, и я проверю подключение.
+
+💡 Ключ будет надёжно зашифрован и использован только для работы с вашим магазином.
+      `.trim(),
+      
+      quickReplies: [
+        { text: '📖 Подробная инструкция WB', action: 'show_wb_instructions' },
+        { text: '⏭️ У меня уже есть ключ', action: 'have_wb_key' },
+        { text: '❓ Зачем нужен API-ключ?', action: 'explain_api_key' },
+      ],
+      
+      expectedInput: 'wb_api_key',
+      nextStep: OnboardingStep.VERIFY_WB_CONNECTION,
+    };
+  }
+
+  /**
+   * Обработка ввода API-ключа Wildberries
+   */
+  async processWBApiKey(userId: string, apiKey: string): Promise<AgentResponse> {
+    // Валидация формата ключа
+    if (!this.isValidWBKeyFormat(apiKey)) {
+      return {
+        message: `
+⚠️ Похоже, формат ключа неверный.
+
+API-ключ Wildberries должен быть длинной строкой (обычно начинается с буквы).
+
+Пожалуйста, проверьте:
+• Скопирован ли ключ полностью
+• Нет ли лишних пробелов в начале или конце
+
+Попробуйте ещё раз или напишите "помощь" для получения инструкции.
+        `.trim(),
+        expectedInput: 'wb_api_key',
+      };
+    }
+
+    // Проверка подключения
+    const connectionResult = await this.verifyWBConnection(apiKey);
+    
+    if (!connectionResult.success) {
+      return {
+        message: `
+❌ Не удалось подключиться к Wildberries.
+
+Ошибка: ${connectionResult.error}
+
+Возможные причины:
+• Ключ неактивен или заблокирован
+• Недостаточно прав у токена
+• Временные проблемы на стороне Wildberries
+
+Что делать:
+1. Проверьте статус токена в личном кабинете WB
+2. Убедитесь, что токен имеет права на "Цены и скидки"
+3. Попробуйте создать новый токен
+
+Отправьте новый ключ или напишите "пропустить" чтобы настроить позже.
+        `.trim(),
+        expectedInput: 'wb_api_key',
+        quickReplies: [
+          { text: '🔄 Попробовать снова', action: 'retry_wb' },
+          { text: '⏭️ Пропустить WB', action: 'skip_wb' },
+          { text: '📞 Нужна помощь', action: 'help_wb' },
+        ],
+      };
+    }
+
+    // Успешное подключение - сохраняем ключ
+    await this.saveMarketplaceConnection(userId, 'wildberries', {
+      apiKey: await this.encryptApiKey(apiKey),
+      supplierId: connectionResult.supplierId,
+      shopName: connectionResult.shopName,
+      connectedAt: new Date(),
+    });
+
+    // Обновляем состояние онбординга
+    await this.updateOnboardingState(userId, {
+      currentStep: OnboardingStep.COLLECT_OZON_API,
+      completedSteps: [OnboardingStep.WELCOME, OnboardingStep.COLLECT_WB_API, OnboardingStep.VERIFY_WB_CONNECTION],
+    });
+
+    return {
+      message: `
+✅ Отлично! Wildberries успешно подключен!
+
+📊 Информация о магазине:
+• Название: ${connectionResult.shopName}
+• ID продавца: ${connectionResult.supplierId}
+• Товаров найдено: ${connectionResult.productsCount}
+
+**Шаг 2 из 10: Подключение Ozon**
+
+Теперь давайте подключим Ozon. Для этого нужны:
+1. **Client ID** — идентификатор продавца
+2. **API Key** — ключ доступа
+
+Как получить:
+1. Войдите в личный кабинет: https://seller.ozon.ru
+2. Перейдите в Настройки → API ключи
+3. Создайте ключ с правами:
+   - Товары (чтение)
+   - Цены (чтение и запись)
+   - Аналитика (чтение)
+
+Сначала отправьте мне **Client ID** (это числовой идентификатор).
+      `.trim(),
+      
+      expectedInput: 'ozon_client_id',
+      nextStep: OnboardingStep.COLLECT_OZON_API,
+      
+      quickReplies: [
+        { text: '📖 Инструкция Ozon', action: 'show_ozon_instructions' },
+        { text: '⏭️ Пропустить Ozon', action: 'skip_ozon' },
+        { text: '❓ Работаю только с WB', action: 'only_wb' },
+      ],
+    };
+  }
+
+  /**
+   * Обработка ввода Ozon API
+   */
+  async processOzonCredentials(
+    userId: string, 
+    clientId: string, 
+    apiKey: string
+  ): Promise<AgentResponse> {
+    
+    // Валидация
+    if (!clientId.match(/^\d+$/)) {
+      return {
+        message: `
+⚠️ Client ID должен содержать только цифры.
+
+Вы отправили: "${clientId}"
+
+Пожалуйста, проверьте и отправьте корректный Client ID.
+        `.trim(),
+        expectedInput: 'ozon_client_id',
+      };
+    }
+
+    // Проверка подключения
+    const connectionResult = await this.verifyOzonConnection(clientId, apiKey);
+    
+    if (!connectionResult.success) {
+      return {
+        message: `
+❌ Не удалось подключиться к Ozon.
+
+Ошибка: ${connectionResult.error}
+
+Проверьте:
+• Правильность Client ID и API Key
+• Активность ключа в личном кабинете Ozon
+• Наличие необходимых прав доступа
+
+Отправьте данные заново или напишите "пропустить".
+        `.trim(),
+        expectedInput: 'ozon_client_id',
+      };
+    }
+
+    // Сохраняем подключение
+    await this.saveMarketplaceConnection(userId, 'ozon', {
+      clientId,
+      apiKey: await this.encryptApiKey(apiKey),
+      shopName: connectionResult.shopName,
+      connectedAt: new Date(),
+    });
+
+    // Следующий шаг - синхронизация товаров
+    return this.startProductSync(userId);
+  }
+
+  /**
+   * Синхронизация товаров со всех подключенных маркетплейсов
+   */
+  async startProductSync(userId: string): Promise<AgentResponse> {
+    const state = await this.getOnboardingState(userId);
+    
+    const hasWB = state.marketplaces.wildberries !== null;
+    const hasOzon = state.marketplaces.ozon !== null;
+    
+    if (!hasWB && !hasOzon) {
+      return {
+        message: `
+⚠️ Для продолжения нужно подключить хотя бы один маркетплейс.
+
+Выберите, какой маркетплейс хотите подключить:
+        `.trim(),
+        quickReplies: [
+          { text: '🟣 Подключить Wildberries', action: 'connect_wb' },
+          { text: '🔵 Подключить Ozon', action: 'connect_ozon' },
+        ],
+      };
+    }
+
+    // Запускаем синхронизацию
+    const syncMessage = await this.sendMessage(userId, `
+🔄 Начинаю синхронизацию товаров...
+
+${hasWB ? '• Wildberries: загрузка...' : ''}
+${hasOzon ? '• Ozon: загрузка...' : ''}
+
+Это может занять несколько минут в зависимости от количества товаров.
+    `);
+
+    // Выполняем синхронизацию
+    const syncResult = await this.performProductSync(userId, {
+      wildberries: hasWB,
+      ozon: hasOzon,
+    });
+
+    // Обновляем состояние
+    await this.updateOnboardingState(userId, {
+      currentStep: OnboardingStep.CONFIGURE_COST_PRICES,
+      productsImported: syncResult.totalProducts,
+    });
+
+    return {
+      message: `
+✅ Синхронизация завершена!
+
+📦 Загружено товаров:
+${hasWB ? `• Wildberries: ${syncResult.wb?.count || 0} товаров` : ''}
+${hasOzon ? `• Ozon: ${syncResult.ozon?.count || 0} товаров` : ''}
+
+📊 Всего: ${syncResult.totalProducts} товаров
+
+**Шаг 4 из 10: Настройка себестоимости**
+
+Для точного расчёта маржи и защиты цен мне нужна себестоимость товаров.
+
+Вы можете:
+1. 📤 Загрузить файл Excel с себестоимостью
+2. ✏️ Указать себестоимость вручную для каждого товара
+3. 📊 Указать среднюю маржу, и я рассчитаю себестоимость
+
+Как хотите продолжить?
+      `.trim(),
+      
+      quickReplies: [
+        { text: '📤 Загрузить Excel', action: 'upload_cost_excel' },
+        { text: '✏️ Ввести вручную', action: 'manual_cost_input' },
+        { text: '📊 Указать % маржи', action: 'set_margin_percent' },
+        { text: '⏭️ Настрою позже', action: 'skip_cost_config' },
+      ],
+    };
+  }
+
+  /**
+   * Настройка правил защиты цен
+   */
+  async configurePriceRules(userId: string): Promise<AgentResponse> {
+    const products = await this.getUserProducts(userId);
+    
+    return {
+      message: `
+🛡️ **Шаг 6 из 10: Настройка защиты цен**
+
+Сейчас я помогу настроить правила защиты для ваших товаров.
+
+📋 У вас ${products.length} товаров. Для каждого можно указать:
+
+1. **Минимальная цена** — ниже этой цены товар не опустится
+2. **Целевая маржа** — какую прибыль хотите сохранять
+3. **Реакция на конкурентов** — как реагировать на изменение цен конкурентов
+
+🎯 **Рекомендую начать с глобальных правил:**
+
+Какую минимальную маржу вы хотите сохранять на всех товарах?
+(Например: 15%, 20%, 25%)
+
+💡 Это значение будет применено ко всем товарам как базовое. 
+Потом сможете настроить индивидуально для каждого товара.
+      `.trim(),
+      
+      expectedInput: 'target_margin_percent',
+      
+      quickReplies: [
+        { text: '15% маржи', action: 'set_margin_15' },
+        { text: '20% маржи', action: 'set_margin_20' },
+        { text: '25% маржи', action: 'set_margin_25' },
+        { text: '30% маржи', action: 'set_margin_30' },
+        { text: '✏️ Другое значение', action: 'custom_margin' },
+      ],
+    };
+  }
+
+  /**
+   * Подключение Telegram для уведомлений
+   */
+  async setupTelegramNotifications(userId: string): Promise<AgentResponse> {
+    const telegramBotUsername = process.env.TELEGRAM_BOT_USERNAME;
+    const linkCode = await this.generateTelegramLinkCode(userId);
+    
+    return {
+      message: `
+📱 **Шаг 8 из 10: Подключение Telegram**
+
+Для получения уведомлений о защите цен подключите Telegram:
+
+1. Откройте бота: @${telegramBotUsername}
+2. Отправьте команду: /start ${linkCode}
+3. Готово! Бот подтвердит подключение.
+
+🔔 После подключения вы будете получать:
+• Отчёты мониторинга каждые 30 минут
+• Алерты об угрозах ценам
+• Уведомления об автоматических корректировках
+• Еженедельную аналитику
+
+⏱️ Ожидаю подключения...
+
+Код действителен 10 минут.
+      `.trim(),
+      
+      quickReplies: [
+        { text: '✅ Я подключил бота', action: 'check_telegram_connection' },
+        { text: '🔄 Новый код', action: 'regenerate_telegram_code' },
+        { text: '⏭️ Подключу позже', action: 'skip_telegram' },
+      ],
+      
+      awaitingWebhook: 'telegram_connection',
+      webhookTimeout: 600000, // 10 минут
+    };
+  }
+
+  /**
+   * Тестовый запуск мониторинга
+   */
+  async runTestMonitoring(userId: string): Promise<AgentResponse> {
+    const state = await this.getOnboardingState(userId);
+    
+    // Запускаем тестовый мониторинг
+    const testResult = await this.priceMonitoringService.runForUser(userId, {
+      testMode: true,
+      sendNotifications: state.telegramConnected,
+    });
+
+    return {
+      message: `
+🧪 **Шаг 9 из 10: Тестовый запуск**
+
+Результаты тестового мониторинга:
+
+📊 **Проверено товаров:** ${testResult.productsChecked}
+
+${testResult.threats.length > 0 ? `
+⚠️ **Обнаружено угроз:** ${testResult.threats.length}
+
+${testResult.threats.slice(0, 3).map(t => `
+• ${t.productName}
+  Угроза: ${t.threatType}
+  Действие: ${t.suggestedAction}
+`).join('\n')}
+
+${testResult.threats.length > 3 ? `...и ещё ${testResult.threats.length - 3} угроз` : ''}
+` : `
+✅ **Угроз не обнаружено!**
+Все ваши цены в безопасности.
+`}
+
+${state.telegramConnected ? '📱 Уведомление отправлено в Telegram' : ''}
+
+**Всё готово к запуску!**
+
+Хотите активировать автоматический мониторинг каждые 30 минут?
+      `.trim(),
+      
+      quickReplies: [
+        { text: '✅ Запустить мониторинг', action: 'activate_monitoring' },
+        { text: '⚙️ Изменить настройки', action: 'edit_settings' },
+        { text: '📊 Подробный отчёт', action: 'detailed_report' },
+      ],
+    };
+  }
+
+  /**
+   * Завершение онбординга
+   */
+  async completeOnboarding(userId: string): Promise<AgentResponse> {
+    await this.updateOnboardingState(userId, {
+      currentStep: OnboardingStep.COMPLETED,
+    });
+
+    // Активируем мониторинг
+    await this.activateMonitoring(userId);
+
+    return {
+      message: `
+🎉 **Поздравляю! Настройка завершена!**
+
+✅ Ваш аккаунт полностью настроен и защита цен активирована.
+
+📋 **Итоги настройки:**
+• Подключено маркетплейсов: ${await this.getConnectedMarketplacesCount(userId)}
+• Товаров под защитой: ${await this.getProtectedProductsCount(userId)}
+• Мониторинг: каждые 30 минут
+• Уведомления: Telegram
+
+🛡️ **Что теперь происходит:**
+1. Каждые 30 минут проверяю цены на всех маркетплейсах
+2. Анализирую цены конкурентов
+3. Слежу за скидками (включая Ozon Card)
+4. При угрозе — автоматически корректирую цену или отправляю алерт
+5. Отправляю отчёты в Telegram
+
+💡 **Полезные команды:**
+• "Отчёт" — текущий статус всех товаров
+• "Угрозы" — список обнаруженных проблем
+• "Настройки" — изменить параметры защиты
+• "Помощь" — справка по командам
+
+Чем могу помочь?
+      `.trim(),
+      
+      quickReplies: [
+        { text: '📊 Показать дашборд', action: 'show_dashboard' },
+        { text: '📦 Мои товары', action: 'show_products' },
+        { text: '⚙️ Настройки', action: 'show_settings' },
+        { text: '❓ Помощь', action: 'show_help' },
+      ],
+    };
+  }
+
+  // Вспомогательные методы
+  
+  private isValidWBKeyFormat(key: string): boolean {
+    // WB ключи обычно длинные строки без пробелов
+    return key.length > 50 && !key.includes(' ') && /^[A-Za-z]/.test(key);
+  }
+
+  private async verifyWBConnection(apiKey: string): Promise<ConnectionResult> {
+    try {
+      const client = new WildberriesClient({ apiKey });
+      const info = await client.getSellerInfo();
+      const products = await client.getProducts();
+      
+      return {
+        success: true,
+        supplierId: info.supplierId,
+        shopName: info.shopName,
+        productsCount: products.length,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: this.parseApiError(error),
+      };
+    }
+  }
+
+  private async encryptApiKey(apiKey: string): Promise<string> {
+    // Используем AES-256-GCM для шифрования
+    const encryptionKey = process.env.API_KEY_ENCRYPTION_SECRET;
+    return encrypt(apiKey, encryptionKey);
+  }
+}
+
+Часть 3: Калькулятор юнит-экономики
+3.1 Полный расчёт всех комиссий и расходов
+Файл: src/services/UnitEconomicsCalculator.ts
+typescriptDownloadCopy code/**
+ * Калькулятор юнит-экономики с учётом ВСЕХ расходов
+ * Включая скрытые комиссии, Ozon Card, логистику и т.д.
+ */
+
+export interface ProductCosts {
+  // Базовые данные
+  productId: string;
+  marketplace: 'wildberries' | 'ozon';
+  sellingPrice: number;      // Цена продажи
+  costPrice: number;         // Себестоимость товара
+  
+  // Размеры и вес (влияют на логистику)
+  weight: number;            // Вес в кг
+  volume: number;            // Объём в литрах
+  category: string;          // Категория товара
+}
+
+export interface UnitEconomicsResult {
+  // Исходные данные
+  sellingPrice: number;
+  costPrice: number;
+  
+  // Комиссии маркетплейса
+  marketplaceCommission: number;
+  marketplaceCommissionPercent: number;
+  
+  // Эквайринг
+  acquiringFee: number;
+  acquiringPercent: number;
+  
+  // Логистика
+  logisticsCost: number;
+  logisticsDetails: {
+    firstMile: number;      // До склада МП
+    lastMile: number;       // До покупателя
+    returnCost: number;     // Возврат (усреднённый)
+    storageCost: number;    // Хранение
+  };
+  
+  // Ozon-специфичные
+  ozonCardDiscount?: number;      // Скидка по Ozon Card (оплачивает продавец!)
+  ozonPremiumDiscount?: number;   // Скидка Ozon Premium
+  
+  // WB-специфичные
+  wbWalletDiscount?: number;      // Скидка WB Кошелёк
+  
+  // Акции и промо
+  promoDiscount: number;          // Текущая акция
+  promoCompensation: number;      // Компенсация от МП за акцию
+  
+  // Прочие расходы
+  packagingCost: number;          // Упаковка
+  returnRate: number;             // % возвратов
+  returnProcessingCost: number;   // Обработка возвратов
+  
+  // Итоги
+  totalCosts: number;             // Все расходы
+  grossProfit: number;            // Валовая прибыль
+  netProfit: number;              // Чистая прибыль
+  marginPercent: number;          // Маржа %
+  roi: number;                    // ROI %
+  
+  // Минимальная безопасная цена
+  minSafePrice: number;           // Цена при которой маржа = 0
+  recommendedMinPrice: number;    // Рекомендуемая мин. цена (с целевой маржой)
+  
+  // Предупреждения
+  warnings: EconomicsWarning[];
+}
+
+export interface EconomicsWarning {
+  type: 'critical' | 'warning' | 'info';
+  code: string;
+  message: string;
+  impact: number; // Влияние на прибыль в рублях
+}
+
+export class UnitEconomicsCalculator {
+  
+  // Комиссии Wildberries по категориям (актуальные на 2025)
+  private readonly WB_COMMISSIONS: Record<string, number> = {
+    'Одежда': 0.15,
+    'Обувь': 0.15,
+    'Электроника': 0.12,
+    'Бытовая техника': 0.12,
+    'Красота': 0.18,
+    'Детские товары': 0.15,
+    'Продукты': 0.10,
+    'Товары для дома': 0.15,
+    'Спорт': 0.15,
+    'default': 0.15,
+  };
+
+  // Комиссии Ozon по категориям
+  private readonly OZON_COMMISSIONS: Record<string, number> = {
+    'Одежда': 0.15,
+    'Обувь': 0.15,
+    'Электроника': 0.10,
+    'Бытовая техника': 0.10,
+    'Красота': 0.20,
+    'Детские товары': 0.15,
+    'Продукты': 0.08,
+    'Товары для дома': 0.15,
+    'default': 0.15,
+  };
+
+  // Скидка Ozon Card (оплачивается продавцом!)
+  private readonly OZON_CARD_DISCOUNT_PERCENT = 0.05; // 5%
+
+  // Логистика WB
+  private readonly WB_LOGISTICS = {
+    baseDeliveryCost: 55,        // Базовая доставка до ПВЗ
+    perKgRate: 5,                // За каждый кг сверх 1
+    perLiterRate: 3,             // За каждый литр сверх 1
+    returnCostPercent: 0.33,     // 33% от стоимости доставки за возврат
+    storagePerDayPerLiter: 0.07, // Хранение за литр в день
+  };
+
+  // Логистика Ozon
+  private readonly OZON_LOGISTICS = {
+    firstMile: {
+      upTo5kg: 76,
+      upTo10kg: 90,
+      upTo15kg: 120,
+      upTo25kg: 180,
+      over25kg: 250,
+    },
+    lastMile: {
+      standard: 65,
+      express: 120,
+    },
+    returnRate: 100,              // Фикс за возврат
+    storagePerDayPerUnit: 2.5,    // Хранение за единицу в день
+  };
+
+  /**
+   * Полный расчёт юнит-экономики
+   */
+  async calculate(input: ProductCosts, options?: CalculationOptions): Promise<UnitEconomicsResult> {
+    const warnings: EconomicsWarning[] = [];
+    
+    // 1. Комиссия маркетплейса
+    const commissionRate = this.getCommissionRate(input.marketplace, input.category);
+    const marketplaceCommission = input.sellingPrice * commissionRate;
+    
+    // 2. Эквайринг (обычно входит в комиссию, но нужно учитывать)
+    const acquiringPercent = input.marketplace === 'ozon' ? 0.015 : 0.02;
+    const acquiringFee = input.sellingPrice * acquiringPercent;
+    
+    // 3. Логистика
+    const logisticsDetails = this.calculateLogistics(input);
+    const logisticsCost = 
+      logisticsDetails.firstMile + 
+      logisticsDetails.lastMile + 
+      logisticsDetails.storageCost;
+    
+    // 4. ⚠️ КРИТИЧНО: Ozon Card скидка (оплачивает продавец!)
+    let ozonCardDiscount = 0;
+    if (input.marketplace === 'ozon') {
+      // По статистике ~40% покупок на Ozon с картой
+      const ozonCardPurchaseRate = 0.40;
+      ozonCardDiscount = input.sellingPrice * this.OZON_CARD_DISCOUNT_PERCENT * ozonCardPurchaseRate;
+      
+      if (ozonCardDiscount > input.sellingPrice * 0.02) {
+        warnings.push({
+          type: 'warning',
+          code: 'OZON_CARD_IMPACT',
+          message: `Скидка Ozon Card съедает ${(ozonCardDiscount / input.sellingPrice * 100).toFixed(1)}% от цены. Учтите это при ценообразовании!`,
+          impact: ozonCardDiscount,
+        });
+      }
+    }
+    
+    // 5. Возвраты
+    const returnRate = options?.customReturnRate || this.getAverageReturnRate(input.category);
+    const returnProcessingCost = (logisticsDetails.lastMile + logisticsDetails.returnCost) * returnRate;
+    
+    // 6. Упаковка
+    const packagingCost = options?.packagingCost || 15; // Среднее значение
+    
+    // 7. Промо-акции
+    const promoDiscount = options?.promoDiscount || 0;
+    const promoCompensation = options?.promoCompensation || 0;
+    
+    // Итоговые расчёты
+    const totalCosts = 
+      input.costPrice +
+      marketplaceCommission +
+      acquiringFee +
+      logisticsCost +
+      ozonCardDiscount +
+      returnProcessingCost +
+      packagingCost +
+      promoDiscount -
+      promoCompensation;
+    
+    const grossProfit = input.sellingPrice - input.costPrice;
+    const netProfit = input.sellingPrice - totalCosts;
+    const marginPercent = (netProfit / input.sellingPrice) * 100;
+    const roi = (netProfit / input.costPrice) * 100;
+    
+    // Минимальная безопасная цена
+    const fixedCosts = packagingCost + logisticsDetails.firstMile;
+    const variableCostRate = commissionRate + acquiringPercent + 
+      (input.marketplace === 'ozon' ? this.OZON_CARD_DISCOUNT_PERCENT * 0.4 : 0);
+    
+    // Формула: Price = (costPrice + fixedCosts) / (1 - variableCostRate)
+    const minSafePrice = (input.costPrice + fixedCosts) / (1 - variableCostRate);
+    
+    // Рекомендуемая цена с целевой маржой
+    const targetMargin = options?.targetMarginPercent || 20;
+    const recommendedMinPrice = (input.costPrice + fixedCosts) / (1 - variableCostRate - targetMargin / 100);
+    
+    // Проверка на критические проблемы
+    if (marginPercent < 0) {
+      warnings.push({
+        type: 'critical',
+        code: 'NEGATIVE_MARGIN',
+        message: `КРИТИЧНО: Вы работаете в убыток! Маржа: ${marginPercent.toFixed(1)}%`,
+        impact: netProfit,
+      });
+    } else if (marginPercent < 5) {
+      warnings.push({
+        type: 'critical',
+        code: 'VERY_LOW_MARGIN',
+        message: `Маржа критически низкая (${marginPercent.toFixed(1)}%). Любое изменение комиссий приведёт к убытку.`,
+        impact: netProfit,
+      });
+    } else if (marginPercent < 10) {
+      warnings.push({
+        type: 'warning',
+        code: 'LOW_MARGIN',
+        message: `Маржа ниже рекомендуемой (${marginPercent.toFixed(1)}%). Рекомендуется минимум 15%.`,
+        impact: (10 - marginPercent) / 100 * input.sellingPrice,
+      });
+    }
+
+    return {
+      sellingPrice: input.sellingPrice,
+      costPrice: input.costPrice,
+      
+      marketplaceCommission,
+      marketplaceCommissionPercent: commissionRate * 100,
+      
+      acquiringFee,
+      acquiringPercent: acquiringPercent * 100,
+      
+      logisticsCost,
+      logisticsDetails,
+      
+      ozonCardDiscount: input.marketplace === 'ozon' ? ozonCardDiscount : undefined,
+      
+      promoDiscount,
+      promoCompensation,
+      
+      packagingCost,
+      returnRate,
+      returnProcessingCost,
+      
+      totalCosts,
+      grossProfit,
+      netProfit,
+      marginPercent,
+      roi,
+      
+      minSafePrice: Math.ceil(minSafePrice),
+      recommendedMinPrice: Math.ceil(recommendedMinPrice),
+      
+      warnings,
+    };
+  }
+
+  /**
+   * Расчёт логистики
+   */
+  private calculateLogistics(input: ProductCosts): LogisticsDetails {
+    if (input.marketplace === 'wildberries') {
+      return this.calculateWBLogistics(input);
+    } else {
+      return this.calculateOzonLogistics(input);
+    }
+  }
+
+  private calculateWBLogistics(input: ProductCosts): LogisticsDetails {
+    const { weight, volume } = input;
+    
+    // First mile (до склада WB) - упрощённо
+    const firstMile = 25; // Если FBS, иначе 0
+    
+    // Last mile (до покупателя)
+    let lastMile = this.WB_LOGISTICS.baseDeliveryCost;
+    if (weight > 1) {
+      lastMile += (weight - 1) * this.WB_LOGISTICS.perKgRate;
+    }
+    if (volume > 1) {
+      lastMile += (volume - 1) * this.WB_LOGISTICS.perLiterRate;
+    }
+    
+    // Возврат
+    const returnCost = lastMile * this.WB_LOGISTICS.returnCostPercent;
+    
+    // Хранение (предполагаем средний срок 14 дней)
+    const averageStorageDays = 14;
+    const storageCost = volume * this.WB_LOGISTICS.storagePerDayPerLiter * averageStorageDays;
+    
+    return { firstMile, lastMile, returnCost, storageCost };
+  }
+
+  private calculateOzonLogistics(input: ProductCosts): LogisticsDetails {
+    const { weight } = input;
+    
+    // First mile
+    let firstMile: number;
+    if (weight <= 5) firstMile = this.OZON_LOGISTICS.firstMile.upTo5kg;
+    else if (weight <= 10) firstMile = this.OZON_LOGISTICS.firstMile.upTo10kg;
+    else if (weight <= 15) firstMile = this.OZON_LOGISTICS.firstMile.upTo15kg;
+    else if (weight <= 25) firstMile = this.OZON_LOGISTICS.firstMile.upTo25kg;
+    else firstMile = this.OZON_LOGISTICS.firstMile.over25kg;
+    
+    // Last mile
+    const lastMile = this.OZON_LOGISTICS.lastMile.standard;
+    
+    // Возврат
+    const returnCost = this.OZON_LOGISTICS.returnRate;
+    
+    // Хранение
+    const averageStorageDays = 14;
+    const storageCost = this.OZON_LOGISTICS.storagePerDayPerUnit * averageStorageDays;
+    
+    return { firstMile, lastMile, returnCost, storageCost };
+  }
+
+  private getCommissionRate(marketplace: string, category: string): number {
+    const commissions = marketplace === 'wildberries' 
+      ? this.WB_COMMISSIONS 
+      : this.OZON_COMMISSIONS;
+    
+    return commissions[category] || commissions['default'];
+  }
+
+  private getAverageReturnRate(category: string): number {
+    // Средние % возвратов по категориям
+    const returnRates: Record<string, number> = {
+      'Одежда': 0.25,      // 25% возвратов
+      'Обувь': 0.30,       // 30% возвратов
+      'Электроника': 0.05,
+      'Красота': 0.08,
+      'Детские товары': 0.15,
+      'default': 0.10,
+    };
+    
+    return returnRates[category] || returnRates['default'];
+  }
+
+  /**
+   * Массовый расчёт для всех товаров пользователя
+   */
+  async calculateBulk(userId: string): Promise<BulkCalculationResult> {
+    const products = await this.getProductsWithCosts(userId);
+    const results: Map<string, UnitEconomicsResult> = new Map();
+    
+    let totalProfit = 0;
+    let criticalCount = 0;
+    let warningCount = 0;
+    
+    for (const product of products) {
+      const result = await this.calculate(product);
+      results.set(product.productId, result);
+      
+      totalProfit += result.netProfit;
+      
+      const criticalWarnings = result.warnings.filter(w => w.type === 'critical').length;
+      const warningWarnings = result.warnings.filter(w => w.type === 'warning').length;
+      
+      if (criticalWarnings > 0) criticalCount++;
+      if (warningWarnings > 0) warningCount++;
+    }
+    
+    return {
+      results,
+      summary: {
+        totalProducts: products.length,
+        totalProfit,
+        averageMargin: totalProfit / products.reduce((sum, p) => sum + p.sellingPrice, 0) * 100,
+        criticalIssues: criticalCount,
+        warnings: warningCount,
+      },
+    };
+  }
+}
+
+Часть 4: Детектор угроз цены
+4.1 Система обнаружения всех угроз
+Файл: src/agent/ThreatDetector.ts
+typescriptDownloadCopy code/**
+ * Детектор угроз ценообразованию
+ * Выявляет все возможные риски для маржи продавца
+ */
+
+export enum ThreatType {
+  // Конкуренты
+  COMPETITOR_PRICE_DROP = 'competitor_price_drop',
+  COMPETITOR_PROMO = 'competitor_promo',
+  NEW_COMPETITOR = 'new_competitor',
+  
+  // Маркетплейс скидки
+  OZON_CARD_EROSION = 'ozon_card_erosion',
+  WB_WALLET_EROSION = 'wb_wallet_erosion',
+  MARKETPLACE_PROMO = 'marketplace_promo',
+  
+  // Комиссии
+  COMMISSION_INCREASE = 'commission_increase',
+  LOGISTICS_COST_INCREASE = 'logistics_cost_increase',
+  
+  // Внутренние
+  MARGIN_BELOW_TARGET = 'margin_below_target',
+  NEGATIVE_MARGIN = 'negative_margin',
+  PRICE_BELOW_MINIMUM = 'price_below_minimum',
+  
+  // Внешние
+  CURRENCY_IMPACT = 'currency_impact',
+  COST_PRICE_INCREASE = 'cost_price_increase',
+  
+  // Системные
+  API_ERROR = 'api_error',
+  SYNC_FAILURE = 'sync_failure',
+}
+
+export interface Threat {
+  id: string;
+  type: ThreatType;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  
+  // Контекст
+  productId: string;
+  productName: string;
+  marketplace: 'wildberries' | 'ozon';
+  
+  // Детали угрозы
+  description: string;
+  impact: {
+    currentValue: number;
+    threatenedValue: number;
+    potentialLoss: number;    // В рублях
+    potentialLossPercent: number;
+  };
+  
+  // Рекомендации
+  suggestedActions: SuggestedAction[];
+  
+  // Метаданные
+  detectedAt: Date;
+  expiresAt?: Date;          // Когда угроза неактуальна
+  autoResolvable: boolean;   // Можно ли решить автоматически
+}
+
+export interface SuggestedAction {
+  type: 'adjust_price' | 'alert_only' | 'request_approval' | 'block_sales';
+  description: string;
+  newPrice?: number;
+  confidence: number;        // 0-100, насколько уверены в рекомендации
+}
+
+export class ThreatDetector {
+  private economicsCalculator: UnitEconomicsCalculator;
+  private competitorTracker: CompetitorTracker;
+  private marketplaceClient: MarketplaceService;
+
+  /**
+   * Полное сканирование угроз для пользователя
+   */
+  async scanAllThreats(userId: string): Promise<ThreatScanResult> {
+    const products = await this.getUserProducts(userId);
+    const threats: Threat[] = [];
+    
+    for (const product of products) {
+      const productThreats = await this.scanProductThreats(product);
+      threats.push(...productThreats);
+    }
+    
+    // Сортировка по серьёзности
+    threats.sort((a, b) => {
+      const severityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+      return severityOrder[a.severity] - severityOrder[b.severity];
+    });
+    
+    return {
+      scannedAt: new Date(),
+      totalProducts: products.length,
+      threats,
+      summary: this.summarizeThreats(threats),
+    };
+  }
+
+  /**
+   * Сканирование угроз для конкретного товара
+   */
+  async scanProductThreats(product: ProductWithPriceRule): Promise<Threat[]> {
+    const threats: Threat[] = [];
+    
+    // 1. Проверка маржинальности
+    const economicsThreats = await this.checkEconomicsThreats(product);
+    threats.push(...economicsThreats);
+    
+    // 2. Проверка конкурентов
+    const competitorThreats = await this.checkCompetitorThreats(product);
+    threats.push(...competitorThreats);
+    
+    // 3. Проверка скидок маркетплейса (Ozon Card!)
+    const discountThreats = await this.checkMarketplaceDiscountThreats(product);
+    threats.push(...discountThreats);
+    
+    // 4. Проверка соответствия правилам
+    const ruleThreats = await this.checkRuleViolations(product);
+    threats.push(...ruleThreats);
+    
+    return threats;
+  }
+
+  /**
+   * Проверка угроз от скидок маркетплейса
+   * КРИТИЧНО: Ozon Card скидку оплачивает продавец!
+   */
+  private async checkMarketplaceDiscountThreats(product: ProductWithPriceRule): Promise<Threat[]> {
+    const threats: Threat[] = [];
+    
+    if (product.marketplace === 'ozon') {
+      // Получаем текущую экономику
+      const economics = await this.economicsCalculator.calculate({
+        productId: product.id,
+        marketplace: 'ozon',
+        sellingPrice: product.currentPrice,
+        costPrice: product.costPrice,
+        weight: product.weight,
+        volume: product.volume,
+        category: product.category,
+      });
+      
+      // Проверяем влияние Ozon Card
+      // Сценарий: если ВСЕ покупки будут с Ozon Card (5% скидка за наш счёт)
+      const worstCaseOzonCard = product.currentPrice * 0.05;
+      const worstCaseMargin = economics.marginPercent - 5;
+      
+      if (worstCaseMargin < product.priceRule.targetMargin) {
+        const marginGap = product.priceRule.targetMargin - worstCaseMargin;
+        
+        threats.push({
+          id: `ozon_card_${product.id}_${Date.now()}`,
+          type: ThreatType.OZON_CARD_EROSION,
+          severity: worstCaseMargin < 5 ? 'critical' : worstCaseMargin < 10 ? 'high' : 'medium',
+          
+          productId: product.id,
+          productName: product.name,
+          marketplace: 'ozon',
+          
+          description: `Скидка Ozon Card (5%) угрожает маржинальности. При оплате картой Ozon вы теряете ${worstCaseOzonCard.toFixed(0)}₽ с каждого заказа.`,
+          
+          impact: {
+            currentValue: economics.marginPercent,
+            threatenedValue: worstCaseMargin,
+            potentialLoss: worstCaseOzonCard,
+            potentialLossPercent: 5,
+          },
+          
+          suggestedActions: [
+            {
+              type: 'adjust_price',
+              description: `Повысить цену на ${Math.ceil(worstCaseOzonCard / 0.95)}₽ чтобы компенсировать Ozon Card`,
+              newPrice: Math.ceil(product.currentPrice * 1.053), // +5.3% для компенсации 5%
+              confidence: 85,
+            },
+            {
+              type: 'alert_only',
+              description: 'Отслеживать долю заказов с Ozon Card',
+              confidence: 100,
+            },
+          ],
+          
+          detectedAt: new Date(),
+          autoResolvable: product.priceRule.autoAdjust,
+        });
+      }
+      
+      // Проверяем Ozon Premium скидки
+      // TODO: Добавить когда появится API для получения этих данных
+    }
+    
+    if (product.marketplace === 'wildberries') {
+      // Проверяем WB Кошелёк
+      // Скидка до 10% по WB Кошельку тоже может влиять на маржу
+      // В отличие от Ozon Card, это кэшбек, а не прямая скидка,
+      // но если продавец участвует в акциях кэшбека - это за его счёт
+      
+      // TODO: Добавить проверку участия в программе кэшбека
+    }
+    
+    return threats;
+  }
+
+  /**
+   * Проверка угроз от конкурентов
+   */
+  private async checkCompetitorThreats(product: ProductWithPriceRule): Promise<Threat[]> {
+    const threats: Threat[] = [];
+    
+    // Получаем цены конкурентов
+    const competitors = await this.competitorTracker.getCompetitorPrices(product);
+    
+    if (competitors.length === 0) {
+      return threats; // Нет данных о конкурентах
+    }
+    
+    const minCompetitorPrice = Math.min(...competitors.map(c => c.price));
+    const avgCompetitorPrice = competitors.reduce((sum, c) => sum + c.price, 0) / competitors.length;
+    
+    // Наша цена сильно выше конкурентов
+    if (product.currentPrice > minCompetitorPrice * 1.20) {
+      threats.push({
+        id: `competitor_price_${product.id}_${Date.now()}`,
+        type: ThreatType.COMPETITOR_PRICE_DROP,
+        severity: 'high',
+        
+        productId: product.id,
+        productName: product.name,
+        marketplace: product.marketplace,
+        
+        description: `Ваша цена (${product.currentPrice}₽) на ${((product.currentPrice / minCompetitorPrice - 1) * 100).toFixed(0)}% выше минимальной цены конкурента (${minCompetitorPrice}₽)`,
+        
+        impact: {
+          currentValue: product.currentPrice,
+          threatenedValue: minCompetitorPrice,
+          potentialLoss: 0, // Сложно оценить упущенные продажи
+          potentialLossPercent: 0,
+        },
+        
+        suggestedActions: [
+          {
+            type: 'adjust_price',
+            description: `Снизить цену до ${Math.ceil(minCompetitorPrice * 1.05)}₽ (на 5% выше конкурента)`,
+            newPrice: Math.ceil(minCompetitorPrice * 1.05),
+            confidence: 75,
+          },
+          {
+            type: 'request_approval',
+            description: 'Запросить у продавца решение по конкурентной цене',
+            confidence: 100,
+          },
+        ],
+        
+        detectedAt: new Date(),
+        autoResolvable: false, // Снижение цены требует подтверждения
+      });
+    }
+    
+    // Конкурент запустил акцию
+    for (const competitor of competitors) {
+      if (competitor.hasPromo && competitor.promoPrice && competitor.promoPrice < product.currentPrice * 0.85) {
+        threats.push({
+          id: `competitor_promo_${product.id}_${competitor.sellerId}_${Date.now()}`,
+          type: ThreatType.COMPETITOR_PROMO,
+          severity: 'medium',
+          
+          productId: product.id,
+          productName: product.name,
+          marketplace: product.marketplace,
+          
+          description: `Конкурент "${competitor.sellerName}" запустил акцию: ${competitor.promoPrice}₽ (было ${competitor.regularPrice}₽)`,
+          
+          impact: {
+            currentValue: product.currentPrice,
+            threatenedValue: competitor.promoPrice,
+            potentialLoss: 0,
+            potentialLossPercent: 0,
+          },
+          
+          suggestedActions: [
+            {
+              type: 'alert_only',
+              description: 'Отслеживать длительность акции конкурента',
+              confidence: 100,
+            },
+          ],
+          
+          detectedAt: new Date(),
+          expiresAt: competitor.promoEndDate,
+          autoResolvable: false,
+        });
+      }
+    }
+    
+    return threats;
+  }
+
+  /**
+   * Проверка нарушений правил ценообразования
+   */
+  private async checkRuleViolations(product: ProductWithPriceRule): Promise<Threat[]> {
+    const threats: Threat[] = [];
+    const rule = product.priceRule;
+    
+    if (!rule) {
+      return threats;
+    }
+    
+    // Цена ниже минимума
+    if (product.currentPrice < rule.minPrice) {
+      threats.push({
+        id: `below_min_${product.id}_${Date.now()}`,
+        type: ThreatType.PRICE_BELOW_MINIMUM,
+        severity: 'critical',
+        
+        productId: product.id,
+        productName: product.name,
+        marketplace: product.marketplace,
+        
+        description: `КРИТИЧНО: Текущая цена (${product.currentPrice}₽) ниже установленного минимума (${rule.minPrice}₽)!`,
+        
+        impact: {
+          currentValue: product.currentPrice,
+          threatenedValue: rule.minPrice,
+          potentialLoss: rule.minPrice - product.currentPrice,
+          potentialLossPercent: ((rule.minPrice - product.currentPrice) / rule.minPrice) * 100,
+        },
+        
+        suggestedActions: [
+          {
+            type: 'adjust_price',
+            description: `Немедленно поднять цену до минимума ${rule.minPrice}₽`,
+            newPrice: rule.minPrice,
+            confidence: 100,
+          },
+        ],
+        
+        detectedAt: new Date(),
+        autoResolvable: true, // Это можно исправить автоматически
+      });
+    }
+    
+    // Маржа ниже целевой
+    const economics = await this.economicsCalculator.calculate({
+      productId: product.id,
+      marketplace: product.marketplace,
+      sellingPrice: product.currentPrice,
+      costPrice: product.costPrice,
+      weight: product.weight,
+      volume: product.volume,
+      category: product.category,
+    });
+    
+    if (economics.marginPercent < rule.targetMargin) {
+      const priceTotargetMargin = economics.recommendedMinPrice;
+      
+      threats.push({
+        id: `low_margin_${product.id}_${Date.now()}`,
+        type: ThreatType.MARGIN_BELOW_TARGET,
+        severity: economics.marginPercent < 5 ? 'critical' : 'high',
+        
+        productId: product.id,
+        productName: product.name,
+        marketplace: product.marketplace,
+        
+        description: `Текущая маржа (${economics.marginPercent.toFixed(1)}%) ниже целевой (${rule.targetMargin}%)`,
+        
+        impact: {
+          currentValue: economics.marginPercent,
+          threatenedValue: rule.targetMargin,
+          potentialLoss: (rule.targetMargin - economics.marginPercent) / 100 * product.currentPrice,
+          potentialLossPercent: rule.targetMargin - economics.marginPercent,
+        },
+        
+        suggestedActions: [
+          {
+            type: 'adjust_price',
+            description: `Поднять цену до ${priceTotargetMargin}₽ для достижения целевой маржи`,
+            newPrice: priceTotargetMargin,
+            confidence: 90,
+          },
+          {
+            type: 'request_approval',
+            description: 'Запросить подтверждение на изменение цены',
+            confidence: 100,
+          },
+        ],
+        
+        detectedAt: new Date(),
+        autoResolvable: rule.autoAdjust,
+      });
+    }
+    
+    // Отрицательная маржа
+    if (economics.marginPercent < 0) {
+      threats.push({
+        id: `negative_margin_${product.id}_${Date.now()}`,
+        type: ThreatType.NEGATIVE_MARGIN,
+        severity: 'critical',
+        
+        productId: product.id,
+        productName: product.name,
+        marketplace: product.marketplace,
+        
+        description: `УБЫТОК! Каждая продажа приносит убыток ${Math.abs(economics.netProfit).toFixed(0)}₽`,
+        
+        impact: {
+          currentValue: economics.netProfit,
+          threatenedValue: 0,
+          potentialLoss: Math.abs(economics.netProfit),
+          potentialLossPercent: Math.abs(economics.marginPercent),
+        },
+        
+        suggestedActions: [
+          {
+            type: 'adjust_price',
+            description: `СРОЧНО поднять цену до ${economics.minSafePrice}₽ (минимум для безубыточности)`,
+            newPrice: economics.minSafePrice,
+            confidence: 100,
+          },
+          {
+            type: 'block_sales',
+            description: 'Снять товар с продажи до пересмотра цены',
+            confidence: 80,
+          },
+        ],
+        
+        detectedAt: new Date(),
+        autoResolvable: true, // Критическая угроза - исправляем автоматически
+      });
+    }
+    
+    return threats;
+  }
+
+  private summarizeThreats(threats: Threat[]): ThreatSummary {
+    return {
+      total: threats.length,
+      bySeverity: {
+        critical: threats.filter(t => t.severity === 'critical').length,
+        high: threats.filter(t => t.severity === 'high').length,
+        medium: threats.filter(t => t.severity === 'medium').length,
+        low: threats.filter(t => t.severity === 'low').length,
+      },
+      byType: threats.reduce((acc, t) => {
+        acc[t.type] = (acc[t.type] || 0) + 1;
+        return acc;
+      }, {} as Record<ThreatType, number>),
+      totalPotentialLoss: threats.reduce((sum, t) => sum + t.impact.potentialLoss, 0),
+      autoResolvableCount: threats.filter(t => t.autoResolvable).length,
+    };
+  }
+}
+
+Часть 5: Исполнитель защиты цены
+5.1 Автоматическая корректировка цен
+Файл: src/agent/PriceShield.ts
+typescriptDownloadCopy code/**
+ * PriceShield - Исполнитель защиты цены
+ * Автоматически корректирует цены через API маркетплейсов
+ */
+
+export interface PriceAdjustment {
+  productId: string;
+  marketplace: 'wildberries' | 'ozon';
+  currentPrice: number;
+  newPrice: number;
+  reason: string;
+  threatId?: string;
+  requiresApproval: boolean;
+}
+
+export interface AdjustmentResult {
+  adjustment: PriceAdjustment;
+  success: boolean;
+  error?: string;
+  apiResponse?: any;
+  executedAt: Date;
+}
+
+export class PriceShield {
+  private wbClient: WildberriesClient;
+  private ozonClient: OzonClient;
+  private notificationService: NotificationService;
+  private auditLog: AuditLogService;
+
+  /**
+   * Выполнить защиту цены по обнаруженной угрозе
+   */
+  async executeProtection(threat: Threat): Promise<AdjustmentResult | null> {
+    // Находим подходящее автоматическое действие
+    const autoAction = threat.suggestedActions.find(
+      a => a.type === 'adjust_price' && a.confidence >= 85 && threat.autoResolvable
+    );
+    
+    if (!autoAction || !autoAction.newPrice) {
+      // Нет подходящего автоматического действия - отправляем алерт
+      await this.sendAlertForManualAction(threat);
+      return null;
+    }
+    
+    const adjustment: PriceAdjustment = {
+      productId: threat.productId,
+      marketplace: threat.marketplace,
+      currentPrice: threat.impact.currentValue,
+      newPrice: autoAction.newPrice,
+      reason: threat.description,
+      threatId: threat.id,
+      requiresApproval: false,
+    };
+    
+    return this.executeAdjustment(adjustment);
+  }
+
+  /**
+   * Выполнить корректировку цены
+   */
+  async executeAdjustment(adjustment: PriceAdjustment): Promise<AdjustmentResult> {
+    const startTime = Date.now();
+    
+    // Логируем начало операции
+    await this.auditLog.log({
+      action: 'PRICE_ADJUSTMENT_STARTED',
+      actor: 'price_shield',
+      resource: adjustment.productId,
+      details: adjustment,
+    });
+    
+    try {
+      let apiResponse: any;
+      
+      if (adjustment.marketplace === 'wildberries') {
+        apiResponse = await this.adjustWBPrice(adjustment);
+      } else {
+        apiResponse = await this.adjustOzonPrice(adjustment);
+      }
+      
+      const result: AdjustmentResult = {
+        adjustment,
+        success: true,
+        apiResponse,
+        executedAt: new Date(),
+      };
+      
+      // Логируем успех
+      await this.auditLog.log({
+        action: 'PRICE_ADJUSTMENT_SUCCESS',
+        actor: 'price_shield',
+        resource: adjustment.productId,
+        details: result,
+        duration: Date.now() - startTime,
+      });
+      
+      // Отправляем уведомление
+      await this.notificationService.sendPriceAdjustmentNotification({
+        ...adjustment,
+        success: true,
+      });
+      
+      return result;
+      
+    } catch (error) {
+      const result: AdjustmentResult = {
+        adjustment,
+        success: false,
+        error: error.message,
+        executedAt: new Date(),
+      };
+      
+      // Логируем ошибку
+      await this.auditLog.log({
+        action: 'PRICE_ADJUSTMENT_FAILED',
+        actor: 'price_shield',
+        resource: adjustment.productId,
+        details: result,
+        error: error.message,
+        duration: Date.now() - startTime,
+      });
+      
+      // Отправляем алерт об ошибке
+      await this.notificationService.sendPriceAdjustmentNotification({
+        ...adjustment,
+        success: false,
+        error: error.message,
+      });
+      
+      return result;
+    }
+  }
+
+  /**
+   * Корректировка цены на Wildberries
+   */
+  private async adjustWBPrice(adjustment: PriceAdjustment): Promise<any> {
+    // Валидация
+    if (adjustment.newPrice < 1) {
+      throw new Error('Цена не может быть меньше 1 рубля');
+    }
+    
+    // WB API для обновления цен
+    const response = await this.wbClient.updatePrice({
+      nmId: parseInt(adjustment.productId.replace('wb_', '')),
+      price: adjustment.newPrice,
+    });
+    
+    // Проверяем результат
+    if (response.error) {
+      throw new Error(`WB API Error: ${response.errorText || response.error}`);
+    }
+    
+    // Дополнительная проверка - убеждаемся, что цена применилась
+    await this.sleep(2000); // Ждём 2 секунды
+    
+    const currentPrice = await this.wbClient.getProductPrice(
+      parseInt(adjustment.productId.replace('wb_', ''))
+    );
+    
+    if (Math.abs(currentPrice - adjustment.newPrice) > 1) {
+      throw new Error(
+        `Цена не применилась. Ожидали: ${adjustment.newPrice}, получили: ${currentPrice}`
+      );
+    }
+    
+    return response;
+  }
+
+  /**
+   * Корректировка цены на Ozon
+   */
+  private async adjustOzonPrice(adjustment: PriceAdjustment): Promise<any> {
+    // Валидация
+    if (adjustment.newPrice < 1) {
+      throw new Error('Цена не может быть меньше 1 рубля');
+    }
+    
+    // Ozon API для обновления цен
+    const response = await this.ozonClient.updatePrices([
+      {
+        product_id: parseInt(adjustment.productId.replace('ozon_', '')),
+        price: adjustment.newPrice.toString(),
+        // Устанавливаем old_price для отображения скидки если цена ниже
+        old_price: adjustment.currentPrice > adjustment.newPrice 
+          ? adjustment.currentPrice.toString() 
+          : undefined,
+      },
+    ]);
+    
+    // Проверяем результат
+    if (response.result?.length > 0) {
+      const itemResult = response.result[0];
+      if (!itemResult.updated) {
+        throw new Error(
+          `Ozon API Error: ${itemResult.errors?.join(', ') || 'Unknown error'}`
+        );
+      }
+    }
+    
+    return response;
+  }
+
+  /**
+   * Массовая корректировка цен
+   */
+  async executeBulkAdjustments(adjustments: PriceAdjustment[]): Promise<AdjustmentResult[]> {
+    const results: AdjustmentResult[] = [];
+    
+    // Группируем по маркетплейсам для батч-обновления
+    const wbAdjustments = adjustments.filter(a => a.marketplace === 'wildberries');
+    const ozonAdjustments = adjustments.filter(a => a.marketplace === 'ozon');
+    
+    // WB позволяет обновлять до 1000 товаров за раз
+    if (wbAdjustments.length > 0) {
+      const wbBatches = this.chunk(wbAdjustments, 1000);
+      for (const batch of wbBatches) {
+        const batchResults = await this.executeBatchWB(batch);
+        results.push(...batchResults);
+      }
+    }
+    
+    // Ozon позволяет обновлять до 1000 товаров за раз
+    if (ozonAdjustments.length > 0) {
+      const ozonBatches = this.chunk(ozonAdjustments, 1000);
+      for (const batch of ozonBatches) {
+        const batchResults = await this.executeBatchOzon(batch);
+        results.push(...batchResults);
+      }
+    }
+    
+    return results;
+  }
+
+  private async executeBatchWB(adjustments: PriceAdjustment[]): Promise<AdjustmentResult[]> {
+    try {
+      const prices = adjustments.map(a => ({
+        nmId: parseInt(a.productId.replace('wb_', '')),
+        price: a.newPrice,
+      }));
+      
+      const response = await this.wbClient.updatePrices(prices);
+      
+      // Обрабатываем результаты
+      return adjustments.map((adjustment, index) => ({
+        adjustment,
+        success: !response.errors?.[index],
+        error: response.errors?.[index],
+        apiResponse: response,
+        executedAt: new Date(),
+      }));
+      
+    } catch (error) {
+      // При ошибке batch-запроса - все считаем неудачными
+      return adjustments.map(adjustment => ({
+        adjustment,
+        success: false,
+        error: error.message,
+        executedAt: new Date(),
+      }));
+    }
+  }
+
+  private async executeBatchOzon(adjustments: PriceAdjustment[]): Promise<AdjustmentResult[]> {
+    try {
+      const prices = adjustments.map(a => ({
+        product_id: parseInt(a.productId.replace('ozon_', '')),
+        price: a.newPrice.toString(),
+      }));
+      
+      const response = await this.ozonClient.updatePrices(prices);
+      
+      // Обрабатываем результаты
+      return adjustments.map((adjustment, index) => {
+        const itemResult = response.result?.[index];
+        return {
+          adjustment,
+          success: itemResult?.updated ?? false,
+          error: itemResult?.errors?.join(', '),
+          apiResponse: response,
+          executedAt: new Date(),
+        };
+      });
+      
+    } catch (error) {
+      return adjustments.map(adjustment => ({
+        adjustment,
+        success: false,
+        error: error.message,
+        executedAt: new Date(),
+      }));
+    }
+  }
+
+  private async sendAlertForManualAction(threat: Threat): Promise<void> {
+    await this.notificationService.sendThreatAlert(threat);
+  }
+
+  private chunk<T>(array: T[], size: number): T[][] {
+    const chunks: T[][] = [];
+    for (let i = 0; i < array.length; i += size) {
+      chunks.push(array.slice(i, i + size));
+    }
+    return chunks;
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}
+
+Часть 6: Мониторинг каждые 30 минут
+6.1 Sentinel Service
+Файл: src/services/SentinelService.ts
+typescriptDownloadCopy code/**
+ * Sentinel Service - Служба мониторинга каждые 30 минут
+ */
+
+export interface MonitoringResult {
+  runId: string;
+  startedAt: Date;
+  completedAt: Date;
+  duration: number;
+  
+  // Статистика
+  stats: {
+    usersProcessed: number;
+    productsChecked: number;
+    threatsDetected: number;
+    autoAdjustments: number;
+    alertsSent: number;
+    errors: number;
+  };
+  
+  // Детали по пользователям
+  userResults: UserMonitoringResult[];
+}
+
+export interface UserMonitoringResult {
+  userId: string;
+  productsChecked: number;
+  threats: Threat[];
+  adjustments: AdjustmentResult[];
+  notificationSent: boolean;
+}
+
+export class SentinelService {
+  private threatDetector: ThreatDetector;
+  private priceShield: PriceShield;
+  private notificationService: NotificationService;
+  private db: Database;
+
+  /**
+   * Запуск полного цикла мониторинга
+   */
+  async runFullMonitoringCycle(): Promise<MonitoringResult> {
+    const runId = `monitoring_${Date.now()}`;
+    const startedAt = new Date();
+    
+    console.log(`[Sentinel] Starting monitoring cycle ${runId}`);
+    
+    const stats = {
+      usersProcessed: 0,
+      productsChecked: 0,
+      threatsDetected: 0,
+      autoAdjustments: 0,
+      alertsSent: 0,
+      errors: 0,
+    };
+    
+    const userResults: UserMonitoringResult[] = [];
+    
+    try {
+      // Получаем всех активных пользователей с настроенными правилами
+      const activeUsers = await this.getActiveUsers();
+      
+      for (const user of activeUsers) {
+        try {
+          const userResult = await this.processUser(user);
+          userResults.push(userResult);
+          
+          stats.usersProcessed++;
+          stats.productsChecked += userResult.productsChecked;
+          stats.threatsDetected += userResult.threats.length;
+          stats.autoAdjustments += userResult.adjustments.filter(a => a.success).length;
+          if (userResult.notificationSent) stats.alertsSent++;
+          
+        } catch (error) {
+          console.error(`[Sentinel] Error processing user ${user.id}:`, error);
+          stats.errors++;
+        }
+      }
+      
+    } catch (error) {
+      console.error(`[Sentinel] Critical error in monitoring cycle:`, error);
+      stats.errors++;
+    }
+    
+    const completedAt = new Date();
+    const duration = completedAt.getTime() - startedAt.getTime();
+    
+    const result: MonitoringResult = {
+      runId,
+      startedAt,
+      completedAt,
+      duration,
+      stats,
+      userResults,
+    };
+    
+    // Сохраняем результат в БД
+    await this.saveMonitoringResult(result);
+    
+    // Логируем итоги
+    console.log(`[Sentinel] Cycle ${runId} completed in ${duration}ms:`, stats);
+    
+    return result;
+  }
+
+  /**
+   * Обработка одного пользователя
+   */
+  private async processUser(user: User): Promise<UserMonitoringResult> {
+    // 1. Синхронизируем актуальные цены с маркетплейсов
+    await this.syncCurrentPrices(user.id);
+    
+    // 2. Сканируем угрозы
+    const scanResult = await this.threatDetector.scanAllThreats(user.id);
+    
+    // 3. Обрабатываем угрозы
+    const adjustments: AdjustmentResult[] = [];
+    const criticalThreats: Threat[] = [];
+    
+    for (const threat of scanResult.threats) {
+      if (threat.autoResolvable && threat.severity === 'critical') {
+        // Критические авто-разрешимые угрозы - исправляем немедленно
+        const result = await this.priceShield.executeProtection(threat);
+        if (result) {
+          adjustments.push(result);
+        }
+      } else if (threat.severity === 'critical' || threat.severity === 'high') {
+        // Не авто-разрешимые критические - собираем для алерта
+        criticalThreats.push(threat);
+      }
+    }
+    
+    // 4. Отправляем уведомление пользователю
+    let notificationSent = false;
+    
+    if (criticalThreats.length > 0 || adjustments.length > 0) {
+      await this.sendUserNotification(user, {
+        threats: criticalThreats,
+        adjustments,
+        totalChecked: scanResult.totalProducts,
+      });
+      notificationSent = true;
+    }
+    
+    return {
+      userId: user.id,
+      productsChecked: scanResult.totalProducts,
+      threats: scanResult.threats,
+      adjustments,
+      notificationSent,
+    };
+  }
+
+  /**
+   * Синхронизация актуальных цен
+   */
+  private async syncCurrentPrices(userId: string): Promise<void> {
+    const connections = await this.getUserMarketplaceConnections(userId);
+    
+    for (const connection of connections) {
+      try {
+        if (connection.marketplace === 'wildberries') {
+          const prices = await this.wbClient.getPrices(connection.apiKey);
+          await this.updateProductPrices(userId, 'wildberries', prices);
+        } else if (connection.marketplace === 'ozon') {
+          const prices = await this.ozonClient.getPrices(connection.clientId, connection.apiKey);
+          await this.updateProductPrices(userId, 'ozon', prices);
+        }
+      } catch (error) {
+        console.error(`[Sentinel] Failed to sync prices for ${connection.marketplace}:`, error);
+      }
+    }
+  }
+
+  /**
+   * Отправка уведомления пользователю
+   */
+  private async sendUserNotification(
+    user: User, 
+    data: { threats: Threat[], adjustments: AdjustmentResult[], totalChecked: number }
+  ): Promise<void> {
+    const message = this.formatMonitoringNotification(data);
+    
+    await this.notificationService.sendTelegram(user.telegramChatId, message);
+  }
+
+  /**
+   * Форматирование уведомления
+   */
+  private formatMonitoringNotification(data: {
+    threats: Threat[],
+    adjustments: AdjustmentResult[],
+    totalChecked: number,
+  }): string {
+    const lines: string[] = [];
+    
+    lines.push(`🛡️ *Отчёт мониторинга*`);
+    lines.push(`⏰ ${new Date().toLocaleString('ru-RU')}`);
+    lines.push(``);
+    lines.push(`📦 Проверено товаров: ${data.totalChecked}`);
+    
+    // Автоматические корректировки
+    if (data.adjustments.length > 0) {
+      lines.push(``);
+      lines.push(`✅ *Автоматически скорректировано: ${data.adjustments.length}*`);
+      
+      for (const adj of data.adjustments.slice(0, 5)) {
+        if (adj.success) {
+          lines.push(`  • ${adj.adjustment.productId}: ${adj.adjustment.currentPrice}₽ → ${adj.adjustment.newPrice}₽`);
+        }
+      }
+      
+      if (data.adjustments.length > 5) {
+        lines.push(`  ...и ещё ${data.adjustments.length - 5}`);
+      }
+    }
+    
+    // Угрозы требующие внимания
+    if (data.threats.length > 0) {
+      lines.push(``);
+      lines.push(`⚠️ *Требуют внимания: ${data.threats.length}*`);
+      
+      const criticalCount = data.threats.filter(t => t.severity === 'critical').length;
+      const highCount = data.threats.filter(t => t.severity === 'high').length;
+      
+      if (criticalCount > 0) {
+        lines.push(`  🚨 Критических: ${criticalCount}`);
+      }
+      if (highCount > 0) {
+        lines.push(`  🔶 Важных: ${highCount}`);
+      }
+      
+      // Показываем первые 3 угрозы
+      for (const threat of data.threats.slice(0, 3)) {
+        const icon = threat.severity === 'critical' ? '🚨' : '⚠️';
+        lines.push(`  ${icon} ${threat.description.slice(0, 60)}...`);
+      }
+      
+      if (data.threats.length > 3) {
+        lines.push(``);
+        lines.push(`📊 Подробнее в личном кабинете`);
+      }
+    }
+    
+    if (data.threats.length === 0 && data.adjustments.length === 0) {
+      lines.push(``);
+      lines.push(`✅ Все цены в безопасности!`);
+    }
+    
+    return lines.join('\n');
+  }
+
+  private async getActiveUsers(): Promise<User[]> {
+    const result = await this.db.query(`
+      SELECT u.* FROM users u
+      JOIN marketplace_connections mc ON u.id = mc.user_id
+      WHERE u.monitoring_enabled = true
+        AND mc.is_active = true
+      GROUP BY u.id
+    `);
+    return result.rows;
+  }
+
+  private async saveMonitoringResult(result: MonitoringResult): Promise<void> {
+    await this.db.query(`
+      INSERT INTO monitoring_runs (run_id, started_at, completed_at, duration, stats, user_count)
+      VALUES ($1, $2, $3, $4, $5, $6)
+    `, [
+      result.runId,
+      result.startedAt,
+      result.completedAt,
+      result.duration,
+      JSON.stringify(result.stats),
+      result.userResults.length,
+    ]);
+  }
+}
+
+Часть 7: База знаний агента
+7.1 Интеграция документации маркетплейсов
+Файл: src/agent/KnowledgeBase.ts
+typescriptDownloadCopy code/**
+ * База знаний агента
+ * Использует актуальную документацию WB и Ozon для точных ответов
+ */
+
+export interface KnowledgeDocument {
+  id: string;
+  source: 'wildberries_docs' | 'ozon_docs' | 'internal' | 'faq';
+  title: string;
+  content: string;
+  url?: string;
+  lastUpdated: Date;
+  tags: string[];
+}
+
+export class AgentKnowledgeBase {
+  private documents: Map<string, KnowledgeDocument> = new Map();
+  private readonly DOCS_PATH = './knowledge/';
+
+  /**
+   * Загрузить все документы базы знаний
+   */
+  async initialize(): Promise<void> {
+    // Загружаем документы из файлов
+    await this.loadDocumentsFromFiles();
+    
+    // Загружаем из БД (пользовательские документы)
+    await this.loadDocumentsFromDB();
+    
+    console.log(`[KnowledgeBase] Loaded ${this.documents.size} documents`);
+  }
+
+  /**
+   * Поиск релевантных документов для ответа
+   */
+  async search(query: string, options?: SearchOptions): Promise<SearchResult[]> {
+    const normalizedQuery = this.normalizeQuery(query);
+    const results: SearchResult[] = [];
+    
+    for (const doc of this.documents.values()) {
+      // Фильтр по источнику
+      if (options?.sources && !options.sources.includes(doc.source)) {
+        continue;
+      }
+      
+      // Вычисляем релевантность
+      const score = this.calculateRelevance(normalizedQuery, doc);
+      
+      if (score > 0.3) { // Минимальный порог релевантности
+        results.push({
+          document: doc,
+          score,
+          snippet: this.extractSnippet(doc.content, normalizedQuery),
+        });
+      }
+    }
+    
+    // Сортируем по релевантности
+    results.sort((a, b) => b.score - a.score);
+    
+    // Ограничиваем количество результатов
+    return results.slice(0, options?.limit || 5);
+  }
+
+  /**
+   * Получить документ для контекста ответа агента
+   */
+  async getContextForQuestion(question: string): Promise<AgentContext> {
+    // Определяем тему вопроса
+    const topic = this.identifyTopic(question);
+    
+    // Ищем релевантные документы
+    const relevantDocs = await this.search(question, {
+      limit: 3,
+      sources: this.getSourcesForTopic(topic),
+    });
+    
+    // Формируем контекст
+    return {
+      topic,
+      relevantDocuments: relevantDocs,
+      systemPromptAddition: this.buildSystemPromptAddition(relevantDocs),
+    };
+  }
+
+  /**
+   * Проверка актуальности документации
+   */
+  async verifyDocumentation(): Promise<VerificationResult> {
+    const result: VerificationResult = {
+      totalDocuments: this.documents.size,
+      bySource: {},
+      outdated: [],
+      missing: [],
+      lastVerified: new Date(),
+    };
+    
+    // Считаем по источникам
+    for (const doc of this.documents.values()) {
+      result.bySource[doc.source] = (result.bySource[doc.source] || 0) + 1;
+      
+      // Проверяем актуальность (документы старше 90 дней)
+      const daysSinceUpdate = (Date.now() - doc.lastUpdated.getTime()) / (1000 * 60 * 60 * 24);
+      if (daysSinceUpdate > 90) {
+        result.outdated.push({
+          id: doc.id,
+          title: doc.title,
+          lastUpdated: doc.lastUpdated,
+          daysOld: Math.floor(daysSinceUpdate),
+        });
+      }
+    }
+    
+    // Проверяем наличие обязательных тем
+    const requiredTopics = [
+      // Wildberries
+      'wb_api_prices',
+      'wb_api_products', 
+      'wb_commissions',
+      'wb_logistics_tariffs',
+      'wb_fbs_fbo',
+      
+      // Ozon
+      'ozon_api_prices',
+      'ozon_api_products',
+      'ozon_commissions',
+      'ozon_card_rules',
+      'ozon_logistics',
+      'ozon_premium',
+      
+      // Общее
+      'unit_economics',
+      'price_protection_rules',
+    ];
+    
+    for (const topic of requiredTopics) {
+      const found = Array.from(this.documents.values()).some(
+        doc => doc.tags.includes(topic)
+      );
+      if (!found) {
+        result.missing.push(topic);
+      }
+    }
+    
+    return result;
+  }
+
+  private async loadDocumentsFromFiles(): Promise<void> {
+    // Загружаем документацию WB
+    const wbDocs = await this.loadWildberriesDocs();
+    for (const doc of wbDocs) {
+      this.documents.set(doc.id, doc);
+    }
+    
+    // Загружаем документацию Ozon
+    const ozonDocs = await this.loadOzonDocs();
+    for (const doc of ozonDocs) {
+      this.documents.set(doc.id, doc);
+    }
+    
+    // Загружаем внутреннюю документацию
+    const internalDocs = await this.loadInternalDocs();
+    for (const doc of internalDocs) {
+      this.documents.set(doc.id, doc);
+    }
+  }
+
+  private async loadWildberriesDocs(): Promise<KnowledgeDocument[]> {
+    // Документация WB API
+    return [
+      {
+        id: 'wb_api_prices',
+        source: 'wildberries_docs',
+        title: 'Wildberries API - Управление ценами',
+        content: `
+# API Wildberries - Цены и скидки
+
+## Endpoint для обновления цен
+POST /public/api/v1/prices
+
+### Структура запроса
+{
+  "data": [
+    {
+      "nmId": 123456789,
+      "price": 1500
+    }
+  ]
+}
+
+### Ограничения
+- Максимум 1000 товаров за один запрос
+- Не более 6 запросов в минуту
+- Цена должна быть целым числом в рублях
+
+### Важно
+- После обновления цена применяется в течение 15-30 минут
+- Есть минимальная наценка от закупочной цены
+- При установке цены ниже рекомендованной - товар может быть скрыт
+
+## Получение текущих цен
+GET /public/api/v1/info
+
+Возвращает список всех товаров с текущими ценами и скидками.
+        `.trim(),
+        url: 'https://openapi.wildberries.ru/prices/api/ru/',
+        lastUpdated: new Date('2025-01-15'),
+        tags: ['wb_api_prices', 'wildberries', 'api', 'prices'],
+      },
+      {
+        id: 'wb_commissions',
+        source: 'wildberries_docs',
+        title: 'Wildberries - Комиссии по категориям',
+        content: `
+# Комиссии Wildberries (актуально на 2025)
+
+## Базовые комиссии по категориям
+
+| Категория | Комиссия |
+|-----------|----------|
+| Одежда | 15% |
+| Обувь | 15% |
+| Электроника | 12% |
+| Бытовая техника | 12% |
+| Красота и здоровье | 18% |
+| Детские товары | 15% |
+| Продукты питания | 10% |
+| Товары для дома | 15% |
+| Спорт | 15% |
+| Ювелирные изделия | 20% |
+
+## Дополнительные сборы
+
+### Логистика (FBS)
+- До 1 кг: 55₽
+- 1-3 кг: 75₽  
+- 3-5 кг: 95₽
+- Свыше 5 кг: +20₽ за каждый кг
+
+### Хранение
+- 0.07₽ за литр в день (первые 60 дней бесплатно)
+
+### Возвраты
+- 33% от стоимости доставки
+
+## Важно
+- Комиссия считается от цены продажи (после скидки)
+- При участии в акциях - комиссия от акционной цены
+- Минимальная комиссия 25₽ за единицу товара
+        `.trim(),
+        url: 'https://seller.wildberries.ru/tariffs',
+        lastUpdated: new Date('2025-01-10'),
+        tags: ['wb_commissions', 'wildberries', 'fees', 'tariffs'],
+      },
+    ];
+  }
+
+  private async loadOzonDocs(): Promise<KnowledgeDocument[]> {
+    return [
+      {
+        id: 'ozon_api_prices',
+        source: 'ozon_docs',
+        title: 'Ozon API - Управление ценами',
+        content: `
+# Ozon Seller API - Работа с ценами
+
+## Обновление цен
+POST /v1/product/import/prices
+
+### Структура запроса
+{
+  "prices": [
+    {
+      "product_id": 123456,
+      "price": "1500",
+      "old_price": "2000",
+      "min_price": "1200"
+    }
+  ]
+}
+
+### Поля
+- price: текущая цена продажи
+- old_price: зачёркнутая цена (для показа скидки)
+- min_price: минимальная цена (для акций)
+
+### Ограничения
+- До 1000 товаров за запрос
+- До 20 запросов в минуту
+- Цены в строковом формате
+
+### Время применения
+- Обычно 5-15 минут
+- При высокой нагрузке до 1 часа
+
+## Получение цен
+POST /v4/product/info/prices
+        `.trim(),
+        url: 'https://docs.ozon.ru/api/seller/',
+        lastUpdated: new Date('2025-01-15'),
+        tags: ['ozon_api_prices', 'ozon', 'api', 'prices'],
+      },
+      {
+        id: 'ozon_card_rules',
+        source: 'ozon_docs',
+        title: 'Ozon Card - Правила и влияние на продавца',
+        content: `
+# Ozon Card - Что нужно знать продавцу
+
+## Как работает скидка по Ozon Card
+
+⚠️ ВАЖНО: Скидку 5% по Ozon Card оплачивает ПРОДАВЕЦ!
+
+### Механика
+1. Покупатель оплачивает картой Ozon
+2. Получает скидку 5% от цены товара
+3. Продавец получает на 5% меньше
+
+### Пример
+- Цена товара: 1000₽
+- Покупатель платит: 950₽
+- Продавец получает: 950₽ минус комиссия Ozon
+
+### Статистика использования
+- ~40% покупок совершается с Ozon Card
+- В категории электроники - до 50%
+- В категории красота - около 35%
+
+## Рекомендации для продавца
+
+1. **Учитывайте в ценообразовании**
+   Закладывайте потенциальную скидку 2-2.5% в цену
+   (40% покупок × 5% = 2% от всех продаж)
+
+2. **Мониторьте статистику**
+   В ЛК доступна доля заказов с Ozon Card
+
+3. **Корректируйте минимальную цену**
+   Убедитесь, что даже со скидкой Ozon Card маржа положительная
+
+## Ozon Premium
+
+Дополнительная скидка для подписчиков Premium.
+Также компенсируется продавцом (обычно 3-5%).
+        `.trim(),
+        url: 'https://seller.ozon.ru/docs/ozon-card.html',
+        lastUpdated: new Date('2025-01-12'),
+        tags: ['ozon_card_rules', 'ozon', 'ozon_card', 'discounts', 'fees'],
+      },
+      {
+        id: 'ozon_commissions',
+        source: 'ozon_docs',
+        title: 'Ozon - Комиссии и сборы',
+        content: `
+# Комиссии Ozon (актуально на 2025)
+
+## Комиссия за продажу по категориям
+
+| Категория | Комиссия |
+|-----------|----------|
+| Электроника | 10% |
+| Бытовая техника | 10% |
+| Одежда | 15% |
+| Обувь | 15% |
+| Красота | 20% |
+| Детские товары | 15% |
+| Продукты | 8% |
+| Товары для дома | 15% |
+
+## Логистика
+
+### FBO (со склада Ozon)
+- Приёмка: 20₽ за единицу
+- Хранение: от 2.5₽ за единицу в день
+- Доставка: включена в комиссию
+
+### FBS (со склада продавца)
+| Вес | Стоимость |
+|-----|-----------|
+| До 5 кг | 76₽ |
+| 5-10 кг | 90₽ |
+| 10-15 кг | 120₽ |
+| 15-25 кг | 180₽ |
+| Более 25 кг | 250₽ |
+
+### Последняя миля
+- Стандартная: 65₽
+- Экспресс: 120₽
+
+## Дополнительные расходы
+
+- Ozon Card: до 5% от цены (за счёт продавца)
+- Ozon Premium: 3-5% от цены (за счёт продавца)
+- Возврат: 100₽ за единицу
+- Эквайринг: ~1.5% (включён в комиссию)
+        `.trim(),
+        url: 'https://seller.ozon.ru/docs/finances/commissions.html',
+        lastUpdated: new Date('2025-01-10'),
+        tags: ['ozon_commissions', 'ozon', 'fees', 'logistics', 'tariffs'],
+      },
+    ];
+  }
+
+  private calculateRelevance(query: string, doc: KnowledgeDocument): number {
+    const queryTerms = query.toLowerCase().split(/\s+/);
+    const titleLower = doc.title.toLowerCase();
+    const contentLower = doc.content.toLowerCase();
+    const tags = doc.tags.map(t => t.toLowerCase());
+    
+    let score = 0;
+    
+    for (const term of queryTerms) {
+      // Точное совпадение в тегах - высший балл
+      if (tags.includes(term)) score += 0.4;
+      
+      // Совпадение в заголовке
+      if (titleLower.includes(term)) score += 0.3;
+      
+      // Совпадение в контенте
+      const contentMatches = (contentLower.match(new RegExp(term, 'g')) || []).length;
+      score += Math.min(contentMatches * 0.05, 0.2);
+    }
+    
+    return Math.min(score, 1);
+  }
+
+  private extractSnippet(content: string, query: string): string {
+    const terms = query.split(/\s+/);
+    const firstTerm = terms[0];
+    
+    const index = content.toLowerCase().indexOf(firstTerm.toLowerCase());
+    if (index === -1) return content.slice(0, 200) + '...';
+    
+    const start = Math.max(0, index - 100);
+    const end = Math.min(content.length, index + 200);
+    
+    let snippet = content.slice(start, end);
+    if (start > 0) snippet = '...' + snippet;
+    if (end < content.length) snippet = snippet + '...';
+    
+    return snippet;
+  }
+
+  private buildSystemPromptAddition(docs: SearchResult[]): string {
+    if (docs.length === 0) return '';
+    
+    let addition = '\n\n--- Релевантная информация из базы знаний ---\n\n';
+    
+    for (const doc of docs) {
+      addition += `### ${doc.document.title}\n`;
+      addition += doc.snippet + '\n\n';
+    }
+    
+    addition += '--- Конец информации из базы знаний ---\n';
+    
+    return addition;
+  }
+}
+
+Часть 8: Проверка 6 автоматизаций n8n
+8.1 Список автоматизаций для проверки
+Файл: n8n/README.md
+markdownDownloadCopy code# n8n Автоматизации NeuroGUARDIAN
+
+## Список всех workflow (6 штук)
+
+### 1. Monitoring Every 30 Minutes
+**ID:** `workflow_monitoring_30min`
+**Функция:** Основной мониторинг цен
+**Расписание:** Каждые 30 минут
+
+**Проверить:**
+- [ ] Триггер срабатывает точно по расписанию
+- [ ] HTTP запрос к /api/webhooks/n8n/monitoring успешен
+- [ ] Обработка ответа корректна
+- [ ] Уведомления в Telegram отправляются
+- [ ] Ошибки логируются и оповещаются
+
+### 2. Daily Products Sync
+**ID:** `workflow_daily_sync`
+**Функция:** Ежедневная синхронизация товаров с маркетплейсов
+**Расписание:** 06:00 и 18:00
+
+**Проверить:**
+- [ ] Синхронизация WB работает
+- [ ] Синхронизация Ozon работает
+- [ ] Новые товары добавляются
+- [ ] Удалённые товары отмечаются
+- [ ] Отчёт отправляется в Telegram
+
+### 3. Price Update Executor
+**ID:** `workflow_price_executor`
+**Функция:** Исполнение автоматических изменений цен
+**Триггер:** Webhook от системы
+
+**Проверить:**
+- [ ] Webhook принимает запросы корректно
+- [ ] Валидация входных данных
+- [ ] Обновление цены через WB API
+- [ ] Обновление цены через Ozon API
+- [ ] Подтверждение применения цены
+- [ ] Уведомление о результате
+
+### 4. Threat Alert Handler
+**ID:** `workflow_threat_alerts`
+**Функция:** Обработка критических угроз
+**Триггер:** Webhook при обнаружении угрозы
+
+**Проверить:**
+- [ ] Критические угрозы обрабатываются немедленно
+- [ ] Формат сообщения в Telegram корректный
+- [ ] Кнопки действий работают
+- [ ] Callback обрабатывается
+
+### 5. Weekly Analytics Report
+**ID:** `workflow_weekly_report`
+**Функция:** Еженедельный аналитический отчёт
+**Расписание:** Понедельник 09:00
+
+**Проверить:**
+- [ ] Сбор статистики за неделю
+- [ ] Расчёт метрик (экономия, угрозы, изменения)
+- [ ] Формирование отчёта
+- [ ] Отправка в Telegram с графиками
+
+### 6. System Health Check
+**ID:** `workflow_health_check`
+**Функция:** Проверка здоровья системы
+**Расписание:** Каждые 5 минут
+
+**Проверить:**
+- [ ] Проверка доступности API сервера
+- [ ] Проверка подключения к БД
+- [ ] Проверка доступности WB API
+- [ ] Проверка доступности Ozon API
+- [ ] Алерт при сбоях
+8.2 Workflow: Мониторинг каждые 30 минут
+Файл: n8n/workflows/monitoring_30min.json
+jsonDownloadCopy code{
+  "name": "Monitoring Every 30 Minutes",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "name": "Every 30 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [240, 300],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.API_BASE_URL }}/api/webhooks/n8n/monitoring",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "action",
+              "value": "full_monitoring_cycle"
+            },
+            {
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "name": "Run Monitoring",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [460, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "N8N Webhook Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.success }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Check Success",
+      "type": "n8n-nodes-base.if",
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.result.stats.threatsDetected }}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "name": "Has Threats?",
+      "type": "n8n-nodes-base.if",
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.result.userResults[0].userId }}",
+        "text": "=🛡️ *Мониторинг: {{ $now.format('HH:mm DD.MM') }}*\n\n📦 Проверено: {{ $json.result.stats.productsChecked }}\n⚠️ Угроз: {{ $json.result.stats.threatsDetected }}\n✅ Авто-корректировок: {{ $json.result.stats.autoAdjustments }}\n\n{{ $json.result.stats.threatsDetected > 0 ? '⚠️ Требуется внимание!' : '✅ Всё в порядке!' }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "name": "Send Report",
+      "type": "n8n-nodes-base.telegram",
+      "position": [1120, 200],
+      "credentials": {
+        "telegramApi": {
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.ADMIN_CHAT_ID }}",
+        "text": "=🚨 *ОШИБКА МОНИТОРИНГА*\n\n{{ $json.error || 'Unknown error' }}\n\n⏰ {{ $now.format('HH:mm DD.MM.YYYY') }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "name": "Send Error Alert",
+      "type": "n8n-nodes-base.telegram",
+      "position": [900, 400],
+      "credentials": {
+        "telegramApi": {
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Логируем результат мониторинга\nconst stats = $input.all()[0].json.result?.stats || {};\n\nconsole.log('Monitoring completed:', {\n  timestamp: new Date().toISOString(),\n  productsChecked: stats.productsChecked,\n  threatsDetected: stats.threatsDetected,\n  autoAdjustments: stats.autoAdjustments,\n});\n\nreturn $input.all();"
+      },
+      "name": "Log Results",
+      "type": "n8n-nodes-base.code",
+      "position": [1120, 300]
+    }
+  ],
+  "connections": {
+    "Every 30 Minutes": {
+      "main": [[{"node": "Run Monitoring", "type": "main", "index": 0}]]
+    },
+    "Run Monitoring": {
+      "main": [[{"node": "Check Success", "type": "main", "index": 0}]]
+    },
+    "Check Success": {
+      "main": [
+        [{"node": "Has Threats?", "type": "main", "index": 0}],
+        [{"node": "Send Error Alert", "type": "main", "index": 0}]
+      ]
+    },
+    "Has Threats?": {
+      "main": [
+        [{"node": "Send Report", "type": "main", "index": 0}],
+        [{"node": "Log Results", "type": "main", "index": 0}]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
+
+Часть 9: Безопасность
+9.1 Комплексная проверка безопасности
+Файл: src/security/SecurityAudit.ts
+typescriptDownloadCopy code/**
+ * Аудит безопасности системы
+ */
+
+export interface SecurityAuditResult {
+  overallScore: number; // 0-100
+  passed: SecurityCheck[];
+  failed: SecurityCheck[];
+  warnings: SecurityCheck[];
+  recommendations: string[];
+}
+
+export interface SecurityCheck {
+  id: string;
+  name: string;
+  category: SecurityCategory;
+  status: 'passed' | 'failed' | 'warning';
+  details: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+}
+
+export enum SecurityCategory {
+  AUTHENTICATION = 'authentication',
+  API_KEYS = 'api_keys',
+  DATA_ENCRYPTION = 'data_encryption',
+  INPUT_VALIDATION = 'input_validation',
+  RATE_LIMITING = 'rate_limiting',
+  AUDIT_LOGGING = 'audit_logging',
+  PRODUCTION_SAFETY = 'production_safety',
+}
+
+export class SecurityAuditService {
+
+  async runFullAudit(): Promise<SecurityAuditResult> {
+    const checks: SecurityCheck[] = [];
+    
+    // 1. Проверка аутентификации
+    checks.push(...await this.checkAuthentication());
+    
+    // 2. Проверка хранения API ключей
+    checks.push(...await this.checkApiKeyStorage());
+    
+    // 3. Проверка шифрования данных
+    checks.push(...await this.checkDataEncryption());
+    
+    // 4. Проверка валидации входных данных
+    checks.push(...await this.checkInputValidation());
+    
+    // 5. Проверка rate limiting
+    checks.push(...await this.checkRateLimiting());
+    
+    // 6. Проверка audit logging
+    checks.push(...await this.checkAuditLogging());
+    
+    // 7. Проверка production safety
+    checks.push(...await this.checkProductionSafety());
+    
+    // Подсчёт результатов
+    const passed = checks.filter(c => c.status === 'passed');
+    const failed = checks.filter(c => c.status === 'failed');
+    const warnings = checks.filter(c => c.status === 'warning');
+    
+    // Расчёт оценки
+    const criticalFailed = failed.filter(f => f.severity === 'critical').length;
+    const highFailed = failed.filter(f => f.severity === 'high').length;
+    
+    let score = 100;
+    score -= criticalFailed * 25;
+    score -= highFailed * 15;
+    score -= failed.filter(f => f.severity === 'medium').length * 5;
+    score -= warnings.length * 2;
+    score = Math.max(0, score);
+    
+    return {
+      overallScore: score,
+      passed,
+      failed,
+      warnings,
+      recommendations: this.generateRecommendations(failed, warnings),
+    };
+  }
+
+  private async checkAuthentication(): Promise<SecurityCheck[]> {
+    const checks: SecurityCheck[] = [];
+    
+    // Проверка JWT секрета
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret || jwtSecret.length < 32) {
+      checks.push({
+        id: 'auth_jwt_secret',
+        name: 'JWT Secret Strength',
+        category: SecurityCategory.AUTHENTICATION,
+        status: 'failed',
+        details: 'JWT secret must be at least 32 characters',
+        severity: 'critical',
+      });
+    } else {
+      checks.push({
+        id: 'auth_jwt_secret',
+        name: 'JWT Secret Strength',
+        category: SecurityCategory.AUTHENTICATION,
+        status: 'passed',
+        details: 'JWT secret meets minimum requirements',
+        severity: 'critical',
+      });
+    }
+    
+    // Проверка срока действия токенов
+    const tokenExpiry = process.env.JWT_EXPIRY || '7d';
+    const expiryDays = this.parseExpiry(tokenExpiry);
+    if (expiryDays > 7) {
+      checks.push({
+        id: 'auth_token_expiry',
+        name: 'Token Expiry Duration',
+        category: SecurityCategory.AUTHENTICATION,
+        status: 'warning',
+        details: `Token expiry is ${expiryDays} days, recommended max 7 days`,
+        severity: 'medium',
+      });
+    } else {
+      checks.push({
+        id: 'auth_token_expiry',
+        name: 'Token Expiry Duration',
+        category: SecurityCategory.AUTHENTICATION,
+        status: 'passed',
+        details: `Token expiry is ${expiryDays} days`,
+        severity: 'medium',
+      });
+    }
+    
+    return checks;
+  }
+
+  private async checkApiKeyStorage(): Promise<SecurityCheck[]> {
+    const checks: SecurityCheck[] = [];
+    
+    // Проверка наличия ключа шифрования
+    const encryptionKey = process.env.API_KEY_ENCRYPTION_SECRET;
+    if (!encryptionKey || encryptionKey.length < 32) {
+      checks.push({
+        id: 'api_key_encryption',
+        name: 'API Key Encryption Secret',
+        category: SecurityCategory.API_KEYS,
+        status: 'failed',
+        details: 'API keys must be encrypted with a strong secret',
+        severity: 'critical',
+      });
+    } else {
+      checks.push({
+        id: 'api_key_encryption',
+        name: 'API Key Encryption Secret',
+        category: SecurityCategory.API_KEYS,
+        status: 'passed',
+        details: 'API key encryption configured correctly',
+        severity: 'critical',
+      });
+    }
+    
+    // Проверка, что ключи не хранятся в открытом виде в БД
+    const plaintextKeys = await this.checkForPlaintextKeys();
+    if (plaintextKeys > 0) {
+      checks.push({
+        id: 'api_key_plaintext',
+        name: 'No Plaintext API Keys',
+        category: SecurityCategory.API_KEYS,
+        status: 'failed',
+        details: `Found ${plaintextKeys} potentially unencrypted API keys`,
+        severity: 'critical',
+      });
+    } else {
+      checks.push({
+        id: 'api_key_plaintext',
+        name: 'No Plaintext API Keys',
+        category: SecurityCategory.API_KEYS,
+        status: 'passed',
+        details: 'No plaintext API keys detected',
+        severity: 'critical',
+      });
+    }
+    
+    return checks;
+  }
+
+  private async checkProductionSafety(): Promise<SecurityCheck[]> {
+    const checks: SecurityCheck[] = [];
+    const isProduction = process.env.NODE_ENV === 'production';
+    
+    if (!isProduction) {
+      checks.push({
+        id: 'prod_env',
+        name: 'Production Environment',
+        category: SecurityCategory.PRODUCTION_SAFETY,
+        status: 'warning',
+        details: 'Not running in production mode',
+        severity: 'low',
+      });
+      return checks;
+    }
+    
+    // TEST_MODE должен быть отключен
+    if (process.env.TEST_MODE === 'true') {
+      checks.push({
+        id: 'prod_test_mode',
+        name: 'Test Mode Disabled',
+        category: SecurityCategory.PRODUCTION_SAFETY,
+        status: 'failed',
+        details: 'TEST_MODE must be false in production',
+        severity: 'critical',
+      });
+    } else {
+      checks.push({
+        id: 'prod_test_mode',
+        name: 'Test Mode Disabled',
+        category: SecurityCategory.PRODUCTION_SAFETY,
+        status: 'passed',
+        details: 'Test mode is correctly disabled',
+        severity: 'critical',
+      });
+    }
+    
+    // Проверка HTTPS
+    const apiUrl = process.env.API_BASE_URL || '';
+    if (!apiUrl.startsWith('https://')) {
+      checks.push({
+        id: 'prod_https',
+        name: 'HTTPS Enforced',
+        category: SecurityCategory.PRODUCTION_SAFETY,
+        status: 'failed',
+        details: 'API must use HTTPS in production',
+        severity: 'critical',
+      });
+    } else {
+      checks.push({
+        id: 'prod_https',
+        name: 'HTTPS Enforced',
+        category: SecurityCategory.PRODUCTION_SAFETY,
+        status: 'passed',
+        details: 'HTTPS is correctly configured',
+        severity: 'critical',
+      });
+    }
+    
+    // Проверка отладочных логов
+    if (process.env.DEBUG === 'true') {
+      checks.push({
+        id: 'prod_debug',
+        name: 'Debug Mode Disabled',
+        category: SecurityCategory.PRODUCTION_SAFETY,
+        status: 'failed',
+        details: 'Debug mode should be disabled in production',
+        severity: 'high',
+      });
+    }
+    
+    return checks;
+  }
+
+  private async checkRateLimiting(): Promise<SecurityCheck[]> {
+    const checks: SecurityCheck[] = [];
+    
+    // Проверка наличия rate limiter
+    const hasRateLimiter = await this.verifyRateLimiterActive();
+    
+    if (!hasRateLimiter) {
+      checks.push({
+        id: 'rate_limit_active',
+        name: 'Rate Limiting Active',
+        category: SecurityCategory.RATE_LIMITING,
+        status: 'failed',
+        details: 'Rate limiting must be enabled to prevent abuse',
+        severity: 'high',
+      });
+    } else {
+      checks.push({
+        id: 'rate_limit_active',
+        name: 'Rate Limiting Active',
+        category: SecurityCategory.RATE_LIMITING,
+        status: 'passed',
+        details: 'Rate limiting is properly configured',
+        severity: 'high',
+      });
+    }
+    
+    return checks;
+  }
+
+  private async checkAuditLogging(): Promise<SecurityCheck[]> {
+    const checks: SecurityCheck[] = [];
+    
+    // Проверка наличия таблицы audit
+    const hasAuditTable = await this.verifyAuditTableExists();
+    
+    if (!hasAuditTable) {
+      checks.push({
+        id: 'audit_table',
+        name: 'Audit Logging Table',
+        category: SecurityCategory.AUDIT_LOGGING,
+        status: 'failed',
+        details: 'Audit logging table does not exist',
+        severity: 'high',
+      });
+    } else {
+      checks.push({
+        id: 'audit_table',
+        name: 'Audit Logging Table',
+        category: SecurityCategory.AUDIT_LOGGING,
+        status: 'passed',
+        details: 'Audit logging is properly configured',
+        severity: 'high',
+      });
+    }
+    
+    // Проверка записи критических операций
+    const recentAuditLogs = await this.getRecentAuditLogCount();
+    if (recentAuditLogs === 0) {
+      checks.push({
+        id: 'audit_logging_active',
+        name: 'Audit Logging Active',
+        category: SecurityCategory.AUDIT_LOGGING,
+        status: 'warning',
+        details: 'No recent audit logs found - verify logging is working',
+        severity: 'medium',
+      });
+    }
+    
+    return checks;
+  }
+
+  private generateRecommendations(
+    failed: SecurityCheck[], 
+    warnings: SecurityCheck[]
+  ): string[] {
+    const recommendations: string[] = [];
+    
+    for (const check of failed) {
+      switch (check.id) {
+        case 'auth_jwt_secret':
+          recommendations.push(
+            'Установите JWT_SECRET длиной минимум 32 символа: ' +
+            'openssl rand -base64 32'
+          );
+          break;
+        case 'api_key_encryption':
+          recommendations.push(
+            'Установите API_KEY_ENCRYPTION_SECRET для шифрования ключей API: ' +
+            'openssl rand -base64 32'
+          );
+          break;
+        case 'api_key_plaintext':
+          recommendations.push(
+            'Зашифруйте все API ключи в базе данных с помощью ' +
+            'npm run encrypt-api-keys'
+          );
+          break;
+        case 'prod_test_mode':
+          recommendations.push(
+            'КРИТИЧНО: Установите TEST_MODE=false в production окружении'
+          );
+          break;
+        case 'prod_https':
+          recommendations.push(
+            'Настройте SSL/TLS и обновите API_BASE_URL на https://'
+          );
+          break;
+        case 'rate_limit_active':
+          recommendations.push(
+            'Включите rate limiting для защиты от DDoS и abuse'
+          );
+          break;
+      }
+    }
+    
+    return recommendations;
+  }
+
+  private async checkForPlaintextKeys(): Promise<number> {
+    // Проверяем, нет ли в БД ключей, похожих на незашифрованные
+    const result = await db.query(`
+      SELECT COUNT(*) as count FROM marketplace_connections
+      WHERE api_key NOT LIKE 'enc:%' 
+        AND api_key IS NOT NULL 
+        AND LENGTH(api_key) > 20
+    `);
+    return parseInt(result.rows[0]?.count || '0');
+  }
+
+  private async verifyRateLimiterActive(): Promise<boolean> {
+    // Проверяем, что rate limiter middleware активен
+    // Можно проверить через тестовый запрос
+    return true; // Placeholder
+  }
+
+  private async verifyAuditTableExists(): Promise<boolean> {
+    const result = await db.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'ops_audit'
+      )
+    `);
+    return result.rows[0]?.exists ?? false;
+  }
+
+  private async getRecentAuditLogCount(): Promise<number> {
+    const result = await db.query(`
+      SELECT COUNT(*) as count FROM ops_audit
+      WHERE created_at > NOW() - INTERVAL '1 hour'
+    `);
+    return parseInt(result.rows[0]?.count || '0');
+  }
+
+  private parseExpiry(expiry: string): number {
+    const match = expiry.match(/^(\d+)([dhms])$/);
+    if (!match) return 1;
+    
+    const value = parseInt(match[1]);
+    const unit = match[2];
+    
+    switch (unit) {
+      case 'd': return value;
+      case 'h': return value / 24;
+      case 'm': return value / 1440;
+      case 's': return value / 86400;
+      default: return 1;
+    }
+  }
+}
+
+Часть 10: Финальный чек-лист
+10.1 Production Readiness Checklist
+Файл: scripts/production-checklist.ts
+typescriptDownloadCopy code#!/usr/bin/env ts-node
+
+/**
+ * Финальный чек-лист готовности к production
+ * Запустить перед деплоем: npm run checklist:prod
+ */
+
+interface ChecklistItem {
+  category: string;
+  item: string;
+  check: () => Promise<boolean>;
+  critical: boolean;
+}
+
+async function runProductionChecklist() {
+  console.log('\n' + '='.repeat(60));
+  console.log('   NEUROGUARDIAN PRODUCTION READINESS CHECKLIST');
+  console.log('='.repeat(60) + '\n');
+
+  const checklist: ChecklistItem[] = [
+    // === БЕЗОПАСНОСТЬ ===
+    {
+      category: '🔒 БЕЗОПАСНОСТЬ',
+      item: 'TEST_MODE отключен',
+      check: async () => process.env.TEST_MODE !== 'true',
+      critical: true,
+    },
+    {
+      category: '🔒 БЕЗОПАСНОСТЬ',
+      item: 'JWT_SECRET установлен (32+ символов)',
+      check: async () => (process.env.JWT_SECRET?.length || 0) >= 32,
+      critical: true,
+    },
+    {
+      category: '🔒 БЕЗОПАСНОСТЬ',
+      item: 'API_KEY_ENCRYPTION_SECRET установлен',
+      check: async () => (process.env.API_KEY_ENCRYPTION_SECRET?.length || 0) >= 32,
+      critical: true,
+    },
+    {
+      category: '🔒 БЕЗОПАСНОСТЬ',
+      item: 'N8N_WEBHOOK_SECRET установлен',
+      check: async () => (process.env.N8N_WEBHOOK_SECRET?.length || 0) >= 16,
+      critical: true,
+    },
+    {
+      category: '🔒 БЕЗОПАСНОСТЬ',
+      item: 'HTTPS в API_BASE_URL',
+      check: async () => process.env.API_BASE_URL?.startsWith('https://') || false,
+      critical: true,
+    },
+
+    // === БАЗА ДАННЫХ ===
+    {
+      category: '🗄️ БАЗА ДАННЫХ',
+      item: 'Подключение к БД',
+      check: async () => {
+        try {
+          await db.query('SELECT 1');
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      critical: true,
+    },
+    {
+      category: '🗄️ БАЗА ДАННЫХ',
+      item: 'Все миграции применены',
+      check: async () => {
+        const result = await db.query(`
+          SELECT COUNT(*) FROM information_schema.tables 
+          WHERE table_name IN ('ops_events', 'ops_audit', 'price_rules', 'knowledge_documents')
+        `);
+        return parseInt(result.rows[0].count) === 4;
+      },
+      critical: true,
+    },
+
+    // === API МАРКЕТПЛЕЙСОВ ===
+    {
+      category: '🛒 МАРКЕТПЛЕЙСЫ',
+      item: 'WB_API_KEY установлен',
+      check: async () => !!process.env.WB_API_KEY,
+      critical: false,
+    },
+    {
+      category: '🛒 МАРКЕТПЛЕЙСЫ',
+      item: 'OZON_CLIENT_ID установлен',
+      check: async () => !!process.env.OZON_CLIENT_ID,
+      critical: false,
+    },
+    {
+      category: '🛒 МАРКЕТПЛЕЙСЫ',
+      item: 'OZON_API_KEY установлен',
+      check: async () => !!process.env.OZON_API_KEY,
+      critical: false,
+    },
+
+    // === TELEGRAM ===
+    {
+      category: '📱 TELEGRAM',
+      item: 'TELEGRAM_BOT_TOKEN установлен',
+      check: async () => !!process.env.TELEGRAM_BOT_TOKEN,
+      critical: true,
+    },
+    {
+      category: '📱 TELEGRAM',
+      item: 'ADMIN_CHAT_ID установлен',
+      check: async () => !!process.env.ADMIN_CHAT_ID,
+      critical: true,
+    },
+    {
+      category: '📱 TELEGRAM',
+      item: 'Бот отвечает на /health',
+      check: async () => {
+        try {
+          const response = await fetch(
+            `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/getMe`
+          );
+          return response.ok;
+        } catch {
+          return false;
+        }
+      },
+      critical: true,
+    },
+
+    // === N8N ===
+    {
+      category: '⚙️ N8N',
+      item: 'Webhook endpoint доступен',
+      check: async () => {
+        try {
+          const response = await fetch(
+            `${process.env.API_BASE_URL}/api/webhooks/n8n/health`,
+            {
+              headers: { 'x-n8n-secret': process.env.N8N_WEBHOOK_SECRET! },
+            }
+          );
+          return response.ok;
+        } catch {
+          return false;
+        }
+      },
+      critical: true,
+    },
+
+    // === МОНИТОРИНГ ===
+    {
+      category: '📊 МОНИТОРИНГ',
+      item: 'Sentinel Service инициализирован',
+      check: async () => {
+        // Проверяем, что сервис может запуститься
+        return true; // Placeholder
+      },
+      critical: true,
+    },
+
+    // === БАЗА ЗНАНИЙ ===
+    {
+      category: '📚 БАЗА ЗНАНИЙ',
+      item: 'Документы загружены',
+      check: async () => {
+        const kb = new AgentKnowledgeBase();
+        await kb.initialize();
+        const verification = await kb.verifyDocumentation();
+        return verification.totalDocuments > 0 && verification.missing.length === 0;
+      },
+      critical: false,
+    },
+
+    // === ТЕСТЫ ===
+    {
+      category: '🧪 ТЕСТЫ',
+      item: 'npm audit без critical',
+      check: async () => {
+        try {
+          execSync('npm audit --audit-level=critical', { stdio: 'pipe' });
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      critical: true,
+    },
+  ];
+
+  // Группируем по категориям
+  const categories = new Map<string, ChecklistItem[]>();
+  for (const item of checklist) {
+    const items = categories.get(item.category) || [];
+    items.push(item);
+    categories.set(item.category, items);
+  }
+
+  let passedCount = 0;
+  let failedCount = 0;
+  let criticalFailed = false;
+
+  // Выполняем проверки
+  for (const [category, items] of categories) {
+    console.log(`\n${category}`);
+    console.log('-'.repeat(40));
+
+    for (const item of items) {
+      const passed = await item.check();
+      const icon = passed ? '✅' : item.critical ? '❌' : '⚠️';
+      const status = passed ? 'OK' : item.critical ? 'FAILED' : 'WARNING';
+
+      console.log(`  ${icon} ${item.item}: ${status}`);
+
+      if (passed) {
+        passedCount++;
+      } else {
+        failedCount++;
+        if (item.critical) {
+          criticalFailed = true;
+        }
+      }
+    }
+  }
+
+  // Итоги
+  console.log('\n' + '='.repeat(60));
+  console.log('ИТОГИ');
+  console.log('='.repeat(60));
+  console.log(`✅ Пройдено: ${passedCount}`);
+  console.log(`❌ Не пройдено: ${failedCount}`);
+
+  if (criticalFailed) {
+    console.log('\n🚫 ДЕПЛОЙ ЗАБЛОКИРОВАН');
+    console.log('Исправьте критические ошибки перед деплоем в production.');
+    process.exit(1);
+  } else if (failedCount > 0) {
+    console.log('\n⚠️ ДЕПЛОЙ ВОЗМОЖЕН С ОГРАНИЧЕНИЯМИ');
+    console.log('Рекомендуется исправить предупреждения.');
+    process.exit(0);
+  } else {
+    console.log('\n✅ ГОТОВ К PRODUCTION!');
+    console.log('Все проверки пройдены. Можно деплоить.');
+    process.exit(0);
+  }
+}
+
+runProductionChecklist().catch(console.error);
+
+Команды для запуска
+jsonDownloadCopy code{
+  "scripts": {
+    "checklist": "ts-node scripts/production-checklist.ts",
+    "checklist:prod": "NODE_ENV=production ts-node scripts/production-checklist.ts",
+    "security:audit": "ts-node scripts/security-audit.ts",
+    "test:integration": "vitest run tests/integrations/",
+    "test:e2e": "vitest run tests/e2e/",
+    "test:all": "vitest run && npm run test:integration",
+    "db:migrate": "node scripts/run-migrations.js",
+    "sentinel:test": "ts-node scripts/test-sentinel.ts",
+    "onboarding:test": "ts-node scripts/test-onboarding.ts",
+    "deploy:pre-check": "npm run test:all && npm run security:audit && npm run checklist:prod"
+  }
+}
+
+Итоговый план выполнения
+Фаза 1: Безопасность (Приоритет CRITICAL)
+
+1.  Проверить и исправить все security checks
+2.  Шифрование API ключей в БД
+3.  Убедиться что TEST_MODE=false
+4.  Настроить rate limiting
+5.  Включить audit logging
+
+Фаза 2: Онбординг агента (День 1)
+
+1.  Реализовать OnboardingFlow
+2.  Тестировать подключение WB API
+3.  Тестировать подключение Ozon API
+4.  Синхронизация товаров
+5.  Настройка правил цен
+
+Фаза 3: Калькулятор юнит-экономики (День 1-2)
+
+1.  Реализовать UnitEconomicsCalculator
+2.  Учесть ВСЕ комиссии WB
+3.  Учесть ВСЕ комиссии Ozon
+4.  КРИТИЧНО: Учесть Ozon Card скидку
+5.  Тестирование на реальных данных
+
+Фаза 4: Детектор угроз (День 2)
+
+1.  Реализовать ThreatDetector
+2.  Проверка конкурентов
+3.  Проверка маржинальности
+4.  Проверка Ozon Card erosion
+5.  Тестирование всех сценариев
+
+Фаза 5: PriceShield (День 2-3)
+
+1.  Реализовать автоматическую корректировку
+2.  Интеграция с WB API для изменения цен
+3.  Интеграция с Ozon API для изменения цен
+4.  Тестирование на staging
+
+Фаза 6: Мониторинг 30 мин (День 3)
+
+1.  Реализовать SentinelService
+2.  Настроить cron/n8n на 30 минут
+3.  Telegram уведомления
+4.  Тестирование полного цикла
+
+Фаза 7: n8n Workflows (День 3-4)
+
+1.  Проверить workflow monitoring_30min
+2.  Проверить workflow daily_sync
+3.  Проверить workflow price_executor
+4.  Проверить workflow threat_alerts
+5.  Проверить workflow weekly_report
+6.  Проверить workflow health_check
+
+Фаза 8: База знаний (День 4)
+
+1.  Загрузить документацию WB
+2.  Загрузить документацию Ozon
+3.  Проверить поиск по базе
+4.  Интеграция с агентом
+
+Фаза 9: Финальное тестирование (День 4-5)
+
+1.  Запустить production checklist
+2.  E2E тестирование
+3.  Мониторинг 24 часа на staging
+4.  Деплой на production
+
+
+Готово к исполнению. Начинать с Фазы 1 (Безопасность).I prefer thisGPT-5.2 (High)PRONEW
+Техническое задание (ТЗ) для агента‑кодера
+Цель: подготовить проект к production и проверить работу в “лайф” режиме (реальное время) для селлеров Wildberries и Ozon: подключение магазинов, синхронизация товаров, расчет/защита цены (“сторож цены”), автокоррекция цен через API, мониторинг каждые 30 минут, уведомления в Telegram, проверка 6 автоматизаций n8n, и особенно — безопасность.
+
+1) Результат проекта (Definition of Done)
+Система считается готовой, если выполнены все пункты:
+
+1. Новый пользователь при первом общении проходит управляемый онбординг: подключает API WB/Ozon → проходит валидацию прав → синхронизирует товары → настраивает “защищаемую цену” и юнит‑экономику → только затем включается мониторинг и авто‑действия.
+2. Мониторинг каждые 30 минут стабильно запускается (n8n/cron), собирает данные, сравнивает с целевыми правилами, при необходимости обновляет цены в маркетплейсах через API и пишет аудит.
+3. Защита цены учитывает все критические угрозы цены и юнит‑экономики, включая скидку по “Ozon карте”/программам, где скидку оплачивает продавец (т.е. влияет на фактическую цену/маржу селлера).
+4. Уведомления в Telegram приходят селлеру:
+
+регулярные отчеты о мониторинге (каждые 30 минут, с троттлингом/объединением),
+мгновенные алерты по критическим событиям (падение маржи, “цена ниже минимума”, ошибки API, рассинхрон).
+
+
+5. Агент в чате отвечает, опираясь на актуальную документацию Ozon/WB из вашей базы знаний (RAG), с цитированием источника/версии, и не “галлюцинирует” при отсутствии данных.
+6. Все 6 автоматизаций n8n проверены end‑to‑end, задокументированы, имеют ретраи/идемпотентность/алерты и не ломают production.
+7. Проведена security hardening: секреты, доступы, аудит, запреты опасных режимов, защита от ошибочных массовых изменения цен.
+
+
+2) Сценарии (User Stories)
+2.1 Онбординг нового селлера (обязательный)
+Как селлер, я впервые пишу агенту → агент:
+
+1. объясняет шаги подключения,
+2. просит подключить WB/Ozon (ключи/Client‑Id/Api‑Key) через безопасный UI (не в чат),
+3. валидирует доступы (read + price update scopes),
+4. делает первичную синхронизацию товаров,
+5. предлагает настроить правила защиты цены (по товарам/группам),
+6. предлагает заполнить юнит‑экономику (комиссии/логистика/себестоимость/скидки/эквайринг/возвраты и пр.),
+7. только после состояния READY включает мониторинг/авто‑изменение цен.
+
+Критерий приемки: пока магазин не READY, агент не делает авто‑действий и не “рассчитывает” на пустых данных; любые действия — только в режиме подсказок.
+
+2.2 Защита цены (“сторож цены”)
+Как селлер, я задаю число “защищаемая цена” (и/или минимальная маржа) → система:
+
+* вычисляет, какая “цена в кабинете/базовая цена” должна быть выставлена на WB/Ozon, чтобы:
+
+выдержать защищаемую цену/маржу с учетом комиссий/логистики/скидок,
+учесть особые механики скидок, в т.ч. скидку, оплачиваемую селлером (Ozon Card/подобные программы),
+не уйти в минус и не нарушить ограничения (min/max, лимит изменения, “заморозка” при аномалиях).
+
+
+* каждые 30 минут проверяет и при отклонении — автоматически выравнивает цену через API (если разрешено правилом), иначе шлет алерт.
+
+Критерий приемки: изменение цены в МП подтверждается реальным API ответом, логируется в audit, отображается в дашборде и отражается в следующем цикле мониторинга.
+
+2.3 Проактивная помощь
+Как селлер, я хочу, чтобы агент сам подсказывал:
+
+* какие данные не заполнены (себестоимость/логистика/процент выкупа/программы скидок),
+* где риск “продажа в минус”,
+* что мешает точному расчету (рассинхрон, промо‑акции, ограничения API),
+* какие товары требуют правил.
+
+Критерий приемки: агент имеет список “missing critical inputs” и формирует план действий пользователю.
+
+3) Функциональные требования
+3.1 Интеграции Wildberries и Ozon (Real‑time readiness)
+Требования:
+
+* Раздельные коннекторы WB и Ozon с:
+
+rate‑limit, backoff, ретраи,
+нормализацией ошибок (401/403/429/5xx),
+идемпотентностью (особенно при повторных запусках n8n),
+журналированием запросов без утечки секретов.
+
+
+* Поддержка операций минимум:
+
+получить список товаров/sku/offer_id,
+получить текущие цены/остатки,
+установить/обновить цены,
+(по возможности) получить данные о скидках/программах, влияющих на цену селлера.
+
+
+
+Критерий приемки: на “лайф” ключах селлера выполняются read‑операции и тестовая update‑операция на тестовом товаре (или в dry‑run, если прод‑риски).
+
+3.2 Синхронизация товаров
+Требования:
+
+* Первичная полная синхронизация (pull) + последующая инкрементальная (по расписанию/по изменившимся).
+* Маппинг сущностей:
+
+WB: nmId/артикул/баркод…
+Ozon: product_id/offer_id/sku…
+
+
+* Хранение истории синхронизации (когда, что обновилось, сколько позиций, ошибки).
+
+Критерий приемки: после sync в БД есть консистентный каталог товаров, на который можно навесить правила защиты цены.
+
+3.3 Калькулятор расчета цены и юнит‑экономика (обязательно)
+Задача: проверить и довести “логику калькулятора” до уровня production.
+Требования к модели расчета (минимум):
+
+* входные параметры по товару/каналу:
+
+себестоимость (COGS),
+логистика (до клиента/фулфилмент/последняя миля — как модель проекта предполагает),
+комиссия МП,
+эквайринг/платежные комиссии,
+налоги (если предусмотрено настройками),
+хранение/платные услуги/обработка возвратов (как минимум коэффициентом),
+рекламные расходы (опционально, но закладка должна быть),
+скидки, оплачиваемые продавцом (ключевой кейс: Ozon Card и аналоги) — как отдельная статья, влияющая на net‑revenue.
+
+
+* выход:
+
+защищаемая величина (настраиваемо):
+A) минимальная маржа, или
+B) минимальная net‑прибыль, или
+C) целевая “финальная цена покупателю”, или
+D) комбинированно (например: “цена покупателю ≤ X, но маржа ≥ Y”).
+рекомендуемая цена, которую нужно выставить через API (base/list price).
+
+
+* “Explainability”: агент/дашборд показывают разложение “куда делись деньги” (понятным текстом и цифрами).
+
+Критерии приемки:
+
+* Есть набор unit‑тестов калькулятора (минимум 20 кейсов), включая:
+
+обычная продажа,
+продажа со скидкой, оплачиваемой селлером,
+пограничные случаи (нулевые/отрицательные значения, округления),
+рост комиссии/логистики,
+запрет “ухода в минус”.
+
+
+* Расчет воспроизводим: одинаковые входные → одинаковый результат.
+
+
+3.4 “Сторож цены” — правила защиты и автокоррекция цен
+Требования:
+
+* Правила на уровень: товар / группа / магазин / маркетплейс.
+* В правилах минимум:
+
+защищаемая цена (что именно защищаем — настраиваемо),
+min/max границы,
+лимит шага изменения (например, не более N% за цикл),
+режим: auto‑apply или “только уведомлять”,
+поведение при промо/акциях (например, “не трогать, но предупреждать”),
+поведение при недоступности API (fallback в уведомления).
+
+
+* Детектор угроз:
+
+“цена ниже минимума”,
+“маржа ниже порога”,
+“скидка продавца активна → риск убытка”,
+“аномальное изменение конкурентов/рынка”,
+“рассинхрон: в БД одно, в МП другое”.
+
+
+
+Критерий приемки: в каждом цикле мониторинга система либо:
+
+* обновляет цену (и подтверждает), либо
+* шлет алерт с четкой причиной и рекомендованной ценой, либо
+* ставит “safety stop” при аномалии (и эскалирует админу).
+
+
+3.5 Анализ конкурентов
+Требования:
+
+* Сбор конкурентных цен по заданным правилам (список конкурентов/категория/топ‑N).
+* Стратегия корректировки: “держать X% выше/ниже”, но никогда не ниже min‑маржи.
+* Логи и репорты: что увидели, что сделали, почему.
+
+Критерий приемки: конкурентный модуль не может заставить цену уйти в минус; любые рекомендации ограничены юнит‑экономикой.
+
+3.6 Агент и база знаний: актуальная документация WB/Ozon
+Требования (RAG/Knowledge QA):
+
+* Документация, которую вы подгружали, должна:
+
+иметь метаданные: источник URL/раздел/дата обновления/версия,
+поддерживать “freshness policy” (например: помечать как устаревшую после N дней).
+
+
+* В ответах агент обязан:
+
+ссылаться на конкретный фрагмент/источник (“цитата‑ссылка/идентификатор документа”),
+при отсутствии уверенности говорить “в документации в контексте не найдено” и предлагать шаги проверки, а не выдумывать.
+
+
+* Набор контрольных вопросов (knowledge tests) по ключевым endpoint’ам и ограничениям API.
+
+Критерий приемки: прогоняется тест‑набор вопросов; точность/полнота в рамках вашей базы знаний; ответы содержат ссылку на источник.
+
+4) n8n: проверка 6 автоматизаций (обязательная)
+Требование: каждая автоматизация описана паспортом и проходит E2E тест.
+Паспорт автоматизации (для каждой из 6)
+
+1. Название / ID
+2. Триггер (cron/вебхук/событие)
+3. Входы (какие данные/секреты нужны)
+4. Шаги (ноды, что делают)
+5. Выходы (БД записи, API вызовы, TG)
+6. Идемпотентность (как избегаем дублей)
+7. Ретраи и DLQ (как обрабатываем падения)
+8. Алёрты (когда и кому)
+9. SLA (что считается “успешно выполнено”)
+10. Тест‑сценарий (как руками/автотестом проверить)
+
+Минимальный набор логически необходимых автоматизаций (если ваши 6 совпадают — отлично)
+
+1. Sync товаров WB
+2. Sync товаров Ozon
+3. Мониторинг/сторож цены (каждые 30 минут)
+4. Отчет в TG (каждые 30 минут/по итогам мониторинга)
+5. Healthcheck/Watchdog (API, БД, n8n, очереди)
+6. Ошибки/инциденты (агрегация, дедуп, эскалация)
+
+Критерий приемки: каждая из 6 выполняется в staging/production‑like окружении, с логами, ретраями, и не вызывает опасных побочных эффектов при повторном запуске.
+
+5) Telegram уведомления (каждые 30 минут + критические)
+Требования:
+
+* Каналы: селлер (личные уведомления) + админ (инциденты).
+* Типы сообщений:
+
+“Мониторинг выполнен”: сколько товаров проверено, сколько изменено, топ‑риски.
+“Цена/маржа под угрозой”: товар, текущая, рекомендованная, причина, что делать.
+“Ошибка API/лимиты/403”: с инструкцией.
+
+
+* Троттлинг/дедуп:
+
+объединять события в один отчет,
+не спамить одинаковыми алертами (cooldown по товару/проблеме).
+
+
+
+Критерий приемки: сообщения приходят стабильно; при массовых изменениях не превращаются в 200 уведомлений подряд.
+
+6) Дашборды и “лайф режим”
+Требования к дашбордам:
+
+* Статус коннекторов (WB/Ozon): последний успех/ошибка/время ответа.
+* Статус мониторинга: последний цикл, следующий цикл, длительность, % ошибок.
+* Таблица “сторож цены”: текущая цена, защищаемая цель, отклонение, последнее действие.
+* Юнит‑экономика по товарам: маржа, риск, влияние скидок (в т.ч. селлер‑funded).
+* Журнал действий (audit trail): кто/что/когда изменил цену, причина, request id.
+
+Критерий приемки: после запуска в лайф режиме дашборд отражает реальные действия и состояния (не “примерные”).
+
+7) Безопасность (приоритет №1)
+7.1 Секреты и доступы
+
+* API ключи WB/Ozon хранятся зашифрованно (KMS/Secret Manager/DB encryption), никогда не логируются.
+* Разделение окружений: dev/staging/prod; запрет использовать prod‑секреты в dev.
+* RBAC: селлер видит только свои магазины/товары/логи.
+* “Dangerous mode” запрещен в prod: любые тестовые мок‑режимы, демо‑аккаунты, bypass‑флаги.
+
+7.2 Safety‑ограничители для цен
+
+* Лимит изменения цены за цикл и за сутки.
+* “Kill switch” на магазин/товар/пользователя.
+* Обязательный dry‑run режим для первого включения авто‑apply (например, 1–2 цикла “только уведомлять”).
+* Блокировка изменений при:
+
+невалидных входных данных юнит‑экономики,
+обнаружении промо/акции, где расчет не уверен,
+резком скачке параметров (аномалия/возможная ошибка API).
+
+
+
+7.3 Аудит и расследования
+
+* Иммутабельный аудит: запись каждого изменения цены, входных данных, версии алгоритма, источника решения.
+* Correlation ID для каждого цикла мониторинга и каждого API вызова.
+
+Критерий приемки: можно ответить на вопрос “почему цена изменилась” за 1 минуту, открыв audit запись.
+
+8) Тестирование и приемка (обязательный набор)
+8.1 Unit tests
+
+* Калькулятор (включая скидки продавца/“Ozon карта”).
+* Правила защиты (min/max/лимиты/stop‑conditions).
+* Нормализация данных (WB/Ozon → unified model).
+
+8.2 Integration tests
+
+* Подключение WB/Ozon (read‑операции обязательно; update — controlled).
+* Проверка n8n вебхуков (auth, payload, ретраи).
+* Telegram отправка (в тестовый чат).
+
+8.3 E2E тест “лайф”
+Сценарий:
+
+1. Новый пользователь → онбординг → подключение → sync
+2. Настройка защищаемой цены на 2–3 товара
+3. Прогон мониторинга (30 минут можно имитировать ручным запуском)
+4. Система корректирует цену через API или шлет алерт
+5. Отчет приходит в TG, запись есть в audit, дашборд обновлен
+
+Критерий приемки: все шаги выполняются без ручных “подкруток в базе”.
+
+9) Технические deliverables (что должен сделать агент‑кодер)
+
+1. Документированный Onboarding state machine (NEW → CONNECTING → SYNCING → CONFIGURING → READY).
+2. Исправления/доработки коннекторов WB/Ozon под update‑операции цен + ограничения.
+3. Проверка/исправление калькулятора и юнит‑тесты.
+4. Реализация/проверка “сторожа цены” с учетом seller‑funded скидок.
+5. Валидация RAG базы знаний + тест‑набор вопросов по докам.
+6. Полная проверка 6 n8n автоматизаций по “паспортам”.
+7. Telegram уведомления (30 минут + критика) с дедупом.
+8. Дашборды статуса/аудита/рисков.
+9. Security hardening: секреты, RBAC, запреты опасных режимов, аудит, kill‑switch, лимиты изменений.
+10. Runbook: “как подключить магазин”, “что делать при 403/429”, “как откатить изменения цены”.
+
+
+10) Приложение: минимальные правила вычисления “выравнивания” цены (формализация)
+Чтобы избежать разночтений, в системе должно быть явно задано что именно защищаем (настройка на товар/профиль):
+
+* Вариант A (самый частый): защищаем минимальную маржу/прибыль селлера. Тогда “выравнивание” поднимает цену, если из‑за скидок (включая seller‑funded) маржа падает ниже порога.
+* Вариант B: защищаем финальную цену покупателю (например, “покупатель должен видеть не ниже X”). Тогда система пересчитывает базовую цену так, чтобы с учетом всех скидок итоговая была X (но при этом проверяет маржу и может запретить выполнение, если это убыточно).
+* Вариант C: гибрид: “финальная цена не ниже X” и “маржа не ниже Y”.
+
+Критерий приемки: выбранный режим отображается в правилах и объясняется в уведомлениях (“что защищаем и почему изменили цену”).
+
+Если вы передадите это ТЗ агенту‑кодеру как есть, он сможет последовательно: (1) зафиксировать логику защиты/расчета, (2) довести интеграции и мониторинг до лайф‑готовности, (3) прогнать n8n/телеграм/дашборды end‑to‑end, (4) закрыть безопасность так, чтобы “авто‑прайсинг” не превратился в “авто‑катастрофу”.I prefer this

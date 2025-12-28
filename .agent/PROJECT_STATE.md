@@ -15,6 +15,14 @@
 
 ## ✅ Recently Completed
 
+### Session 2025-12-28 (Session 14 - Price Guard & Economics)
+
+- [x] **Security**: Implemented `PriceGuard` service with safety limits for price adjustments and integrated it into the AI Agent.
+- [x] **Unit Economics**: Refactored `unit-economics.ts` with 2025 commission rates, 5% Ozon Card discount, and volume-based logistics costs.
+- [x] **Sentinel v2**: Modernized price protection architecture with a new `SentinelService` class and `ThreatDetector`.
+- [x] **Marketplace API**: Updated batch price update limits to support 1000 items as per TZ v2.0.
+- [x] **API Keys**: Verified and fixed legacy Ozon API key encryption/decryption inconsistencies.
+
 ### Session 2025-12-28 (Session 12 - v2.12.0 PRODUCTION READY)
 
 - [x] **Security**: Implemented `productionGuard.ts` and hardened `constants.ts` against mock/test modes.
@@ -164,6 +172,6 @@
 
 ## 🔮 Next Session Suggestions
 
-1.  **Product Sync Loop**: Refactor `handleSyncProducts` to support multi-account iteration (Backend).
-2.  **Notification System**: Enhance Telegram notifications with actionable buttons.
-3.  **Advanced Analytics**: Integrate ClickHouse for deeper data analysis in Audit Log.
+1.  **Product Sync with Accounts**: Refactor product sync logic to iterate through all marketplace accounts properly.
+2.  **Sentinel Dashboard**: Update the Frontend Dashboard to display Sentinel v2's detected threats (erosion, commission increase).
+3.  **Analytics Service**: Move ABC analysis and stock forecasting from mock/deceptive logic to real DB-backed queries in `marketplace-orders`.

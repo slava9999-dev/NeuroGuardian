@@ -477,11 +477,11 @@ export async function updateWbPrices(
     return { success: false, count: 0, error: 'Нет валидных товаров для обновления' };
   }
 
-  // Batch limit: WB allows max 200 items per request
-  if (validUpdates.length > 200) {
-    console.warn(`⚠️ WB: Truncating batch from ${validUpdates.length} to 200 items`);
+  // Batch limit: WB allows max 1000 items per request (TZ 2.0 readiness)
+  if (validUpdates.length > 1000) {
+    console.warn(`⚠️ WB: Truncating batch from ${validUpdates.length} to 1000 items`);
   }
-  const batchedUpdates = validUpdates.slice(0, 200);
+  const batchedUpdates = validUpdates.slice(0, 1000);
 
   try {
     // CRITICAL FIX: nmID (not nmId) + discount: 0
@@ -719,9 +719,15 @@ export async function updateOzonPrices(
     return { success: false, count: 0, error: 'Нет валидных товаров для обновления' };
   }
 
+  // Batch limit: Ozon allows max 1000 items per request
+  if (validUpdates.length > 1000) {
+    console.warn(`⚠️ Ozon: Truncating batch from ${validUpdates.length} to 1000 items`);
+  }
+  const batchedUpdates = validUpdates.slice(0, 1000);
+
   try {
     const payload = {
-      prices: validUpdates.map(u => ({
+      prices: batchedUpdates.map(u => ({
         product_id: u.productId,
         price: String(u.price),
         old_price: String(Math.round(u.price * 1.1)),

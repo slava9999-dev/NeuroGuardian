@@ -333,8 +333,10 @@ export async function handleAgentV4Confirm(
     getWbFbsWarehouses,
     updateWbStockFbs,
     updateOzonStockFbs,
+    getMarketplaceKeys,
   } = await import('../services/marketplace.js');
   const { updateProductMinPrice, getProductsByUserId } = await import('../services/database.js');
+  const { validatePriceUpdate } = await import('../services/price-guard.js');
 
   try {
     let resultMessage = '';
@@ -357,36 +359,66 @@ export async function handleAgentV4Confirm(
         }
 
         // Split by marketplace
-        const wbUpdates = priceUpdates.filter(u => u.marketplace === 'WB' && u.nm_id);
-        const ozonUpdates = priceUpdates.filter(u => u.marketplace === 'Ozon');
+        // Support account_id if provided
+        const accountId = pendingAction.details.account_id as number | undefined;
+        const keys = await getMarketplaceKeys(userId, accountId);
+
+        // Fetch products for min_price and current_price security checks
+        const products = await getProductsByUserId(userId, accountId);
+
+        const validatedUpdates: Array<{ nmId: number; price: number }> = [];
+        const ozonValidatedUpdates: Array<{ productId: number; price: number }> = [];
+        const safetyWarnings: string[] = [];
+
+        for (const u of priceUpdates) {
+          const product = products.find(p => p.product_id === u.product_id);
+
+          const securityResult = validatePriceUpdate({
+            productId: u.product_id,
+            nmId: u.nm_id,
+            currentPrice: product?.current_price || u.new_price, // fallback if price not cached
+            proposedPrice: u.new_price,
+            minPrice: product?.min_price || 0,
+            marketplace: u.marketplace,
+          });
+
+          if (securityResult.isAdjusted) {
+            safetyWarnings.push(`⚠️ ${product?.title || u.product_id}: ${securityResult.reason}`);
+          }
+
+          if (u.marketplace === 'WB' && u.nm_id) {
+            validatedUpdates.push({ nmId: u.nm_id, price: securityResult.safePrice });
+          } else if (u.marketplace === 'Ozon') {
+            ozonValidatedUpdates.push({
+              productId: parseInt(u.product_id),
+              price: securityResult.safePrice,
+            });
+          }
+        }
 
         let wbResult = { success: true, count: 0 };
         let ozonResult = { success: true, count: 0 };
 
-        // Support account_id if provided
-        const accountId = pendingAction.details.account_id as number | undefined;
-        const { getMarketplaceKeys } = await import('../services/marketplace.js');
-        const keys = await getMarketplaceKeys(userId, accountId);
-
         // Update WB prices
-        if (wbUpdates.length > 0 && keys.wb) {
-          wbResult = await updateWbPrices(
-            keys.wb,
-            wbUpdates.map(u => ({ nmId: u.nm_id!, price: u.new_price }))
-          );
+        if (validatedUpdates.length > 0 && keys.wb) {
+          wbResult = await updateWbPrices(keys.wb, validatedUpdates);
         }
 
         // Update Ozon prices
-        if (ozonUpdates.length > 0 && keys.ozon) {
+        if (ozonValidatedUpdates.length > 0 && keys.ozon) {
           ozonResult = await updateOzonPrices(
             keys.ozon.clientId,
             keys.ozon.apiKey,
-            ozonUpdates.map(u => ({ productId: parseInt(u.product_id), price: u.new_price }))
+            ozonValidatedUpdates
           );
         }
 
         executedCount = wbResult.count + ozonResult.count;
         resultMessage = `✅ Цены обновлены: ${executedCount} товаров`;
+
+        if (safetyWarnings.length > 0) {
+          resultMessage += `\n\n🛡️ **Защита цены:**\n${safetyWarnings.join('\n')}`;
+        }
 
         if (!wbResult.success || !ozonResult.success) {
           resultMessage += `\n⚠️ Некоторые обновления не удались`;

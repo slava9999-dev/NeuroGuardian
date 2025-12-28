@@ -9,19 +9,12 @@ import { syncSalesHistory } from '../services/marketplace.js';
 import {
   getProductsByUserId,
   getSalesHistory,
-  // Marketplace service functions
   getMarketplaceKeys,
   fetchWbOrders,
   fetchOzonFbsUnfulfilledOrders,
   fetchOzonAnalytics,
   fetchWbStocks,
   fetchOzonStocksV3,
-  // Unit Economics service (removes hardcoded commissions)
-  getCommissionRate,
-  LOGISTICS_COSTS,
-  STORAGE_COSTS,
-  SPP_RATES,
-  ACQUIRING_RATES,
   getSystemEvents,
 } from '../services/index.js';
 
@@ -550,64 +543,45 @@ export async function executeCalculateUnitEconomics(
   const productsWithCost = targetProducts.filter((p: any) => p.cost_price && p.cost_price > 0);
   const costDataCoverage = Math.round((productsWithCost.length / targetProducts.length) * 100);
 
-  const calculations = targetProducts.slice(0, 10).map((p: any) => {
-    const price = p.current_price || 0;
-    const mp = (p.marketplace || 'WB') as 'WB' | 'Ozon';
-    const isWB = mp === 'WB';
+  const calculations = await Promise.all(
+    targetProducts.slice(0, 10).map(async (p: any) => {
+      const mp = (p.marketplace || 'WB') as 'WB' | 'Ozon';
 
-    // Get commission rate from centralized service (category-aware)
-    const commissionRate = getCommissionRate(mp, p.category);
-    const logistics = isWB ? LOGISTICS_COSTS.WB.fbo : LOGISTICS_COSTS.Ozon.fbo;
+      // Call the centralized service
+      const { calculateUnitEconomics } = await import('../services/unit-economics.js');
 
-    // Use real cost_price if available in DB, then from args, then estimate
-    let costPrice: number;
-    let costSource: string;
+      // Use real cost_price if available in DB, then from args, then estimate (30%)
+      const costPrice = p.cost_price || args.cost_price || Math.round((p.current_price || 0) * 0.3);
+      const costSource =
+        p.cost_price > 0 ? 'из БД' : args.cost_price ? 'указана вами' : '⚠️ оценка 30%';
 
-    if (p.cost_price && p.cost_price > 0) {
-      costPrice = p.cost_price;
-      costSource = 'из БД';
-    } else if (args.cost_price) {
-      costPrice = args.cost_price;
-      costSource = 'указана вами';
-    } else {
-      // Fallback: estimate as 30% of price (very rough)
-      costPrice = Math.round(price * 0.3);
-      costSource = '⚠️ оценка 30%';
-    }
+      const result = calculateUnitEconomics({
+        price: p.current_price || 0,
+        costPrice,
+        category: p.category,
+        marketplace: mp,
+        useOzonCard: true, // Account for Ozon Card by default as per TZ 2.0
+      });
 
-    const commission = Math.round(price * commissionRate);
-
-    // Fixed storage calculation: 30 days at correct daily rate + SPP/acquiring
-    const storageDaily = isWB ? STORAGE_COSTS.WB : STORAGE_COSTS.Ozon;
-    const sppRate = isWB ? SPP_RATES.WB : SPP_RATES.Ozon;
-    const acquiringRate = isWB ? ACQUIRING_RATES.WB : ACQUIRING_RATES.Ozon;
-
-    const otherCosts = isWB
-      ? Math.round(storageDaily * 30) + Math.round(price * sppRate)
-      : // WB: storage + SPP
-        Math.round(storageDaily * 30) + Math.round(price * acquiringRate);
-    // Ozon: storage + acquiring
-
-    const profit = price - costPrice - commission - logistics - otherCosts;
-    const margin = price > 0 ? Math.round((profit / price) * 100) : 0;
-    const roi = costPrice > 0 ? Math.round((profit / costPrice) * 100) : 0;
-
-    return {
-      product: p.title.substring(0, 40),
-      marketplace: mp,
-      price,
-      costPrice,
-      costSource,
-      commission,
-      commissionRate: `${Math.round(commissionRate * 100)}%`,
-      logistics,
-      otherCosts,
-      profit: Math.round(profit),
-      margin: `${margin}%`,
-      roi: `${roi}%`,
-      status: margin >= 20 ? '🟢 Здоровая' : margin >= 10 ? '🟡 Низкая' : '🔴 Убыток',
-    };
-  });
+      return {
+        product: p.title.substring(0, 40),
+        marketplace: mp,
+        price: result.revenue,
+        costPrice: result.costPrice,
+        costSource,
+        commission: result.commission,
+        commissionRate: `${Math.round(result.commissionRate * 100)}%`,
+        logistics: result.logistics,
+        otherCosts: result.storage + result.spp + result.acquiring + result.ozonCardCosts,
+        ozonCard: mp === 'Ozon' ? result.ozonCardCosts : 0,
+        profit: result.profit,
+        margin: `${result.margin}%`,
+        roi: `${result.roi}%`,
+        status:
+          result.margin >= 20 ? '🟢 Здоровая' : result.margin >= 10 ? '🟡 Низкая' : '🔴 Убыток',
+      };
+    })
+  );
 
   // Generate honest data quality message
   let dataQualityNote: string;
@@ -632,9 +606,9 @@ export async function executeCalculateUnitEconomics(
         coverage: `${costDataCoverage}%`,
       },
       commissionRates: {
-        note: 'Комиссии усредненные. Реальные зависят от категории товара.',
-        WB: 'Комиссия 8-34.5% (среднее 20%), логистика 23-46₽, СПП до 25%, хранение 0.08₽/л/день',
-        Ozon: 'Комиссия 4-24% (среднее 15%), логистика FBO 46₽, FBS 80₽, эквайринг 1.5%',
+        note: 'Комиссии и логистика в реальном времени (2025).',
+        WB: 'Комиссия 8-34.5%, логистика 35-50₽, хранение 0.08₽/л/день',
+        Ozon: 'Комиссия 4-24%, логистика FBO/FBS 46/80₽, эквайринг 1.5%, Ozon Card 5%',
       },
       products: calculations,
     },

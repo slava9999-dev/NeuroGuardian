@@ -102,8 +102,8 @@ export async function handleSettings(
   res: VercelResponse,
   userId: number
 ): Promise<VercelResponse> {
-  // Import crypto for API key encryption
-  const { encryptApiKey } = await import('../lib/crypto.js');
+  // Import crypto for API key encryption/decryption
+  const { encryptApiKey, decryptApiKey } = await import('../lib/crypto.js');
 
   if (req.method === 'GET') {
     const user = await getUserById(userId);
@@ -162,15 +162,33 @@ export async function handleSettings(
     updates.push('wbApiKey');
   }
 
-  if (body.ozonApiKey !== undefined) {
-    const encrypted = body.ozonApiKey ? encryptApiKey(body.ozonApiKey) : null;
-    await sql`UPDATE users SET api_key_ozon = ${encrypted} WHERE id = ${userId}`;
-    updates.push('ozonApiKey');
-  }
+  // Legacy Ozon Key Storage (supports marketplace.ts getMarketplaceKeys)
+  if (body.ozonApiKey !== undefined || body.ozonClientId !== undefined) {
+    const user = await getUserById(userId);
+    const currentClientId = body.ozonClientId || user?.ozon_client_id || '';
+    const currentApiKey =
+      body.ozonApiKey || (user?.api_key_ozon ? decryptApiKey(user.api_key_ozon) : '');
 
-  if (body.ozonClientId !== undefined) {
-    await sql`UPDATE users SET ozon_client_id = ${body.ozonClientId || null} WHERE id = ${userId}`;
-    updates.push('ozonClientId');
+    // 1. Store separate Ozon Client ID (encrypted for safety)
+    if (body.ozonClientId !== undefined) {
+      const encryptedClient = body.ozonClientId ? encryptApiKey(body.ozonClientId) : null;
+      await sql`UPDATE users SET ozon_client_id = ${encryptedClient} WHERE id = ${userId}`;
+      updates.push('ozonClientId');
+    }
+
+    // 2. Store combined Key in legacy column if both parts are available
+    if (currentClientId && (body.ozonApiKey || currentApiKey)) {
+      const apiKeyToSave = body.ozonApiKey || currentApiKey;
+      const combined = `${currentClientId}:${apiKeyToSave}`;
+      const encryptedCombined = encryptApiKey(combined);
+      await sql`UPDATE users SET api_key_ozon = ${encryptedCombined} WHERE id = ${userId}`;
+      updates.push('ozonApiKey (legacy)');
+    } else if (body.ozonApiKey) {
+      // Just save API key if no client ID available (will be fixed on next update)
+      const encrypted = encryptApiKey(body.ozonApiKey);
+      await sql`UPDATE users SET api_key_ozon = ${encrypted} WHERE id = ${userId}`;
+      updates.push('ozonApiKey');
+    }
   }
 
   // Sentinel buffer settings
