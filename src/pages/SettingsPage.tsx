@@ -3,11 +3,16 @@
 // User settings, API keys, and sync
 // ============================================
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAppStore, useProductsStore } from '../stores';
 import { hapticFeedback } from '../lib/telegram';
 import { PaymentModal } from '../components/ui/PaymentModal';
-import { settingsApi, productsApi } from '../lib/api';
+import {
+  settingsApi,
+  productsApi,
+  marketplaceAccountsApi,
+  type MarketplaceAccount,
+} from '../lib/api';
 import { SecurityBadge } from '../components/ui/SecurityBadge';
 import type { DefenseMode, Product } from '../types';
 
@@ -26,6 +31,70 @@ export function SettingsPage({
   const [apiKey, setApiKey] = useState('');
   const [clientId, setClientId] = useState('');
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
+
+  // Multi-account state
+  const [accounts, setAccounts] = useState<MarketplaceAccount[]>([]);
+  const [showAccountModal, setShowAccountModal] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<Partial<MarketplaceAccount>>({});
+
+  useEffect(() => {
+    loadAccounts();
+  }, []);
+
+  const loadAccounts = async () => {
+    try {
+      const res = await marketplaceAccountsApi.getAccounts();
+      if (res.success) {
+        setAccounts(res.accounts);
+      }
+    } catch (e) {
+      console.error('Failed to load accounts:', e);
+    }
+  };
+
+  const handleSaveAccount = async () => {
+    if (!editingAccount.name || !editingAccount.marketplace) {
+      alert('Заполните обязательные поля');
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const res = await marketplaceAccountsApi.saveAccount({
+        id: editingAccount.id,
+        name: editingAccount.name,
+        marketplace: editingAccount.marketplace,
+        wbApiKey: editingAccount.wb_token, // Mapping from UI state to API payload
+        ozonClientId: editingAccount.ozon_client_id,
+        ozonApiKey: editingAccount.ozon_api_key,
+        isActive: editingAccount.is_active,
+      });
+      if (res.success) {
+        hapticFeedback('success');
+        setShowAccountModal(false);
+        setEditingAccount({});
+        loadAccounts();
+      } else {
+        alert('Ошибка: ' + res.error);
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Ошибка сохранения');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteAccount = async (id: number) => {
+    if (!confirm('Удалить аккаунт?')) return;
+    try {
+      await marketplaceAccountsApi.deleteAccount(id);
+      loadAccounts();
+      hapticFeedback('success');
+    } catch (e) {
+      console.error(e);
+      alert('Ошибка удаления');
+    }
+  };
 
   const handleDefenseModeChange = async (mode: DefenseMode) => {
     hapticFeedback('light');
@@ -153,10 +222,199 @@ export function SettingsPage({
         </section>
       )}
 
-      {/* Connected APIs */}
+      {/* Marketplace Accounts (Multi-Account) */}
       <section className="mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-medium text-stone-400 uppercase tracking-wider">
+            Аккаунты Маркетплейсов
+          </h3>
+          <button
+            onClick={() => {
+              setEditingAccount({ marketplace: 'wb', is_active: true });
+              setShowAccountModal(true);
+            }}
+            className="text-xs uppercase font-bold text-amber-500 hover:text-amber-400"
+          >
+            + Добавить
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          {accounts.map(acc => (
+            <div key={acc.id} className="glass-panel p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center ${acc.marketplace === 'wb' ? 'bg-purple-500/20 text-purple-400' : 'bg-blue-500/20 text-blue-400'}`}
+                >
+                  <span className="text-sm font-bold">
+                    {acc.marketplace === 'wb' ? 'WB' : 'Oz'}
+                  </span>
+                </div>
+                <div>
+                  <h4 className="font-medium text-white">{acc.name}</h4>
+                  <p className="text-xs text-stone-400">
+                    ID: {acc.id} | {acc.is_active ? 'Активен' : 'Отключен'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setEditingAccount(acc);
+                    setShowAccountModal(true);
+                  }}
+                  className="p-2 rounded-lg bg-stone-800 text-stone-400 hover:text-white hover:bg-stone-700"
+                >
+                  ✎
+                </button>
+                <button
+                  onClick={() => handleDeleteAccount(acc.id)}
+                  className="p-2 rounded-lg bg-stone-800 text-red-400 hover:text-red-300 hover:bg-stone-700"
+                >
+                  🗑️
+                </button>
+              </div>
+            </div>
+          ))}
+          {accounts.length === 0 && (
+            <div className="text-center p-4 rounded-xl border border-dashed border-stone-700 text-stone-500 text-sm">
+              Нет добавленных аккаунтов. Добавьте аккаунт для работы.
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Account Modal */}
+      {showAccountModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md glass-panel p-6">
+            <h3 className="text-lg font-bold text-white mb-4">
+              {editingAccount.id ? 'Редактировать аккаунт' : 'Добавить аккаунт'}
+            </h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-stone-400 mb-1">Название</label>
+                <input
+                  type="text"
+                  value={editingAccount.name || ''}
+                  onChange={e => setEditingAccount({ ...editingAccount, name: e.target.value })}
+                  className="w-full p-3 rounded-xl bg-stone-800 border border-stone-700 text-white focus:border-amber-500 focus:outline-none"
+                  placeholder="Например: Основной магазин"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-stone-400 mb-1">Маркетплейс</label>
+                <div className="flex gap-2 p-1 bg-stone-800 rounded-xl">
+                  {['wb', 'ozon'].map(m => (
+                    <button
+                      key={m}
+                      onClick={() =>
+                        !editingAccount.id &&
+                        setEditingAccount({ ...editingAccount, marketplace: m as 'wb' | 'ozon' })
+                      }
+                      disabled={!!editingAccount.id}
+                      className={`
+                        flex-1 py-2 rounded-lg text-sm font-medium transition-colors
+                        ${
+                          editingAccount.marketplace === m
+                            ? m === 'wb'
+                              ? 'bg-purple-500 text-white'
+                              : 'bg-blue-500 text-white'
+                            : 'text-stone-400 hover:text-white'
+                        }
+                        ${editingAccount.id ? 'opacity-50 cursor-not-allowed' : ''}
+                      `}
+                    >
+                      {m === 'wb' ? 'Wildberries' : 'Ozon'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {(!editingAccount.marketplace || editingAccount.marketplace === 'wb') && (
+                <div>
+                  <label className="block text-sm text-stone-400 mb-1">API Token (Header)</label>
+                  <input
+                    type="password"
+                    value={editingAccount.wb_token || ''}
+                    onChange={e =>
+                      setEditingAccount({ ...editingAccount, wb_token: e.target.value })
+                    }
+                    className="w-full p-3 rounded-xl bg-stone-800 border border-stone-700 text-white focus:border-amber-500 focus:outline-none"
+                    placeholder={
+                      editingAccount.id ? '•••••••• (оставьте пустым)' : 'Вставьте токен'
+                    }
+                  />
+                </div>
+              )}
+
+              {editingAccount.marketplace === 'ozon' && (
+                <>
+                  <div>
+                    <label className="block text-sm text-stone-400 mb-1">Client ID</label>
+                    <input
+                      type="text"
+                      value={editingAccount.ozon_client_id || ''}
+                      onChange={e =>
+                        setEditingAccount({ ...editingAccount, ozon_client_id: e.target.value })
+                      }
+                      className="w-full p-3 rounded-xl bg-stone-800 border border-stone-700 text-white focus:border-amber-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-stone-400 mb-1">API Key</label>
+                    <input
+                      type="password"
+                      value={editingAccount.ozon_api_key || ''}
+                      onChange={e =>
+                        setEditingAccount({ ...editingAccount, ozon_api_key: e.target.value })
+                      }
+                      className="w-full p-3 rounded-xl bg-stone-800 border border-stone-700 text-white focus:border-amber-500 focus:outline-none"
+                      placeholder={
+                        editingAccount.id ? '•••••••• (оставьте пустым)' : 'Вставьте ключ'
+                      }
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="flex items-center gap-3 pt-2">
+                <input
+                  type="checkbox"
+                  id="isActive"
+                  checked={editingAccount.is_active !== false}
+                  onChange={e =>
+                    setEditingAccount({ ...editingAccount, is_active: e.target.checked })
+                  }
+                  className="w-5 h-5 rounded border-stone-700 bg-stone-800 text-amber-500 focus:ring-amber-500"
+                />
+                <label htmlFor="isActive" className="text-sm text-white cursor-pointer select-none">
+                  Аккаунт активен (мониторинг включен)
+                </label>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setShowAccountModal(false)} className="flex-1 btn-secondary">
+                Отмена
+              </button>
+              <button
+                onClick={handleSaveAccount}
+                className="flex-1 btn-primary"
+                disabled={isSaving}
+              >
+                {isSaving ? 'Сохранение...' : 'Сохранить'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Connected APIs (LEGACY / SINGLE) */}
+      <section className="mb-6 opacity-60 hover:opacity-100 transition-opacity">
         <h3 className="text-sm font-medium text-stone-400 uppercase tracking-wider mb-3">
-          Подключённые API
+          Legacy (Старое подключение)
         </h3>
 
         <div className="space-y-3">

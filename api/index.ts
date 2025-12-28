@@ -84,6 +84,9 @@ import { handleGetAnalytics, handleGetSystemMetrics } from './handlers/analytics
 // Ops Panel handlers
 import { handleOpsEvents, handleOpsAudit, handleOpsDashboard } from './handlers/ops.js';
 
+// Marketplace Accounts
+import { handleMarketplaceAccounts } from './handlers/marketplace-accounts.js';
+
 // Utilities
 import {
   sanitizeInput,
@@ -225,6 +228,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // ========== USER ENDPOINTS (TELEGRAM AUTH) ==========
       case 'products':
       case 'settings':
+      case 'marketplace-accounts':
       case 'create-payment':
       case 'batch-set-stop-loss':
       case 'sentinel-logs': {
@@ -233,9 +237,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return sendAuthError(res, auth.error, auth.statusCode);
         }
 
-        const handlers: Record<string, typeof handleProducts> = {
+        const handlers: Record<
+          string,
+          (req: VercelRequest, res: VercelResponse, userId: number) => Promise<VercelResponse>
+        > = {
           products: handleProducts,
           settings: handleSettings,
+          'marketplace-accounts': handleMarketplaceAccounts,
           'create-payment': handleCreatePayment,
           'batch-set-stop-loss': handleBatchSetStopLoss,
           'sentinel-logs': handleSentinelLogs,

@@ -111,6 +111,55 @@ export const settingsApi = {
   },
 };
 
+export interface MarketplaceAccount {
+  id: number;
+  name: string;
+  marketplace: 'wb' | 'ozon';
+  is_active: boolean;
+  wb_token?: string;
+  ozon_client_id?: string;
+  ozon_api_key?: string;
+  created_at: string;
+}
+
+export const marketplaceAccountsApi = {
+  getAccounts: async (): Promise<{ success: boolean; accounts: MarketplaceAccount[] }> => {
+    const initData = getInitData();
+    const response = await api.get('', {
+      params: { action: 'marketplace-accounts' },
+      headers: { 'X-Init-Data': initData || '' },
+    });
+    return response.data;
+  },
+
+  saveAccount: async (account: {
+    id?: number;
+    name: string;
+    marketplace: 'wb' | 'ozon';
+    wbApiKey?: string;
+    ozonClientId?: string;
+    ozonApiKey?: string;
+    isActive?: boolean;
+  }) => {
+    const initData = getInitData();
+    const response = await api.post('', {
+      action: 'marketplace-accounts',
+      initData,
+      ...account,
+    });
+    return response.data;
+  },
+
+  deleteAccount: async (id: number) => {
+    const initData = getInitData();
+    const response = await api.delete('', {
+      params: { action: 'marketplace-accounts', id },
+      headers: { 'X-Init-Data': initData || '' },
+    });
+    return response.data;
+  },
+};
+
 // ============================================
 // PRODUCTS SERVICE
 // ============================================

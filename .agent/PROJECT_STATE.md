@@ -138,8 +138,35 @@
 
 ---
 
+### 2025-12-28 (Session 12 - Multi-Account & Deployment)
+
+**Focus:** Multi-account architecture and local infrastructure.
+
+**Accomplishments:**
+
+- **Infrastructure**: Started Docker Security Stack (Vault, ClickHouse, Redis).
+- **Backend API**: Implemented `marketplace-accounts` handler for managing multiple WB/Ozon accounts.
+- **Frontend**: Updated `SettingsPage` to support Multi-Account Management (Create, Edit, Delete).
+- **Database**: Validated `marketplace_accounts` schema usage.
+- **Migration**: Ran Ops schema migration.
+
+**Files Created/Modified:**
+
+- `src/pages/SettingsPage.tsx`
+- `api/handlers/marketplace-accounts.ts`
+- `api/index.ts`
+- `src/api-lib/services/users.ts`
+- `src/lib/api.ts`
+
+---
+
 ## 🔮 Next Session Suggestions
 
-1. **Production Deployment** - Deploy changes
-2. **Docker Security Stack** - Spin up local infrastructure
-3. **Advanced AI Monitoring** - Add `restart_services` or `clear_cache` tools to AI SysAdmin
+1.  **Refine Security Agent**:
+    - Complete Vault integration (secrets storage).
+    - Implement ClickHouse logging for critical security events.
+2.  **Product Sync**:
+    - Update `handleSyncProducts` to iterate over all active marketplace accounts.
+    - Currently it might default to legacy keys or first account. Needs refactoring.
+3.  **Deploy**:
+    - Verify Vercel deployment and database migrations in production.
