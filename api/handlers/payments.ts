@@ -15,6 +15,7 @@ import {
   getUserById,
 } from '../../src/api-lib/services/index.js';
 import { sendTelegramNotification } from '../../src/api-lib/services/notifications.js';
+import { getSecurityAgent } from '@neuroguardian/security-agent';
 
 /**
  * Handle create-payment action
@@ -39,8 +40,23 @@ export async function handleCreatePayment(
   const user = await getUserById(userId);
 
   // PRODUCTION: YooKassa must be configured
-  const SHOP_ID = process.env.YOOKASSA_SHOP_ID || '';
-  const SECRET_KEY = process.env.YOOKASSA_SECRET_KEY || '';
+  // PRODUCTION: YooKassa must be configured
+  const agent = getSecurityAgent();
+  if (!agent.isInitialized()) await agent.initialize();
+
+  const SHOP_ID = (await agent.secrets.get({
+    userId: 'system',
+    key: 'yookassa_shop_id',
+    purpose: 'payment_handler_check',
+    ttl: 300
+  })).value || process.env.YOOKASSA_SHOP_ID || '';
+
+  const SECRET_KEY = (await agent.secrets.get({
+    userId: 'system',
+    key: 'yookassa_secret_key',
+    purpose: 'payment_handler_check',
+    ttl: 300
+  })).value || process.env.YOOKASSA_SECRET_KEY || '';
   const IS_PRODUCTION =
     process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
 

@@ -8,6 +8,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql } from '@vercel/postgres';
 
 import { validateTelegramInitData, logger } from '../../src/api-lib/lib/index.js';
+import { getSecurityAgent } from '@neuroguardian/security-agent';
 
 import {
   getUserById,
@@ -62,14 +63,33 @@ export async function handleCheckPrices(
   const authHeader = req.headers['authorization'];
   const initData = (req.headers['x-init-data'] as string) || '';
   const querySecret = req.query.secret as string;
-  const adminKey = (req.query.key as string) || (req.headers['x-admin-key'] as string);
+  const reqAdminKey = (req.query.key as string) || (req.headers['x-admin-key'] as string);
+  // Initialize Security Agent
+  const agent = getSecurityAgent();
+  if (!agent.isInitialized()) {
+    await agent.initialize();
+  }
+  
+  // Fetch secrets
+  const cronSecret = (await agent.secrets.get({
+    userId: 'system',
+    key: 'cron_secret',
+    purpose: 'sentinel_cron_auth',
+    ttl: 60
+  }).catch(() => ({ value: process.env.CRON_SECRET }))).value;
+
+  const adminApiKey = (await agent.secrets.get({
+    userId: 'system',
+    key: 'admin_api_key',
+    purpose: 'sentinel_admin_auth',
+    ttl: 60
+  }).catch(() => ({ value: process.env.ADMIN_API_KEY }))).value;
 
   // Check for cron authorization (Bearer header OR query parameter)
-  const cronSecret = process.env.CRON_SECRET;
   const isCron =
     authHeader === `Bearer ${cronSecret}` ||
     (querySecret && cronSecret && querySecret === cronSecret);
-  const isAdmin = adminKey === process.env.ADMIN_API_KEY;
+  const isAdmin = !!(adminApiKey && reqAdminKey && reqAdminKey === adminApiKey);
 
   // TEST_MODE: bypass subscription check
   const isTestMode = process.env.TEST_MODE === 'true';
@@ -623,7 +643,22 @@ async function sendSentinelAlert(
   userId: number,
   data: SentinelAlertData & { marketplace?: string; isError?: boolean }
 ) {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const agent = getSecurityAgent();
+  if (!agent.isInitialized()) await agent.initialize();
+
+  let token: string | undefined;
+  try {
+     const resp = await agent.secrets.get({
+         userId: userId.toString(), 
+         key: 'telegram_bot_token', 
+         purpose: 'send_telegram_alert',
+         ttl: 60
+     });
+     token = resp.value;
+  } catch {
+     // Fallback
+     token = process.env.TELEGRAM_BOT_TOKEN;
+  }
 
   if (!token) {
     console.warn('⚠️ TELEGRAM_BOT_TOKEN not configured, skipping alert');

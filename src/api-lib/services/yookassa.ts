@@ -8,8 +8,29 @@ import { SUBSCRIPTION_PLANS, type PlanId } from '../lib/index.js';
 import { createTransaction } from './database.js';
 
 const YOOKASSA_API_URL = 'https://api.yookassa.ru/v3';
-const SHOP_ID = process.env.YOOKASSA_SHOP_ID || '';
-const SECRET_KEY = process.env.YOOKASSA_SECRET_KEY || '';
+// Helper to get secrets
+import { getSecurityAgent } from '@neuroguardian/security-agent';
+
+async function getYookassaSecrets() {
+  const agent = getSecurityAgent();
+  if (!agent.isInitialized()) await agent.initialize();
+  
+  const shopId = (await agent.secrets.get({
+    userId: 'system',
+    key: 'yookassa_shop_id',
+    purpose: 'payment_processing',
+    ttl: 300
+  })).value || process.env.YOOKASSA_SHOP_ID || '';
+
+  const secretKey = (await agent.secrets.get({
+    userId: 'system',
+    key: 'yookassa_secret_key',
+    purpose: 'payment_processing',
+    ttl: 300
+  })).value || process.env.YOOKASSA_SECRET_KEY || '';
+
+  return { shopId, secretKey };
+}
 
 export interface PaymentResult {
   success: boolean;
@@ -24,9 +45,7 @@ export interface PaymentResult {
     price: number;
     durationDays: number;
   };
-}
-
-/**
+}/**
  * Create YooKassa payment
  */
 export async function createYookassaPayment(
@@ -39,6 +58,8 @@ export async function createYookassaPayment(
   if (!plan) {
     return { success: false, error: 'Invalid plan' };
   }
+
+  const { shopId: SHOP_ID, secretKey: SECRET_KEY } = await getYookassaSecrets();
 
   if (!SHOP_ID || !SECRET_KEY) {
     return { success: false, error: 'Payment system not configured' };
@@ -136,6 +157,8 @@ export async function getPaymentStatus(paymentId: string): Promise<{
   paid: boolean;
   metadata?: Record<string, string>;
 } | null> {
+  const { shopId: SHOP_ID, secretKey: SECRET_KEY } = await getYookassaSecrets();
+
   if (!SHOP_ID || !SECRET_KEY) {
     return null;
   }

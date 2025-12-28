@@ -9,9 +9,9 @@
  * ============================================
  */
 
-import { SecretsGuard, createEnvProxy, generateSignature, verifySignature } from './secrets.js';
+import { SecretsGuard, createEnvProxy } from './secrets.js';
 import { AuditLogger, createAuditContext } from './audit.js';
-import { AuthorizationGuard, extractPermissionsFromJWT, verifyJWT } from './authz.js';
+import { AuthorizationGuard } from './authz.js';
 import type { SecurityAgentConfig } from './types.js';
 
 // Re-export all types
@@ -82,13 +82,22 @@ export class SecurityAgent {
  * Create a Security Agent instance from environment
  */
 export function createSecurityAgentFromEnv(): SecurityAgent {
+  const vaultConfig: SecurityAgentConfig['vault'] = {
+    address: process.env.VAULT_ADDR || 'http://localhost:8200',
+    tlsEnabled: process.env.VAULT_TLS_ENABLED === 'true',
+  };
+  if (process.env.VAULT_TOKEN) vaultConfig.token = process.env.VAULT_TOKEN;
+  if (process.env.VAULT_NAMESPACE) vaultConfig.namespace = process.env.VAULT_NAMESPACE;
+
+  const redisConfig: SecurityAgentConfig['redis'] = {
+    host: process.env.REDIS_HOST || 'localhost',
+    port: parseInt(process.env.REDIS_PORT || '6379', 10),
+  };
+  if (process.env.UPSTASH_REDIS_REST_URL) redisConfig.url = process.env.UPSTASH_REDIS_REST_URL;
+  if (process.env.REDIS_PASSWORD) redisConfig.password = process.env.REDIS_PASSWORD;
+
   const config: SecurityAgentConfig = {
-    vault: {
-      address: process.env.VAULT_ADDR || 'http://localhost:8200',
-      token: process.env.VAULT_TOKEN,
-      namespace: process.env.VAULT_NAMESPACE,
-      tlsEnabled: process.env.VAULT_TLS_ENABLED === 'true',
-    },
+    vault: vaultConfig,
     clickhouse: {
       host: process.env.CLICKHOUSE_HOST || 'localhost',
       port: parseInt(process.env.CLICKHOUSE_PORT || '8123', 10),
@@ -96,12 +105,7 @@ export function createSecurityAgentFromEnv(): SecurityAgent {
       username: process.env.CLICKHOUSE_USER || 'security_agent',
       password: process.env.CLICKHOUSE_PASSWORD || '',
     },
-    redis: {
-      url: process.env.UPSTASH_REDIS_REST_URL,
-      host: process.env.REDIS_HOST || 'localhost',
-      port: parseInt(process.env.REDIS_PORT || '6379', 10),
-      password: process.env.REDIS_PASSWORD,
-    },
+    redis: redisConfig,
     environment:
       (process.env.NODE_ENV as 'development' | 'staging' | 'production') || 'development',
     signingKey: process.env.SECURITY_SIGNING_KEY || 'dev-signing-key-change-in-production',
@@ -184,12 +188,21 @@ export function securityMiddleware<T extends (...args: unknown[]) => Promise<unk
     }
 
     // Set audit context
+    // Set audit context
     if (req.headers) {
-      const context = createAuditContext({
-        headers: req.headers,
-        url: req.url,
-        method: req.method,
-      });
+      // Cast headers to match what createAuditContext accepts (checking for presence manually if needed, or trusting the type compatibility for string | undefined)
+      // Since req.headers is Record<string, string>, it satisfies string | undefined.
+      // The issue is likely url and method.
+      const ctxReq: {
+        headers: Record<string, string | undefined>;
+        url?: string;
+        method?: string;
+      } = { headers: req.headers };
+
+      if (req.url) ctxReq.url = req.url;
+      if (req.method) ctxReq.method = req.method;
+
+      const context = createAuditContext(ctxReq);
       agent.audit.setContext(context);
     }
 
@@ -221,6 +234,7 @@ export function securityMiddleware<T extends (...args: unknown[]) => Promise<unk
           event: options.auditEvent,
           category: 'data',
           userId: req.userId,
+          severity: 'info',
         });
       }
 
@@ -249,7 +263,7 @@ export function enableSecureEnv(allowedVars: string[] = []): void {
   const proxy = createEnvProxy(agent.secrets, allowedVars);
 
   // This is a dangerous operation - only use in production!
-  // @ts-expect-error - Intentionally replacing process.env
+  // @ts-ignore - Intentionally replacing process.env which might cause issues in some environments
   process.env = proxy;
 
   console.log('[SecurityAgent] Secure environment enabled');

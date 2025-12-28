@@ -129,14 +129,15 @@ export class AuditLogger {
       id: randomUUID(),
       traceId: context.traceId,
       timestamp: new Date(),
-      userIp: context.userIp,
-      userAgent: context.userAgent,
-      sessionId: context.sessionId,
-      requestPath: context.requestPath,
-      requestMethod: context.requestMethod,
       signature: '', // Will be set below
       signatureVersion: this.SIGNATURE_VERSION,
     };
+
+    if (context.userIp) entry.userIp = context.userIp;
+    if (context.userAgent) entry.userAgent = context.userAgent;
+    if (context.sessionId) entry.sessionId = context.sessionId;
+    if (context.requestPath) entry.requestPath = context.requestPath;
+    if (context.requestMethod) entry.requestMethod = context.requestMethod;
 
     // Generate signature
     entry.signature = this.generateSignature(entry);
@@ -183,6 +184,7 @@ export class AuditLogger {
         description: `Critical security event detected for user ${event.userId}`,
         affectedUsers: [event.userId],
         detectionMethod: 'audit_logger',
+        autoRemediation: false,
       });
     }
 
@@ -546,14 +548,17 @@ export function createAuditContext(req: {
   url?: string;
   method?: string;
 }): AuditContext {
-  return {
+  const context: AuditContext = {
     traceId: req.headers['x-trace-id'] || req.headers['x-request-id'] || randomUUID(),
     userIp:
       req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
       req.headers['x-real-ip'] ||
       'unknown',
-    userAgent: req.headers['user-agent'],
-    requestPath: req.url,
-    requestMethod: req.method,
   };
+
+  if (req.headers['user-agent']) context.userAgent = req.headers['user-agent'];
+  if (req.url) context.requestPath = req.url;
+  if (req.method) context.requestMethod = req.method;
+
+  return context;
 }

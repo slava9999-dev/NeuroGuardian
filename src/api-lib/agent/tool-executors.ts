@@ -24,6 +24,8 @@ import {
   ACQUIRING_RATES,
 } from '../services/index.js';
 
+import { getSecurityAgent } from '@neuroguardian/security-agent';
+
 // Zod validation schemas
 import {
   validateToolArgs,
@@ -1079,8 +1081,21 @@ export async function executeSearchWeb(_userId: number, rawArgs: unknown): Promi
 
   console.log(`🌐 executeSearchWeb: query="${args.query}" topic=${args.topic}`);
 
-  // Retrieve Serper.dev API key from environment
-  const apiKey = process.env.SERPER_API_KEY;
+  // Retrieve Serper.dev API key from Security Agent
+  const agent = getSecurityAgent();
+  if (!agent.isInitialized()) await agent.initialize();
+
+  let apiKey: string | undefined;
+  try {
+     apiKey = (await agent.secrets.get({
+         userId: 'system',
+         key: 'serper_api_key',
+         purpose: 'web_search',
+         ttl: 300
+     })).value;
+  } catch {
+     apiKey = process.env.SERPER_API_KEY;
+  }
 
   if (!apiKey) {
     console.warn('⚠️ Web Search: SERPER_API_KEY not found');

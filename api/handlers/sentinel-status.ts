@@ -40,15 +40,59 @@ interface DefenseLog {
 // HELPER: Get KV Client
 // ============================================
 
-function getKVClient() {
-  if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+// Helper to get secrets
+import { getSecurityAgent } from '@neuroguardian/security-agent';
+
+async function getAuthSecrets() {
+  const agent = getSecurityAgent();
+  if (!agent.isInitialized()) await agent.initialize();
+
+  const cronSecret = (await agent.secrets.get({
+    userId: 'system',
+    key: 'cron_secret',
+    purpose: 'sentinel_status_cron_auth',
+    ttl: 300
+  })).value || process.env.CRON_SECRET;
+
+  const adminApiKey = (await agent.secrets.get({
+    userId: 'system',
+    key: 'admin_api_key',
+    purpose: 'sentinel_status_admin_auth',
+    ttl: 300
+  })).value || process.env.ADMIN_API_KEY;
+
+  return { cronSecret, adminApiKey };
+}
+
+// Helper to get KV client with secrets
+async function getKVClient() {
+  const agent = getSecurityAgent();
+  if (!agent.isInitialized()) await agent.initialize();
+
+  const url = (await agent.secrets.get({
+      userId: 'system',
+      key: 'kv_rest_api_url',
+      purpose: 'kv_client_init',
+      ttl: 300
+  })).value || process.env.KV_REST_API_URL;
+  
+  const token = (await agent.secrets.get({
+      userId: 'system',
+      key: 'kv_rest_api_token',
+      purpose: 'kv_client_init',
+      ttl: 300
+  })).value || process.env.KV_REST_API_TOKEN;
+
+  if (url && token) {
     return createClient({
-      url: process.env.KV_REST_API_URL,
-      token: process.env.KV_REST_API_TOKEN,
+      url,
+      token,
     });
   }
   return null;
 }
+
+// ... existing code ...
 
 // ============================================
 // GET SENTINEL STATUS
@@ -67,7 +111,7 @@ export async function handleSentinelStatus(
   }
 
   const userId = validation.user.id;
-  const kv = getKVClient();
+  const kv = await getKVClient();
 
   try {
     // Get user settings
@@ -140,6 +184,7 @@ export async function handleSentinelStatus(
     return res.status(500).json({ error: 'Failed to get sentinel status' });
   }
 }
+
 
 // ============================================
 // GET DEFENSE HISTORY
@@ -300,8 +345,9 @@ export async function handleUpdateSentinelStatus(
   // Auth: Only cron/admin
   const cronSecret = req.headers['x-cron-secret'] as string;
   const adminKey = req.headers['x-admin-key'] as string;
+  const { cronSecret: secretCron, adminApiKey: secretAdmin } = await getAuthSecrets();
 
-  if (cronSecret !== process.env.CRON_SECRET && adminKey !== process.env.ADMIN_API_KEY) {
+  if (cronSecret !== secretCron && adminKey !== secretAdmin) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
@@ -311,7 +357,7 @@ export async function handleUpdateSentinelStatus(
     return res.status(400).json({ error: 'user_id required' });
   }
 
-  const kv = getKVClient();
+  const kv = await getKVClient();
   if (!kv) {
     return res.status(500).json({ error: 'KV not available' });
   }
@@ -355,8 +401,9 @@ export async function handleLogDefense(
   // Auth: Only cron/admin
   const cronSecret = req.headers['x-cron-secret'] as string;
   const adminKey = req.headers['x-admin-key'] as string;
+  const { cronSecret: secretCron, adminApiKey: secretAdmin } = await getAuthSecrets();
 
-  if (cronSecret !== process.env.CRON_SECRET && adminKey !== process.env.ADMIN_API_KEY) {
+  if (cronSecret !== secretCron && adminKey !== secretAdmin) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
@@ -398,8 +445,9 @@ export async function handleBulkLogDefense(
   // Auth: Only cron/admin
   const cronSecret = req.headers['x-cron-secret'] as string;
   const adminKey = req.headers['x-admin-key'] as string;
+  const { cronSecret: secretCron, adminApiKey: secretAdmin } = await getAuthSecrets();
 
-  if (cronSecret !== process.env.CRON_SECRET && adminKey !== process.env.ADMIN_API_KEY) {
+  if (cronSecret !== secretCron && adminKey !== secretAdmin) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 

@@ -47,26 +47,54 @@ interface LLMProvider {
   supportsStructuredOutput: boolean;
 }
 
-function getAvailableProviders(): LLMProvider[] {
+import { getSecurityAgent } from '@neuroguardian/security-agent';
+
+async function getAvailableProviders(): Promise<LLMProvider[]> {
   const providers: LLMProvider[] = [];
+  const agent = getSecurityAgent();
+  if (!agent.isInitialized()) await agent.initialize();
 
   // Primary: OpenAI
-  if (process.env.OPENAI_API_KEY) {
+  let openaiKey: string | undefined;
+  try {
+    openaiKey = (await agent.secrets.get({
+        userId: 'system',
+        key: 'openai_api_key',
+        purpose: 'llm_inference',
+        ttl: 300 // 5 min cache
+    })).value;
+  } catch {
+    openaiKey = process.env.OPENAI_API_KEY;
+  }
+
+  if (openaiKey) {
     providers.push({
       name: 'OpenAI',
       url: 'https://api.openai.com/v1/chat/completions',
-      apiKey: process.env.OPENAI_API_KEY,
+      apiKey: openaiKey,
       model: 'gpt-4o-mini',
       supportsStructuredOutput: true,
     });
   }
 
   // Fallback: Groq
-  if (process.env.GROQ_API_KEY) {
+  let groqKey: string | undefined;
+  try {
+    groqKey = (await agent.secrets.get({
+        userId: 'system',
+        key: 'groq_api_key',
+        purpose: 'llm_inference',
+        ttl: 300
+    })).value;
+  } catch {
+    groqKey = process.env.GROQ_API_KEY;
+  }
+
+  if (groqKey) {
     providers.push({
       name: 'Groq',
       url: 'https://api.groq.com/openai/v1/chat/completions',
-      apiKey: process.env.GROQ_API_KEY,
+      apiKey: groqKey,
       model: 'llama-3.1-70b-versatile',
       supportsStructuredOutput: false, // Groq doesn't support json_schema
     });
@@ -87,7 +115,7 @@ async function callLLMWithFallback(
     preferredModel?: string;
   }
 ): Promise<{ content: string; tokensUsed: number; provider: string }> {
-  const providers = getAvailableProviders();
+  const providers = await getAvailableProviders();
 
   if (providers.length === 0) {
     throw new Error('No LLM providers configured. Set OPENAI_API_KEY or GROQ_API_KEY.');

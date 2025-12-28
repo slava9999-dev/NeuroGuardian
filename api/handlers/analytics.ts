@@ -6,6 +6,30 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql } from '@vercel/postgres';
 
+// Helper to get auth secrets
+import { getSecurityAgent } from '@neuroguardian/security-agent';
+
+async function getAuthSecrets() {
+  const agent = getSecurityAgent();
+  if (!agent.isInitialized()) await agent.initialize();
+
+  const cronSecret = (await agent.secrets.get({
+    userId: 'system',
+    key: 'cron_secret',
+    purpose: 'analytics_cron_auth',
+    ttl: 300
+  })).value || process.env.CRON_SECRET;
+
+  const adminApiKey = (await agent.secrets.get({
+    userId: 'system',
+    key: 'admin_api_key',
+    purpose: 'analytics_admin_auth',
+    ttl: 300
+  })).value || process.env.ADMIN_API_KEY;
+
+  return { cronSecret, adminApiKey };
+}
+
 /**
  * Handle get-analytics action
  * Returns daily statistics for monitoring
@@ -17,10 +41,10 @@ export async function handleGetAnalytics(
   // Authorization check
   const authHeader = req.headers.authorization;
   const adminKey = req.headers['x-admin-key'] as string;
-  const cronSecret = process.env.CRON_SECRET;
+  const { cronSecret, adminApiKey } = await getAuthSecrets();
 
   const isCron = authHeader === `Bearer ${cronSecret}`;
-  const isAdmin = adminKey === process.env.ADMIN_API_KEY;
+  const isAdmin = !!(adminKey && adminApiKey && adminKey === adminApiKey);
 
   if (!isCron && !isAdmin) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -147,10 +171,10 @@ export async function handleGetSystemMetrics(
   // Authorization check
   const authHeader = req.headers.authorization;
   const adminKey = req.headers['x-admin-key'] as string;
-  const cronSecret = process.env.CRON_SECRET;
+  const { cronSecret, adminApiKey } = await getAuthSecrets();
 
   const isCron = authHeader === `Bearer ${cronSecret}`;
-  const isAdmin = adminKey === process.env.ADMIN_API_KEY;
+  const isAdmin = !!(adminKey && adminApiKey && adminKey === adminApiKey);
 
   if (!isCron && !isAdmin) {
     return res.status(401).json({ error: 'Unauthorized' });

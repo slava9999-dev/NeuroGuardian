@@ -25,6 +25,7 @@ import {
 
 // V4 Architecture: Two-Phase Pipeline with Structured Output
 import { orchestrateV4, type UserContext } from '../../src/api-lib/agent/orchestrator-v4.js';
+import { getSecurityAgent } from '@neuroguardian/security-agent';
 
 // ============================================
 // TYPE DEFINITIONS
@@ -45,11 +46,28 @@ interface DBUserRecord {
 }
 
 // Helper to get KV client
-function getKVClient() {
-  if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) {
+async function getKVClient() {
+  const agent = getSecurityAgent();
+  if (!agent.isInitialized()) await agent.initialize();
+
+  const url = (await agent.secrets.get({
+    userId: 'system',
+    key: 'kv_rest_api_url',
+    purpose: 'kv_client_init',
+    ttl: 300
+  })).value || process.env.KV_REST_API_URL;
+
+  const token = (await agent.secrets.get({
+    userId: 'system',
+    key: 'kv_rest_api_token',
+    purpose: 'kv_client_init',
+    ttl: 300
+  })).value || process.env.KV_REST_API_TOKEN;
+
+  if (url && token) {
     return createClient({
-      url: process.env.KV_REST_API_URL,
-      token: process.env.KV_REST_API_TOKEN,
+      url,
+      token,
     });
   }
   return null;
@@ -75,13 +93,40 @@ export async function handleAgentV4(
   // 1. Authentication
   // Support admin API key for testing (bypasses Telegram validation)
   const authHeader = req.headers['authorization'] as string;
-  const adminApiKey = process.env.ADMIN_API_KEY;
+  
+  const agent = getSecurityAgent();
+  if (!agent.isInitialized()) {
+    await agent.initialize();
+  }
+
+  let adminApiKey: string | undefined;
+  try {
+     const resp = await agent.secrets.get({
+        userId: 'system', 
+        key: 'admin_api_key',
+        purpose: 'agent_v4_test_bypass',
+        ttl: 60
+     });
+     adminApiKey = resp.value;
+  } catch {
+    // Fallback or ignore if not configured
+  }
+
   let userId: number;
 
   if (adminApiKey && authHeader === `Bearer ${adminApiKey}` && req.body?.telegramId) {
     // Admin bypass for testing
     userId = parseInt(req.body.telegramId);
     console.log(`🔑 Admin API access for agent: user ${userId}`);
+    
+    // Audit this bypass
+    await agent.audit.log({
+        event: 'auth.bypass.admin_key',
+        category: 'auth',
+        severity: 'warning',
+        userId: userId.toString(),
+        metadata: { mechanism: 'admin_api_key' }
+    });
   } else {
     // Normal Telegram authentication
     const initData = sanitizeInput(
@@ -122,7 +167,7 @@ export async function handleAgentV4(
   }
 
   // 5. Load conversation history
-  const kv = getKVClient();
+  const kv = await getKVClient();
   const historyKey = `chat:v4:${userId}`;
   let conversationHistory: Array<{ role: string; content: string }> = [];
 
@@ -280,7 +325,7 @@ export async function handleAgentV4Confirm(
   }
 
   const userId = validation.user.id;
-  const kv = getKVClient();
+  const kv = await getKVClient();
 
   if (!kv) {
     return res.status(500).json({ error: 'KV offline' });
