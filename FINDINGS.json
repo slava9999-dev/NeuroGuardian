@@ -1,0 +1,148 @@
+{
+  "audit": {
+    "project": "NeuroGUARDIAN",
+    "version": "2.11.0",
+    "date": "2025-12-28",
+    "verdict": "NOT_READY",
+    "gates": {
+      "G0_NoMocks": "FAIL",
+      "G1_Security": "PARTIAL",
+      "G2_Reliability": "PARTIAL",
+      "G3_Observability": "PARTIAL",
+      "G4_Release": "PASS",
+      "G5_Data": "PARTIAL",
+      "G6_Performance": "NOT_TESTED"
+    }
+  },
+  "findings": [
+    {
+      "id": "MOCK-001",
+      "category": "Mocks",
+      "severity": "BLOCKER",
+      "description": "MOCK_PRODUCTS constant in ProductsPage used in dev mode",
+      "file": "src/pages/ProductsPage.tsx",
+      "line": "16-17, 103-106",
+      "evidence": "const MOCK_PRODUCTS: Product[] = [...]; setProducts(MOCK_PRODUCTS);",
+      "recommendation": "Remove or gate behind strict DEV check that tree-shakes in production",
+      "owner": "Frontend",
+      "status": "Open"
+    },
+    {
+      "id": "MOCK-002",
+      "category": "Mocks",
+      "severity": "BLOCKER",
+      "description": "getMockResponse() fallback in agentApi.ts",
+      "file": "src/lib/agentApi.ts",
+      "line": "188-190, 360-369",
+      "evidence": "function getMockResponse(message: string): AgentResponse",
+      "recommendation": "Remove fallback, fail explicitly with proper error message",
+      "owner": "Frontend",
+      "status": "Open"
+    },
+    {
+      "id": "MOCK-003",
+      "category": "Mocks",
+      "severity": "BLOCKER",
+      "description": "MOCK_USER constant in App.tsx for dev mode",
+      "file": "src/App.tsx",
+      "line": "67-68, 141-147",
+      "evidence": "const MOCK_USER = { id: ..., username: 'demo_user' }",
+      "recommendation": "Use Telegram SDK or fail with proper error in non-Telegram environments",
+      "owner": "Frontend",
+      "status": "Open"
+    },
+    {
+      "id": "DEMO-001",
+      "category": "Mocks",
+      "severity": "BLOCKER",
+      "description": "DEMO_USER export in constants.ts with demo mode in telegram.ts",
+      "file": "src/api-lib/lib/constants.ts",
+      "line": "117-123",
+      "evidence": "export const DEMO_USER = { id: 123456789, first_name: 'Demo' }",
+      "recommendation": "Delete export or move to dev-only module",
+      "owner": "Backend",
+      "status": "Open"
+    },
+    {
+      "id": "SEC-001",
+      "category": "Security",
+      "severity": "HIGH",
+      "description": "7 npm vulnerabilities (5 moderate, 2 high)",
+      "file": "package-lock.json",
+      "line": "N/A",
+      "evidence": "npm audit: esbuild <=0.24.2 (moderate), path-to-regexp 4.0.0-6.2.2 (high)",
+      "recommendation": "Run npm audit fix to resolve path-to-regexp; Consider vitest upgrade for esbuild",
+      "owner": "DevOps",
+      "status": "Open"
+    },
+    {
+      "id": "SEC-002",
+      "category": "Security",
+      "severity": "HIGH",
+      "description": "TEST_MODE=true in .env.master file",
+      "file": ".env.master",
+      "line": "20",
+      "evidence": "TEST_MODE=true (bypasses payment system)",
+      "recommendation": "Ensure .env.master never reaches production; verify Vercel env vars",
+      "owner": "DevOps",
+      "status": "Open"
+    },
+    {
+      "id": "INFRA-001",
+      "category": "Reliability",
+      "severity": "HIGH",
+      "description": "Security Agent infrastructure not deployed",
+      "file": "security-agent/docker-compose.yml",
+      "line": "N/A",
+      "evidence": "Vault, ClickHouse, Redis containers not running",
+      "recommendation": "Deploy via docker-compose up -d in security-agent directory",
+      "owner": "DevOps",
+      "status": "Open"
+    },
+    {
+      "id": "OBS-001",
+      "category": "Observability",
+      "severity": "MEDIUM",
+      "description": "No alert firing test evidence",
+      "file": "N/A",
+      "line": "N/A",
+      "evidence": "No Grafana/alertmanager configuration found",
+      "recommendation": "Configure alerts and test with synthetic incident",
+      "owner": "SRE",
+      "status": "Open"
+    },
+    {
+      "id": "DATA-001",
+      "category": "Data",
+      "severity": "MEDIUM",
+      "description": "Missing ops_events and ops_audit migrations",
+      "file": "migrations/",
+      "line": "N/A",
+      "evidence": "Only 10 migrations present; 011 and 012 referenced in code but missing",
+      "recommendation": "Create and commit migrations/011_ops_events.sql and 012_ops_audit.sql",
+      "owner": "Backend",
+      "status": "Open"
+    },
+    {
+      "id": "PERF-001",
+      "category": "Performance",
+      "severity": "LOW",
+      "description": "No load test conducted",
+      "file": "N/A",
+      "line": "N/A",
+      "evidence": "No k6/artillery scripts or test results found",
+      "recommendation": "Create load test script and run smoke test with 50 concurrent users",
+      "owner": "QA",
+      "status": "Open"
+    }
+  ],
+  "statistics": {
+    "total_findings": 10,
+    "blockers": 4,
+    "high": 3,
+    "medium": 2,
+    "low": 1,
+    "tests_passed": 175,
+    "regression_checks_passed": 9
+  }
+}

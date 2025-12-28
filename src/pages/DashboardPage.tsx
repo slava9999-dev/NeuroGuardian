@@ -18,7 +18,6 @@ import { PaymentModal } from '../components/ui/PaymentModal';
 import { SecurityModal } from '../components/ui/SecurityModal';
 import { WelcomeBanner } from '../components/ui/WelcomeBanner';
 import { hapticFeedback } from '../lib/telegram';
-import type { Product } from '../types';
 
 // Format money with k abbreviation
 function formatMoney(amount: number): string {
@@ -28,109 +27,7 @@ function formatMoney(amount: number): string {
   return `₽${amount}`;
 }
 
-// Mock data for development
-const MOCK_PRODUCTS: Product[] = [
-  {
-    id: '1',
-    userId: 123456,
-    productId: 'wb-123456789',
-    nmId: 123456789,
-    vendorCode: 'SKU-001',
-    title: 'Кроссовки Nike Air Max 270',
-    imageUrl: '/products/sneakers_nike.webp',
-    brand: 'Nike',
-    currentPrice: 12500,
-    minPrice: 10000,
-    stock: 45,
-    marketplace: 'WB',
-    status: 'protected',
-    isMonitored: true,
-    lastCheckedAt: new Date(),
-    lastTriggeredAt: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '2',
-    userId: 123456,
-    productId: 'wb-987654321',
-    nmId: 987654321,
-    vendorCode: 'SKU-002',
-    title: 'Худи Adidas Originals',
-    imageUrl: '/products/hoodie_adidas.webp',
-    brand: 'Adidas',
-    currentPrice: 6500,
-    minPrice: 5000,
-    stock: 120,
-    marketplace: 'WB',
-    status: 'triggered',
-    isMonitored: true,
-    lastCheckedAt: new Date(),
-    lastTriggeredAt: new Date(),
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '3',
-    userId: 123456,
-    productId: 'ozon-111222333',
-    offerId: 'OZON-SKU-003',
-    vendorCode: 'SKU-003',
-    title: 'Смартфон Samsung Galaxy S23',
-    imageUrl: '/products/smartphone_samsung.webp',
-    brand: 'Samsung',
-    currentPrice: 89990,
-    minPrice: 80000,
-    stock: 15,
-    marketplace: 'Ozon',
-    status: 'protected',
-    isMonitored: true,
-    lastCheckedAt: new Date(),
-    lastTriggeredAt: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '4',
-    userId: 123456,
-    productId: 'ozon-444555666',
-    offerId: 'OZON-SKU-004',
-    vendorCode: 'SKU-004',
-    title: 'Наушники Sony WH-1000XM5',
-    imageUrl: '/products/headphones_sony.webp',
-    brand: 'Sony',
-    currentPrice: 34990,
-    minPrice: 0,
-    stock: 32,
-    marketplace: 'Ozon',
-    status: 'active',
-    isMonitored: false,
-    lastCheckedAt: new Date(),
-    lastTriggeredAt: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '5',
-    userId: 123456,
-    productId: 'wb-555666777',
-    nmId: 555666777,
-    vendorCode: 'SKU-005',
-    title: 'Футболка Puma Essential',
-    imageUrl: '/products/tshirt_puma.webp',
-    brand: 'Puma',
-    currentPrice: 2990,
-    minPrice: 2500,
-    stock: 250,
-    marketplace: 'WB',
-    status: 'protected',
-    isMonitored: true,
-    lastCheckedAt: new Date(),
-    lastTriggeredAt: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-];
+// NOTE: Mock data removed for production safety (AUDIT-2025-12-28)
 
 interface DashboardPageProps {
   onGoToSettings?: () => void;
@@ -140,7 +37,6 @@ interface DashboardPageProps {
 export function DashboardPage({ onGoToSettings, onGoToAgent }: DashboardPageProps) {
   const subscriptionDaysLeft = useAppStore(state => state.subscriptionDaysLeft);
   const user = useAppStore(state => state.user);
-  const setProducts = useProductsStore(state => state.setProducts);
   const products = useProductsStore(state => state.products);
 
   // Calculate stats from real data
@@ -153,15 +49,8 @@ export function DashboardPage({ onGoToSettings, onGoToAgent }: DashboardPageProp
     };
   }, [user, products]);
 
-  // Load mock data ONLY in development mode
-  useEffect(() => {
-    // Only load mock data in development if no products exist
-    if (import.meta.env.DEV && products.length === 0) {
-      console.log('🔧 DEV MODE: Loading mock products...');
-      setProducts(MOCK_PRODUCTS);
-      console.log('✅ Mock products loaded:', MOCK_PRODUCTS.length);
-    }
-  }, [setProducts, products.length]);
+  // NOTE: Mock data loading removed for production safety (AUDIT-2025-12-28)
+  // Products are now loaded exclusively from the API via App.tsx
 
   const [showHelp, setShowHelp] = useState(false);
   const [showPayment, setShowPayment] = useState(false);

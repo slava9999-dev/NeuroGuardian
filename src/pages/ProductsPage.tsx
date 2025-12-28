@@ -3,7 +3,7 @@
 // Clean, organized view for products
 // ============================================
 
-import { useEffect, useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useAppStore, useProductsStore } from '../stores';
 import { GlobalSwitch } from '../components/controls/GlobalSwitch';
@@ -11,71 +11,8 @@ import { DashboardGrid } from '../components/dashboard/DashboardGrid';
 import { BulkStopLossModal } from '../components/dashboard/BulkStopLossModal';
 import { LogHistory } from '../components/dashboard/LogHistory';
 import { hapticFeedback } from '../lib/telegram';
-import type { Product } from '../types';
 
-// Mock data for development
-const MOCK_PRODUCTS: Product[] = [
-  {
-    id: '1',
-    userId: 123456,
-    productId: 'wb-123456789',
-    nmId: 123456789,
-    vendorCode: 'SKU-001',
-    title: 'Кроссовки Nike Air Max 270',
-    imageUrl: '/products/sneakers_nike.webp',
-    brand: 'Nike',
-    currentPrice: 12500,
-    minPrice: 10000,
-    stock: 45,
-    marketplace: 'WB',
-    status: 'protected',
-    isMonitored: true,
-    lastCheckedAt: new Date(),
-    lastTriggeredAt: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '2',
-    userId: 123456,
-    productId: 'wb-987654321',
-    nmId: 987654321,
-    vendorCode: 'SKU-002',
-    title: 'Худи Adidas Originals',
-    imageUrl: '/products/hoodie_adidas.webp',
-    brand: 'Adidas',
-    currentPrice: 6500,
-    minPrice: 5000,
-    stock: 120,
-    marketplace: 'WB',
-    status: 'triggered',
-    isMonitored: true,
-    lastCheckedAt: new Date(),
-    lastTriggeredAt: new Date(),
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '3',
-    userId: 123456,
-    productId: 'ozon-111222333',
-    offerId: 'OZON-SKU-003',
-    vendorCode: 'SKU-003',
-    title: 'Смартфон Samsung Galaxy S23',
-    imageUrl: '/products/smartphone_samsung.webp',
-    brand: 'Samsung',
-    currentPrice: 89990,
-    minPrice: 80000,
-    stock: 15,
-    marketplace: 'Ozon',
-    status: 'protected',
-    isMonitored: true,
-    lastCheckedAt: new Date(),
-    lastTriggeredAt: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-];
+// NOTE: Mock data removed for production safety (AUDIT-2025-12-28)
 
 // Format money
 function formatMoney(amount: number): string {
@@ -95,17 +32,12 @@ interface ProductsPageProps {
 export function ProductsPage({ onBack }: ProductsPageProps) {
   const user = useAppStore(state => state.user);
   const products = useProductsStore(state => state.products);
-  const setProducts = useProductsStore(state => state.setProducts);
 
   const [showBulkStopLoss, setShowBulkStopLoss] = useState(false);
   const [showLogHistory, setShowLogHistory] = useState(false);
 
-  // Load mock data in dev mode
-  useEffect(() => {
-    if (import.meta.env.DEV && products.length === 0) {
-      setProducts(MOCK_PRODUCTS);
-    }
-  }, [setProducts, products.length]);
+  // NOTE: Mock data loading removed for production safety (AUDIT-2025-12-28)
+  // Products are loaded from the API via App.tsx on authentication
 
   // Calculate stats
   const stats = useMemo(() => {

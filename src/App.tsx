@@ -64,24 +64,8 @@ function LoadingScreen() {
   );
 }
 
-// Mock user for development outside Telegram
-const MOCK_USER = {
-  telegramId: 123456789,
-  username: 'demo_user',
-  firstName: 'Demo User',
-  lastName: '',
-  photoUrl: null,
-  subscriptionActive: true,
-  subscriptionExpiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
-  subscriptionPlan: 'trial' as const,
-  protectionEnabled: true,
-  defenseMode: 'zero_stock' as const,
-  wbKeyRef: null,
-  ozonKeyRef: null,
-  totalProducts: 5,
-  triggeredToday: 2,
-  savedAmount: 15600,
-};
+// NOTE: Mock user removed for production safety (AUDIT-2025-12-28)
+// Applications must authenticate via Telegram WebApp
 
 // Pages enum - Agent is first!
 type Page = 'agent' | 'products' | 'settings' | 'info' | 'ops';
@@ -92,6 +76,7 @@ function App() {
   const isLoading = useAppStore(state => state.isLoading);
 
   const [isInitialized, setIsInitialized] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState<Page>('agent'); // Agent is default!
 
   const initPerformed = useRef(false);
@@ -136,16 +121,17 @@ function App() {
             } catch {
               console.log('📦 No products yet');
             }
+          } else {
+            setAuthError('Не удалось получить данные авторизации Telegram');
           }
         } else {
-          console.log('🔧 Dev mode - using mock user');
-          setUser(MOCK_USER);
+          // AUDIT-2025-12-28: No mock user in non-Telegram environments
+          console.warn('⚠️ Not running in Telegram WebApp - authentication required');
+          setAuthError('Приложение работает только внутри Telegram');
         }
       } catch (error) {
         console.error('❌ Init error:', error);
-        if (import.meta.env.DEV) {
-          setUser(MOCK_USER);
-        }
+        setAuthError('Ошибка аутентификации. Попробуйте перезапустить приложение.');
       } finally {
         setLoading(false);
         setIsInitialized(true);
@@ -164,6 +150,29 @@ function App() {
 
   if (!isInitialized || isLoading) {
     return <LoadingScreen />;
+  }
+
+  // Show auth error if not in Telegram
+  if (authError) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-stone-900 to-stone-800 p-6">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center max-w-sm"
+        >
+          <div className="text-6xl mb-6">🔐</div>
+          <h1 className="text-2xl font-bold text-white mb-4">Требуется авторизация</h1>
+          <p className="text-stone-400 mb-6">{authError}</p>
+          <a
+            href="https://t.me/NeuroGuardianBot"
+            className="inline-block px-6 py-3 bg-violet-500 text-white font-medium rounded-xl hover:bg-violet-600 transition-colors"
+          >
+            Открыть в Telegram
+          </a>
+        </motion.div>
+      </div>
+    );
   }
 
   return (

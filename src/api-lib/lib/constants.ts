@@ -114,13 +114,8 @@ export const ALLOWED_ORIGINS = [
   process.env.WEBAPP_URL,
 ].filter(Boolean) as string[];
 
-// Demo user ONLY for development
-export const DEMO_USER = {
-  id: 123456789,
-  first_name: 'Demo',
-  last_name: 'User',
-  username: 'demo_user',
-};
+// NOTE: DEMO_USER removed for production safety (AUDIT-2025-12-28)
+// All authentication must go through Telegram WebApp validation
 
 // ============================================
 // AI AGENT

@@ -5,29 +5,28 @@
 
 import * as crypto from 'crypto';
 import type { TelegramUser, InitDataValidationResult } from './types.js';
-import { TELEGRAM_BOT_TOKEN, IS_PRODUCTION, DEMO_USER } from './constants.js';
+import { TELEGRAM_BOT_TOKEN, IS_PRODUCTION } from './constants.js';
+
+// NOTE: DEMO_USER removed for production safety (AUDIT-2025-12-28)
 
 /**
  * Validates Telegram WebApp initData using HMAC-SHA256
  * As per: https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app
  */
 export function validateTelegramInitData(initData: string): InitDataValidationResult {
-  // PRODUCTION MODE: No demo fallback allowed
+  // AUDIT-2025-12-28: All paths now require proper authentication
   if (!initData || initData === '') {
-    if (IS_PRODUCTION) {
-      return { valid: false, user: null, error: 'Authentication required' };
-    }
-    console.log('🧪 [DEV ONLY] Using demo user');
-    return { valid: true, user: DEMO_USER };
+    return { valid: false, user: null, error: 'Authentication required - please open in Telegram' };
   }
 
-  // Explicitly allow 'demo' only in development
+  // Demo mode disabled in all environments (AUDIT-2025-12-28)
   if (initData === 'demo') {
     if (IS_PRODUCTION) {
       return { valid: false, user: null, error: 'Demo mode disabled in production' };
     }
-    console.log('🧪 [DEV ONLY] Demo mode activated');
-    return { valid: true, user: DEMO_USER };
+    // Even in dev, return error instead of fake user for security audit compliance
+    console.warn('⚠️ [DEV] Demo mode requested but disabled for security');
+    return { valid: false, user: null, error: 'Demo mode disabled - use real Telegram auth' };
   }
 
   try {
