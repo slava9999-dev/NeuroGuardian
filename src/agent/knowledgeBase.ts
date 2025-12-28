@@ -1,4 +1,4 @@
-import { db } from '../lib/db';
+// db import removed - using file-based docs for now
 
 export interface KnowledgeDocument {
   id: string;
@@ -240,15 +240,15 @@ export class AgentKnowledgeBase {
     return Math.min(score, 1);
   }
 
-  private extractSnippet(content: string, query: string): string {
+  private extractSnippet(content: string, _query: string): string {
     return content.slice(0, 200);
   }
 
-  private identifyTopic(question: string): string {
+  private identifyTopic(_question: string): string {
     return 'general';
   }
 
-  private getSourcesForTopic(topic: string): string[] | undefined {
+  private getSourcesForTopic(_topic: string): string[] | undefined {
     return undefined;
   }
 
