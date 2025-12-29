@@ -139,7 +139,9 @@ export async function handleAgentV4(
 
   // 6. Fetch user products for context
   const products = await getProductsByUserId(userId);
-  const protectedCount = products.filter(p => p.min_price > 0).length;
+  const protectedCount = products.filter(
+    (p: { min_price?: number }) => (p.min_price || 0) > 0
+  ).length;
 
   console.log(`🚀 V4 Agent Request from User ${userId}: "${message.substring(0, 50)}..."`);
 
@@ -371,7 +373,9 @@ export async function handleAgentV4Confirm(
         const safetyWarnings: string[] = [];
 
         for (const u of priceUpdates) {
-          const product = products.find(p => p.product_id === u.product_id);
+          const product = products.find(
+            (p: { product_id: string }) => p.product_id === u.product_id
+          );
 
           const securityResult = validatePriceUpdateSync({
             productId: u.product_id,
@@ -468,7 +472,9 @@ export async function handleAgentV4Confirm(
         let updated = 0;
 
         for (const productId of bulkData.product_ids) {
-          const product = products.find(p => p.product_id === productId);
+          const product = products.find(
+            (p: { product_id: string; current_price: number }) => p.product_id === productId
+          );
           if (product) {
             let minPrice: number;
             if (bulkData.min_price_percent) {

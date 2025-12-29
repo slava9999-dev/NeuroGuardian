@@ -1,3 +1,8 @@
+// ============================================
+// NeuroGUARDIAN — Local Database Service
+// Uses pg driver for local development
+// ============================================
+
 import pkg from 'pg';
 const { Pool } = pkg;
 
@@ -10,7 +15,7 @@ const pool = new Pool({
 /**
  * Standard query function for local pg
  */
-export async function query(text, params) {
+export async function query(text: string, params?: unknown[]): Promise<pkg.QueryResult> {
   const client = await pool.connect();
   try {
     const result = await client.query(text, params);
@@ -23,9 +28,12 @@ export async function query(text, params) {
 /**
  * Vercel-like sql tagged template literal mock
  */
-export const sql = async (strings, ...values) => {
+export const sql = async (
+  strings: TemplateStringsArray,
+  ...values: unknown[]
+): Promise<pkg.QueryResult> => {
   const text = strings.reduce(
-    (acc, str, i) => acc + str + (i < values.length ? `$${i + 1}` : ''),
+    (acc: string, str: string, i: number) => acc + str + (i < values.length ? `$${i + 1}` : ''),
     ''
   );
   const client = await pool.connect();

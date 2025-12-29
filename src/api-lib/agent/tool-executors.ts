@@ -51,6 +51,31 @@ interface ToolResult {
   error?: string;
 }
 
+// Product interface for type safety
+interface Product {
+  product_id: string;
+  nm_id?: number;
+  offer_id?: string;
+  title: string;
+  current_price: number;
+  min_price?: number;
+  current_stock?: number;
+  marketplace: string;
+  status?: string;
+  cost_price?: number;
+  category?: string;
+}
+
+// Forecast interface
+interface Forecast {
+  status: string;
+  title?: string;
+  stock?: number;
+  velocity?: number;
+  daysRemaining?: number | null;
+  recommendation?: string;
+}
+
 /**
  * GET_PRODUCTS — Get user's products with prices and stocks
  */
@@ -664,11 +689,13 @@ export async function executeGetAbcAnalysis(userId: number, rawArgs: unknown): P
 
     if (order.marketplace === 'WB') {
       // Find WB product by nm_id
-      matchedProduct = products.find(p => String(p.nm_id) === order.marketplace_product_id);
+      matchedProduct = products.find(
+        (p: Product) => String(p.nm_id) === order.marketplace_product_id
+      );
     } else {
       // Find Ozon product by offer_id or product_id regex
       matchedProduct = products.find(
-        p =>
+        (p: Product) =>
           p.offer_id === order.marketplace_product_id ||
           p.product_id === `ozon-${order.marketplace_product_id}`
       );
@@ -687,7 +714,7 @@ export async function executeGetAbcAnalysis(userId: number, rawArgs: unknown): P
 
   // 5. Build Analysis List
   // Combine real sales data with product list
-  const analyzedProducts = products.map(p => {
+  const analyzedProducts = products.map((p: Product) => {
     const sales = revenueMap.get(p.product_id);
     return {
       product_id: p.product_id,
@@ -849,11 +876,11 @@ export async function executeGetStockForecast(
     // Determine mapping logic (same as ABC analysis)
     let matchedId = null;
     if (order.marketplace === 'WB') {
-      const p = products.find(p => String(p.nm_id) === order.marketplace_product_id);
+      const p = products.find((p: Product) => String(p.nm_id) === order.marketplace_product_id);
       if (p) matchedId = p.product_id;
     } else {
       const p = products.find(
-        p =>
+        (p: Product) =>
           p.offer_id === order.marketplace_product_id ||
           p.product_id === `ozon-${order.marketplace_product_id}`
       );
@@ -867,7 +894,7 @@ export async function executeGetStockForecast(
   }
 
   // 4. Generate Forecasts
-  const forecasts = filtered.map(p => {
+  const forecasts = filtered.map((p: Product) => {
     const sold30Days = salesMap.get(p.product_id) || 0;
 
     // Velocity per day (based on 30 days)
@@ -877,8 +904,9 @@ export async function executeGetStockForecast(
     let status: 'ok' | 'warning' | 'critical' | 'out_of_stock' = 'ok';
     let predictedDate = null;
     let message = '';
+    const currentStock = p.current_stock || 0;
 
-    if (p.current_stock <= 0) {
+    if (currentStock <= 0) {
       status = 'out_of_stock';
       daysLeft = 0;
       message = 'УЖЕ ЗАКОНЧИЛСЯ';
@@ -887,7 +915,7 @@ export async function executeGetStockForecast(
       status = 'ok';
       message = 'Нет продаж за 30 дней (застой)';
     } else {
-      daysLeft = Math.round(p.current_stock / velocity);
+      daysLeft = Math.round(currentStock / velocity);
 
       const targetDate = new Date();
       targetDate.setDate(targetDate.getDate() + daysLeft);
@@ -945,7 +973,7 @@ export async function executeGetStockForecast(
         .slice(0, 10),
       warningItems: sorted.filter(f => f.status === 'warning').slice(0, 5),
       totalAnalyzed: forecasts.length,
-      outOfStockCount: forecasts.filter(f => f.status === 'out_of_stock').length,
+      outOfStockCount: forecasts.filter((f: Forecast) => f.status === 'out_of_stock').length,
     },
   };
 }
@@ -1433,7 +1461,7 @@ export async function executeBulkProtectProducts(
     let targetProducts = products;
 
     if (args.only_unprotected) {
-      targetProducts = products.filter(p => !p.min_price || p.min_price === 0);
+      targetProducts = products.filter((p: Product) => !p.min_price || p.min_price === 0);
     }
 
     if (targetProducts.length === 0) {
@@ -1443,7 +1471,7 @@ export async function executeBulkProtectProducts(
       };
     }
 
-    const updates = targetProducts.map(p => ({
+    const updates = targetProducts.map((p: Product) => ({
       product_id: p.product_id,
       title: p.title,
       current_price: p.current_price,
@@ -1455,7 +1483,7 @@ export async function executeBulkProtectProducts(
       data: {
         percentage: args.percentage,
         count: updates.length,
-        product_ids: updates.map(u => u.product_id),
+        product_ids: updates.map((u: { product_id: string }) => u.product_id),
         preview: updates.slice(0, 5),
       },
     };
