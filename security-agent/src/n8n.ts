@@ -89,31 +89,47 @@ export class N8nGuardian {
       return;
     }
 
+    // On Vercel without Vault, skip crypto key initialization
+    const isVercel = !!process.env.VERCEL || !!process.env.VERCEL_URL;
+    const hasVault =
+      !!process.env.VAULT_TOKEN && process.env.VAULT_ADDR !== 'http://localhost:8200';
+
+    if (isVercel && !hasVault) {
+      console.log('[N8nGuardian] Running on Vercel without Vault, workflow signing disabled');
+      this.n8nApiKey = process.env.N8N_API_KEY || null;
+      return;
+    }
+
     if (!this.secrets || !this.audit) {
       throw new Error('N8nGuardian: dependencies not set. Call setDependencies() first.');
     }
 
-    // Get or generate signing keys
-    const signingKeyPem = await this.getOrCreateSigningKey();
+    try {
+      // Get or generate signing keys
+      const signingKeyPem = await this.getOrCreateSigningKey();
 
-    this.signingKey = crypto.createPrivateKey({
-      key: signingKeyPem,
-      format: 'pem',
-      type: 'pkcs8',
-    });
+      this.signingKey = crypto.createPrivateKey({
+        key: signingKeyPem,
+        format: 'pem',
+        type: 'pkcs8',
+      });
 
-    this.verifyKey = crypto.createPublicKey(this.signingKey);
+      this.verifyKey = crypto.createPublicKey(this.signingKey);
 
-    // Get n8n API credentials
-    const n8nCreds = await this.secrets.get({
-      userId: 'system',
-      key: 'n8n/api_key',
-      purpose: 'n8n_api_access',
-      ttl: 300,
-    });
-    this.n8nApiKey = n8nCreds.value || process.env.N8N_API_KEY || null;
+      // Get n8n API credentials
+      const n8nCreds = await this.secrets.get({
+        userId: 'system',
+        key: 'n8n/api_key',
+        purpose: 'n8n_api_access',
+        ttl: 300,
+      });
+      this.n8nApiKey = n8nCreds.value || process.env.N8N_API_KEY || null;
 
-    console.log('[N8nGuardian] Initialized with workflow signing enabled');
+      console.log('[N8nGuardian] Initialized with workflow signing enabled');
+    } catch (error) {
+      console.warn('[N8nGuardian] Key initialization failed, workflow signing disabled:', error);
+      this.n8nApiKey = process.env.N8N_API_KEY || null;
+    }
   }
 
   /**
