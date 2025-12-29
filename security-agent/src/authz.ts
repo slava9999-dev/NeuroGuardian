@@ -160,8 +160,13 @@ export class AuthorizationGuard {
           },
           ttl: async key => await upstash.ttl(key),
         };
+        console.log('[AuthorizationGuard] Upstash Redis connected');
+      } else if (process.env.VERCEL || process.env.VERCEL_URL) {
+        // On Vercel without Upstash - use local cache only
+        console.log('[AuthorizationGuard] Running on Vercel without Redis, using local cache');
+        this.redis = null;
       } else {
-        // Use ioredis for local Redis
+        // Local development - try local Redis
         const ioredis = await import('ioredis');
         const RedisClient = ioredis.default || ioredis;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -169,26 +174,39 @@ export class AuthorizationGuard {
           host: this.config.redis.host || 'localhost',
           port: this.config.redis.port || 6379,
           password: this.config.redis.password,
+          lazyConnect: true,
+          maxRetriesPerRequest: 1,
+          retryStrategy: () => null, // Don't retry
         });
 
-        this.redis = {
-          get: async key => await client.get(key),
-          set: async (key, value, options) => {
-            if (options?.EX) {
-              await client.setex(key, options.EX, value);
-            } else {
-              await client.set(key, value);
-            }
-          },
-          incr: async key => await client.incr(key),
-          expire: async (key, seconds) => {
-            await client.expire(key, seconds);
-          },
-          ttl: async key => await client.ttl(key),
-        };
-      }
+        // Try to connect with timeout
+        try {
+          await Promise.race([
+            client.connect(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000)),
+          ]);
 
-      console.log('[AuthorizationGuard] Redis connected');
+          this.redis = {
+            get: async key => await client.get(key),
+            set: async (key, value, options) => {
+              if (options?.EX) {
+                await client.setex(key, options.EX, value);
+              } else {
+                await client.set(key, value);
+              }
+            },
+            incr: async key => await client.incr(key),
+            expire: async (key, seconds) => {
+              await client.expire(key, seconds);
+            },
+            ttl: async key => await client.ttl(key),
+          };
+          console.log('[AuthorizationGuard] Local Redis connected');
+        } catch {
+          console.log('[AuthorizationGuard] Local Redis not available, using local cache');
+          this.redis = null;
+        }
+      }
     } catch (error) {
       console.warn('[AuthorizationGuard] Redis connection failed, using local cache only', error);
       // Continue without Redis - use local cache

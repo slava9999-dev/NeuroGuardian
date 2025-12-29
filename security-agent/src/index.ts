@@ -114,6 +114,14 @@ export class SecurityAgent {
  * Create a Security Agent instance from environment
  */
 export function createSecurityAgentFromEnv(): SecurityAgent {
+  // Auto-detect Vercel environment without Vault
+  const isVercel = !!process.env.VERCEL || !!process.env.VERCEL_URL;
+  const hasVault = !!process.env.VAULT_TOKEN && process.env.VAULT_ADDR !== 'http://localhost:8200';
+  const hasUpstash = !!process.env.UPSTASH_REDIS_REST_URL;
+
+  // Enable permissive mode if on Vercel without proper infrastructure
+  const autoPermissive = isVercel && (!hasVault || !hasUpstash);
+
   const vaultConfig: SecurityAgentConfig['vault'] = {
     address: process.env.VAULT_ADDR || 'http://localhost:8200',
     tlsEnabled: process.env.VAULT_TLS_ENABLED === 'true',
@@ -125,8 +133,11 @@ export function createSecurityAgentFromEnv(): SecurityAgent {
     host: process.env.REDIS_HOST || 'localhost',
     port: parseInt(process.env.REDIS_PORT || '6379', 10),
   };
-  if (process.env.UPSTASH_REDIS_REST_URL) redisConfig.url = process.env.UPSTASH_REDIS_REST_URL;
-  if (process.env.REDIS_PASSWORD) redisConfig.password = process.env.REDIS_PASSWORD;
+  // Only use Upstash if URL is provided
+  if (process.env.UPSTASH_REDIS_REST_URL) {
+    redisConfig.url = process.env.UPSTASH_REDIS_REST_URL;
+    redisConfig.password = process.env.UPSTASH_REDIS_REST_TOKEN || '';
+  }
 
   const config: SecurityAgentConfig = {
     vault: vaultConfig,
@@ -142,8 +153,13 @@ export function createSecurityAgentFromEnv(): SecurityAgent {
       (process.env.NODE_ENV as 'development' | 'staging' | 'production') || 'development',
     signingKey: process.env.SECURITY_SIGNING_KEY || 'dev-signing-key-change-in-production',
     enableLeakDetection: process.env.ENABLE_LEAK_DETECTION !== 'false',
-    permissiveMode: process.env.SECURITY_PERMISSIVE_MODE === 'true',
+    // Auto-enable permissive mode on Vercel without infrastructure
+    permissiveMode: process.env.SECURITY_PERMISSIVE_MODE === 'true' || autoPermissive,
   };
+
+  if (autoPermissive) {
+    console.log('[SecurityAgent] Auto-enabled permissive mode (Vercel without Vault/Upstash)');
+  }
 
   return new SecurityAgent(config);
 }
