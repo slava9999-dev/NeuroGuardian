@@ -632,19 +632,8 @@ function MessageBubble({ message, onConfirm }: MessageBubbleProps) {
             try {
               // Try to parse as URL
               const parsed = new URL(rawHref, window.location.origin);
-
-              // If URL points to our domain — it's garbage
-              if (
-                parsed.hostname.includes('vercel.app') ||
-                parsed.hostname === window.location.hostname
-              ) {
-                console.warn('🚫 Blocked internal redirect:', rawHref);
-                return;
-              }
-
               cleanUrl = parsed.href;
             } catch {
-              // If href is garbage like `" target="_blank"...`
               // Extract actual URL using regex
               const urlMatch = rawHref.match(/^(https?:\/\/[^\s"'<>]+)/);
               if (urlMatch) {

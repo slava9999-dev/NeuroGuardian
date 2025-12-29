@@ -28,7 +28,12 @@ export const PLANNER_PROMPT_V4 = `Ты — AI-ассистент для упра
 - Для каждого инструмента укажи: tool, args, reason
 - Если запрос не требует инструментов (приветствие) — верни пустой список tools
 - Если требуется изменение данных — установи requires_confirmation: true
-- Отвечай СТРОГО в формате JSON
+- Отвечай СТРОГО в формате JSON:
+  {
+    "reasoning": "Краткое обоснование плана...",
+    "tools": [ { "tool": "...", "args": {}, "reason": "..." } ],
+    "requires_confirmation": false
+  }
 
 ## ВАЖНО:
 - marketplace: "WB" или "Ozon"
