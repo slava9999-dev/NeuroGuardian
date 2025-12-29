@@ -45,7 +45,8 @@ const CONFIG = {
     'analytics-workflow.json',
     'monitoring-workflow.json',
     'notifications-workflow.json',
-    'agent-dashboard-workflow.json'
+    'agent-dashboard-workflow.json',
+    'unit-economics-monitor-workflow.json'
   ]
 };
 

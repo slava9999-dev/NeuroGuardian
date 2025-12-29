@@ -331,5 +331,6 @@
   "pinData": {},
   "versionId": "sync-v3",
   "triggerCount": 0,
-  "tags": []
+  "tags": [],
+  "active": false
 }

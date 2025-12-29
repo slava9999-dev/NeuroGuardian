@@ -36,6 +36,20 @@ function fixWorkflow(filePath) {
     }
   });
   
+  // Ensure 'active' field exists (fix for import constraint)
+  if (workflow.active === undefined) {
+    workflow.active = false;
+    fixed = true;
+    console.log(`   ✅ Добавлено поле: active = false`);
+  }
+
+  // Ensure 'versionId' field exists (fix for import constraint)
+  if (workflow.versionId === undefined) {
+    workflow.versionId = require('crypto').randomUUID();
+    fixed = true;
+    console.log(`   ✅ Добавлено поле: versionId`);
+  }
+
   if (fixed) {
     // Сохраняем исправленный файл
     fs.writeFileSync(filePath, JSON.stringify(workflow, null, 2), 'utf-8');

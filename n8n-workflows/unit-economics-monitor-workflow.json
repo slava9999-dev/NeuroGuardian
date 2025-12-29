@@ -16,7 +16,10 @@
       "name": "Every Hour",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
-      "position": [240, 300]
+      "position": [
+        240,
+        300
+      ]
     },
     {
       "parameters": {
@@ -57,7 +60,10 @@
       "name": "Configuration",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [460, 300]
+      "position": [
+        460,
+        300
+      ]
     },
     {
       "parameters": {
@@ -81,7 +87,10 @@
       "name": "Get All Products",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [680, 300]
+      "position": [
+        680,
+        300
+      ]
     },
     {
       "parameters": {
@@ -92,7 +101,10 @@
       "name": "Split Products",
       "type": "n8n-nodes-base.splitOut",
       "typeVersion": 1,
-      "position": [900, 300]
+      "position": [
+        900,
+        300
+      ]
     },
     {
       "parameters": {
@@ -118,7 +130,10 @@
       "name": "Calculate Unit Economics",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [1120, 300]
+      "position": [
+        1120,
+        300
+      ]
     },
     {
       "parameters": {
@@ -171,7 +186,10 @@
       "name": "Merge Product Data",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [1340, 300]
+      "position": [
+        1340,
+        300
+      ]
     },
     {
       "parameters": {
@@ -199,7 +217,10 @@
       "name": "Has Warnings?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
-      "position": [1560, 300]
+      "position": [
+        1560,
+        300
+      ]
     },
     {
       "parameters": {
@@ -261,7 +282,10 @@
       "name": "Severity Router",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.4,
-      "position": [1780, 180]
+      "position": [
+        1780,
+        180
+      ]
     },
     {
       "parameters": {
@@ -272,7 +296,10 @@
       "name": "Build Critical Alert",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2000, 80]
+      "position": [
+        2000,
+        80
+      ]
     },
     {
       "parameters": {
@@ -289,7 +316,10 @@
       "name": "Send Critical Alert",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [2220, 80]
+      "position": [
+        2220,
+        80
+      ]
     },
     {
       "parameters": {
@@ -301,7 +331,10 @@
       "name": "Aggregate Warnings",
       "type": "n8n-nodes-base.aggregate",
       "typeVersion": 1,
-      "position": [2000, 280]
+      "position": [
+        2000,
+        280
+      ]
     },
     {
       "parameters": {
@@ -312,7 +345,10 @@
       "name": "Build Warning Digest",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2220, 280]
+      "position": [
+        2220,
+        280
+      ]
     },
     {
       "parameters": {
@@ -329,45 +365,140 @@
       "name": "Send Warning Digest",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
-      "position": [2440, 280]
+      "position": [
+        2440,
+        280
+      ]
     }
   ],
   "connections": {
     "Every Hour": {
-      "main": [[{"node": "Configuration", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Configuration": {
-      "main": [[{"node": "Get All Products", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Get All Products",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Get All Products": {
-      "main": [[{"node": "Split Products", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Split Products",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Split Products": {
-      "main": [[{"node": "Calculate Unit Economics", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Calculate Unit Economics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Calculate Unit Economics": {
-      "main": [[{"node": "Merge Product Data", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Merge Product Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Merge Product Data": {
-      "main": [[{"node": "Has Warnings?", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Has Warnings?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Has Warnings?": {
-      "main": [[{"node": "Severity Router", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Severity Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Severity Router": {
       "main": [
-        [{"node": "Build Critical Alert", "type": "main", "index": 0}],
-        [{"node": "Aggregate Warnings", "type": "main", "index": 0}]
+        [
+          {
+            "node": "Build Critical Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Aggregate Warnings",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Build Critical Alert": {
-      "main": [[{"node": "Send Critical Alert", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Send Critical Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Aggregate Warnings": {
-      "main": [[{"node": "Build Warning Digest", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Build Warning Digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Build Warning Digest": {
-      "main": [[{"node": "Send Warning Digest", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Send Warning Digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "pinData": {},
@@ -378,5 +509,6 @@
   "tags": [],
   "triggerCount": 0,
   "updatedAt": "2025-12-29T07:37:00.000Z",
-  "versionId": "1"
+  "versionId": "1",
+  "active": false
 }
