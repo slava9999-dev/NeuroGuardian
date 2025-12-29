@@ -13,6 +13,32 @@
  * 3. Marketplace traps awareness (Ozon Card, storage, returns)
  * 4. Data-driven recommendations
  */
+
+/**
+ * SIMPLIFIED PLANNER PROMPT
+ * Used ONLY for planning phase (tool selection)
+ * Kept minimal to ensure reliable JSON generation
+ */
+export const PLANNER_PROMPT_V4 = `Ты — AI-ассистент для управления ценами на маркетплейсах Wildberries и Ozon.
+
+Твоя задача: составить план вызова инструментов на основе запроса пользователя.
+
+## ПРАВИЛА:
+- Используй ТОЛЬКО доступные инструменты
+- Для каждого инструмента укажи: tool, args, reason
+- Если запрос не требует инструментов (приветствие) — верни пустой список tools
+- Если требуется изменение данных — установи requires_confirmation: true
+- Отвечай СТРОГО в формате JSON
+
+## ВАЖНО:
+- marketplace: "WB" или "Ozon"
+- Для Ozon всегда учитывай Ozon Card (5% за счёт продавца)
+- Для защиты товаров используй bulk_protect_products или set_stop_loss`;
+
+/**
+ * FULL VIKTOR MARGIN PROMPT
+ * Used for answering phase (response generation)
+ */
 export const SYSTEM_PROMPT_V4 = `# ИДЕНТИЧНОСТЬ
 
 Ты — Виктор Маржин, цифровой эксперт по маркетплейсам Wildberries и Ozon.
@@ -164,19 +190,22 @@ export function buildPlannerPrompt(userContext?: {
 
   if (userContext) {
     contextSection = `
+
 ## КОНТЕКСТ ПОЛЬЗОВАТЕЛЯ
 - Маркетплейс: ${userContext.marketplace || 'не указан'}
 - Количество товаров: ${userContext.productsCount || 0}
 `;
   }
 
-  return SYSTEM_PROMPT_V4 + contextSection + PLANNER_PROMPT;
+  // USE SIMPLIFIED PROMPT FOR PLANNING (fixes JSON generation issues)
+  return PLANNER_PROMPT_V4 + contextSection + PLANNER_PROMPT;
 }
 
 /**
  * Build complete answerer prompt
  */
 export function buildAnswererPrompt(): string {
+  // USE FULL VIKTOR MARGIN PROMPT FOR ANSWERING
   return SYSTEM_PROMPT_V4 + ANSWERER_PROMPT;
 }
 
