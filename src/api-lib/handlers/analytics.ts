@@ -242,15 +242,16 @@ export async function handleGetSystemMetrics(
 
   try {
     // Get subscriptions expiring soon
+    // Note: In users table, 'id' IS the telegram_id (BIGINT PRIMARY KEY)
     const expiringSubscriptionsResult = await sql`
       SELECT 
-        user_id,
-        telegram_id,
-        subscription_end_date
+        id,
+        username,
+        subscription_end as subscription_end_date
       FROM users
       WHERE subscription_active = true
-      AND subscription_end_date <= NOW() + INTERVAL '3 days'
-      ORDER BY subscription_end_date ASC
+      AND subscription_end <= NOW() + INTERVAL '3 days'
+      ORDER BY subscription_end ASC
       LIMIT 10
     `;
 
@@ -258,7 +259,7 @@ export async function handleGetSystemMetrics(
     const recentErrorsResult = await sql`
       SELECT 
         COUNT(*) as error_count
-      FROM defense_logs
+      FROM sentinel_logs
       WHERE success = false
       AND created_at >= NOW() - INTERVAL '1 hour'
     `;
@@ -267,15 +268,16 @@ export async function handleGetSystemMetrics(
     const lastSentinelRunResult = await sql`
       SELECT 
         MAX(created_at) as last_run
-      FROM defense_logs
+      FROM sentinel_logs
     `;
 
     const metrics = {
       timestamp: new Date().toISOString(),
       subscriptions: {
         expiring_soon: expiringSubscriptionsResult.rows.map(row => ({
-          user_id: row.user_id,
-          telegram_id: row.telegram_id,
+          user_id: row.id,
+          telegram_id: row.id, // id IS the telegram_id
+          username: row.username,
           expires_at: row.subscription_end_date,
         })),
       },

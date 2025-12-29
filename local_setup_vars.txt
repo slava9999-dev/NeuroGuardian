@@ -1,0 +1,30 @@
+# NeuroGUARDIAN - Local Environment Setup
+# Заполните эти данные и скопируйте в файл .env.local
+
+# 1. DATABASE
+# Ссылка на ваш локальный Postgres
+POSTGRES_URL=postgresql://postgres:postgres@localhost:5432/neuroguardian
+
+# 2. TELEGRAM
+# Токен от @BotFather
+TELEGRAM_BOT_TOKEN=
+# Ваш ID от @userinfobot
+ADMIN_TELEGRAM_ID=
+# Обычно совпадает с ADMIN_TELEGRAM_ID
+ADMIN_CHAT_ID=
+
+# 3. SECURITY
+# Секретный ключ для связи n8n и API (придумайте любой)
+CRON_SECRET=dev-cron-secret
+# Ключ для входа в админ-панель
+ADMIN_API_KEY=admin-local-dev-key
+
+# 4. AI (Выберите один и вставьте ключ)
+AGENTROUTER_API_KEY=
+GROQ_API_KEY=
+GOOGLE_GENERATIVE_AI_API_KEY=
+OPENAI_API_KEY=
+
+# 5. MODES
+NODE_ENV=development
+LOCAL_DEV=true

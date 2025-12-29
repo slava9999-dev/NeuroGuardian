@@ -50,12 +50,6 @@
               "name": "adminChatId",
               "value": "={{ $env.ADMIN_CHAT_ID }}",
               "type": "string"
-            },
-            {
-              "id": "id-5",
-              "name": "adminTelegramId",
-              "value": "={{ $env.ADMIN_TELEGRAM_ID }}",
-              "type": "string"
             }
           ]
         },
@@ -82,10 +76,6 @@
             {
               "name": "Authorization",
               "value": "=Bearer {{ $('Configuration').first().json.cronSecret }}"
-            },
-            {
-              "name": "X-Telegram-Id",
-              "value": "={{ $('Configuration').first().json.adminTelegramId }}"
             }
           ]
         },
@@ -126,10 +116,6 @@
             {
               "name": "Authorization",
               "value": "=Bearer {{ $('Configuration').first().json.cronSecret }}"
-            },
-            {
-              "name": "X-Telegram-Id",
-              "value": "={{ $('Configuration').first().json.adminTelegramId }}"
             }
           ]
         },

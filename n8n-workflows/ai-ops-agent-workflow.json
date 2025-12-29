@@ -1,0 +1,407 @@
+{
+  "name": "NeuroGUARDIAN AI Ops Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "neuroguardian-agent",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Telegram Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1200,
+        400
+      ],
+      "webhookId": "neuroguardian-ops-agent"
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "apiBaseUrl",
+              "value": "={{ $env.API_URL }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "cronSecret",
+              "value": "={{ $env.CRON_SECRET }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "telegramBotToken",
+              "value": "={{ $env.TELEGRAM_BOT_TOKEN }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "adminChatId",
+              "value": "={{ $env.ADMIN_CHAT_ID }}",
+              "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "adminTelegramId",
+              "value": "={{ $env.ADMIN_TELEGRAM_ID }}",
+              "type": "string"
+            },
+            {
+              "id": "id-6",
+              "name": "openaiApiKey",
+              "value": "={{ $env.OPENAI_API_KEY }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "include": "all"
+      },
+      "id": "config",
+      "name": "Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -980,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Parse incoming Telegram message\nconst body = $input.first().json.body || $input.first().json;\nconst message = body.message || {};\nconst chatId = message.chat?.id || message.from?.id;\nconst text = message.text || '';\nconst userId = message.from?.id;\nconst username = message.from?.username || message.from?.first_name || 'User';\n\n// Check if admin\nconst adminId = $('Configuration').first().json.adminTelegramId;\nconst isAdmin = String(userId) === String(adminId);\n\nreturn {\n  json: {\n    chatId: chatId,\n    userId: userId,\n    username: username,\n    text: text,\n    isAdmin: isAdmin,\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "parse-message",
+      "name": "Parse Telegram Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -760,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{ $json.isAdmin }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "check-admin",
+      "name": "Is Admin?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -540,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Configuration').first().json.apiBaseUrl }}?action=get-system-metrics",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Configuration').first().json.cronSecret }}"
+            },
+            {
+              "name": "X-Telegram-Id",
+              "value": "={{ $('Configuration').first().json.adminTelegramId }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "get-metrics",
+      "name": "Get System Metrics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -320,
+        400
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Configuration').first().json.apiBaseUrl }}?action=get-analytics",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Configuration').first().json.cronSecret }}"
+            },
+            {
+              "name": "X-Telegram-Id",
+              "value": "={{ $('Configuration').first().json.adminTelegramId }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "get-analytics",
+      "name": "Get Analytics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -100,
+        400
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Build context for AI Agent\nconst userMessage = $('Parse Telegram Message').first().json;\nconst metrics = $('Get System Metrics').first().json || {};\nconst analytics = $input.first().json?.analytics || {};\n\nconst systemContext = {\n  timestamp: new Date().toISOString(),\n  api_status: metrics.success ? 'healthy' : 'error',\n  subscriptions: {\n    active: analytics.subscriptions?.active || 0,\n    expiring_soon: analytics.subscriptions?.expiring_soon || 0\n  },\n  sentinel: {\n    total_actions: analytics.sentinel?.total_actions || 0,\n    success_rate: analytics.sentinel?.success_rate || 0,\n    errors_last_hour: metrics.metrics?.sentinel?.errors_last_hour || 0\n  },\n  products: {\n    protected: analytics.products?.total_protected || 0,\n    users_with_protection: analytics.products?.users_with_protection || 0\n  },\n  money_saved: analytics.money_saved?.total_rub || 0\n};\n\nreturn {\n  json: {\n    userMessage: userMessage.text,\n    chatId: userMessage.chatId,\n    username: userMessage.username,\n    systemContext: systemContext\n  }\n};"
+      },
+      "id": "build-context",
+      "name": "Build AI Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        120,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "options": {
+          "temperature": 0.7,
+          "maxTokens": 1000
+        },
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "=Ты — NeuroGUARDIAN Operations Agent, AI-ассистент для управления системой защиты цен на маркетплейсах.\n\nТвои задачи:\n1. Отвечать на вопросы о состоянии системы\n2. Помогать с диагностикой проблем\n3. Давать рекомендации по оптимизации\n4. Информировать о статусе подписок и товаров\n\nТекущее состояние системы:\n{{ JSON.stringify($json.systemContext, null, 2) }}\n\nПравила:\n- Отвечай на русском языке\n- Будь кратким и информативным\n- Используй эмодзи для наглядности\n- Если не знаешь ответа — честно скажи об этом\n- Для технических деталей предлагай обратиться к документации\n\nДоступные команды (если пользователь спрашивает):\n• /status — общий статус системы\n• /sentinel — статистика защиты цен\n• /users — информация о пользователях\n• /analytics — аналитика за 24 часа\n• /help — список команд"
+            },
+            {
+              "role": "user",
+              "content": "={{ $json.userMessage }}"
+            }
+          ]
+        }
+      },
+      "id": "ai-agent",
+      "name": "AI Agent (OpenAI)",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.9,
+      "position": [
+        340,
+        400
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "openai-api",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Format AI response for Telegram\nconst aiResponse = $input.first().json;\nconst context = $('Build AI Context').first().json;\n\nlet responseText = aiResponse.message?.content || aiResponse.text || 'Произошла ошибка. Попробуйте позже.';\n\n// Escape special Markdown characters for Telegram\nresponseText = responseText\n  .replace(/([_*\\[\\]()~`>#+\\-=|{}.!])/g, '\\\\$1')\n  .replace(/\\\\\\*/g, '*')\n  .replace(/\\\\_/g, '_');\n\nreturn {\n  json: {\n    chat_id: context.chatId,\n    text: responseText,\n    parse_mode: 'MarkdownV2'\n  }\n};"
+      },
+      "id": "format-response",
+      "name": "Format Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $('Configuration').first().json.telegramBotToken }}/sendMessage",
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "send-response",
+      "name": "Send Telegram Response",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        780,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $('Configuration').first().json.telegramBotToken }}/sendMessage",
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{ $('Parse Telegram Message').first().json.chatId }}\",\n  \"text\": \"⛔ Доступ запрещен. Этот бот доступен только администраторам.\"\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "access-denied",
+      "name": "Access Denied",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -320,
+        600
+      ]
+    }
+  ],
+  "connections": {
+    "Telegram Webhook": {
+      "main": [
+        [
+          {
+            "node": "Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuration": {
+      "main": [
+        [
+          {
+            "node": "Parse Telegram Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Telegram Message": {
+      "main": [
+        [
+          {
+            "node": "Is Admin?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Admin?": {
+      "main": [
+        [
+          {
+            "node": "Get System Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Access Denied",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get System Metrics": {
+      "main": [
+        [
+          {
+            "node": "Get Analytics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Analytics": {
+      "main": [
+        [
+          {
+            "node": "Build AI Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build AI Context": {
+      "main": [
+        [
+          {
+            "node": "AI Agent (OpenAI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent (OpenAI)": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Response": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-12-29T17:00:00.000Z",
+  "versionId": "ai-agent-v1",
+  "active": false
+}

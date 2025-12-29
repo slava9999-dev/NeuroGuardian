@@ -51,6 +51,27 @@ async function startServer() {
           }
         }
         
+        // Extract headers for auth and context
+        const telegramId = req.headers['x-telegram-id'];
+        const cronSecret = req.headers['x-cron-secret'];
+        const isAdminBypass = cronSecret === process.env.CRON_SECRET;
+
+        // Resolve userId if telegramId is provided (Admin/n8n context)
+        let resolvedUserId = null;
+        if (isAdminBypass && telegramId) {
+          try {
+            const { getUserInfoByTelegramId } = await import('../src/api-lib/services/database.js');
+            // Note: We'll need to make sure database.js works locally!
+            const user = await getUserInfoByTelegramId(telegramId);
+            if (user) {
+              resolvedUserId = user.id;
+              console.log(`👤 Resolved user from X-Telegram-Id: ${telegramId} -> ${resolvedUserId}`);
+            }
+          } catch (e) {
+            console.warn('⚠️ Failed to resolve userId from telegramId:', e.message);
+          }
+        }
+
         // Create Vercel-compatible request object
         const vercelReq = {
           method: req.method,
@@ -58,6 +79,10 @@ async function startServer() {
           headers: req.headers,
           query: parsedUrl.query,
           body,
+          // Custom properties for our local environment
+          isAdminBypass,
+          telegramId,
+          session: { userId: resolvedUserId } 
         };
         
         // Create Vercel-compatible response object

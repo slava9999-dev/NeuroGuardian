@@ -1,19 +1,19 @@
 {
-  "name": "NeuroGUARDIAN Analytics Report",
+  "name": "NeuroGUARDIAN Health Monitor",
   "nodes": [
     {
       "parameters": {
         "rule": {
           "interval": [
             {
-              "field": "cronExpression",
-              "expression": "0 0 * * *"
+              "field": "hours",
+              "triggerAtHour": 6
             }
           ]
         }
       },
-      "id": "analytics-trigger",
-      "name": "Daily at Midnight",
+      "id": "monitor-trigger",
+      "name": "Every 6 Hours",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
       "position": [
@@ -35,26 +35,20 @@
             },
             {
               "id": "id-2",
-              "name": "cronSecret",
-              "value": "={{ $env.CRON_SECRET }}",
-              "type": "string"
-            },
-            {
-              "id": "id-3",
               "name": "telegramBotToken",
               "value": "={{ $env.TELEGRAM_BOT_TOKEN }}",
               "type": "string"
             },
             {
-              "id": "id-4",
+              "id": "id-3",
               "name": "adminChatId",
               "value": "={{ $env.ADMIN_CHAT_ID }}",
               "type": "string"
             },
             {
-              "id": "id-5",
-              "name": "adminTelegramId",
-              "value": "={{ $env.ADMIN_TELEGRAM_ID }}",
+              "id": "id-cron",
+              "name": "cronSecret",
+              "value": "={{ $env.CRON_SECRET }}",
               "type": "string"
             }
           ]
@@ -63,7 +57,7 @@
         "include": "all",
         "options": {}
       },
-      "id": "analytics-config",
+      "id": "monitor-config",
       "name": "Configuration",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
@@ -75,27 +69,23 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ $('Configuration').first().json.apiBaseUrl }}?action=get-analytics",
+        "url": "={{ $('Configuration').first().json.apiBaseUrl }}?action=get-system-metrics",
         "authentication": "none",
+        "options": {
+          "timeout": 10000
+        },
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "Authorization",
               "value": "=Bearer {{ $('Configuration').first().json.cronSecret }}"
-            },
-            {
-              "name": "X-Telegram-Id",
-              "value": "={{ $('Configuration').first().json.adminTelegramId }}"
             }
           ]
-        },
-        "options": {
-          "timeout": 30000
         }
       },
-      "id": "get-analytics",
-      "name": "Get Analytics Data",
+      "id": "health-check",
+      "name": "API Health Check",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
@@ -107,14 +97,14 @@
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const data = $input.first()?.json?.analytics || {};\n\nconst formatNumber = (num) => {\n  return new Intl.NumberFormat('ru-RU').format(num || 0);\n};\n\nconst formatMoney = (num) => {\n  return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(num || 0);\n};\n\nconst message = `📊 *NeuroGUARDIAN — Ежедневный Отчёт*\\n\\n` +\n  `📅 Период: последние 24 часа\\n` +\n  `⏰ ${new Date().toLocaleString('ru-RU')}\\n\\n` +\n  `━━━━━━━━━━━━━━━━━━━━━━\\n\\n` +\n  `👥 *Подписки*\\n` +\n  `✅ Активных: ${formatNumber(data.subscriptions?.active)}\\n` +\n  `⚠️ Истекают скоро: ${formatNumber(data.subscriptions?.expiring_soon)}\\n\\n` +\n  `🛡️ *Защищённые товары*\\n` +\n  `📦 Всего: ${formatNumber(data.products?.total_protected)}\\n` +\n  `👤 Пользователей: ${formatNumber(data.products?.users_with_protection)}\\n` +\n  `💰 Средняя мин. цена: ${formatMoney(data.products?.avg_min_price)}\\n\\n` +\n  `⚡ *Sentinel (за 24ч)*\\n` +\n  `🔧 Всего действий: ${formatNumber(data.sentinel?.total_actions)}\\n` +\n  `💵 Корректировок цен: ${formatNumber(data.sentinel?.price_corrections)}\\n` +\n  `📉 Обнулений остатков: ${formatNumber(data.sentinel?.zero_stocks)}\\n` +\n  `✅ Успешных: ${formatNumber(data.sentinel?.successful)}\\n` +\n  `❌ Ошибок: ${formatNumber(data.sentinel?.failed)}\\n` +\n  `📈 Success Rate: ${data.sentinel?.success_rate || 0}%\\n\\n` +\n  `💸 *Сохранено денег*\\n` +\n  `${formatMoney(data.money_saved?.total_rub)}\\n\\n` +\n  `👥 *Активность*\\n` +\n  `Активных пользователей: ${formatNumber(data.users?.active_last_24h)}\\n\\n` +\n  `━━━━━━━━━━━━━━━━━━━━━━`;\n\nreturn {\n  json: {\n    message: message,\n    hasData: !!data.timestamp,\n    analytics: data\n  }\n};"
+        "jsCode": "const metricsResult = $input.first()?.json || {};\n\nconst issues = [];\nlet status = 'healthy';\n\n// Check API health\nif (!metricsResult.success) {\n  issues.push('❌ API не отвечает');\n  status = 'critical';\n}\n\n// Check expiring subscriptions\nconst expiringCount = metricsResult.metrics?.subscriptions?.expiring_soon?.length || 0;\nif (expiringCount > 0) {\n  issues.push(`⚠️ Истекает подписок: ${expiringCount}`);\n  if (status === 'healthy') status = 'warning';\n}\n\n// Check Sentinel errors\nconst sentinelErrors = metricsResult.metrics?.sentinel?.errors_last_hour || 0;\nif (sentinelErrors > 10) {\n  issues.push(`⚠️ Sentinel ошибок за час: ${sentinelErrors}`);\n  if (status === 'healthy') status = 'warning';\n}\n\nlet message = '';\nif (status === 'healthy') {\n  message = `✅ *NeuroGUARDIAN Health Report*\n\n` +\n    `🟢 API: Работает\n` +\n    `🛡️ Sentinel: OK\n` +\n    `📊 Подписки: OK\n` +\n    `⏰ ${new Date().toLocaleString('ru-RU')}`;\n} else {\n  message = `⚠️ *NeuroGUARDIAN Alert*\n\n` +\n    `Status: ${status.toUpperCase()}\n\n` +\n    `Проблемы:\n${issues.join('\n')}\n\n` +\n    `⏰ ${new Date().toLocaleString('ru-RU')}`;\n}\n\nreturn {\n  json: {\n    status: status,\n    issues: issues,\n    message: message,\n    shouldNotify: status !== 'healthy',\n    metricsResult: metricsResult\n  }\n};"
       },
-      "id": "build-report",
-      "name": "Build Report Message",
+      "id": "analyze-health",
+      "name": "Analyze Health",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -140,
+        -80,
         300
       ]
     },
@@ -129,7 +119,7 @@
           "conditions": [
             {
               "id": "id-1",
-              "leftValue": "={{ $json.hasData }}",
+              "leftValue": "={{ $json.shouldNotify }}",
               "rightValue": true,
               "operator": {
                 "type": "boolean",
@@ -140,12 +130,12 @@
           "combinator": "and"
         }
       },
-      "id": "has-data",
-      "name": "Has Data?",
+      "id": "should-notify",
+      "name": "Should Notify?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        80,
+        140,
         300
       ]
     },
@@ -160,12 +150,12 @@
           "timeout": 30000
         }
       },
-      "id": "send-report",
-      "name": "Send Report to Telegram",
+      "id": "send-notification",
+      "name": "Send Alert",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        300,
+        360,
         200
       ]
     },
@@ -178,7 +168,7 @@
             {
               "id": "id-1",
               "name": "status",
-              "value": "no_data_skip",
+              "value": "all_healthy_no_notification",
               "type": "string"
             }
           ]
@@ -186,18 +176,18 @@
         "includeOtherFields": true,
         "include": "all"
       },
-      "id": "no-data",
-      "name": "No Data",
+      "id": "all-good",
+      "name": "All Good",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        300,
+        360,
         400
       ]
     }
   ],
   "connections": {
-    "Daily at Midnight": {
+    "Every 6 Hours": {
       "main": [
         [
           {
@@ -212,47 +202,47 @@
       "main": [
         [
           {
-            "node": "Get Analytics Data",
+            "node": "API Health Check",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Get Analytics Data": {
+    "API Health Check": {
       "main": [
         [
           {
-            "node": "Build Report Message",
+            "node": "Analyze Health",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Build Report Message": {
+    "Analyze Health": {
       "main": [
         [
           {
-            "node": "Has Data?",
+            "node": "Should Notify?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Has Data?": {
+    "Should Notify?": {
       "main": [
         [
           {
-            "node": "Send Report to Telegram",
+            "node": "Send Alert",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "No Data",
+            "node": "All Good",
             "type": "main",
             "index": 0
           }
@@ -265,5 +255,5 @@
     "executionOrder": "v1"
   },
   "active": true,
-  "versionId": "1a367d15-1245-420b-a805-e1c0fbe5326f"
+  "versionId": "e7b1b0db-e284-4448-b7ac-5145996cc89b"
 }

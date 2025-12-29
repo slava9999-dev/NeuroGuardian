@@ -83,10 +83,6 @@
             {
               "name": "Authorization",
               "value": "=Bearer {{ $('Configuration').first().json.cronSecret }}"
-            },
-            {
-              "name": "X-Telegram-Id",
-              "value": "={{ $('Configuration').first().json.adminTelegramId }}"
             }
           ]
         },
@@ -118,10 +114,6 @@
             {
               "name": "Authorization",
               "value": "=Bearer {{ $('Configuration').first().json.cronSecret }}"
-            },
-            {
-              "name": "X-Telegram-Id",
-              "value": "={{ $('Configuration').first().json.adminTelegramId }}"
             }
           ]
         },

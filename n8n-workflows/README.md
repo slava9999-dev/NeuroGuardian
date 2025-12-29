@@ -1,371 +1,199 @@
-# 🔄 n8n Workflows - Viktor Margin v3.0
+# NeuroGUARDIAN N8N Workflows v2.0
 
-**Дата:** 2025-12-29  
-**Статус:** Production Ready
+## 📋 Обзор
 
----
+Этот каталог содержит все workflow-файлы для автоматизации NeuroGUARDIAN через n8n.
 
-## 📊 ОБЗОР WORKFLOWS
+## 🔧 Список Workflows
 
-### Существующие (6):
+### Core Workflows (Обязательные)
 
-1. **sentinel-workflow.json** ✅ ОБНОВЛЁН
-   - Каждые 5 минут
-   - Проверка цен WB/Ozon
-   - Автоматическая защита (zero_stock/price_fix)
-   - **НОВОЕ:** Viktor Margin alert format
-   - **НОВОЕ:** Детальный breakdown маржи
-   - **НОВОЕ:** Годовой impact calculation
+| Workflow           | Файл                       | Триггер        | Описание                               |
+| ------------------ | -------------------------- | -------------- | -------------------------------------- |
+| **Sentinel**       | `sentinel-workflow.json`   | Каждые 5 мин   | Защита цен от демпинга                 |
+| **Product Sync**   | `sync-workflow.json`       | Каждый час     | Синхронизация товаров с маркетплейсами |
+| **Health Monitor** | `monitoring-workflow.json` | Каждые 6 часов | Проверка здоровья API                  |
 
-2. **unit-economics-monitor-workflow.json** ✨ НОВЫЙ
-   - Каждый час
-   - Расчёт Unit Economics для всех товаров
-   - Обнаружение warnings (Ozon Card, Storage, Returns)
-   - Severity routing (Critical → Immediate, Warning → Digest)
-   - Telegram alerts в Viktor Margin стиле
+### Analytics & Reports
 
-3. **monitoring-workflow.json**
-   - System health monitoring
-   - API status checks
+| Workflow               | Файл                                   | Триггер           | Описание                            |
+| ---------------------- | -------------------------------------- | ----------------- | ----------------------------------- |
+| **Analytics Report**   | `analytics-workflow.json`              | Ежедневно в 00:00 | Ежедневный отчёт в Telegram         |
+| **User Notifications** | `notifications-workflow.json`          | Каждые 12 часов   | Уведомления об истекающих подписках |
+| **Unit Economics**     | `unit-economics-monitor-workflow.json` | Каждый час        | Viktor Margin мониторинг            |
 
-4. **sync-workflow.json**
-   - Product synchronization
-   - WB/Ozon data sync
+### Operations & AI (NEW v2.0)
 
-5. **notifications-workflow.json**
-   - Telegram alert system
-   - Email notifications
-
-6. **analytics-workflow.json**
-   - Daily statistics
-   - Performance metrics
-
-7. **agent-dashboard-workflow.json**
-   - AI agent monitoring
-   - Conversation analytics
+| Workflow            | Файл                            | Триггер          | Описание                    |
+| ------------------- | ------------------------------- | ---------------- | --------------------------- |
+| **Ops Center**      | `ops-center-workflow.json`      | Webhook + 30 мин | Операционные команды        |
+| **AI Ops Agent**    | `ai-ops-agent-workflow.json`    | Telegram Webhook | AI-ассистент для управления |
+| **Agent Dashboard** | `agent-dashboard-workflow.json` | Каждые 6 часов   | Мониторинг AI агента        |
 
 ---
 
-## 🚀 QUICK START
+## 🚀 Установка
 
-### 1. Import Workflows в n8n
+### 1. Настройка переменных окружения в n8n
 
-```bash
-# Откройте n8n
-http://localhost:5678
-
-# Для каждого workflow:
-# 1. Workflows → Import from File
-# 2. Выберите .json файл
-# 3. Activate workflow
-```
-
-### 2. Настройте Environment Variables
-
-В n8n Settings → Environment Variables:
+Убедитесь, что в n8n настроены следующие env-переменные:
 
 ```env
 API_URL=https://your-api.vercel.app/api
 CRON_SECRET=your-cron-secret
-TELEGRAM_BOT_TOKEN=your-bot-token
+TELEGRAM_BOT_TOKEN=your-telegram-bot-token
 ADMIN_CHAT_ID=your-telegram-id
+ADMIN_TELEGRAM_ID=your-telegram-id
+OPENAI_API_KEY=your-openai-key  # Для AI Agent
 ```
 
-### 3. Тест Workflows
+### 2. Импорт workflows
 
-**Sentinel (Price Defense):**
+Для каждого файла:
+
+1. Откройте n8n Dashboard
+2. Нажмите **Add Workflow**
+3. Нажмите на три точки → **Import from File**
+4. Выберите JSON-файл
+5. Нажмите **Save**
+6. Активируйте workflow (toggle в правом верхнем углу)
+
+### 3. Настройка Telegram Webhook (для AI Agent)
+
+Для workflow `ai-ops-agent-workflow.json`:
 
 ```bash
-# Manual trigger
-Workflows → Sentinel → Execute Workflow
-# Проверьте Telegram alert
+# Замените на ваш webhook URL из n8n
+curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook" \
+  -d "url=<N8N_WEBHOOK_URL>/webhook/neuroguardian-agent"
 ```
 
-**Unit Economics Monitor:**
+---
+
+## 📊 Архитектура v2.0
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    TELEGRAM BOT                              │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
+│  │  Commands   │  │  AI Agent   │  │    Notifications    │  │
+│  └──────┬──────┘  └──────┬──────┘  └──────────┬──────────┘  │
+└─────────┼────────────────┼────────────────────┼─────────────┘
+          │                │                    │
+          ▼                ▼                    ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      N8N WORKFLOWS                           │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐   │
+│  │  Ops Center  │  │  AI Agent    │  │  Notifications   │   │
+│  │  /status     │  │  (OpenAI)    │  │  Subscription    │   │
+│  │  /resync     │  │              │  │  Expiry          │   │
+│  │  /sentinel   │  │              │  │                  │   │
+│  └──────┬───────┘  └──────┬───────┘  └────────┬─────────┘   │
+│         │                 │                   │              │
+│  ┌──────┴─────────────────┴───────────────────┴──────────┐  │
+│  │                NEUROGUARDIAN API                       │  │
+│  │  (check-prices, sync-products, get-analytics, etc.)   │  │
+│  └────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+                    ┌─────────────────┐
+                    │   PostgreSQL    │
+                    │   (Neon)        │
+                    └─────────────────┘
+```
+
+---
+
+## 🔐 Безопасность
+
+### Стандартные Headers
+
+Все API-запросы включают:
+
+```json
+{
+  "Authorization": "Bearer {{ cronSecret }}",
+  "X-Telegram-Id": "{{ adminTelegramId }}"
+}
+```
+
+### Admin Check
+
+AI Agent и Ops Center проверяют `telegram_id` отправителя против `ADMIN_TELEGRAM_ID`.
+
+---
+
+## 🧪 Тестирование
+
+### Локальное тестирование
+
+1. Запустите локальный API сервер:
+
+   ```bash
+   npx tsx scripts/local-api-server.mjs
+   ```
+
+2. В n8n, измените `API_URL` на:
+
+   ```
+   http://localhost:3001/api
+   ```
+
+3. Запустите workflow вручную (Execute Workflow)
+
+### Проверка Sentinel
 
 ```bash
-# Manual trigger
-Workflows → Unit Economics Monitor → Execute Workflow
-# Проверьте Telegram digest
+curl -X GET "http://localhost:3001/api?action=check-prices&include_details=true" \
+  -H "Authorization: Bearer your-cron-secret" \
+  -H "X-Telegram-Id: your-telegram-id"
 ```
 
 ---
 
-## 📋 ДЕТАЛИ WORKFLOWS
+## 📝 Changelog
 
-### 1. Sentinel - Price Defense
+### v2.0.0 (2025-12-29)
 
-**Trigger:** Every 5 minutes
+- ✅ Добавлен `adminTelegramId` во все Configuration ноды
+- ✅ Добавлен `X-Telegram-Id` header во все API-запросы
+- ✅ Новый workflow: **Ops Center** (`ops-center-workflow.json`)
+- ✅ Новый workflow: **AI Ops Agent** (`ai-ops-agent-workflow.json`)
+- ✅ Унифицированы таймауты (30-120 сек)
+- ✅ Добавлены `continueOnFail` для graceful error handling
 
-**Flow:**
+### v1.0.0 (2025-12-27)
 
-1. Configuration → Load env vars
-2. Check Prices API → Get violations
-3. Has Violations? → Filter
-4. Rate Limit Check → Max 100 per run
-5. Split Violations → Process each
-6. Validate Required Fields
-7. Defense Action Router:
-   - WB Zero Stock
-   - WB Price Fix
-   - Ozon Zero Stock
-   - Ozon Price Fix
-8. **Build Summary Message** (Viktor Margin format)
-9. Send Telegram Alert
-10. Bulk Log Results
-
-**Viktor Margin Features:**
-
-- ✅ Детальный breakdown каждого товара
-- ✅ Конкретные цифры (detected price, min price, saved amount)
-- ✅ Годовой impact (на 1000 заказов)
-- ✅ Threat severity indicators
-- ✅ Брендинг Viktor Margin
-
-**Example Alert:**
-
-```
-🛡️ VIKTOR MARGIN: Защита сработала!
-
-📊 СТАТИСТИКА:
-✅ Защищено: 2
-📦 Всего обработано: 2
-
-━━━━━━━━━━━━━━━━━━━━
-ЗАЩИЩЁННЫЕ ТОВАРЫ:
-
-🟣 Футболка мужская хлопок
-├─ Обнаружена цена: 850₽
-├─ Лимит (Stop-Loss): 950₽
-├─ Падение: 10.5%
-├─ Сохранено: 100₽ на заказ
-├─ Годовой impact: 100,000₽ (на 1000 заказов)
-└─ 🛡️ Цена возвращена к 950₽
-
-━━━━━━━━━━━━━━━━━━━━
-💡 Viktor Margin
-_Защита вашей маржи 24/7_
-```
+- Начальная версия с базовыми workflows
 
 ---
 
-### 2. Unit Economics Monitor (NEW)
+## 🆘 Troubleshooting
 
-**Trigger:** Every hour
+### Workflow не запускается
 
-**Flow:**
+1. Проверьте, что workflow активирован (toggle включён)
+2. Проверьте env-переменные в n8n Settings
+3. Проверьте логи выполнения в Executions
 
-1. Configuration → Load env vars
-2. Get All Products → Fetch from API
-3. Split Products → Process each
-4. **Calculate Unit Economics** → Full breakdown
-   - Ozon Card impact
-   - Storage costs
-   - Return costs
-   - All commissions
-5. Merge Product Data
-6. Has Warnings? → Filter
-7. Severity Router:
-   - **Critical** → Immediate Telegram alert
-   - **Warning** → Aggregate for digest
-   - **Info** → Log only
-8. Send Alerts
+### Ошибка "Unauthorized"
 
-**Critical Alert Example:**
+1. Убедитесь, что `CRON_SECRET` в n8n совпадает с API
+2. Проверьте, что `X-Telegram-Id` соответствует пользователю в БД
 
-```
-🚨 КРИТИЧЕСКАЯ УГРОЗА МАРЖИ!
+### Telegram не отвечает
 
-🔵 Кроссовки спортивные
-Ozon
-
-📊 UNIT ECONOMICS:
-├─ Цена: 2000₽
-├─ Себестоимость: 1200₽
-├─ Комиссия: 240₽ (12.0%)
-├─ Логистика: 46₽
-├─ Ozon Card: 40₽
-└─ ПРИБЫЛЬ: 474₽ (23.7%)
-
-⚠️ РИСКИ:
-🚨 Скидка Ozon Card съедает 40₽ (2.0%) с каждого заказа! При 1000 заказов в год вы теряете 40,000₽ маржи. Учтите это при ценообразовании!
-
-💡 Viktor Margin
-_Срочно требуется действие!_
-```
-
-**Warning Digest Example:**
-
-```
-📊 VIKTOR MARGIN: Hourly Report
-
-⚠️ Обнаружено 5 товаров с предупреждениями
-
-*Типы предупреждений:*
-  • Ozon Card: 3
-  • Долгое хранение: 2
-
-💡 Viktor Margin
-_Проверьте детали в dashboard_
-```
+1. Проверьте `TELEGRAM_BOT_TOKEN`
+2. Проверьте webhook URL для AI Agent
+3. Убедитесь, что бот не заблокирован
 
 ---
 
-## 🔧 ОБНОВЛЕНИЕ WORKFLOWS
+## 📞 Контакты
 
-### Обновить Sentinel на Viktor Margin формат:
+При возникновении проблем проверьте:
 
-См. `UPDATE_SENTINEL_INSTRUCTIONS.md`
-
-**Краткая версия:**
-
-1. Откройте workflow в n8n
-2. Найдите node "Build Summary Message"
-3. Замените код на `viktor-margin-alert-builder.js`
-4. Save & Test
-
----
-
-## 📊 МОНИТОРИНГ
-
-### Проверка статуса workflows:
-
-```bash
-# В n8n UI
-Workflows → Status column
-
-# Должны быть Active:
-✅ Sentinel - Price Defense
-✅ Unit Economics Monitor
-✅ Monitoring
-✅ Sync
-```
-
-### Логи выполнения:
-
-```bash
-# В n8n UI
-Executions → Filter by workflow
-
-# Проверьте:
-- Success rate
-- Execution time
-- Error messages
-```
-
----
-
-## 🚨 TROUBLESHOOTING
-
-### Workflow не запускается:
-
-1. **Проверьте env vars:**
-
-   ```bash
-   Settings → Environment Variables
-   # Убедитесь что все переменные установлены
-   ```
-
-2. **Проверьте API доступность:**
-
-   ```bash
-   curl https://your-api.vercel.app/api/health
-   ```
-
-3. **Проверьте Telegram bot token:**
-   ```bash
-   curl https://api.telegram.org/bot<TOKEN>/getMe
-   ```
-
-### Alerts не приходят:
-
-1. **Проверьте ADMIN_CHAT_ID:**
-
-   ```bash
-   # Получите свой chat_id:
-   # 1. Напишите боту /start
-   # 2. Откройте: https://api.telegram.org/bot<TOKEN>/getUpdates
-   # 3. Найдите "chat":{"id":123456789}
-   ```
-
-2. **Проверьте формат сообщения:**
-   ```bash
-   # В node "Send Summary Telegram"
-   # parse_mode должен быть "Markdown"
-   ```
-
-### API errors:
-
-1. **Проверьте CRON_SECRET:**
-
-   ```bash
-   # Должен совпадать с .env.production
-   ```
-
-2. **Проверьте rate limits:**
-   ```bash
-   # Sentinel: max 100 violations per run
-   # Unit Economics: обрабатывает все товары
-   ```
-
----
-
-## 📈 МЕТРИКИ
-
-### Sentinel Performance:
-
-- **Frequency:** Every 5 minutes = 288 runs/day
-- **Average execution:** 10-30 seconds
-- **Success rate target:** >95%
-
-### Unit Economics Monitor:
-
-- **Frequency:** Every hour = 24 runs/day
-- **Average execution:** 30-60 seconds (depends on product count)
-- **Success rate target:** >98%
-
----
-
-## 🎯 СЛЕДУЮЩИЕ ШАГИ
-
-### Phase 2: PriceShield Integration
-
-Когда реализуем автоматическую корректировку цен:
-
-1. **Threat Detection Workflow** (NEW)
-   - Webhook trigger on threat detected
-   - Auto-resolution logic
-   - PriceShield API integration
-
-2. **Update Sentinel**
-   - Add PriceShield calls
-   - Verification of price changes
-   - Rollback on errors
-
-### Phase 3: Onboarding Tracking
-
-1. **Onboarding Progress Workflow** (NEW)
-   - Track user progress
-   - Detect blockers
-   - Auto-assist
-
----
-
-## 📞 SUPPORT
-
-**Документация:**
-
-- `UPDATE_SENTINEL_INSTRUCTIONS.md` - Как обновить Sentinel
-- `viktor-margin-alert-builder.js` - Код для alerts
-- `N8N_INTEGRATION_PLAN_v3.0.md` - Полный план интеграции
-
-**Файлы:**
-
-- `sentinel-workflow.json` - Обновлённый Sentinel
-- `unit-economics-monitor-workflow.json` - Новый мониторинг
-
----
-
-**Version:** 3.0.0  
-**Date:** 2025-12-29  
-**Status:** Production Ready ✅
+- `/status` команду в Telegram
+- n8n Executions логи
+- API `/api?action=health` endpoint

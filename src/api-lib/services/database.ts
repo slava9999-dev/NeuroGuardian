@@ -4,7 +4,17 @@
 // Version: 2.1.0 | Date: December 2024
 // ============================================
 
-import { sql } from '@vercel/postgres';
+// Use local pg driver for local development, @vercel/postgres for production
+let sql: any;
+
+if (process.env.NODE_ENV === 'production' && !process.env.LOCAL_DEV) {
+  const { sql: vercelSql } = await import('@vercel/postgres');
+  sql = vercelSql;
+} else {
+  const { sql: localSql } = await import('./database.local.js');
+  sql = localSql;
+}
+
 import { logger } from '../lib/index.js';
 
 export interface TelegramUser {
@@ -648,3 +658,5 @@ export async function getSalesHistory(
   `;
   return result.rows;
 }
+
+export const getUserInfoByTelegramId = getUserById;

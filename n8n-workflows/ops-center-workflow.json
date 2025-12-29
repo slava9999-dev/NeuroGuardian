@@ -1,0 +1,658 @@
+{
+  "name": "NeuroGUARDIAN Ops Center",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ops-command",
+        "options": {}
+      },
+      "id": "webhook-ops",
+      "name": "Ops Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1000,
+        400
+      ],
+      "webhookId": "neuroguardian-ops-center"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "heartbeat-trigger",
+      "name": "Heartbeat (30min)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -1000,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "apiBaseUrl",
+              "value": "={{ $env.API_URL }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "cronSecret",
+              "value": "={{ $env.CRON_SECRET }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "telegramBotToken",
+              "value": "={{ $env.TELEGRAM_BOT_TOKEN }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "adminChatId",
+              "value": "={{ $env.ADMIN_CHAT_ID }}",
+              "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "adminTelegramId",
+              "value": "={{ $env.ADMIN_TELEGRAM_ID }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "include": "all"
+      },
+      "id": "ops-config",
+      "name": "Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -780,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Parse command from webhook or heartbeat\nconst input = $input.first().json;\nlet command = 'heartbeat';\nlet params = {};\n\nif (input.body) {\n  // From webhook\n  const text = input.body.message?.text || '';\n  const parts = text.split(' ');\n  command = parts[0]?.replace('/', '') || 'status';\n  params = { args: parts.slice(1) };\n} else if (input.command) {\n  // Direct call\n  command = input.command;\n  params = input.params || {};\n}\n\nreturn {\n  json: {\n    command: command,\n    params: params,\n    timestamp: new Date().toISOString(),\n    source: input.body ? 'webhook' : 'scheduler'\n  }\n};"
+      },
+      "id": "parse-command",
+      "name": "Parse Command",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "status",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Status"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "resync",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Resync"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "sentinel",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Sentinel"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "heartbeat",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Heartbeat"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Help"
+        }
+      },
+      "id": "command-router",
+      "name": "Command Router",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -340,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Configuration').first().json.apiBaseUrl }}?action=get-system-metrics",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Configuration').first().json.cronSecret }}"
+            },
+            {
+              "name": "X-Telegram-Id",
+              "value": "={{ $('Configuration').first().json.adminTelegramId }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "get-status",
+      "name": "Get Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -100,
+        100
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const metrics = $input.first().json;\nconst m = metrics.metrics || {};\n\nconst apiStatus = metrics.success ? '🟢 Online' : '🔴 Offline';\nconst sentinelErrors = m.sentinel?.errors_last_hour || 0;\nconst sentinelStatus = sentinelErrors < 5 ? '🟢 OK' : sentinelErrors < 20 ? '🟡 Warning' : '🔴 Critical';\n\nconst message = `📊 *NeuroGUARDIAN Status*\\n\\n` +\n  `🌐 API: ${apiStatus}\\n` +\n  `🛡️ Sentinel: ${sentinelStatus}\\n` +\n  `├─ Errors (1h): ${sentinelErrors}\\n` +\n  `└─ Actions today: ${m.sentinel?.total_actions_today || 0}\\n\\n` +\n  `👥 Users: ${m.subscriptions?.active_count || 0} active\\n` +\n  `📦 Products: ${m.products?.protected_count || 0} protected\\n\\n` +\n  `⏰ ${new Date().toLocaleString('ru-RU')}`;\n\nreturn {\n  json: {\n    message: message,\n    chat_id: $('Configuration').first().json.adminChatId\n  }\n};"
+      },
+      "id": "build-status",
+      "name": "Build Status Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        120,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Configuration').first().json.apiBaseUrl }}?action=sync-products",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Configuration').first().json.cronSecret }}"
+            },
+            {
+              "name": "X-Telegram-Id",
+              "value": "={{ $('Configuration').first().json.adminTelegramId }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"telegramId\": \"{{ $('Configuration').first().json.adminTelegramId }}\",\n  \"marketplace\": \"all\"\n}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "trigger-resync",
+      "name": "Trigger Resync",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -100,
+        250
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const result = $input.first().json;\nconst success = result.success || result.count !== undefined;\n\nconst message = success\n  ? `✅ *Resync Complete*\\n\\nSynced ${result.count || 0} products.\\n\\n⏰ ${new Date().toLocaleString('ru-RU')}`\n  : `❌ *Resync Failed*\\n\\nError: ${result.error || 'Unknown'}\\n\\n⏰ ${new Date().toLocaleString('ru-RU')}`;\n\nreturn {\n  json: {\n    message: message,\n    chat_id: $('Configuration').first().json.adminChatId\n  }\n};"
+      },
+      "id": "build-resync-result",
+      "name": "Build Resync Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        120,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Configuration').first().json.apiBaseUrl }}?action=check-prices&include_details=true",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Configuration').first().json.cronSecret }}"
+            },
+            {
+              "name": "X-Telegram-Id",
+              "value": "={{ $('Configuration').first().json.adminTelegramId }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "get-sentinel-data",
+      "name": "Get Sentinel Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -100,
+        400
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const data = $input.first().json;\nconst violations = data.violations || [];\nconst totalChecked = data.totalChecked || 0;\n\nlet message = `🛡️ *Sentinel Status*\\n\\n`;\nmessage += `📊 Checked: ${totalChecked} products\\n`;\nmessage += `⚠️ Violations: ${violations.length}\\n\\n`;\n\nif (violations.length > 0) {\n  message += `*Recent Violations:*\\n`;\n  violations.slice(0, 5).forEach((v, i) => {\n    const emoji = v.marketplace === 'WB' ? '🟣' : '🔵';\n    message += `${i + 1}. ${emoji} ${v.title?.substring(0, 30)}...\\n`;\n    message += `   ${v.action}: ${v.currentPrice}₽ → ${v.expectedPrice}₽\\n`;\n  });\n  if (violations.length > 5) {\n    message += `\\n_...и ещё ${violations.length - 5}_\\n`;\n  }\n} else {\n  message += `✅ All prices are correct!\\n`;\n}\n\nmessage += `\\n⏰ ${new Date().toLocaleString('ru-RU')}`;\n\nreturn {\n  json: {\n    message: message,\n    chat_id: $('Configuration').first().json.adminChatId\n  }\n};"
+      },
+      "id": "build-sentinel-report",
+      "name": "Build Sentinel Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        120,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Configuration').first().json.apiBaseUrl }}?action=health",
+        "authentication": "none",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "heartbeat-check",
+      "name": "Heartbeat Check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -100,
+        550
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const result = $input.first().json;\nconst healthy = result.status === 'ok' || result.success;\n\n// Only alert if unhealthy\nif (!healthy) {\n  return {\n    json: {\n      shouldAlert: true,\n      message: `🚨 *ALERT: API DOWN*\\n\\nNeuroGUARDIAN API is not responding!\\n\\nError: ${result.error || 'Connection failed'}\\n\\n⏰ ${new Date().toLocaleString('ru-RU')}`,\n      chat_id: $('Configuration').first().json.adminChatId\n    }\n  };\n}\n\nreturn {\n  json: {\n    shouldAlert: false,\n    status: 'healthy'\n  }\n};"
+      },
+      "id": "check-heartbeat",
+      "name": "Check Heartbeat",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        120,
+        550
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{ $json.shouldAlert }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "should-alert",
+      "name": "Should Alert?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        340,
+        550
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const message = `📖 *NeuroGUARDIAN Ops Commands*\\n\\n` +\n  `/status — System status overview\\n` +\n  `/sentinel — Price protection report\\n` +\n  `/resync — Trigger full product sync\\n` +\n  `/help — Show this message\\n\\n` +\n  `💡 Use AI Agent for natural language queries.`;\n\nreturn {\n  json: {\n    message: message,\n    chat_id: $('Configuration').first().json.adminChatId\n  }\n};"
+      },
+      "id": "build-help",
+      "name": "Build Help Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -100,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $('Configuration').first().json.telegramBotToken }}/sendMessage",
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{ $json.chat_id }}\",\n  \"text\": \"{{ $json.message }}\",\n  \"parse_mode\": \"Markdown\"\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "send-telegram",
+      "name": "Send Telegram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        560,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Ops Webhook": {
+      "main": [
+        [
+          {
+            "node": "Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Heartbeat (30min)": {
+      "main": [
+        [
+          {
+            "node": "Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuration": {
+      "main": [
+        [
+          {
+            "node": "Parse Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Command": {
+      "main": [
+        [
+          {
+            "node": "Command Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Command Router": {
+      "main": [
+        [
+          {
+            "node": "Get Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Trigger Resync",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Sentinel Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Heartbeat Check",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Help Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Status": {
+      "main": [
+        [
+          {
+            "node": "Build Status Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Status Message": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Resync": {
+      "main": [
+        [
+          {
+            "node": "Build Resync Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Resync Result": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Sentinel Data": {
+      "main": [
+        [
+          {
+            "node": "Build Sentinel Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Sentinel Report": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Heartbeat Check": {
+      "main": [
+        [
+          {
+            "node": "Check Heartbeat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Heartbeat": {
+      "main": [
+        [
+          {
+            "node": "Should Alert?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Alert?": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Help Message": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-12-29T17:10:00.000Z",
+  "versionId": "ops-center-v1",
+  "active": false
+}

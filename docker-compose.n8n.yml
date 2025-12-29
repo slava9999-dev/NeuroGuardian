@@ -3,7 +3,7 @@
 
 services:
   n8n:
-    image: n8nio/n8n:latest
+    image: n8nio/n8n:2.2.0
     container_name: neuroguardian-n8n
     restart: unless-stopped
     ports:
@@ -30,7 +30,7 @@ services:
       - EXECUTIONS_DATA_SAVE_ON_SUCCESS=all
       - EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS=true
 
-      # Allow $env access in workflows
+      # Allow $env access in workflows (n8n 2.0+ correct variable)
       - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
 
       # Enable Public API (for automation scripts)
