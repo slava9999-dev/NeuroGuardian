@@ -336,7 +336,7 @@ export async function handleAgentV4Confirm(
     getMarketplaceKeys,
   } = await import('../services/marketplace.js');
   const { updateProductMinPrice, getProductsByUserId } = await import('../services/database.js');
-  const { validatePriceUpdate } = await import('../services/price-guard.js');
+  const { validatePriceUpdateSync } = await import('../services/price-guard.js');
 
   try {
     let resultMessage = '';
@@ -373,9 +373,10 @@ export async function handleAgentV4Confirm(
         for (const u of priceUpdates) {
           const product = products.find(p => p.product_id === u.product_id);
 
-          const securityResult = validatePriceUpdate({
+          const securityResult = validatePriceUpdateSync({
             productId: u.product_id,
             nmId: u.nm_id,
+            userId,
             currentPrice: product?.current_price || u.new_price, // fallback if price not cached
             proposedPrice: u.new_price,
             minPrice: product?.min_price || 0,
