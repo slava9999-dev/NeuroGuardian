@@ -416,5 +416,107 @@ describe('Unit Economics Calculator', () => {
       const criticalWarnings = result.warnings.filter(w => w.type === 'critical');
       expect(criticalWarnings.length).toBe(0);
     });
+
+    // ============================================
+    // Viktor Margin v3.0: Storage Warnings
+    // ============================================
+    it('27. HIGH_STORAGE_DAYS warning for WB products >45 days', () => {
+      const result = calculateUnitEconomics({
+        price: 1000,
+        costPrice: 400,
+        marketplace: 'WB',
+        category: 'Одежда',
+        avgStorageDays: 50,
+      });
+
+      const warning = result.warnings.find(w => w.code === 'HIGH_STORAGE_DAYS');
+      expect(warning).toBeDefined();
+      expect(warning?.type).toBe('warning'); // Not critical yet (before 60 days)
+      expect(warning?.message).toContain('50 дней');
+      expect(warning?.message).toContain('удвоится');
+    });
+
+    it('28. CRITICAL storage warning for WB products >60 days', () => {
+      const result = calculateUnitEconomics({
+        price: 1000,
+        costPrice: 400,
+        marketplace: 'WB',
+        category: 'Одежда',
+        avgStorageDays: 70,
+      });
+
+      const warning = result.warnings.find(w => w.code === 'HIGH_STORAGE_DAYS');
+      expect(warning).toBeDefined();
+      expect(warning?.type).toBe('critical'); // Critical after 60 days
+      expect(warning?.message).toContain('70 дней');
+      expect(warning?.message).toContain('x2');
+    });
+
+    it('29. CRITICAL storage warning for WB products >90 days', () => {
+      const result = calculateUnitEconomics({
+        price: 1000,
+        costPrice: 400,
+        marketplace: 'WB',
+        category: 'Одежда',
+        avgStorageDays: 100,
+      });
+
+      const warning = result.warnings.find(w => w.code === 'HIGH_STORAGE_DAYS');
+      expect(warning).toBeDefined();
+      expect(warning?.type).toBe('critical');
+      expect(warning?.message).toContain('100 дней');
+      expect(warning?.message).toContain('x4');
+      expect(warning?.message).toContain('распродавайте');
+    });
+
+    // ============================================
+    // Viktor Margin v3.0: Return Rate Warnings
+    // ============================================
+    it('30. HIGH_RETURN_RATE warning for return rate >15%', () => {
+      const result = calculateUnitEconomics({
+        price: 1000,
+        costPrice: 400,
+        marketplace: 'WB',
+        category: 'Одежда',
+        returnRate: 0.2, // 20% return rate
+      });
+
+      const warning = result.warnings.find(w => w.code === 'HIGH_RETURN_RATE');
+      expect(warning).toBeDefined();
+      expect(warning?.type).toBe('warning'); // Warning for 15-25%
+      expect(warning?.message).toContain('20%');
+      expect(warning?.message).toContain('размерную сетку');
+    });
+
+    it('31. CRITICAL return rate warning for >25%', () => {
+      const result = calculateUnitEconomics({
+        price: 1000,
+        costPrice: 400,
+        marketplace: 'WB',
+        category: 'Обувь',
+        returnRate: 0.3, // 30% return rate (common for shoes)
+      });
+
+      const warning = result.warnings.find(w => w.code === 'HIGH_RETURN_RATE');
+      expect(warning).toBeDefined();
+      expect(warning?.type).toBe('critical'); // Critical for >25%
+      expect(warning?.message).toContain('30%');
+    });
+
+    it('32. Enhanced Ozon Card warning with annual impact', () => {
+      const result = calculateUnitEconomics({
+        price: 2500,
+        costPrice: 1000,
+        marketplace: 'Ozon',
+        category: 'Электроника',
+        useOzonCard: true,
+      });
+
+      const warning = result.warnings.find(w => w.code === 'OZON_CARD_IMPACT');
+      expect(warning).toBeDefined();
+      expect(warning?.message).toContain('съедает');
+      expect(warning?.message).toContain('1000 заказов');
+      expect(warning?.message).toContain('маржи');
+    });
   });
 });
