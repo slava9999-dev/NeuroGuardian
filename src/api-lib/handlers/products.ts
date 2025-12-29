@@ -31,6 +31,7 @@ export async function handleProducts(
   res: VercelResponse,
   userId: number
 ): Promise<VercelResponse> {
+  console.log(`🔍 [handleProducts] userId=${userId}, method=${req.method}`);
   if (req.method === 'GET') {
     const products = await getProductsByUserId(userId);
 

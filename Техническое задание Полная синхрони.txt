@@ -1,0 +1,1795 @@
+Техническое задание: Полная синхронизация инфраструктуры NeuroGuardian
+🎯 Цель проекта
+Создать единую, полностью синхронизированную инфраструктуру для проекта NeuroGuardian (ассистент маркетплейсов "Виктор Маржин") с локальным управлением, мониторингом и автоматизацией всех процессов.
+
+1. Архитектура системы
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         ЛОКАЛЬНАЯ СРЕДА РАЗРАБОТКИ                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐  │
+│  │   VS Code   │    │   Docker    │    │    pnpm     │    │   Cursor    │  │
+│  │  /Cursor    │    │   Compose   │    │   monorepo  │    │    Agent    │  │
+│  └──────┬──────┘    └──────┬──────┘    └──────┬──────┘    └──────┬──────┘  │
+│         │                  │                  │                  │         │
+│         └──────────────────┼──────────────────┼──────────────────┘         │
+│                            │                  │                            │
+│  ┌─────────────────────────┴──────────────────┴─────────────────────────┐  │
+│  │                         DOCKER NETWORK                               │  │
+│  │  ┌───────────┐  ┌───────────┐  ┌───────────┐  ┌───────────────────┐  │  │
+│  │  │PostgreSQL │  │   Redis   │  │    n8n    │  │   App (Next.js)   │  │  │
+│  │  │  :5432    │  │   :6379   │  │   :5678   │  │      :3000        │  │  │
+│  │  └───────────┘  └───────────┘  └───────────┘  └───────────────────┘  │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      │ git push / deploy
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              GITHUB                                         │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐                     │
+│  │    Main     │    │   Develop   │    │   Actions   │                     │
+│  │   branch    │◄───│   branch    │───►│   CI/CD     │                     │
+│  └──────┬──────┘    └─────────────┘    └──────┬──────┘                     │
+└─────────┼────────────────────────────────────┼─────────────────────────────┘
+          │                                    │
+          │ auto-deploy                        │ tests
+          ▼                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              VERCEL                                         │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐                     │
+│  │ Production  │    │  Preview    │    │    Edge     │                     │
+│  │   deploy    │    │  deploys    │    │  Functions  │                     │
+│  └──────┬──────┘    └─────────────┘    └─────────────┘                     │
+└─────────┼───────────────────────────────────────────────────────────────────┘
+          │
+          │ connects to
+          ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         ВНЕШНИЕ СЕРВИСЫ                                     │
+│  ┌───────────┐  ┌───────────┐  ┌───────────┐  ┌───────────┐  ┌──────────┐  │
+│  │  Supabase │  │ Anthropic │  │ WB API    │  │ Ozon API  │  │  n8n     │  │
+│  │    DB     │  │   Claude  │  │           │  │           │  │  Cloud   │  │
+│  └───────────┘  └───────────┘  └───────────┘  └───────────┘  └──────────┘  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+2. Компоненты системы
+2.1 Список всех инструментов
+yamlDownloadCopy codedevelopment_environment:
+  ide:
+    - name: "Cursor IDE"
+      version: "latest"
+      extensions:
+        - "ESLint"
+        - "Prettier"
+        - "Prisma"
+        - "Tailwind CSS IntelliSense"
+        - "GitLens"
+        - "Docker"
+        - "Thunder Client"
+        - "GitHub Copilot" # опционально
+        
+  runtime:
+    - name: "Node.js"
+      version: "20.x LTS"
+    - name: "pnpm"
+      version: "9.x"
+    - name: "Docker Desktop"
+      version: "latest"
+    - name: "Docker Compose"
+      version: "v2"
+      
+  cli_tools:
+    - name: "git"
+      version: "latest"
+    - name: "gh" # GitHub CLI
+      version: "latest"
+    - name: "vercel"
+      version: "latest"
+    - name: "supabase"
+      version: "latest"
+    - name: "prisma"
+      version: "^5.x"
+
+local_services:
+  database:
+    - name: "PostgreSQL"
+      version: "16"
+      port: 5432
+  cache:
+    - name: "Redis"
+      version: "7"
+      port: 6379
+  automation:
+    - name: "n8n"
+      version: "latest"
+      port: 5678
+  app:
+    - name: "Next.js App"
+      port: 3000
+
+cloud_services:
+  hosting:
+    - name: "Vercel"
+      type: "production"
+  database:
+    - name: "Supabase"
+      type: "PostgreSQL + Auth"
+  ai:
+    - name: "Anthropic Claude"
+      model: "claude-sonnet-4-20250514"
+  automation:
+    - name: "n8n Cloud"
+      type: "optional backup"
+
+external_apis:
+  marketplaces:
+    - "Wildberries API"
+    - "Ozon API"
+
+3. Структура проекта
+3.1 Файловая структура
+neuroguardian/
+├── .github/
+│   ├── workflows/
+│   │   ├── ci.yml                 # Тесты и линтинг
+│   │   ├── deploy-preview.yml     # Preview деплой
+│   │   └── deploy-production.yml  # Production деплой
+│   └── CODEOWNERS
+│
+├── docker/
+│   ├── docker-compose.yml         # Основной compose файл
+│   ├── docker-compose.dev.yml     # Dev overrides
+│   ├── docker-compose.test.yml    # Test overrides
+│   ├── postgres/
+│   │   └── init.sql               # Инициализация БД
+│   ├── n8n/
+│   │   ├── Dockerfile             # Кастомный n8n с плагинами
+│   │   └── workflows/             # Экспортированные workflow
+│   └── nginx/
+│       └── nginx.conf             # Локальный reverse proxy
+│
+├── packages/
+│   ├── database/                  # Prisma схема и миграции
+│   │   ├── prisma/
+│   │   │   ├── schema.prisma
+│   │   │   └── migrations/
+│   │   └── package.json
+│   │
+│   ├── shared/                    # Общие типы и утилиты
+│   │   ├── src/
+│   │   │   ├── types/
+│   │   │   ├── utils/
+│   │   │   └── constants/
+│   │   └── package.json
+│   │
+│   └── api-clients/               # Клиенты внешних API
+│       ├── src/
+│       │   ├── wildberries/
+│       │   ├── ozon/
+│       │   └── anthropic/
+│       └── package.json
+│
+├── apps/
+│   └── web/                       # Next.js приложение
+│       ├── src/
+│       │   ├── app/               # App Router
+│       │   ├── components/
+│       │   ├── lib/
+│       │   ├── hooks/
+│       │   ├── services/
+│       │   └── agent/             # Виктор Маржин
+│       ├── public/
+│       └── package.json
+│
+├── knowledge-base/                # База знаний агента
+│   ├── marketplaces/
+│   ├── business-logic/
+│   └── setup-guides/
+│
+├── scripts/
+│   ├── setup.sh                   # Первоначальная настройка
+│   ├── sync-env.sh                # Синхронизация .env файлов
+│   ├── db-backup.sh               # Бэкап базы данных
+│   ├── test-integrations.sh       # Тестирование интеграций
+│   └── health-check.sh            # Проверка всех сервисов
+│
+├── tests/
+│   ├── e2e/
+│   ├── integration/
+│   └── unit/
+│
+├── .env.example                   # Шаблон переменных окружения
+├── .env.local                     # Локальные переменные (git ignored)
+├── .env.test                      # Тестовые переменные
+├── pnpm-workspace.yaml
+├── turbo.json                     # Turborepo конфиг
+├── package.json
+└── README.md
+
+
+4. Конфигурационные файлы
+4.1 Docker Compose (основной)
+yamlDownloadCopy code# docker/docker-compose.yml
+version: '3.9'
+
+services:
+  # ============================================
+  # PostgreSQL - Основная база данных
+  # ============================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: ng_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-neuroguardian}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-localdevpassword}
+      POSTGRES_DB: ${POSTGRES_DB:-neuroguardian_dev}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-neuroguardian}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ng_network
+
+  # ============================================
+  # Redis - Кэширование и очереди
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: ng_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-localredispass}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-localredispass}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ng_network
+
+  # ============================================
+  # n8n - Автоматизация и workflow
+  # ============================================
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: ng_n8n
+    restart: unless-stopped
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:-localn8npass}
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://localhost:5678/
+      - GENERIC_TIMEZONE=Europe/Moscow
+      - TZ=Europe/Moscow
+      # Подключение к PostgreSQL для хранения данных n8n
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=n8n
+      - DB_POSTGRESDB_USER=${POSTGRES_USER:-neuroguardian}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD:-localdevpassword}
+      # Секреты для шифрования credentials
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:-your-32-char-encryption-key-here}
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n/workflows:/home/node/workflows:ro
+    ports:
+      - "5678:5678"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:5678/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ng_network
+
+  # ============================================
+  # Приложение Next.js (dev режим)
+  # ============================================
+  app:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.dev
+    container_name: ng_app
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-neuroguardian}:${POSTGRES_PASSWORD:-localdevpassword}@postgres:5432/${POSTGRES_DB:-neuroguardian_dev}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-localredispass}@redis:6379
+      - N8N_WEBHOOK_URL=http://n8n:5678
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - WB_API_TOKEN=${WB_API_TOKEN}
+      - OZON_CLIENT_ID=${OZON_CLIENT_ID}
+      - OZON_API_KEY=${OZON_API_KEY}
+    volumes:
+      - ../apps/web:/app/apps/web
+      - ../packages:/app/packages
+      - /app/node_modules
+      - /app/apps/web/node_modules
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      n8n:
+        condition: service_healthy
+    networks:
+      - ng_network
+
+  # ============================================
+  # Adminer - UI для базы данных
+  # ============================================
+  adminer:
+    image: adminer:latest
+    container_name: ng_adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    networks:
+      - ng_network
+
+  # ============================================
+  # Redis Commander - UI для Redis
+  # ============================================
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: ng_redis_commander
+    restart: unless-stopped
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-localredispass}
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - ng_network
+
+volumes:
+  postgres_data:
+  redis_data:
+  n8n_data:
+
+networks:
+  ng_network:
+    driver: bridge
+4.2 Переменные окружения
+bashDownloadCopy code# .env.example
+# =============================================
+# ЛОКАЛЬНАЯ РАЗРАБОТКА - NeuroGuardian
+# =============================================
+
+# === База данных (локальный Docker) ===
+POSTGRES_USER=neuroguardian
+POSTGRES_PASSWORD=localdevpassword
+POSTGRES_DB=neuroguardian_dev
+DATABASE_URL="postgresql://neuroguardian:localdevpassword@localhost:5432/neuroguardian_dev"
+
+# === База данных (Supabase Production) ===
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_KEY=your-service-key
+DATABASE_URL_PRODUCTION="postgresql://postgres:password@db.your-project.supabase.co:5432/postgres"
+
+# === Redis ===
+REDIS_PASSWORD=localredispass
+REDIS_URL="redis://:localredispass@localhost:6379"
+
+# === n8n ===
+N8N_USER=admin
+N8N_PASSWORD=localn8npass
+N8N_HOST=localhost
+N8N_ENCRYPTION_KEY=your-32-character-encryption-key
+N8N_WEBHOOK_URL=http://localhost:5678
+
+# === AI ===
+ANTHROPIC_API_KEY=sk-ant-your-api-key
+
+# === Маркетплейсы ===
+# Wildberries
+WB_API_TOKEN=your-wb-api-token
+
+# Ozon
+OZON_CLIENT_ID=your-ozon-client-id
+OZON_API_KEY=your-ozon-api-key
+
+# === Vercel ===
+VERCEL_TOKEN=your-vercel-token
+VERCEL_ORG_ID=your-org-id
+VERCEL_PROJECT_ID=your-project-id
+
+# === GitHub ===
+GITHUB_TOKEN=your-github-token
+
+# === Приложение ===
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXTAUTH_SECRET=your-nextauth-secret
+NEXTAUTH_URL=http://localhost:3000
+
+# === Режим работы ===
+NODE_ENV=development
+LOG_LEVEL=debug
+4.3 Prisma схема
+prismaDownloadCopy code// packages/database/prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================
+// Пользователи и аутентификация
+// =============================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Связи
+  stores        Store[]
+  settings      UserSettings?
+  
+  @@map("users")
+}
+
+model UserSettings {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Настройки уведомлений
+  notifyLowStock        Boolean  @default(true)
+  notifyPriceChange     Boolean  @default(true)
+  notifyLowMargin       Boolean  @default(true)
+  lowStockThreshold     Int      @default(10)
+  lowMarginThreshold    Float    @default(15.0)
+  
+  // Настройки агента
+  agentVoice            String   @default("professional") // professional, friendly, expert
+  defaultMarketplace    String   @default("wb") // wb, ozon, both
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@map("user_settings")
+}
+
+// =============================================
+// Магазины и интеграции
+// =============================================
+
+model Store {
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name          String
+  marketplace   Marketplace
+  isActive      Boolean     @default(true)
+  
+  // API credentials (зашифрованы)
+  apiToken      String?     @db.Text
+  clientId      String?
+  
+  // Статус синхронизации
+  lastSyncAt    DateTime?
+  syncStatus    SyncStatus  @default(PENDING)
+  syncError     String?
+  
+  // Связи
+  products      Product[]
+  orders        Order[]
+  
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  @@unique([userId, marketplace])
+  @@map("stores")
+}
+
+enum Marketplace {
+  WB
+  OZON
+}
+
+enum SyncStatus {
+  PENDING
+  SYNCING
+  SUCCESS
+  ERROR
+}
+
+// =============================================
+// Товары
+// =============================================
+
+model Product {
+  id                String        @id @default(cuid())
+  storeId           String
+  store             Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  
+  // Идентификаторы маркетплейса
+  externalId        String        // nmId для WB, product_id для Ozon
+  sku               String?
+  barcode           String?
+  
+  // Основная информация
+  name              String
+  brand             String?
+  category          String?
+  
+  // Цены
+  price             Float         // Текущая цена
+  priceBeforeDiscount Float?      // Цена до скидки
+  costPrice         Float?        // Себестоимость
+  minPrice          Float?        // Минимальная цена (защита маржи)
+  
+  // Комиссии и расчёты
+  commissionPercent Float?        // Комиссия МП
+  logisticsCost     Float?        // Логистика
+  sppPercent        Float?        // СПП (WB)
+  
+  // Остатки
+  stock             Int           @default(0)
+  reservedStock     Int           @default(0)
+  
+  // Медиа
+  imageUrl          String?
+  images            String[]      // Массив URL
+  
+  // Статус
+  isActive          Boolean       @default(true)
+  status            ProductStatus @default(ACTIVE)
+  
+  // Метрики
+  rating            Float?
+  reviewsCount      Int           @default(0)
+  salesCount        Int           @default(0)
+  
+  // Связи
+  priceHistory      PriceHistory[]
+  stockHistory      StockHistory[]
+  calculations      PriceCalculation[]
+  
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  
+  @@unique([storeId, externalId])
+  @@index([storeId])
+  @@index([sku])
+  @@map("products")
+}
+
+enum ProductStatus {
+  ACTIVE
+  INACTIVE
+  OUT_OF_STOCK
+  BLOCKED
+}
+
+// =============================================
+// История цен
+// =============================================
+
+model PriceHistory {
+  id          String   @id @default(cuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  price       Float
+  priceType   String   // regular, promo, spp
+  source      String   // api_sync, manual, agent
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([productId, createdAt])
+  @@map("price_history")
+}
+
+// =============================================
+// История остатков
+// =============================================
+
+model StockHistory {
+  id          String   @id @default(cuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  stock       Int
+  warehouse   String?
+  source      String   // api_sync, manual
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([productId, createdAt])
+  @@map("stock_history")
+}
+
+// =============================================
+// Расчёты калькулятора
+// =============================================
+
+model PriceCalculation {
+  id                    String   @id @default(cuid())
+  productId             String
+  product               Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  // Входные данные
+  inputCostPrice        Float
+  inputPrice            Float
+  inputLogistics        Float
+  inputCommission       Float
+  inputSpp              Float
+  inputCardDiscount     Float
+  inputReturnRate       Float
+  
+  // Результаты
+  calculatedMargin      Float
+  calculatedProfit      Float
+  recommendedPrice      Float
+  breakEvenPrice        Float
+  
+  // Предупреждения
+  warnings              String[] // Массив предупреждений
+  
+  createdAt             DateTime @default(now())
+  
+  @@index([productId])
+  @@map("price_calculations")
+}
+
+// =============================================
+// Заказы
+// =============================================
+
+model Order {
+  id              String      @id @default(cuid())
+  storeId         String
+  store           Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  
+  externalId      String      // Номер заказа в МП
+  status          OrderStatus
+  
+  // Финансы
+  totalPrice      Float
+  commission      Float?
+  logistics       Float?
+  profit          Float?
+  
+  // Даты
+  orderedAt       DateTime
+  deliveredAt     DateTime?
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  
+  @@unique([storeId, externalId])
+  @@index([storeId, orderedAt])
+  @@map("orders")
+}
+
+enum OrderStatus {
+  NEW
+  CONFIRMED
+  ASSEMBLED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  RETURNED
+}
+
+// =============================================
+// Уведомления и алерты
+// =============================================
+
+model Alert {
+  id          String      @id @default(cuid())
+  storeId     String
+  productId   String?
+  
+  type        AlertType
+  severity    AlertSeverity
+  title       String
+  message     String
+  data        Json?       // Дополнительные данные
+  
+  isRead      Boolean     @default(false)
+  isResolved  Boolean     @default(false)
+  resolvedAt  DateTime?
+  
+  createdAt   DateTime    @default(now())
+  
+  @@index([storeId, isRead])
+  @@map("alerts")
+}
+
+enum AlertType {
+  LOW_STOCK
+  LOW_MARGIN
+  PRICE_DROP
+  COMMISSION_CHANGE
+  STORAGE_WARNING
+  PENALTY_RISK
+  SYNC_ERROR
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+// =============================================
+// Логи агента
+// =============================================
+
+model AgentLog {
+  id          String   @id @default(cuid())
+  storeId     String?
+  
+  action      String   // analyze_price, check_stock, etc.
+  input       Json?
+  output      Json?
+  tokensUsed  Int?
+  duration    Int?     // миллисекунды
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([storeId, createdAt])
+  @@map("agent_logs")
+}
+
+// =============================================
+// Настройки комиссий (кэш из базы знаний)
+// =============================================
+
+model CommissionRate {
+  id              String      @id @default(cuid())
+  marketplace     Marketplace
+  category        String
+  subcategory     String?
+  
+  commissionRate  Float       // Процент комиссии
+  fboRate         Float?      // Тариф FBO
+  fbsRate         Float?      // Тариф FBS
+  storageRate     Float?      // Тариф хранения
+  
+  validFrom       DateTime
+  validTo         DateTime?
+  
+  source          String      // official, calculated
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  
+  @@unique([marketplace, category, subcategory, validFrom])
+  @@map("commission_rates")
+}
+
+5. Скрипты автоматизации
+5.1 Главный скрипт настройки
+bashDownloadCopy code#!/bin/bash
+# scripts/setup.sh
+# Полная настройка локальной среды разработки
+
+set -e
+
+# Цвета для вывода
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Функции для вывода
+log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
+log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
+log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
+log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
+
+# Баннер
+echo -e "${GREEN}"
+echo "╔═══════════════════════════════════════════════════════════╗"
+echo "║                                                           ║"
+echo "║     🛡️  NEUROGUARDIAN - ПОЛНАЯ НАСТРОЙКА СИСТЕМЫ  🛡️      ║"
+echo "║                                                           ║"
+echo "║     Виктор Маржин - Эксперт по маркетплейсам              ║"
+echo "║                                                           ║"
+echo "╚═══════════════════════════════════════════════════════════╝"
+echo -e "${NC}"
+
+# ============================================
+# Проверка зависимостей
+# ============================================
+log_info "Проверка системных зависимостей..."
+
+check_command() {
+    if ! command -v $1 &> /dev/null; then
+        log_error "$1 не установлен!"
+        return 1
+    else
+        log_success "$1 найден: $(command -v $1)"
+        return 0
+    fi
+}
+
+MISSING_DEPS=0
+
+check_command "node" || MISSING_DEPS=1
+check_command "pnpm" || MISSING_DEPS=1
+check_command "docker" || MISSING_DEPS=1
+check_command "docker-compose" || { check_command "docker compose" || MISSING_DEPS=1; }
+check_command "git" || MISSING_DEPS=1
+
+if [ $MISSING_DEPS -eq 1 ]; then
+    log_error "Установите недостающие зависимости и запустите скрипт снова."
+    exit 1
+fi
+
+# Проверка версий
+NODE_VERSION=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
+if [ "$NODE_VERSION" -lt 18 ]; then
+    log_error "Требуется Node.js 18+. Текущая версия: $(node -v)"
+    exit 1
+fi
+log_success "Node.js версия: $(node -v)"
+
+# ============================================
+# Настройка переменных окружения
+# ============================================
+log_info "Настройка переменных окружения..."
+
+if [ ! -f ".env.local" ]; then
+    if [ -f ".env.example" ]; then
+        cp .env.example .env.local
+        log_success "Создан .env.local из .env.example"
+        log_warning "Не забудьте заполнить API ключи в .env.local!"
+    else
+        log_error ".env.example не найден!"
+        exit 1
+    fi
+else
+    log_info ".env.local уже существует"
+fi
+
+# ============================================
+# Установка зависимостей
+# ============================================
+log_info "Установка npm зависимостей..."
+pnpm install
+
+if [ $? -ne 0 ]; then
+    log_error "Ошибка при установке зависимостей"
+    exit 1
+fi
+log_success "Зависимости установлены"
+
+# ============================================
+# Запуск Docker контейнеров
+# ============================================
+log_info "Запуск Docker контейнеров..."
+
+cd docker
+
+# Остановка существующих контейнеров
+docker compose down 2>/dev/null || true
+
+# Запуск новых
+docker compose up -d
+
+if [ $? -ne 0 ]; then
+    log_error "Ошибка при запуске Docker контейнеров"
+    exit 1
+fi
+
+cd ..
+
+log_success "Docker контейнеры запущены"
+
+# ============================================
+# Ожидание готовности сервисов
+# ============================================
+log_info "Ожидание готовности сервисов..."
+
+wait_for_service() {
+    local service=$1
+    local port=$2
+    local max_attempts=30
+    local attempt=1
+    
+    while [ $attempt -le $max_attempts ]; do
+        if nc -z localhost $port 2>/dev/null; then
+            log_success "$service готов (порт $port)"
+            return 0
+        fi
+        echo -n "."
+        sleep 2
+        attempt=$((attempt + 1))
+    done
+    
+    log_error "$service не отвечает на порту $port"
+    return 1
+}
+
+wait_for_service "PostgreSQL" 5432
+wait_for_service "Redis" 6379
+wait_for_service "n8n" 5678
+
+# ============================================
+# Применение миграций базы данных
+# ============================================
+log_info "Применение миграций базы данных..."
+
+pnpm db:migrate
+
+if [ $? -ne 0 ]; then
+    log_error "Ошибка при применении миграций"
+    exit 1
+fi
+log_success "Миграции применены"
+
+# Генерация Prisma Client
+pnpm db:generate
+log_success "Prisma Client сгенерирован"
+
+# ============================================
+# Seed базы данных (опционально)
+# ============================================
+read -p "Заполнить базу тестовыми данными? (y/n): " SEED_DB
+if [ "$SEED_DB" = "y" ]; then
+    log_info "Заполнение базы тестовыми данными..."
+    pnpm db:seed
+    log_success "Тестовые данные добавлены"
+fi
+
+# ============================================
+# Проверка интеграций
+# ============================================
+log_info "Проверка интеграций..."
+
+./scripts/test-integrations.sh --quick
+
+# ============================================
+# Импорт n8n workflows
+# ============================================
+log_info "Импорт n8n workflows..."
+
+# Ждём полной готовности n8n
+sleep 5
+
+# Импорт через CLI (если есть)
+if [ -d "docker/n8n/workflows" ] && [ "$(ls -A docker/n8n/workflows)" ]; then
+    log_info "Найдены workflow файлы для импорта"
+    log_warning "Импортируйте их вручную через n8n UI: http://localhost:5678"
+else
+    log_info "Нет workflow для импорта"
+fi
+
+# ============================================
+# Финальная проверка
+# ============================================
+log_info "Финальная проверка системы..."
+
+echo ""
+echo -e "${GREEN}╔═══════════════════════════════════════════════════════════╗${NC}"
+echo -e "${GREEN}║                    СИСТЕМА ГОТОВА!                        ║${NC}"
+echo -e "${GREEN}╚═══════════════════════════════════════════════════════════╝${NC}"
+echo ""
+echo "📍 Доступные сервисы:"
+echo ""
+echo "   🌐 Приложение:      http://localhost:3000"
+echo "   🔄 n8n Dashboard:   http://localhost:5678"
+echo "   🗄️  Adminer (БД):    http://localhost:8080"
+echo "   📊 Redis Commander: http://localhost:8081"
+echo ""
+echo "📝 Credentials для n8n:"
+echo "   User: admin"
+echo "   Pass: localn8npass (см. .env.local)"
+echo ""
+echo "🚀 Команды для запуска:"
+echo ""
+echo "   pnpm dev           - Запуск приложения"
+echo "   pnpm test          - Запуск тестов"
+echo "   pnpm db:studio     - Prisma Studio"
+echo "   docker compose logs -f  - Логи контейнеров"
+echo ""
+log_warning "Не забудьте добавить API ключи в .env.local!"
+echo ""
+5.2 Скрипт проверки интеграций
+bashDownloadCopy code#!/bin/bash
+# scripts/test-integrations.sh
+# Тестирование всех интеграций
+
+set -e
+
+QUICK_MODE=false
+if [ "$1" = "--quick" ]; then
+    QUICK_MODE=true
+fi
+
+# Цвета
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+log_test() { echo -e "${YELLOW}[TEST]${NC} $1"; }
+log_pass() { echo -e "${GREEN}[PASS]${NC} $1"; }
+log_fail() { echo -e "${RED}[FAIL]${NC} $1"; }
+
+echo ""
+echo "🧪 ТЕСТИРОВАНИЕ ИНТЕГРАЦИЙ"
+echo "=========================="
+echo ""
+
+FAILED=0
+
+# ============================================
+# Тест PostgreSQL
+# ============================================
+log_test "PostgreSQL подключение..."
+if pg_isready -h localhost -p 5432 -U neuroguardian &>/dev/null; then
+    log_pass "PostgreSQL работает"
+else
+    log_fail "PostgreSQL недоступен"
+    FAILED=1
+fi
+
+# ============================================
+# Тест Redis
+# ============================================
+log_test "Redis подключение..."
+if redis-cli -h localhost -p 6379 -a localredispass ping 2>/dev/null | grep -q "PONG"; then
+    log_pass "Redis работает"
+else
+    log_fail "Redis недоступен"
+    FAILED=1
+fi
+
+# ============================================
+# Тест n8n
+# ============================================
+log_test "n8n API..."
+N8N_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5678/healthz 2>/dev/null || echo "000")
+if [ "$N8N_RESPONSE" = "200" ]; then
+    log_pass "n8n работает"
+else
+    log_fail "n8n недоступен (код: $N8N_RESPONSE)"
+    FAILED=1
+fi
+
+# ============================================
+# Тест внешних API (только если не quick mode)
+# ============================================
+if [ "$QUICK_MODE" = false ]; then
+    
+    # Загрузка переменных
+    if [ -f ".env.local" ]; then
+        export $(grep -v '^#' .env.local | xargs)
+    fi
+    
+    # Wildberries API
+    log_test "Wildberries API..."
+    if [ -n "$WB_API_TOKEN" ]; then
+        WB_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: $WB_API_TOKEN" \
+            "https://suppliers-api.wildberries.ru/api/v3/warehouses" 2>/dev/null || echo "000")
+        if [ "$WB_RESPONSE" = "200" ]; then
+            log_pass "Wildberries API работает"
+        else
+            log_fail "Wildberries API ошибка (код: $WB_RESPONSE)"
+            FAILED=1
+        fi
+    else
+        log_fail "WB_API_TOKEN не установлен"
+        FAILED=1
+    fi
+    
+    # Ozon API
+    log_test "Ozon API..."
+    if [ -n "$OZON_CLIENT_ID" ] && [ -n "$OZON_API_KEY" ]; then
+        OZON_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Client-Id: $OZON_CLIENT_ID" \
+            -H "Api-Key: $OZON_API_KEY" \
+            "https://api-seller.ozon.ru/v1/warehouse/list" 2>/dev/null || echo "000")
+        if [ "$OZON_RESPONSE" = "200" ]; then
+            log_pass "Ozon API работает"
+        else
+            log_fail "Ozon API ошибка (код: $OZON_RESPONSE)"
+            FAILED=1
+        fi
+    else
+        log_fail "OZON_CLIENT_ID или OZON_API_KEY не установлены"
+        FAILED=1
+    fi
+    
+    # Anthropic API
+    log_test "Anthropic API..."
+    if [ -n "$ANTHROPIC_API_KEY" ]; then
+        ANTHROPIC_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
+            "https://api.anthropic.com/v1/models" 2>/dev/null || echo "000")
+        if [ "$ANTHROPIC_RESPONSE" = "200" ]; then
+            log_pass "Anthropic API работает"
+        else
+            log_fail "Anthropic API ошибка (код: $ANTHROPIC_RESPONSE)"
+            FAILED=1
+        fi
+    else
+        log_fail "ANTHROPIC_API_KEY не установлен"
+        FAILED=1
+    fi
+fi
+
+# ============================================
+# Результат
+# ============================================
+echo ""
+echo "=========================="
+if [ $FAILED -eq 0 ]; then
+    echo -e "${GREEN}✅ Все тесты пройдены!${NC}"
+    exit 0
+else
+    echo -e "${RED}❌ Некоторые тесты не пройдены${NC}"
+    exit 1
+fi
+5.3 Скрипт синхронизации с GitHub
+bashDownloadCopy code#!/bin/bash
+# scripts/sync-github.sh
+# Синхронизация с GitHub и проверка статуса
+
+set -e
+
+BLUE='\033[0;34m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
+log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
+log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
+
+echo ""
+echo "🔄 СИНХРОНИЗАЦИЯ С GITHUB"
+echo "========================="
+echo ""
+
+# Проверка текущей ветки
+CURRENT_BRANCH=$(git branch --show-current)
+log_info "Текущая ветка: $CURRENT_BRANCH"
+
+# Проверка незакоммиченных изменений
+if [ -n "$(git status --porcelain)" ]; then
+    log_warning "Есть незакоммиченные изменения:"
+    git status --short
+    echo ""
+    read -p "Продолжить синхронизацию? (y/n): " CONTINUE
+    if [ "$CONTINUE" != "y" ]; then
+        exit 0
+    fi
+fi
+
+# Fetch последних изменений
+log_info "Получение последних изменений..."
+git fetch origin
+
+# Проверка расхождения с origin
+LOCAL=$(git rev-parse @)
+REMOTE=$(git rev-parse @{u} 2>/dev/null || echo "none")
+BASE=$(git merge-base @ @{u} 2>/dev/null || echo "none")
+
+if [ "$REMOTE" = "none" ]; then
+    log_warning "Upstream не настроен"
+elif [ "$LOCAL" = "$REMOTE" ]; then
+    log_success "Локальная ветка синхронизирована с origin"
+elif [ "$LOCAL" = "$BASE" ]; then
+    log_warning "Есть новые коммиты в origin. Выполните: git pull"
+elif [ "$REMOTE" = "$BASE" ]; then
+    log_warning "Есть локальные коммиты для push. Выполните: git push"
+else
+    log_warning "Ветки разошлись. Требуется merge/rebase"
+fi
+
+# Проверка статуса GitHub Actions
+if command -v gh &> /dev/null; then
+    log_info "Статус последних workflow:"
+    gh run list --limit 5
+else
+    log_warning "GitHub CLI не установлен. Установите: brew install gh"
+fi
+
+echo ""
+log_success "Синхронизация завершена"
+5.4 Health Check скрипт
+bashDownloadCopy code#!/bin/bash
+# scripts/health-check.sh
+# Полная проверка здоровья системы
+
+echo ""
+echo "🏥 HEALTH CHECK - NEUROGUARDIAN"
+echo "================================"
+echo ""
+
+# Функция проверки сервиса
+check_service() {
+    local name=$1
+    local url=$2
+    local expected=$3
+    
+    response=$(curl -s -o /dev/null -w "%{http_code}" "$url" 2>/dev/null || echo "000")
+    
+    if [ "$response" = "$expected" ]; then
+        echo "✅ $name: OK"
+        return 0
+    else
+        echo "❌ $name: FAILED (код: $response, ожидался: $expected)"
+        return 1
+    fi
+}
+
+# Проверка Docker контейнеров
+echo "📦 Docker контейнеры:"
+docker ps --format "  {{.Names}}: {{.Status}}" 2>/dev/null || echo "  ❌ Docker не запущен"
+echo ""
+
+# Проверка сервисов
+echo "🌐 Сервисы:"
+check_service "PostgreSQL" "localhost:5432" "000" 2>/dev/null && echo "  ✅ PostgreSQL: Порт открыт" || true
+
+# Проверка через pg_isready
+if pg_isready -h localhost -p 5432 &>/dev/null; then
+    echo "  ✅ PostgreSQL: Готов к подключениям"
+else
+    echo "  ⚠️  PostgreSQL: Не готов"
+fi
+
+check_service "n8n" "http://localhost:5678/healthz" "200"
+check_service "Приложение" "http://localhost:3000/api/health" "200"
+
+echo ""
+
+# Проверка использования ресурсов
+echo "📊 Использование ресурсов:"
+docker stats --no-stream --format "  {{.Name}}: CPU {{.CPUPerc}} | Memory {{.MemUsage}}" 2>/dev/null || echo "  Нет данных"
+echo ""
+
+# Проверка места на диске
+echo "💾 Место на диске (Docker volumes):"
+docker system df 2>/dev/null || echo "  Нет данных"
+echo ""
+
+# Проверка логов на ошибки
+echo "📝 Последние ошибки в логах:"
+docker compose -f docker/docker-compose.yml logs --tail=50 2>/dev/null | grep -i "error\|fail\|exception" | tail -5 || echo "  Ошибок не найдено"
+echo ""
+
+echo "================================"
+echo "Health check завершён"
+
+6. GitHub Actions CI/CD
+6.1 Основной CI Pipeline
+yamlDownloadCopy code# .github/workflows/ci.yml
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '9'
+
+jobs:
+  # ============================================
+  # Линтинг и проверка типов
+  # ============================================
+  lint:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        
+      - name: Run ESLint
+        run: pnpm lint
+        
+      - name: Run Type Check
+        run: pnpm type-check
+
+  # ============================================
+  # Unit тесты
+  # ============================================
+  test-unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        
+      - name: Run unit tests
+        run: pnpm test:unit --coverage
+        
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/lcov.info
+
+  # ============================================
+  # Интеграционные тесты
+  # ============================================
+  test-integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: neuroguardian_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        
+      - name: Generate Prisma Client
+        run: pnpm db:generate
+        
+      - name: Run migrations
+        run: pnpm db:migrate
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/neuroguardian_test
+          
+      - name: Run integration tests
+        run: pnpm test:integration
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/neuroguardian_test
+          REDIS_URL: redis://localhost:6379
+
+  # ============================================
+  # Build проверка
+  # ============================================
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [lint, test-unit]
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        
+      - name: Generate Prisma Client
+        run: pnpm db:generate
+        
+      - name: Build
+        run: pnpm build
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SKIP_ENV_VALIDATION: true
+6.2 Deploy Pipeline
+yamlDownloadCopy code# .github/workflows/deploy.yml
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    name: Deploy to Vercel
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
+          
+      - name: Notify on success
+        if: success()
+        run: |
+          echo "✅ Deployment successful!"
+          # Здесь можно добавить уведомление в Telegram/Slack
+          
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ Deployment failed!"
+
+7. n8n Workflows
+7.1 Основные workflow для экспорта
+jsonDownloadCopy code// docker/n8n/workflows/price-monitor.json
+{
+  "name": "Price Monitor - NeuroGuardian",
+  "nodes": [
+    {
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "position": [250, 300]
+    },
+    {
+      "name": "Get Products",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "url": "http://app:3000/api/products",
+        "method": "GET",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "position": [450, 300]
+    },
+    {
+      "name": "Check Margins",
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "jsCode": "const products = $input.all();\nconst alerts = [];\n\nfor (const item of products) {\n  const product = item.json;\n  if (product.margin && product.margin < 15) {\n    alerts.push({\n      productId: product.id,\n      name: product.name,\n      currentMargin: product.margin,\n      type: 'LOW_MARGIN'\n    });\n  }\n}\n\nreturn alerts.map(a => ({ json: a }));"
+      },
+      "position": [650, 300]
+    },
+    {
+      "name": "Create Alerts",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "url": "http://app:3000/api/alerts",
+        "method": "POST",
+        "body": "={{ $json }}"
+      },
+      "position": [850, 300]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [[{ "node": "Get Products", "type": "main", "index": 0 }]]
+    },
+    "Get Products": {
+      "main": [[{ "node": "Check Margins", "type": "main", "index": 0 }]]
+    },
+    "Check Margins": {
+      "main": [[{ "node": "Create Alerts", "type": "main", "index": 0 }]]
+    }
+  }
+}
+7.2 Stock Monitor Workflow
+jsonDownloadCopy code// docker/n8n/workflows/stock-monitor.json
+{
+  "name": "Stock Monitor - NeuroGuardian",
+  "nodes": [
+    {
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "hours", "hoursInterval": 4 }]
+        }
+      }
+    },
+    {
+      "name": "Sync WB Stock",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "url": "http://app:3000/api/sync/wildberries/stock",
+        "method": "POST"
+      }
+    },
+    {
+      "name": "Sync Ozon Stock",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "url": "http://app:3000/api/sync/ozon/stock",
+        "method": "POST"
+      }
+    },
+    {
+      "name": "Check Low Stock",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "url": "http://app:3000/api/products/low-stock",
+        "method": "GET"
+      }
+    },
+    {
+      "name": "Send Notifications",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "url": "http://app:3000/api/notifications/send",
+        "method": "POST"
+      }
+    }
+  ]
+}
+
+8. Package.json Scripts
+jsonDownloadCopy code{
+  "name": "neuroguardian",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "start": "turbo run start",
+    "lint": "turbo run lint",
+    "lint:fix": "turbo run lint:fix",
+    "type-check": "turbo run type-check",
+    
+    "test": "turbo run test",
+    "test:unit": "vitest run --coverage",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:e2e": "playwright test",
+    "test:watch": "vitest",
+    
+    "db:generate": "prisma generate --schema=packages/database/prisma/schema.prisma",
+    "db:migrate": "prisma migrate dev --schema=packages/database/prisma/schema.prisma",
+    "db:migrate:prod": "prisma migrate deploy --schema=packages/database/prisma/schema.prisma",
+    "db:push": "prisma db push --schema=packages/database/prisma/schema.prisma",
+    "db:seed": "prisma db seed --schema=packages/database/prisma/schema.prisma",
+    "db:studio": "prisma studio --schema=packages/database/prisma/schema.prisma",
+    "db:reset": "prisma migrate reset --schema=packages/database/prisma/schema.prisma",
+    
+    "docker:up": "docker compose -f docker/docker-compose.yml up -d",
+    "docker:down": "docker compose -f docker/docker-compose.yml down",
+    "docker:logs": "docker compose -f docker/docker-compose.yml logs -f",
+    "docker:reset": "docker compose -f docker/docker-compose.yml down -v && docker compose -f docker/docker-compose.yml up -d",
+    
+    "setup": "chmod +x scripts/*.sh && ./scripts/setup.sh",
+    "health": "./scripts/health-check.sh",
+    "sync:github": "./scripts/sync-github.sh",
+    "test:integrations": "./scripts/test-integrations.sh",
+    
+    "vercel:dev": "vercel dev",
+    "vercel:deploy": "vercel --prod",
+    
+    "clean": "turbo run clean && rm -rf node_modules",
+    "clean:docker": "docker system prune -af"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "prisma": "^5.10.0",
+    "turbo": "^1.12.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.3.0",
+    "@playwright/test": "^1.42.0"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@9.0.0"
+}
+
+9. Чеклист синхронизации
+9.1 Полный чеклист настройки
+markdownDownloadCopy code## 🔧 ЧЕКЛИСТ СИНХРОНИЗАЦИИ NEUROGUARDIAN
+
+### Этап 1: Локальная среда
+- [ ] Node.js 20+ установлен
+- [ ] pnpm 9+ установлен  
+- [ ] Docker Desktop установлен и запущен
+- [ ] Git настроен с SSH ключами
+- [ ] Cursor IDE установлен с расширениями
+
+### Этап 2: Клонирование и настройка
+- [ ] Репозиторий склонирован
+- [ ] .env.local создан из .env.example
+- [ ] Все API ключи добавлены:
+  - [ ] ANTHROPIC_API_KEY
+  - [ ] WB_API_TOKEN
+  - [ ] OZON_CLIENT_ID + OZON_API_KEY
+  - [ ] SUPABASE_URL + keys
+
+### Этап 3: Docker контейнеры
+- [ ] docker compose up -d выполнен
+- [ ] PostgreSQL работает (порт 5432)
+- [ ] Redis работает (порт 6379)
+- [ ] n8n работает (порт 5678)
+- [ ] Adminer доступен (порт 8080)
+
+### Этап 4: База данных
+- [ ] Миграции применены (pnpm db:migrate)
+- [ ] Prisma Client сгенерирован
+- [ ] Seed данные загружены (опционально)
+- [ ] Подключение к Supabase проверено
+
+### Этап 5: n8n
+- [ ] Вход в n8n выполнен
+- [ ] Credentials настроены:
+  - [ ] PostgreSQL connection
+  - [ ] HTTP Header Auth для API
+- [ ] Workflows импортированы:
+  - [ ] Price Monitor
+  - [ ] Stock Monitor
+  - [ ] Alert Sender
+- [ ] Workflows активированы
+
+### Этап 6: GitHub
+- [ ] Репозиторий подключён
+- [ ] Secrets добавлены в GitHub:
+  - [ ] VERCEL_TOKEN
+  - [ ] VERCEL_ORG_ID
+  - [ ] VERCEL_PROJECT_ID
+  - [ ] DATABASE_URL (production)
+- [ ] GitHub Actions работают
+
+### Этап 7: Vercel
+- [ ] Проект создан в Vercel
+- [ ] Environment variables настроены
+- [ ] Deploy hook работает
+- [ ] Preview deploys работают
+
+### Этап 8: Тестирование
+- [ ] Unit тесты проходят
+- [ ] Интеграционные тесты проходят
+- [ ] E2E тесты проходят
+- [ ] API маркетплейсов отвечает
+- [ ] Агент Виктор Маржин работает
+
+### Этап 9: Финальная проверка
+- [ ] Health check пройден (./scripts/health-check.sh)
+- [ ] Все интеграции работают (./scripts/test-integrations.sh)
+- [ ] Логи без ошибок
+- [ ] Мониторинг настроен
+
+10. Команды быстрого старта
+bashDownloadCopy code# 1. Полная установка с нуля
+./scripts/setup.sh
+
+# 2. Ежедневный запуск
+pnpm docker:up && pnpm dev
+
+# 3. Проверка здоровья системы
+./scripts/health-check.sh
+
+# 4. Просмотр логов
+pnpm docker:logs
+
+# 5. Открыть все дашборды
+open http://localhost:3000      # Приложение
+open http://localhost:5678      # n8n
+open http://localhost:8080      # Adminer (БД)
+open http://localhost:8081      # Redis Commander
+
+# 6. Остановка всего
+pnpm docker:down
+
+# 7. Полный сброс (осторожно!)
+pnpm docker:reset
+pnpm db:reset
+
+11. Следующие шаги
+После создания этого ТЗ агент-разработчик должен:
+
+1. Проверить текущую структуру проекта — что уже есть
+2. Сравнить с целевой структурой — что нужно создать/изменить
+3. Выполнить синхронизацию поэтапно — следуя чеклисту
+4. Протестировать каждый компонент — после настройки
+5. Задокументировать изменения — обновить README
+
+Скинь мне текущую структуру проекта и содержимое ключевых файлов — я проведу аудит и дам конкретные инструкции по синхронизации.

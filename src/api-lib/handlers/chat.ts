@@ -4,7 +4,6 @@
 // ============================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { validateTelegramInitData, sanitizeInput } from '../lib/index.js';
 import { getChatHistory, saveChatHistory, clearChatHistory } from '../services/database.js';
 
 /**
@@ -12,20 +11,12 @@ import { getChatHistory, saveChatHistory, clearChatHistory } from '../services/d
  * Retrieves user's chat history from database
  */
 export async function handleGetChatHistory(
-  req: VercelRequest,
-  res: VercelResponse
+  _req: VercelRequest,
+  res: VercelResponse,
+  userId: number
 ): Promise<VercelResponse> {
-  const initData = sanitizeInput(
-    (req.headers['x-init-data'] as string) || req.body?.initData || ''
-  );
-  const validation = validateTelegramInitData(initData);
-
-  if (!validation.valid || !validation.user) {
-    return res.status(401).json({ error: 'Unauthorized', code: 'AUTH_FAILED' });
-  }
-
   try {
-    const messages = await getChatHistory(validation.user.id);
+    const messages = await getChatHistory(userId);
     return res.status(200).json({ success: true, messages });
   } catch (error) {
     console.error('Get chat history error:', error);
@@ -42,17 +33,11 @@ export async function handleGetChatHistory(
  */
 export async function handleSaveChatHistory(
   req: VercelRequest,
-  res: VercelResponse
+  res: VercelResponse,
+  userId: number
 ): Promise<VercelResponse> {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  const initData = sanitizeInput(req.body?.initData || '');
-  const validation = validateTelegramInitData(initData);
-
-  if (!validation.valid || !validation.user) {
-    return res.status(401).json({ error: 'Unauthorized', code: 'AUTH_FAILED' });
   }
 
   const messages = req.body?.messages || [];
@@ -62,7 +47,7 @@ export async function handleSaveChatHistory(
   }
 
   try {
-    await saveChatHistory(validation.user.id, messages);
+    await saveChatHistory(userId, messages);
     return res.status(200).json({ success: true });
   } catch (error) {
     console.error('Save chat history error:', error);
@@ -79,21 +64,15 @@ export async function handleSaveChatHistory(
  */
 export async function handleClearChatHistory(
   req: VercelRequest,
-  res: VercelResponse
+  res: VercelResponse,
+  userId: number
 ): Promise<VercelResponse> {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const initData = sanitizeInput(req.body?.initData || '');
-  const validation = validateTelegramInitData(initData);
-
-  if (!validation.valid || !validation.user) {
-    return res.status(401).json({ error: 'Unauthorized', code: 'AUTH_FAILED' });
-  }
-
   try {
-    await clearChatHistory(validation.user.id);
+    await clearChatHistory(userId);
     return res.status(200).json({ success: true });
   } catch (error) {
     console.error('Clear chat history error:', error);

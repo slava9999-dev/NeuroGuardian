@@ -1,0 +1,135 @@
+# ============================================
+# NeuroGuardian - Full Development Stack
+# ============================================
+# Запуск: docker compose -f docker/docker-compose.yml up -d
+# Остановка: docker compose -f docker/docker-compose.yml down
+# Очистка: docker compose -f docker/docker-compose.yml down -v
+
+services:
+  # ============================================
+  # PostgreSQL - Основная база данных
+  # ============================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: ng_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-neuroguardian}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-localdevpassword}
+      POSTGRES_DB: ${POSTGRES_DB:-neuroguardian_dev}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-neuroguardian}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ng_network
+
+  # ============================================
+  # Redis - Кэширование и очереди
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: ng_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-localredispass}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-localredispass}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ng_network
+
+  # ============================================
+  # n8n - Автоматизация и workflow
+  # ============================================
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: ng_n8n
+    restart: unless-stopped
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:-localn8npass}
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://localhost:5678/
+      - GENERIC_TIMEZONE=Europe/Moscow
+      - TZ=Europe/Moscow
+      # SQLite для простоты (можно переключить на PostgreSQL)
+      - DB_TYPE=sqlite
+      - DB_SQLITE_DATABASE=/home/node/.n8n/database.sqlite
+      # Секреты для шифрования credentials
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:-your-32-char-encryption-key-here}
+      # NeuroGuardian API Settings
+      - API_URL=${API_URL:-http://host.docker.internal:3000}
+      - CRON_SECRET=${CRON_SECRET:-dev-cron-secret}
+      - ADMIN_CHAT_ID=${ADMIN_CHAT_ID:-0}
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ../n8n-workflows:/home/node/workflows:ro
+    ports:
+      - "5678:5678"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:5678/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - ng_network
+
+  # ============================================
+  # Adminer - UI для базы данных
+  # ============================================
+  adminer:
+    image: adminer:latest
+    container_name: ng_adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - ADMINER_DEFAULT_SERVER=postgres
+    depends_on:
+      - postgres
+    networks:
+      - ng_network
+
+  # ============================================
+  # Redis Commander - UI для Redis
+  # ============================================
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: ng_redis_commander
+    restart: unless-stopped
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-localredispass}
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - ng_network
+
+volumes:
+  postgres_data:
+  redis_data:
+  n8n_data:
+
+networks:
+  ng_network:
+    driver: bridge

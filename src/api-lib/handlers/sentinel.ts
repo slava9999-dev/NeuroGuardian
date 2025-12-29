@@ -15,9 +15,31 @@ export async function handleCheckPrices(
   res: VercelResponse
 ): Promise<VercelResponse> {
   const { sentinelService } = await import('../services/sentinel-service.js');
+  const { getSecret } = await import('../lib/secrets-helper.js');
 
-  // 1. Authentication
-  const isAdmin = await verifyAdminAccessAsync(req);
+  // 1. Authentication - support both header and query param for cron-job.org
+  let isAdmin = await verifyAdminAccessAsync(req);
+
+  // If not authenticated via header, check query param secret
+  if (!isAdmin) {
+    const querySecret = req.query.secret as string;
+    if (querySecret) {
+      try {
+        const expectedSecret = await getSecret('cron_secret', 'sentinel_cron');
+        if (querySecret === expectedSecret || querySecret === process.env.CRON_SECRET) {
+          isAdmin = true;
+          console.log('✅ Authenticated via cron query param');
+        }
+      } catch {
+        // Fallback to env var
+        if (querySecret === process.env.CRON_SECRET) {
+          isAdmin = true;
+          console.log('✅ Authenticated via cron query param (env fallback)');
+        }
+      }
+    }
+  }
+
   const auth = extractTelegramAuth(req);
 
   try {

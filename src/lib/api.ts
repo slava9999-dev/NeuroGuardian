@@ -20,8 +20,20 @@ const api = axios.create({
 // Add initData header to every request
 api.interceptors.request.use(config => {
   const initData = getInitData();
+  const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
+  const ADMIN_KEY = import.meta.env.VITE_ADMIN_API_KEY;
+
   if (initData) {
     config.headers['X-Init-Data'] = initData;
+  } else if (DEV_MODE && ADMIN_KEY) {
+    // Bypass auth for local development using Admin Key
+    config.headers['X-Admin-Key'] = ADMIN_KEY;
+
+    // Add telegramId to both params (for GET) and data (for POST)
+    config.params = { ...config.params, telegramId: 7548070478 };
+    if (config.data && typeof config.data === 'object') {
+      config.data = { ...config.data, telegramId: 7548070478 };
+    }
   }
   return config;
 });

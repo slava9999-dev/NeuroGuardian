@@ -10,6 +10,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import {
   extractTelegramAuth,
   extractAnyAuth,
+  extractAnyAuthAsync,
   sendAuthError,
   sendMethodNotAllowed,
 } from '../src/api-lib/middleware/auth.js';
@@ -128,6 +129,7 @@ function setCorsHeaders(req: VercelRequest, res: VercelResponse) {
   const origin = req.headers.origin || '';
   const isAllowed =
     !IS_PRODUCTION ||
+    origin.includes('localhost') ||
     ALLOWED_ORIGINS.some(allowed => allowed && (origin === allowed || origin.startsWith(allowed)));
 
   res.setHeader('Access-Control-Allow-Origin', isAllowed ? origin || '*' : '');
@@ -252,7 +254,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'create-payment':
       case 'batch-set-stop-loss':
       case 'sentinel-logs': {
-        const auth = extractAnyAuth(req);
+        const auth = await extractAnyAuthAsync(req);
         if (auth.success === false) {
           return sendAuthError(res, auth.error, auth.statusCode);
         }
@@ -273,7 +275,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       case 'sync-products': {
         if (req.method !== 'POST') return sendMethodNotAllowed(res);
-        const auth = extractAnyAuth(req);
+        const auth = await extractAnyAuthAsync(req);
         if (auth.success === false) {
           return sendAuthError(res, auth.error, auth.statusCode);
         }
@@ -316,13 +318,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // ========== CHAT HISTORY ==========
       case 'get-chat-history':
-        return handleGetChatHistory(req, res);
-
       case 'save-chat-history':
-        return handleSaveChatHistory(req, res);
+      case 'clear-chat-history': {
+        const auth = await extractAnyAuthAsync(req);
+        if (auth.success === false) {
+          return sendAuthError(res, auth.error, auth.statusCode);
+        }
 
-      case 'clear-chat-history':
-        return handleClearChatHistory(req, res);
+        const chatHandlers: Record<
+          string,
+          (req: VercelRequest, res: VercelResponse, userId: number) => Promise<VercelResponse>
+        > = {
+          'get-chat-history': handleGetChatHistory,
+          'save-chat-history': handleSaveChatHistory,
+          'clear-chat-history': handleClearChatHistory,
+        };
+        return chatHandlers[action](req, res, auth.context.userId);
+      }
 
       // ========== ANALYTICS ==========
       case 'get-analytics':

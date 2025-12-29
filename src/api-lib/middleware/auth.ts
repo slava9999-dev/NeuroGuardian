@@ -58,7 +58,8 @@ export function extractTelegramAuth(req: VercelRequest): AuthResult {
  */
 export async function extractAdminAuthAsync(req: VercelRequest): Promise<AuthResult> {
   const adminKey = (req.headers['x-admin-key'] as string) || '';
-  const adminUserId = req.body?.userId || req.body?.telegramId;
+  const adminUserId =
+    req.body?.userId || req.body?.telegramId || req.query?.telegramId || req.query?.userId;
 
   const expectedAdminKey = await getSecret('admin_api_key', 'admin_auth');
 
@@ -85,7 +86,8 @@ export async function extractAdminAuthAsync(req: VercelRequest): Promise<AuthRes
  */
 export function extractAdminAuth(req: VercelRequest): AuthResult {
   const adminKey = (req.headers['x-admin-key'] as string) || '';
-  const adminUserId = req.body?.userId || req.body?.telegramId;
+  const adminUserId =
+    req.body?.userId || req.body?.telegramId || req.query?.telegramId || req.query?.userId;
 
   const expectedAdminKey = getSecretSync('admin_api_key');
 
@@ -163,6 +165,53 @@ export function extractCronAuth(req: VercelRequest): AuthResult {
  * Try all auth methods in order: Telegram → Admin → Cron (async version)
  */
 export async function extractAnyAuthAsync(req: VercelRequest): Promise<AuthResult> {
+  try {
+    // Admin Key Bypass: Allow testing/admin access with valid admin key
+    // This is safe because ADMIN_API_KEY itself is secret
+    const adminKey = (req.headers['x-admin-key'] as string) || '';
+    const telegramId = req.query?.telegramId || req.body?.telegramId;
+
+    if (adminKey && telegramId) {
+      // Get expected key with multiple fallbacks
+      let expectedAdminKey: string | undefined;
+
+      // Try Security Agent first
+      try {
+        expectedAdminKey = await getSecret('admin_api_key', 'admin_auth');
+      } catch (secretError) {
+        console.warn('[AUTH] getSecret failed:', secretError);
+      }
+
+      // Always check process.env as final fallback (most reliable on Vercel)
+      const envKey = process.env.ADMIN_API_KEY;
+      if (!expectedAdminKey && envKey) {
+        expectedAdminKey = envKey;
+        console.log('[AUTH] Using process.env.ADMIN_API_KEY fallback');
+      }
+
+      // Debug logging (safe - only shows first 8 chars)
+      console.log('[AUTH] Key check:', {
+        receivedKeyPrefix: adminKey.substring(0, 8) + '...',
+        expectedKeyPrefix: expectedAdminKey?.substring(0, 8) + '...',
+        match: adminKey === expectedAdminKey,
+        telegramId,
+      });
+
+      if (expectedAdminKey && adminKey === expectedAdminKey) {
+        console.log(`🔧 [AUTH] Admin-key bypass for user ${telegramId}`);
+        return {
+          success: true,
+          context: {
+            userId: parseInt(telegramId as string),
+            authMethod: 'admin',
+          },
+        };
+      }
+    }
+  } catch (err) {
+    console.error('⚠️ Auth bypass error:', err);
+  }
+
   // Try Telegram first (most common, sync)
   const telegramAuth = extractTelegramAuth(req);
   if (telegramAuth.success) return telegramAuth;

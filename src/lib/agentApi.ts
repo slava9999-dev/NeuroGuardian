@@ -101,6 +101,23 @@ export function classifyComplexity(message: string): TaskComplexity {
   return 'simple';
 }
 
+// Helper to get auth headers for API requests
+function getAuthHeaders(): HeadersInit {
+  const initData = getInitData();
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+
+  if (initData) {
+    headers['X-Init-Data'] = initData;
+  } else if (import.meta.env.VITE_DEV_MODE === 'true' && import.meta.env.VITE_ADMIN_API_KEY) {
+    // Dev mode: use admin key
+    headers['X-Admin-Key'] = import.meta.env.VITE_ADMIN_API_KEY;
+  }
+
+  return headers;
+}
+
 // Agent API
 export const agentApi = {
   /**
@@ -111,18 +128,20 @@ export const agentApi = {
     const initData = getInitData();
     const action = USE_V4_AGENT ? 'agent-v4' : 'agent';
 
+    // Build URL with telegramId for dev mode
+    let url = `${API_BASE}?action=${action}`;
+    if (!initData && import.meta.env.VITE_DEV_MODE === 'true') {
+      url += '&telegramId=7548070478';
+    }
+
     try {
-      const response = await fetch(`${API_BASE}?action=${action}`, {
+      const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Init-Data': initData || '',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           action,
           message,
           history,
-          initData,
         }),
       });
 
@@ -204,14 +223,15 @@ export const agentApi = {
     details: Record<string, unknown>
   ): Promise<AgentResponse> => {
     const initData = getInitData();
+    let url = `${API_BASE}?action=agent-confirm`;
+    if (!initData && import.meta.env.VITE_DEV_MODE === 'true') {
+      url += '&telegramId=7548070478';
+    }
 
     try {
-      const response = await fetch(`${API_BASE}?action=agent-confirm`, {
+      const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Init-Data': initData || '',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           action: 'agent-confirm',
           operation,
@@ -246,12 +266,14 @@ export const agentApi = {
     capabilities: string[];
   }> => {
     const initData = getInitData();
+    let url = `${API_BASE}?action=agent-status`;
+    if (!initData && import.meta.env.VITE_DEV_MODE === 'true') {
+      url += '&telegramId=7548070478';
+    }
 
     try {
-      const response = await fetch(`${API_BASE}?action=agent-status`, {
-        headers: {
-          'X-Init-Data': initData || '',
-        },
+      const response = await fetch(url, {
+        headers: getAuthHeaders(),
       });
 
       if (!response.ok) {
@@ -273,12 +295,14 @@ export const agentApi = {
    */
   loadHistory: async (): Promise<AgentMessage[]> => {
     const initData = getInitData();
+    let url = `${API_BASE}?action=get-chat-history`;
+    if (!initData && import.meta.env.VITE_DEV_MODE === 'true') {
+      url += '&telegramId=7548070478';
+    }
 
     try {
-      const response = await fetch(`${API_BASE}?action=get-chat-history`, {
-        headers: {
-          'X-Init-Data': initData || '',
-        },
+      const response = await fetch(url, {
+        headers: getAuthHeaders(),
       });
 
       if (!response.ok) {
@@ -298,14 +322,15 @@ export const agentApi = {
    */
   saveHistory: async (messages: AgentMessage[]): Promise<boolean> => {
     const initData = getInitData();
+    let url = `${API_BASE}?action=save-chat-history`;
+    if (!initData && import.meta.env.VITE_DEV_MODE === 'true') {
+      url += '&telegramId=7548070478';
+    }
 
     try {
-      const response = await fetch(`${API_BASE}?action=save-chat-history`, {
+      const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Init-Data': initData || '',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           action: 'save-chat-history',
           messages,
@@ -325,14 +350,15 @@ export const agentApi = {
    */
   clearHistory: async (): Promise<boolean> => {
     const initData = getInitData();
+    let url = `${API_BASE}?action=clear-chat-history`;
+    if (!initData && import.meta.env.VITE_DEV_MODE === 'true') {
+      url += '&telegramId=7548070478';
+    }
 
     try {
-      const response = await fetch(`${API_BASE}?action=clear-chat-history`, {
+      const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Init-Data': initData || '',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           action: 'clear-chat-history',
           initData,

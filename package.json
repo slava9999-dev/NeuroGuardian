@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:api": "node scripts/local-api-server.mjs",
+    "dev:full": "concurrently \"npm run dev:api\" \"cross-env VITE_LOCAL_BACKEND=true npm run dev\"",
     "build": "vite build",
     "build:security-agent": "cd security-agent && npm run build",
     "vercel-build": "npm run build:security-agent && npm run build",
@@ -22,7 +24,13 @@
     "check:production": "node scripts/production-check.cjs",
     "check:all": "npm run lint && npm run typecheck && npm run build && npm run test && npm run check:regression",
     "db:migrate": "node scripts/run-migrations.cjs",
-    "checklist": "node scripts/production-checklist.cjs"
+    "checklist": "node scripts/production-checklist.cjs",
+    "docker:up": "cd docker && docker compose up -d",
+    "docker:down": "cd docker && docker compose down",
+    "docker:logs": "cd docker && docker compose logs -f",
+    "docker:reset": "cd docker && docker compose down -v && docker compose up -d",
+    "health": "powershell -ExecutionPolicy Bypass -File scripts/health-check.ps1",
+    "setup": "powershell -ExecutionPolicy Bypass -File scripts/setup.ps1"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.46",

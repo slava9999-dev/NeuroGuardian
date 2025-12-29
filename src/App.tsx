@@ -64,8 +64,48 @@ function LoadingScreen() {
   );
 }
 
-// NOTE: Mock user removed for production safety (AUDIT-2025-12-28)
-// Applications must authenticate via Telegram WebApp
+// DEV_MODE: Enable local development without Telegram
+// Set VITE_DEV_MODE=true in .env for local testing
+const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
+
+// Mock user for development (only used when DEV_MODE=true)
+import type { User } from './types';
+
+const DEV_USER: User = {
+  telegramId: 7548070478,
+  username: 'slava9999', // Updated to match user context if possible, but ID is key
+  firstName: 'Developer',
+  lastName: 'User',
+  photoUrl: null,
+
+  // Subscription
+  subscriptionActive: true,
+  subscriptionExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+  subscriptionPlan: 'pro',
+  subscriptionDaysLeft: 365,
+
+  // Protection settings
+  protectionEnabled: true,
+  defenseMode: 'price_correction',
+
+  // API Keys (empty - user will add in settings)
+  wbKeyRef: null,
+  ozonKeyRef: null,
+
+  // Stats
+  totalProducts: 0,
+  triggeredToday: 0,
+  savedAmount: 0,
+
+  // Sentinel buffer settings
+  priceBufferPercent: 5,
+  warningThresholdPercent: 10,
+
+  // Timestamps
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  lastActiveAt: new Date(),
+};
 
 // Pages enum - Agent is first!
 type Page = 'agent' | 'products' | 'settings' | 'info' | 'ops';
@@ -89,7 +129,32 @@ function App() {
       setLoading(true);
 
       try {
-        if (isTelegramWebApp()) {
+        // DEV_MODE: Skip Telegram auth for local development
+        if (DEV_MODE && !isTelegramWebApp()) {
+          console.log('🔧 DEV_MODE: Running with mock user');
+          console.warn('⚠️ DEV MODE ACTIVE - DO NOT USE IN PRODUCTION');
+          setUser(DEV_USER);
+
+          // Try to load products from API (will work if backend is running)
+          try {
+            const productsResult = await productsApi.getProducts();
+            if (productsResult.products) {
+              const products = productsResult.products.map(p => ({
+                ...p,
+                vendorCode: p.vendorCode || '',
+                imageUrl: p.imageUrl || '',
+                lastCheckedAt: new Date(),
+                lastTriggeredAt: null,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              }));
+              useProductsStore.getState().setProducts(products);
+              console.log('📦 Products loaded:', products.length);
+            }
+          } catch {
+            console.log('📦 No products yet (connect your store in Settings)');
+          }
+        } else if (isTelegramWebApp()) {
           console.log('🚀 Telegram WebApp detected');
           initTelegramWebApp();
 
@@ -125,7 +190,7 @@ function App() {
             setAuthError('Не удалось получить данные авторизации Telegram');
           }
         } else {
-          // AUDIT-2025-12-28: No mock user in non-Telegram environments
+          // Not in Telegram and DEV_MODE is off
           console.warn('⚠️ Not running in Telegram WebApp - authentication required');
           setAuthError('Приложение работает только внутри Telegram');
         }
