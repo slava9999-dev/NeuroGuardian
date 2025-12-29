@@ -428,7 +428,7 @@ export async function handleHealth(
       status: 'ok',
       timestamp: new Date().toISOString(),
       database: dbOk ? 'connected' : 'error',
-      version: '2.6.0',
+      version: '2.12.0',
     });
   } catch (error) {
     return res.json({
