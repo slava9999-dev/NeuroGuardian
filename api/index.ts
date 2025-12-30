@@ -107,6 +107,14 @@ import {
   handleN8nGetStats,
 } from '../src/api-lib/handlers/n8n-webhooks.js';
 
+// MoE (Hybrid AI Router)
+import {
+  handleMoEClassify,
+  handleMoEQuery,
+  handleMoEHealth,
+  handleMoEPriceCheck,
+} from '../src/api-lib/handlers/moe.js';
+
 // Utilities
 import {
   sanitizeInput,
@@ -164,7 +172,12 @@ async function applyRateLimit(
     limit = RateLimitPresets.ADMIN.limit;
     windowSeconds = RateLimitPresets.ADMIN.windowSeconds;
     namespace = 'admin';
-  } else if (action === 'agent' || action === 'agent-v4' || action === 'agent-confirm') {
+  } else if (
+    action === 'agent' ||
+    action === 'agent-v4' ||
+    action === 'agent-confirm' ||
+    action.startsWith('moe-')
+  ) {
     limit = RateLimitPresets.AGENT.limit;
     windowSeconds = RateLimitPresets.AGENT.windowSeconds;
     namespace = 'agent';
@@ -427,6 +440,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       case 'ops-action':
         return handleOpsAction(req, res);
+
+      // ========== MOE (HYBRID AI) ENDPOINTS ==========
+      case 'moe-health':
+        return handleMoEHealth(req, res);
+
+      case 'moe-classify':
+      case 'moe-query':
+      case 'moe-price-check': {
+        const auth = await extractAnyAuthAsync(req);
+        if (auth.success === false) {
+          return sendAuthError(res, auth.error, auth.statusCode);
+        }
+
+        const moeHandlers: Record<
+          string,
+          (req: VercelRequest, res: VercelResponse, userId: number) => Promise<VercelResponse>
+        > = {
+          'moe-classify': handleMoEClassify,
+          'moe-query': handleMoEQuery,
+          'moe-price-check': handleMoEPriceCheck,
+        };
+        return moeHandlers[action](req, res, auth.context.userId);
+      }
 
       // ========== DEFAULT ==========
       default:

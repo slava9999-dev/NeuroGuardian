@@ -45,7 +45,9 @@ export const ROUTE_GROUPS = {
     'send-reminders',
     'referral',
   ],
-  ops: ['ops-events', 'ops-audit', 'ops-dashboard'],
+  ops: ['ops-events', 'ops-audit', 'ops-dashboard', 'ops-overview', 'ops-clients', 'ops-action'],
+  n8n: ['n8n-price-check', 'n8n-sync-products', 'n8n-health', 'n8n-send-report', 'n8n-get-stats'],
+  moe: ['moe-health', 'moe-classify', 'moe-query', 'moe-price-check'],
 } as const;
 
 // ============================================
@@ -62,4 +64,6 @@ export const AVAILABLE_ACTIONS = [
   ...ROUTE_GROUPS.analytics,
   ...ROUTE_GROUPS.admin,
   ...ROUTE_GROUPS.ops,
+  ...ROUTE_GROUPS.n8n,
+  ...ROUTE_GROUPS.moe,
 ];
