@@ -33,7 +33,11 @@
     "setup": "powershell -ExecutionPolicy Bypass -File scripts/setup.ps1",
     "n8n:export": "node scripts/n8n-export.mjs",
     "n8n:import": "node scripts/n8n-import.mjs",
-    "n8n:import:activate": "node scripts/n8n-import.mjs --activate"
+    "n8n:import:activate": "node scripts/n8n-import.mjs --activate",
+    "gpu:up": "cd docker/gpu && docker compose up -d",
+    "gpu:down": "cd docker/gpu && docker compose down",
+    "gpu:logs": "cd docker/gpu && docker compose logs -f",
+    "inngest:dev": "npx inngest-cli@latest dev -u http://localhost:3001/api/inngest"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.46",
@@ -51,7 +55,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dompurify": "^3.3.1",
-    "dotenv": "^17.2.3",
+    "dotenv": "^16.4.7",
     "framer-motion": "^12.23.26",
     "pg": "^8.16.3",
     "react": "^19.2.0",
@@ -60,7 +64,13 @@
     "tailwind-merge": "^3.4.0",
     "uuid": "^13.0.0",
     "zod": "^4.1.13",
-    "zustand": "^5.0.9"
+    "zustand": "^5.0.9",
+    "chromadb": "^1.10.4",
+    "@langchain/langgraph": "^0.2.45",
+    "@langchain/openai": "^0.3.17",
+    "@langchain/community": "^0.3.28",
+    "@langchain/core": "^0.3.37",
+    "inngest": "^3.22.12"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

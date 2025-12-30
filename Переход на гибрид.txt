@@ -1,0 +1,321 @@
+тличная инициатива. Переход на гибридную MoE-архитектуру с локальной инференцией — это правильный шаг для масштабирования NeuroGUARDIAN. Разберу ваш RFC по пунктам и дам конкретные рекомендации.
+Критический анализ текущего состояния
+Проблема диагностирована верно: Синхронные вызовы Gemini при ~20 concurrent requests вызывают ECONNRESET — типичное поведение при превышении rate limits (Cloud Run/Cloud Functions на Google Cloud). Вы уплачиваете как за API-calls, так и за idle-time.
+Сильные стороны подхода:
+
+1. Локальная GPU (RTX 4070) — отличная точка входа для MoE
+2. Четкое разделение интентов (price check / chat / analysis) — идеально для экспертов
+3. Осознание проблемы контекста — ключевой bottleneck при 100 пользователях
+
+Слабые места в предложении:
+
+1. Windows + Docker для продакшн LLM может быть источником проблем
+2. Отсутствие фоллбэков при сбое локальной инфраструктуры
+3. State management — действительно самый сложный вопрос
+
+
+Ответы на вопросы "Консорциума"
+A. Лучший "Router"-модель для 8GB VRAM
+Для интент-классификации нужна не креативность, а стабильный JSON-выход и низкая задержка.
+Рекомендация:
+
+* Основной выбор: Phi-3-mini-4k-instruct (3.8B, GGUF q4_K_M)
+* Альтернатива: Qwen2.5-Coder-1.5B-Instruct (ещё меньше, специально для function calling)
+* Резерв: Llama-3.1-8B-Instruct (q4_K_M, но будет нагружать VRAM сильнее)
+
+Почему Phi-3-mini:
+
+* Вмещается в VRAM с запасом (~2.2GB для q4) для параллельных запросов
+* Отличное следование инструкциям (Microsoft)
+* Ниже задержка (~30-50ms на 4070)
+* Достаточно "ума" для классификации, где точность ~95% vs 98% у 8B-моделей
+
+Практический совет: Используйте vLLM вместо Ollama для продакшн-роутера:
+bashDownloadCopy code# docker-compose для vLLM
+services:
+  llm-router:
+    image: vllm/vllm-openai:latest
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    command: 
+      --model TheBloke/Phi-3-mini-4k-instruct-GGUF 
+      --quantization gptq
+      --max-model-len 2048
+      --port 8000
+      --host 0.0.0.0
+Критерий успеха роутера: Классификация с точностью >95% и latency <100ms P95.
+
+B. State Management (Context Window)
+Для 100 пользователей держать историю в контексте — антипаттерн. Вот готовый паттерн для Node.js/TypeScript:
+Слоистая архитектура памяти:
+typescriptDownloadCopy code// 1. Краткосрочная память (1 сессия)
+interface ShortTermMemory {
+  sessionId: string;
+  messages: Array<{role: string, content: string}>; // Последние 10 сообщений
+}
+
+// 2. Долгосрочная память (Vector DB)
+class LongTermMemory {
+  async summarizeAndStore(sessionId: string, messages: Message[]): Promise<string> {
+    // Использовать маленькую модель (phi-3-mini) для суммаризации
+    const summary = await summarizeModel.generate(`Summarize: ${messages}`);
+    await vectorStore.upsert(sessionId, summary);
+    return summary;
+  }
+  
+  async retrieveRelevant(sessionId: string, query: string): Promise<string[]> {
+    return await vectorStore.similaritySearch(sessionId, query, {k: 3});
+  }
+}
+
+// 3. "Working memory" для текущего запроса
+const buildPrompt = (shortTerm: Message[], longTerm: string[]) => `
+Relevant context: ${longTerm.join('\n')}
+Recent conversation: ${shortTerm.map(m => `${m.role}: ${m.content}`).join('\n')}
+Current query: {user_input}
+`;
+Готовые решения:
+
+1. LangGraph.js + Vector Store (рекомендую):
+
+typescriptDownloadCopy codeimport { StateGraph, MemorySaver } from "@langchain/langgraph";
+import { Chroma } from "@langchain/community/vectorstores/chroma";
+
+// MemorySaver автоматически управляет состоянием между вызовами
+const memory = new MemorySaver();
+const graph = new StateGraph({...}).addMemory(memory);
+
+1. 
+MemGPT для Node.js (экспериментально) — если нужно сложное управление иерархической памятью.
+
+2. 
+Свой велосипед с использованием библиотек:
+
+
+typescriptDownloadCopy code// Простое и работающее решение
+import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
+import { MemoryVectorStore } from "langchain/vectorstores/memory";
+import { OpenAIEmbeddings } from "@langchain/openai";
+
+// Каждые 10 сообщений — суммаризируем и сохраняем в векторную БД
+Векторная БД на выбор:
+
+* Chroma (легковесный, в памяти, для начала)
+* Qdrant (продакшн-решение, в Docker)
+* Postgres с pgvector (если уже есть Neon)
+
+
+C. Фреймворки оркестрации
+Рекомендую минималистичный стек:
+1. Для роутинга/агентов — LangGraph.js
+typescriptDownloadCopy codeimport { StateGraph, Annotation } from "@langchain/langgraph";
+import { HumanMessage, AIMessage } from "@langchain/core/messages";
+
+// Определяем состояние
+const State = Annotation.Root({
+  messages: Annotation<Array<HumanMessage | AIMessage>>({
+    reducer: (current, update) => current.concat(update),
+  }),
+  intent: Annotation<string>(),
+  routeTo: Annotation<string>(),
+});
+
+// Строим граф
+const workflow = new StateGraph(State)
+  .addNode("classify_intent", classifyIntentNode)
+  .addNode("handle_price_check", priceCheckNode)
+  .addNode("handle_chat", chatNode)
+  .addNode("handle_complex", complexNode)
+  .addEdge("__start__", "classify_intent")
+  .addConditionalEdges("classify_intent", routeByIntent);
+
+// Компилируем в применимый граф
+const app = workflow.compile({ checkpointer: new MemorySaver() });
+Преимущества LangGraph:
+
+* Нативный TypeScript
+* Stateful из коробки
+* Визуализация графов (LangSmith)
+* Легко добавлять человеческий-in-the-loop
+
+2. Для долгоживущих процессов — Temporal.io
+Если нужны гарантии исполнения (например, фоновые price checks на 1000 товаров):
+typescriptDownloadCopy code// Temporal workflow для асинхронных задач
+export async function checkPricesWorkflow(
+  { skuList }: { skuList: string[] }
+): Promise<PriceResult[]> {
+  // Каждый SKU обрабатывается как отдельная activity
+  return await Promise.all(
+    skuList.map(sku => 
+      workflowExecuteLocal(sku) // Локальная инференция
+        .catch(() => workflowExecuteCloud(sku)) // Фоллбэк на облако
+    )
+  );
+}
+AutoGen — overkill для вашего case (слишком много агентов, сложная координация).
+
+D. Queue Dilemma
+Рекомендация: Inngest + Redis на Fly.io/Railway
+Архитектура:
+Vercel (Serverless) → Inngest Cloud → Webhook → Local Worker (GPU) ← Redis на Railway
+
+Почему именно так:
+
+1. 
+Inngest:
+
+Нативный для Vercel (SDK)
+HTTP-based — не нужно открывать порты локально
+Durable execution из коробки
+Concurrency control (важно для GPU)
+
+
+2. 
+Redis (Upstash или Railway):
+
+Для кэширования контекста пользователей
+Для rate limiting локальной модели
+Для очередей падения (dead letter queues)
+
+
+
+Конфигурация:
+typescriptDownloadCopy code// Inngest функция в Next.js API route
+import { inngest } from "@/lib/inngest";
+
+export const processHeavyCheck = inngest.createFunction(
+  { id: "heavy-price-check" },
+  { event: "price.check.requested" },
+  async ({ event, step }) => {
+    // 1. Проверка кэша
+    const cached = await step.run("check-cache", () => redis.get(event.data.sku));
+    if (cached) return cached;
+    
+    // 2. Локальная обработка
+    const localResult = await step.run("process-local", async () => {
+      return await callLocalLLM(event.data);
+    }).catch(() => null);
+    
+    // 3. Фоллбэк на облако
+    if (!localResult) {
+      return await step.run("process-cloud", () => callGemini(event.data));
+    }
+    
+    return localResult;
+  }
+);
+Локальный worker:
+typescriptDownloadCopy code// Worker на TypeScript, запущенный на GPU-машине
+import { createWorker } from "@inngest/worker";
+import { serve } from "inngest/next";
+
+const worker = createWorker({
+  client: inngest,
+  functions: [processHeavyCheck],
+  // Локальный URL для обратного вызова
+  url: "http://localhost:3000/api/inngest",
+});
+
+worker.start();
+
+Дополнительные критические рекомендации
+1. GPU-инфраструктура на Windows
+Windows для продакшн LLM — плохая идея. Решение:
+
+* Установите Ubuntu 22.04 dual-boot или в WSL2 (с CUDA)
+* Или мигрируйте на Lambda Labs / RunPod для стабильности
+* Для локального development используйте Triton Inference Server
+
+2. Fallback стратегия
+Локальная GPU может упасть. Нужен план:
+typescriptDownloadCopy codeclass HybridExecutor {
+  async execute(request: Request): Promise<Response> {
+    try {
+      // 1. Пробуем локально
+      return await localLLM.executeWithTimeout(request, 2000);
+    } catch (error) {
+      // 2. Фоллбэк на облачную модель
+      metrics.increment("fallback_to_cloud");
+      return await cloudLLM.execute(request);
+    }
+  }
+}
+3. Мониторинг распределения нагрузки
+Добавьте метрики для проверки критериев успеха:
+typescriptDownloadCopy code// Prometheus метрики
+const metrics = {
+  requests_total: new Counter({ name: 'requests_total' }),
+  intent_distribution: new Gauge({ 
+    name: 'intent_distribution',
+    labelNames: ['intent_type']
+  }),
+  cost_savings: new Counter({ name: 'cost_savings_dollars' })
+};
+
+// После роутинга
+metrics.intent_distribution.labels(intent).inc();
+if (intent === 'SIMPLE') {
+  metrics.cost_savings.inc(0.0015); // Стоимость одного запроса к Gemini
+}
+
+Конкретный план внедрения (4 недели)
+Неделя 1: Базовая инфраструктура
+
+* Настройка Ubuntu + Docker + vLLM на RTX 4070
+* Развертывание Phi-3-mini как роутера
+* Настройка Inngest + Redis (Railway)
+
+Неделя 2: Ядро MoE
+
+* Реализация LangGraph для роутинга
+* Подключение 3 экспертов: price check (локальный код), chat (локальный LLM), complex (Gemini)
+* Векторная БД для контекста
+
+Неделя 3: State management и производительность
+
+* Реализация слоистой памяти (short-term + vector store)
+* Нагрузочное тестирование до 100 пользователей
+* Оптимизация latency (кеширование, prefetching)
+
+Неделя 4: Продакшн-готовность
+
+* Circuit breakers и fallback стратегии
+* Мониторинг (Sentry, Prometheus, Grafana)
+* A/B тестирование точности классификации
+
+
+Оценка критериев успеха
+1. Zero ECONNRESET при 100 пользователях
+
+* Достижимо: Inngest дедуплицирует запросы, GPU очередь регулирует нагрузку
+* Потенциальная проблема: memory leaks в vector store. Решение — TTL кэшей
+
+2. 60% cost reduction
+
+* Реалистично: Phi-3-mini vs Gemini Pro экономит ~$0.0015 на запрос
+* С 10K запросов/день → экономия $15/день → $450/месяц
+* Роутер должен направлять 60% трафика на локальное исполнение
+
+3. <2s latency для простых интентов
+
+* Достижимо: Локальная инференция (50-200ms) + кэш Redis (10ms)
+* Критично: Кэширование результатов price check на 1-5 минут
+
+
+Риски и их mitigation
+РискВероятностьВлияниеMitigationЛокальная GPU недоступнаСредняяВысокоеCloud fallback, health checksНеточность классификацииВысокаяСреднееA/B тестирование моделей, человеческий аудитУтечка контекста между пользователямиНизкаяКритичноеИзоляция сессий, шифрование данныхВекторная БД становится bottleneckСредняяВысокоеИндексирование, шардинг, переход на Qdrant
+Заключение
+Ваша архитектура MoE перспективна. Стартовый стек:
+
+1. Роутер: Phi-3-mini (q4_K_M) на vLLM
+2. Оркестратор: LangGraph.js + Inngest
+3. Память: Chroma (локально) + Redis кэш
+4. Эксперты: Код (price check), Llama-3.1-8B (chat), Gemini (complex)
+
+Главный совет: Начните с изоляции роутера как отдельного сервиса. Протестируйте accuracy классификации на исторических данных. Затем постепенно добавляйте экспертов.
+Хотите, я подготовлю docker-compose.yml для всей инфраструктуры (vLLM + Redis + Chroma + Node.js worker) или минимальный рабочий пример на LangGraph с роутингом?I prefer this

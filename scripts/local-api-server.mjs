@@ -120,7 +120,13 @@ async function startServer() {
           }
         };
         
-        // Call the API handler
+        // --- MOE SUPPORT: Handle Inngest endpoint ---
+        if (parsedUrl.pathname === '/api/inngest') {
+          const { default: inngestHandler } = await import('../api/inngest.ts');
+          return await inngestHandler(vercelReq, vercelRes);
+        }
+
+        // Call the main API handler
         await handler(vercelReq, vercelRes);
         
       } catch (error) {

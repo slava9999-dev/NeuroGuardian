@@ -1,0 +1,59 @@
+# Docker Compose для GPU-ноды NeuroGUARDIAN (vLLM + Redis + Chroma)
+services:
+  # LLM Router: Phi-3-mini для классификации интентов
+  llm-router:
+    image: vllm/vllm-openai:latest
+    container_name: neuro-llm-router
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    ports:
+      - "8000:8000"
+    command: >
+      --model microsoft/Phi-3-mini-4k-instruct
+      --trust-remote-code
+      --dtype half
+      --max-model-len 2048
+      --gpu-memory-utilization 0.5
+      --port 8000
+    networks:
+      - neuro-gpu-network
+    restart: unless-stopped
+
+  # Redis для Inngest и кэширования контекста (Порт изменен на 6380 для избежания конфликта)
+  redis:
+    image: redis:7-alpine
+    container_name: neuro-gpu-redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - neuro-gpu-network
+    restart: unless-stopped
+
+  # Vector DB для долгосрочной памяти (RAG/Summarization)
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: neuro-gpu-chroma
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    networks:
+      - neuro-gpu-network
+    restart: unless-stopped
+
+networks:
+  neuro-gpu-network:
+    driver: bridge
+
+volumes:
+  redis_data:
+  chroma_data:
