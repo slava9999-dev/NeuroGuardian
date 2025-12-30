@@ -1,9 +1,17 @@
 import { serve } from 'inngest/next';
 import { inngest } from '../lib/inngest.js';
-import { processMoEQuery, backgroundPriceCheck } from '../services/inngest-functions.js';
+import {
+  processMoEQuery,
+  backgroundPriceCheck,
+  scheduledSentinelCycle,
+} from '../services/inngest-functions.js';
 
-// Экспортируем обработчик для Vercel
+// Регистрируем все Inngest функции для Vercel
 export const handleInngest = serve({
   client: inngest,
-  functions: [processMoEQuery, backgroundPriceCheck],
+  functions: [
+    processMoEQuery, // MoE query routing
+    backgroundPriceCheck, // On-demand price checks
+    scheduledSentinelCycle, // 30-min automated monitoring
+  ],
 });
