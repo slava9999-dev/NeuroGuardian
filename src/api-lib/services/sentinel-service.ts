@@ -222,6 +222,7 @@ export class SentinelService {
                     marketplace,
                     threat_type: 'competitor_match',
                     success: true,
+                    details: { reason: repricing.reason, competitorPrice },
                   });
                   // Skip regular threat scan if we just repriced?
                   // Ideally yes, to avoid double-checking our own old price.

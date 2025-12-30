@@ -9,7 +9,6 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 // Middleware (moved to src/api-lib to avoid Vercel function limit)
 import {
   extractTelegramAuth,
-  extractAnyAuth,
   extractAnyAuthAsync,
   sendAuthError,
   sendMethodNotAllowed,
@@ -111,15 +110,14 @@ import {
 // Utilities
 import {
   sanitizeInput,
-  checkRateLimit,
   checkRateLimitV2,
   RateLimitPresets,
   getRequestIdentifier,
   getRateLimitHeaders,
-  RATE_LIMIT,
   IS_PRODUCTION,
   ALLOWED_ORIGINS,
 } from '../src/api-lib/lib/index.js';
+import { captureException } from '../src/api-lib/lib/monitoring.js';
 
 // ============================================
 // CORS HEADERS
@@ -439,6 +437,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   } catch (error) {
     console.error('API Error:', error);
+    captureException(error, {
+      action,
+      method: req.method,
+      url: req.url,
+    });
     return res.status(500).json({
       error: error instanceof Error ? error.message : 'Internal server error',
     });
