@@ -182,6 +182,7 @@ export async function initializeDatabase(): Promise<void> {
   // Ensure new columns exist
   await sql`ALTER TABLE sentinel_logs ADD COLUMN IF NOT EXISTS threat_type VARCHAR(50)`;
   await sql`ALTER TABLE sentinel_logs ADD COLUMN IF NOT EXISTS success BOOLEAN DEFAULT true`;
+  await sql`ALTER TABLE sentinel_logs ADD COLUMN IF NOT EXISTS details JSONB DEFAULT '{}'`;
 
   // 6. Chat History
   await sql`
