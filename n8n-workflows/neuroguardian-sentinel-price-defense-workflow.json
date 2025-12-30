@@ -1,0 +1,986 @@
+{
+  "updatedAt": "2025-12-29T22:23:05.555Z",
+  "createdAt": "2025-12-29T22:23:05.555Z",
+  "id": "vUn4GxA6EuAeim3g",
+  "name": "NeuroGUARDIAN Sentinel - Price Defense",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "b6dbf3c9-3ae2-4659-99db-6aa72a5609dc",
+      "name": "Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -2000,
+        1248
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "apiBaseUrl",
+              "value": "={{ $env.API_URL }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "cronSecret",
+              "value": "={{ $env.CRON_SECRET }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "telegramBotToken",
+              "value": "={{ $env.TELEGRAM_BOT_TOKEN }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "maxViolationsPerRun",
+              "value": 100,
+              "type": "number"
+            },
+            {
+              "id": "id-5",
+              "name": "adminChatId",
+              "value": "={{ $env.ADMIN_CHAT_ID }}",
+              "type": "string"
+            },
+            {
+              "id": "id-6",
+              "name": "adminTelegramId",
+              "value": "={{ $env.ADMIN_TELEGRAM_ID }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "include": "all",
+        "options": {}
+      },
+      "id": "59faa058-66e8-4c3b-a167-16f8095fe740",
+      "name": "Workflow Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1776,
+        1248
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Workflow Configuration').first().json.apiBaseUrl }}?action=check-prices&include_details=true",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Workflow Configuration').first().json.cronSecret }}"
+            },
+            {
+              "name": "X-Telegram-Id",
+              "value": "={{ $('Workflow Configuration').first().json.adminTelegramId }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "e0848bea-1e2c-4aa2-9f76-86f6730732de",
+      "name": "Check Prices API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1552,
+        1248
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{ $json.violations_found }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "ebaee3bd-65b9-4d09-9d3b-8c1786a566de",
+      "name": "Has Violations?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1328,
+        1248
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{ $json.violations.length }}",
+              "rightValue": "={{ $('Workflow Configuration').item.json.maxViolationsPerRun }}",
+              "operator": {
+                "type": "number",
+                "operation": "lte"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "ea7b5e99-7a5e-4bd3-953a-c2e52b106baf",
+      "name": "Rate Limit Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1104,
+        1248
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "violations",
+        "include": "noOtherFields"
+      },
+      "id": "4780f00e-f0ed-47f5-a2d2-c90f26436538",
+      "name": "Split Violations",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -880,
+        1248
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{ $json.defense_action }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "id-2",
+              "leftValue": "={{ $json.marketplace }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "id-3",
+              "leftValue": "={{ $json.product_id || $json.offer_id }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "7649ac2e-087c-4970-bb21-d2c08cad21b1",
+      "name": "Validate Required Fields",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -656,
+        1248
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.defense_action }}",
+                    "rightValue": "zero_stock",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  },
+                  {
+                    "leftValue": "={{ $json.marketplace }}",
+                    "rightValue": "wildberries",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "WB Zero Stock"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.defense_action }}",
+                    "rightValue": "price_correction",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  },
+                  {
+                    "leftValue": "={{ $json.marketplace }}",
+                    "rightValue": "wildberries",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "WB Price Fix"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.defense_action }}",
+                    "rightValue": "zero_stock",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  },
+                  {
+                    "leftValue": "={{ $json.marketplace }}",
+                    "rightValue": "ozon",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Ozon Zero Stock"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.defense_action }}",
+                    "rightValue": "price_correction",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  },
+                  {
+                    "leftValue": "={{ $json.marketplace }}",
+                    "rightValue": "ozon",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Ozon Price Fix"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Unknown"
+        }
+      },
+      "id": "2bae74f7-11f5-4b45-b60e-e047ab2b7f28",
+      "name": "Defense Action Router",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -432,
+        912
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://suppliers-api.wildberries.ru/api/v3/stocks/0",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $json.api_key_wb }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={ \"stocks\": [{ \"sku\": \"{{ $json.product_id }}\", \"amount\": 0 }] }",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "b816097a-5fad-4ec3-9834-57193af623fc",
+      "name": "WB Zero Stock",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -208,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://suppliers-api.wildberries.ru/public/api/v1/prices",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $json.api_key_wb }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={ \"prices\": [{ \"nmID\": {{ $json.nm_id }}, \"price\": {{ $json.min_price }}, \"discount\": 0 }] }",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "df46d32e-86c0-436e-8f0d-c7a68f089236",
+      "name": "WB Price Fix",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -208,
+        768
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api-seller.ozon.ru/v2/products/stocks",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Client-Id",
+              "value": "={{ $json.ozon_client_id }}"
+            },
+            {
+              "name": "Api-Key",
+              "value": "={{ $json.api_key_ozon }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={ \"stocks\": [{ \"offer_id\": \"{{ $json.offer_id }}\", \"stock\": 0 }] }",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "701e4b1f-3388-4509-80b5-6a78cb520fa3",
+      "name": "Ozon Zero Stock",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -208,
+        960
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api-seller.ozon.ru/v1/product/import/prices",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Client-Id",
+              "value": "={{ $json.ozon_client_id }}"
+            },
+            {
+              "name": "Api-Key",
+              "value": "={{ $json.api_key_ozon }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"prices\": [\n    {\n      \"offer_id\": \"{{ $json.offer_id }}\",\n      \"price\": \"{{ $json.min_price }}\"\n    }\n  ]\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "b2882de3-d676-4428-b47b-dda11d425c27",
+      "name": "Ozon Price Fix",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -208,
+        1152
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "execution_status",
+              "value": "success",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "processed_at",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "include": "all"
+      },
+      "id": "25161fe4-815a-4c3f-8513-008b888031e9",
+      "name": "Mark as Success",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        16,
+        864
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "execution_status",
+              "value": "validation_failed",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "error_reason",
+              "value": "Missing required fields",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "include": "all"
+      },
+      "id": "91ec460a-cfd9-4e76-84ee-e176ed2f67ae",
+      "name": "Mark as Error",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        16,
+        1536
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "execution_status",
+              "value": "unknown_route",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "error_reason",
+              "value": "Unknown marketplace or defense action combination",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "include": "all"
+      },
+      "id": "c6d02fe0-9899-471f-a824-dd5c5f44a189",
+      "name": "Log Unknown Route",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -208,
+        1344
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $('Workflow Configuration').first().json.telegramBotToken }}/sendMessage",
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{ $('Workflow Configuration').first().json.adminChatId }}\",\n  \"text\": \"⚠️ Unknown Defense Route\\n\\nMarketplace: {{ $json.marketplace }}\\nDefense Action: {{ $json.defense_action }}\\nProduct ID: {{ $json.product_id || $json.offer_id }}\\n\\nThis combination is not configured in the workflow.\",\n  \"parse_mode\": \"HTML\"\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "799104de-dc53-4d0c-a381-81587afaf680",
+      "name": "Alert Admin Unknown",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        16,
+        1344
+      ]
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "data",
+        "include": "allFields"
+      },
+      "id": "d5c01077-d709-4581-b5c5-b2dc5501b0c4",
+      "name": "Aggregate Results",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        240,
+        1344
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items = $input.all();\n\nlet successCount = 0;\nlet errorCount = 0;\nlet validationFailedCount = 0;\nconst successProducts = [];\nconst errorProducts = [];\n\nfor (const item of items) {\n  const status = item.json.execution_status;\n  const marketplace = item.json.marketplace || 'unknown';\n  const productId = item.json.product_id || item.json.offer_id || 'unknown';\n  const action = item.json.defense_action || 'unknown';\n  \n  if (status === 'success') {\n    successCount++;\n    successProducts.push(`${marketplace.toUpperCase()}: ${productId} (${action})`);\n  } else if (status === 'validation_failed') {\n    validationFailedCount++;\n    errorProducts.push(`${marketplace.toUpperCase()}: ${productId} - Validation Failed`);\n  } else {\n    errorCount++;\n    const errorReason = item.json.error_reason || 'Unknown error';\n    errorProducts.push(`${marketplace.toUpperCase()}: ${productId} - ${errorReason}`);\n  }\n}\n\nlet message = `🛡️ *Defense System Report*\\n\\n`;\nmessage += `✅ Successful: ${successCount}\\n`;\nmessage += `❌ Failed: ${errorCount}\\n`;\nmessage += `⚠️ Validation Failed: ${validationFailedCount}\\n`;\nmessage += `📊 Total Processed: ${items.length}\\n\\n`;\n\nif (successProducts.length > 0) {\n  message += `*Successful Actions:*\\n`;\n  successProducts.forEach(p => message += `  • ${p}\\n`);\n  message += `\\n`;\n}\n\nif (errorProducts.length > 0) {\n  message += `*Failed Actions:*\\n`;\n  errorProducts.forEach(p => message += `  • ${p}\\n`);\n}\n\nreturn [{ json: {\n    message: message,\n    successCount: successCount,\n    errorCount: errorCount,\n    validationFailedCount: validationFailedCount,\n    totalProcessed: items.length\n  }}];"
+      },
+      "id": "14e58854-11d8-4dd8-a818-407ea4e64c77",
+      "name": "Build Summary Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        1344
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $('Workflow Configuration').first().json.telegramBotToken }}/sendMessage",
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{ $('Workflow Configuration').first().json.adminChatId }}\",\n  \"text\": \"{{ $('Build Summary Message').first().json.message }}\",\n  \"parse_mode\": \"Markdown\"\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "7aa69946-a736-4beb-a412-41d999ca92d1",
+      "name": "Send Summary Telegram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        688,
+        1344
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Workflow Configuration').first().json.apiBaseUrl }}?action=bulk-log-defense",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Workflow Configuration').first().json.cronSecret }}"
+            },
+            {
+              "name": "X-Telegram-Id",
+              "value": "={{ $('Workflow Configuration').first().json.adminTelegramId }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "2db2cceb-108c-461d-9d5a-8cfe1cc9a444",
+      "name": "Bulk Log Results",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        912,
+        1344
+      ]
+    }
+  ],
+  "connections": {
+    "Every 5 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Workflow Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Workflow Configuration": {
+      "main": [
+        [
+          {
+            "node": "Check Prices API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Prices API": {
+      "main": [
+        [
+          {
+            "node": "Has Violations?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Violations?": {
+      "main": [
+        [
+          {
+            "node": "Rate Limit Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rate Limit Check": {
+      "main": [
+        [
+          {
+            "node": "Split Violations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Violations": {
+      "main": [
+        [
+          {
+            "node": "Validate Required Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Required Fields": {
+      "main": [
+        [
+          {
+            "node": "Defense Action Router",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark as Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Defense Action Router": {
+      "main": [
+        [
+          {
+            "node": "WB Zero Stock",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WB Price Fix",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ozon Zero Stock",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ozon Price Fix",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Unknown Route",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WB Zero Stock": {
+      "main": [
+        [
+          {
+            "node": "Mark as Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WB Price Fix": {
+      "main": [
+        [
+          {
+            "node": "Mark as Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ozon Zero Stock": {
+      "main": [
+        [
+          {
+            "node": "Mark as Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ozon Price Fix": {
+      "main": [
+        [
+          {
+            "node": "Mark as Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark as Success": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark as Error": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Unknown Route": {
+      "main": [
+        [
+          {
+            "node": "Alert Admin Unknown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alert Admin Unknown": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Results": {
+      "main": [
+        [
+          {
+            "node": "Build Summary Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Summary Message": {
+      "main": [
+        [
+          {
+            "node": "Send Summary Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Summary Telegram": {
+      "main": [
+        [
+          {
+            "node": "Bulk Log Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": {
+    "node:Every 5 Minutes": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": null,
+  "pinData": null,
+  "versionId": "6e8e17f0-677e-4655-9b42-3f93f3f4299f",
+  "activeVersionId": "6e8e17f0-677e-4655-9b42-3f93f3f4299f",
+  "versionCounter": 9,
+  "triggerCount": 1,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2025-12-29T22:23:05.555Z",
+      "createdAt": "2025-12-29T22:23:05.555Z",
+      "role": "workflow:owner",
+      "workflowId": "vUn4GxA6EuAeim3g",
+      "projectId": "D1eyPmjU9i1mB4hG",
+      "project": {
+        "updatedAt": "2025-12-29T22:13:15.845Z",
+        "createdAt": "2025-12-29T22:09:37.583Z",
+        "id": "D1eyPmjU9i1mB4hG",
+        "name": "Admin NeuroGuardian <admin@neuroguardian.local>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "2d0ee0eb-407d-40a8-a0f2-6bb597cc633b"
+      }
+    }
+  ]
+}

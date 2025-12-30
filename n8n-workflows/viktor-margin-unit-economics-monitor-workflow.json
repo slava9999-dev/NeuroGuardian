@@ -1,0 +1,560 @@
+{
+  "updatedAt": "2025-12-29T22:23:05.597Z",
+  "createdAt": "2025-12-29T22:23:05.597Z",
+  "id": "0TYASxgS0t5OGIj0",
+  "name": "Viktor Margin - Unit Economics Monitor",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "hourly-trigger",
+      "name": "Every Hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "apiBaseUrl",
+              "value": "={{ $env.API_URL }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "cronSecret",
+              "value": "={{ $env.CRON_SECRET }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "telegramBotToken",
+              "value": "={{ $env.TELEGRAM_BOT_TOKEN }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "adminChatId",
+              "value": "={{ $env.ADMIN_CHAT_ID }}",
+              "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "adminTelegramId",
+              "value": "={{ $env.ADMIN_TELEGRAM_ID }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "include": "all"
+      },
+      "id": "config",
+      "name": "Configuration",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Configuration').first().json.apiBaseUrl }}?action=get-products&include_economics=true",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Configuration').first().json.cronSecret }}"
+            },
+            {
+              "name": "X-Telegram-Id",
+              "value": "={{ $('Configuration').first().json.adminTelegramId }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "get-products",
+      "name": "Get All Products",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "products",
+        "include": "noOtherFields"
+      },
+      "id": "split-products",
+      "name": "Split Products",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Configuration').first().json.apiBaseUrl }}?action=calculate-unit-economics",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Configuration').first().json.cronSecret }}"
+            },
+            {
+              "name": "X-Telegram-Id",
+              "value": "={{ $('Configuration').first().json.adminTelegramId }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"price\": {{ $json.current_price || $json.price }},\n  \"costPrice\": {{ $json.cost_price }},\n  \"marketplace\": \"{{ $json.marketplace }}\",\n  \"category\": \"{{ $json.category }}\",\n  \"volumeLiters\": {{ $json.volume_liters || 1 }},\n  \"avgStorageDays\": {{ $json.avg_storage_days || 30 }},\n  \"returnRate\": {{ $json.return_rate || 0.1 }},\n  \"useOzonCard\": true\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "calc-economics",
+      "name": "Calculate Unit Economics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1120,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "product_id",
+              "value": "={{ $('Split Products').item.json.product_id }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "product_title",
+              "value": "={{ $('Split Products').item.json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "marketplace",
+              "value": "={{ $('Split Products').item.json.marketplace }}",
+              "type": "string"
+            },
+            {
+              "id": "id-4",
+              "name": "economics",
+              "value": "={{ $json }}",
+              "type": "object"
+            },
+            {
+              "id": "id-5",
+              "name": "warnings",
+              "value": "={{ $json.warnings }}",
+              "type": "object"
+            },
+            {
+              "id": "id-6",
+              "name": "hasWarnings",
+              "value": "={{ $json.warnings && $json.warnings.length > 0 }}",
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "include": "none"
+      },
+      "id": "merge-data",
+      "name": "Merge Product Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1340,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{ $json.hasWarnings }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "has-warnings",
+      "name": "Has Warnings?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1560,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.warnings.some(w => w.type === 'critical') }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Critical"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.warnings.some(w => w.type === 'warning') }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Warning"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Info"
+        }
+      },
+      "id": "severity-router",
+      "name": "Severity Router",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1780,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const product = $input.item.json;\nconst mpEmoji = product.marketplace.toLowerCase() === 'wildberries' || product.marketplace.toLowerCase() === 'wb' ? '🟣' : '🔵';\n\nlet message = `🚨 *КРИТИЧЕСКАЯ УГРОЗА МАРЖИ!*\\n\\n`;\nmessage += `${mpEmoji} *${product.product_title}*\\n`;\nmessage += `${product.marketplace}\\n\\n`;\n\nmessage += `📊 *UNIT ECONOMICS:*\\n`;\nconst econ = product.economics;\nmessage += `├─ Цена: ${econ.revenue}₽\\n`;\nmessage += `├─ Себестоимость: ${econ.costPrice}₽\\n`;\nmessage += `├─ Комиссия: ${econ.commission}₽ (${(econ.commissionRate * 100).toFixed(1)}%)\\n`;\nmessage += `├─ Логистика: ${econ.logistics}₽\\n`;\nif (econ.ozonCardCosts > 0) {\n  message += `├─ Ozon Card: ${econ.ozonCardCosts}₽\\n`;\n}\nmessage += `└─ ПРИБЫЛЬ: ${econ.profit}₽ (${econ.margin}%)\\n\\n`;\n\nmessage += `⚠️ *РИСКИ:*\\n`;\nproduct.warnings.forEach(w => {\n  if (w.type === 'critical') {\n    message += `🚨 ${w.message}\\n`;\n  }\n});\n\nmessage += `\\n💡 *Viktor Margin*\\n`;\nmessage += `_Срочно требуется действие!_`;\n\nreturn [{ json: {\n    message: message,\n    chat_id: $('Configuration').first().json.adminChatId\n  }}];"
+      },
+      "id": "build-critical-alert",
+      "name": "Build Critical Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $('Configuration').first().json.telegramBotToken }}/sendMessage",
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{ $json.chat_id }}\",\n  \"text\": \"{{ $json.message }}\",\n  \"parse_mode\": \"Markdown\"\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "send-critical-telegram",
+      "name": "Send Critical Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2220,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "warnings",
+        "include": "allFields"
+      },
+      "id": "aggregate-warnings",
+      "name": "Aggregate Warnings",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        2000,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items = $input.all();\\n\\nlet message = `📊 *VIKTOR MARGIN: Hourly Report*\\n\\n`;\\nmessage += `⚠️ Обнаружено ${items.length} товаров с предупреждениями\\n\\n`;\\n\\nconst warningTypes = {};\\nitems.forEach(item => {\\n  item.json.warnings.forEach(w => {\\n    if (w.type === 'warning') {\\n      warningTypes[w.code] = (warningTypes[w.code] || 0) + 1;\\n    }\\n  });\\n});\\n\\nmessage += `*Типы предупреждений:*\\n`;\\nObject.entries(warningTypes).forEach(([code, count]) => {\\n  const label = code === 'OZON_CARD_IMPACT' ? 'Ozon Card' :\\n                code === 'HIGH_STORAGE_DAYS' ? 'Долгое хранение' :\\n                code === 'HIGH_RETURN_RATE' ? 'Высокий возврат' : code;\\n  message += `  • ${label}: ${count}\\n`;\\n});\\n\\nmessage += `\\n💡 *Viktor Margin*\\n`;\\nmessage += `_Проверьте детали в dashboard_`;\\n\\nreturn {\\n  json: {\\n    message: message\\n  }\\n};"
+      },
+      "id": "build-warning-digest",
+      "name": "Build Warning Digest",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2220,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $('Configuration').first().json.telegramBotToken }}/sendMessage",
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{ $('Configuration').first().json.adminChatId }}\",\n  \"text\": \"{{ $json.message }}\",\n  \"parse_mode\": \"Markdown\"\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "send-warning-digest",
+      "name": "Send Warning Digest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2440,
+        280
+      ]
+    }
+  ],
+  "connections": {
+    "Every Hour": {
+      "main": [
+        [
+          {
+            "node": "Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuration": {
+      "main": [
+        [
+          {
+            "node": "Get All Products",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Products": {
+      "main": [
+        [
+          {
+            "node": "Split Products",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Products": {
+      "main": [
+        [
+          {
+            "node": "Calculate Unit Economics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Unit Economics": {
+      "main": [
+        [
+          {
+            "node": "Merge Product Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Product Data": {
+      "main": [
+        [
+          {
+            "node": "Has Warnings?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Warnings?": {
+      "main": [
+        [
+          {
+            "node": "Severity Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Severity Router": {
+      "main": [
+        [
+          {
+            "node": "Build Critical Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Aggregate Warnings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Critical Alert": {
+      "main": [
+        [
+          {
+            "node": "Send Critical Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Warnings": {
+      "main": [
+        [
+          {
+            "node": "Build Warning Digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Warning Digest": {
+      "main": [
+        [
+          {
+            "node": "Send Warning Digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": {
+    "node:Every Hour": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": null,
+  "pinData": null,
+  "versionId": "6a11b00d-fb48-4b62-9bd6-c8baf3513a65",
+  "activeVersionId": "6a11b00d-fb48-4b62-9bd6-c8baf3513a65",
+  "versionCounter": 9,
+  "triggerCount": 1,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2025-12-29T22:23:05.597Z",
+      "createdAt": "2025-12-29T22:23:05.597Z",
+      "role": "workflow:owner",
+      "workflowId": "0TYASxgS0t5OGIj0",
+      "projectId": "D1eyPmjU9i1mB4hG",
+      "project": {
+        "updatedAt": "2025-12-29T22:13:15.845Z",
+        "createdAt": "2025-12-29T22:09:37.583Z",
+        "id": "D1eyPmjU9i1mB4hG",
+        "name": "Admin NeuroGuardian <admin@neuroguardian.local>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "2d0ee0eb-407d-40a8-a0f2-6bb597cc633b"
+      }
+    }
+  ]
+}

@@ -90,6 +90,7 @@ services:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       # API Key for REST API access (import/export workflows)
+      - N8N_PUBLIC_API_DISABLED=false
       - N8N_API_KEY=${N8N_API_KEY:-neuroguardian-n8n-api-2024}
     volumes:
       - n8n_data:/home/node/.n8n
