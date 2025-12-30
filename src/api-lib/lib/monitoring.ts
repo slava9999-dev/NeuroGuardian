@@ -1,64 +1,35 @@
 // ============================================
 // NeuroGUARDIAN — Monitoring Service
-// Wrapper for Sentry or other observability tools
-// Version: 1.0.1 | Date: December 2024
+// Sentry Integration for Error Tracking & Performance
+// Version: 2.0.0 (Stable) | Date: December 2024
 // ============================================
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
+import * as Sentry from '@sentry/node';
+import { nodeProfilingIntegration } from '@sentry/profiling-node';
 import { logger } from './logger.js';
 
-let Sentry: any = null;
-
-// Try to initialize Sentry if environment variable is present
-// We use dynamic import to avoid hard dependency crash if package is missing
+// Initialize Sentry only if DSN is provided
 if (process.env.SENTRY_DSN) {
-  (async () => {
-    try {
-      // @ts-expect-error: Dynamic import of optional dependency might fail types check
-      const SentryModule = await import('@sentry/node');
-
-      let nodeProfilingIntegration = null;
-      try {
-        // @ts-expect-error: Dynamic import of optional dependency
-        const profiling = await import('@sentry/profiling-node');
-        nodeProfilingIntegration = profiling.nodeProfilingIntegration;
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      } catch (_err) {
-        // Profiling not available
-      }
-
-      Sentry = SentryModule;
-
-      const integrations = [];
-      if (nodeProfilingIntegration) {
-        integrations.push(nodeProfilingIntegration());
-      }
-
-      Sentry.init({
-        dsn: process.env.SENTRY_DSN,
-        environment: process.env.NODE_ENV || 'development',
-        integrations,
-        // Performance Monitoring
-        tracesSampleRate: 1.0, // Capture 100% of the transactions
-        // Set sampling rate for profiling - this is relative to tracesSampleRate
-        profilesSampleRate: 1.0,
-      });
-
-      logger.info('✅ Sentry initialized successfully');
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (_e) {
-      logger.debug('ℹ️ Sentry SDK not installed or failed to initialize. Monitoring disabled.');
-    }
-  })();
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV || 'development',
+    integrations: [nodeProfilingIntegration()],
+    // Performance Monitoring
+    tracesSampleRate: 1.0, // Capture 100% of the transactions
+    // Profiling
+    profilesSampleRate: 1.0, // Capture 100% of the profiles
+  });
+  logger.info('✅ Sentry initialized successfully');
+} else {
+  logger.debug('ℹ️ Sentry DSN not found. Monitoring is disabled.');
 }
 
 /**
  * Capture exception to monitoring system
  */
 export function captureException(error: unknown, context?: Record<string, any>): void {
-  if (Sentry) {
-    Sentry.withScope((scope: any) => {
+  if (process.env.SENTRY_DSN) {
+    Sentry.withScope(scope => {
       if (context) {
         scope.setExtras(context);
         if (context.userId) scope.setUser({ id: String(context.userId) });
@@ -66,11 +37,12 @@ export function captureException(error: unknown, context?: Record<string, any>):
       Sentry.captureException(error);
     });
   } else {
-    // Fallback to console if Sentry not active
-    // Logger already does console.error, so we prevent double logging if called from logger
+    // Fallback: log to console if not already logged by logger
     if (!context?._fromLogger) {
-      console.error('Captured Exception (Simulated Sentry):', error);
-      if (context) console.error('Context:', context);
+      console.error('Captured Exception (Local):', error);
+      if (context && Object.keys(context).length > 0) {
+        console.debug('Context:', context);
+      }
     }
   }
 }
@@ -80,11 +52,11 @@ export function captureException(error: unknown, context?: Record<string, any>):
  */
 export function captureMessage(
   message: string,
-  level: 'info' | 'warning' | 'error' = 'info',
+  level: 'info' | 'warning' | 'error' | 'debug' | 'fatal' = 'info',
   context?: Record<string, any>
 ): void {
-  if (Sentry) {
-    Sentry.withScope((scope: any) => {
+  if (process.env.SENTRY_DSN) {
+    Sentry.withScope(scope => {
       if (context) scope.setExtras(context);
       Sentry.captureMessage(message, level);
     });
