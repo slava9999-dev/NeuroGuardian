@@ -20,6 +20,21 @@ interface OpsOverview {
   recent_events: OpsEvent[];
 }
 
+interface MoEHealth {
+  healthy: boolean;
+  components: {
+    localLLM: { healthy: boolean; latencyMs: number; error?: string };
+    chromaDB: { healthy: boolean };
+    vercelKV: { healthy: boolean };
+    embeddings: { available: boolean };
+  };
+  config: {
+    moeEnabled: boolean;
+    forceLocal: boolean;
+  };
+  latencyMs: number;
+}
+
 interface OpsEvent {
   id: number; // Changed to number to match DB
   event_type: string;
@@ -44,13 +59,16 @@ interface ClientUser {
 // ============================================
 
 export function OpsPanelPage({ onBack }: { onBack: () => void }) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'clients' | 'audit' | 'n8n'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'clients' | 'audit' | 'n8n' | 'moe'>(
+    'overview'
+  );
   const [loading, setLoading] = useState(false);
 
   // Data State
   const [overview, setOverview] = useState<OpsOverview | null>(null);
   const [clients, setClients] = useState<ClientUser[]>([]);
   const [events, setEvents] = useState<OpsEvent[]>([]);
+  const [moeHealth, setMoeHealth] = useState<MoEHealth | null>(null);
 
   // Auth State
   const [adminKey, setAdminKey] = useState(localStorage.getItem('admin_key') || '');
@@ -112,6 +130,18 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
     }
   };
 
+  const fetchMoEHealth = async () => {
+    setLoading(true);
+    try {
+      const data = await apiFetch('/api?action=moe-health');
+      setMoeHealth(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // ============================================
   // EFFECTS
   // ============================================
@@ -122,10 +152,16 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
     if (activeTab === 'overview') fetchOverview();
     if (activeTab === 'clients') fetchClients();
     if (activeTab === 'audit') fetchAudit();
+    if (activeTab === 'moe') fetchMoEHealth();
 
     // Auto-refresh for overview every 30s
     if (activeTab === 'overview') {
       const interval = setInterval(fetchOverview, 30000);
+      return () => clearInterval(interval);
+    }
+    // Auto-refresh for MoE every 15s
+    if (activeTab === 'moe') {
+      const interval = setInterval(fetchMoEHealth, 15000);
       return () => clearInterval(interval);
     }
   }, [activeTab, isAuthenticated, clientsPage]);
@@ -275,6 +311,12 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
             onClick={() => setActiveTab('n8n')}
             icon="⚡"
             label="n8n"
+          />
+          <TabButton
+            active={activeTab === 'moe'}
+            onClick={() => setActiveTab('moe')}
+            icon="🧠"
+            label="MoE"
           />
         </div>
       </div>
@@ -466,6 +508,171 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
                   <span className="text-stone-400">Активные сценарии</span>
                   <span className="text-stone-200">3</span>
                 </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* MOE STATUS */}
+          {activeTab === 'moe' && (
+            <motion.div
+              key="moe"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="space-y-6"
+            >
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-bold text-white">🧠 Hybrid MoE Router</h2>
+                  <p className="text-stone-500 text-sm mt-1">
+                    Mixture of Experts: Local LLM → Cloud → Rules
+                  </p>
+                </div>
+                <div
+                  className={`px-4 py-2 rounded-xl font-bold ${
+                    moeHealth?.healthy
+                      ? 'bg-emerald-900/30 text-emerald-400 border border-emerald-800'
+                      : 'bg-amber-900/30 text-amber-400 border border-amber-800'
+                  }`}
+                >
+                  {moeHealth?.healthy ? '● Все системы работают' : '⚠ Проблемы с инфраструктурой'}
+                </div>
+              </div>
+
+              {/* MoE Config */}
+              <div className="bg-stone-900/50 rounded-2xl border border-stone-800 p-6">
+                <h3 className="text-lg font-bold text-stone-200 mb-4">Конфигурация</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex justify-between">
+                    <span className="text-stone-400">MoE Routing</span>
+                    <span
+                      className={
+                        moeHealth?.config?.moeEnabled ? 'text-emerald-400' : 'text-stone-500'
+                      }
+                    >
+                      {moeHealth?.config?.moeEnabled ? 'Включено' : 'Выключено'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-stone-400">Force Local</span>
+                    <span
+                      className={
+                        moeHealth?.config?.forceLocal ? 'text-violet-400' : 'text-stone-500'
+                      }
+                    >
+                      {moeHealth?.config?.forceLocal ? 'Да' : 'Нет'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Components Health */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Local LLM */}
+                <div className="p-5 bg-stone-900/50 rounded-2xl border border-stone-800">
+                  <div className="text-stone-500 text-xs font-bold uppercase tracking-wider mb-2">
+                    Локальный LLM
+                  </div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <div
+                      className={`w-2.5 h-2.5 rounded-full ${
+                        moeHealth?.components?.localLLM?.healthy
+                          ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]'
+                          : 'bg-red-500'
+                      }`}
+                    />
+                    <div
+                      className={`text-lg font-bold ${
+                        moeHealth?.components?.localLLM?.healthy
+                          ? 'text-emerald-400'
+                          : 'text-red-400'
+                      }`}
+                    >
+                      {moeHealth?.components?.localLLM?.healthy ? 'Онлайн' : 'Недоступен'}
+                    </div>
+                  </div>
+                  <div className="text-stone-600 text-xs font-mono">
+                    {moeHealth?.components?.localLLM?.latencyMs || 0}ms
+                  </div>
+                </div>
+
+                {/* ChromaDB */}
+                <div className="p-5 bg-stone-900/50 rounded-2xl border border-stone-800">
+                  <div className="text-stone-500 text-xs font-bold uppercase tracking-wider mb-2">
+                    ChromaDB
+                  </div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <div
+                      className={`w-2.5 h-2.5 rounded-full ${
+                        moeHealth?.components?.chromaDB?.healthy ? 'bg-emerald-500' : 'bg-amber-500'
+                      }`}
+                    />
+                    <div
+                      className={`text-lg font-bold ${
+                        moeHealth?.components?.chromaDB?.healthy
+                          ? 'text-emerald-400'
+                          : 'text-amber-400'
+                      }`}
+                    >
+                      {moeHealth?.components?.chromaDB?.healthy ? 'Норма' : 'Оффлайн'}
+                    </div>
+                  </div>
+                  <div className="text-stone-600 text-xs">Vector Store</div>
+                </div>
+
+                {/* Vercel KV */}
+                <div className="p-5 bg-stone-900/50 rounded-2xl border border-stone-800">
+                  <div className="text-stone-500 text-xs font-bold uppercase tracking-wider mb-2">
+                    Vercel KV
+                  </div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <div
+                      className={`w-2.5 h-2.5 rounded-full ${
+                        moeHealth?.components?.vercelKV?.healthy ? 'bg-emerald-500' : 'bg-amber-500'
+                      }`}
+                    />
+                    <div
+                      className={`text-lg font-bold ${
+                        moeHealth?.components?.vercelKV?.healthy
+                          ? 'text-emerald-400'
+                          : 'text-amber-400'
+                      }`}
+                    >
+                      {moeHealth?.components?.vercelKV?.healthy ? 'Норма' : 'Оффлайн'}
+                    </div>
+                  </div>
+                  <div className="text-stone-600 text-xs">Session Memory</div>
+                </div>
+
+                {/* Embeddings */}
+                <div className="p-5 bg-stone-900/50 rounded-2xl border border-stone-800">
+                  <div className="text-stone-500 text-xs font-bold uppercase tracking-wider mb-2">
+                    Embeddings
+                  </div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <div
+                      className={`w-2.5 h-2.5 rounded-full ${
+                        moeHealth?.components?.embeddings?.available
+                          ? 'bg-emerald-500'
+                          : 'bg-stone-600'
+                      }`}
+                    />
+                    <div
+                      className={`text-lg font-bold ${
+                        moeHealth?.components?.embeddings?.available
+                          ? 'text-emerald-400'
+                          : 'text-stone-500'
+                      }`}
+                    >
+                      {moeHealth?.components?.embeddings?.available ? 'Готово' : 'Нет'}
+                    </div>
+                  </div>
+                  <div className="text-stone-600 text-xs">OpenAI text-embedding</div>
+                </div>
+              </div>
+
+              {/* Latency */}
+              <div className="text-center text-stone-600 text-sm">
+                Health check: {moeHealth?.latencyMs || 0}ms
               </div>
             </motion.div>
           )}

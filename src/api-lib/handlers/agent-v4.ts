@@ -275,6 +275,9 @@ export async function handleAgentV4Status(
   _req: VercelRequest,
   res: VercelResponse
 ): Promise<VercelResponse> {
+  const moeEnabled = process.env.MOE_ROUTING_ENABLED !== 'false';
+  const forceLocal = process.env.FORCE_LOCAL_INFERENCE === 'true';
+
   return res.json({
     available: true,
     version: 'v4',
@@ -289,6 +292,13 @@ export async function handleAgentV4Status(
       'Two-Phase Pipeline',
       'Tool Results Only Links',
     ],
+    moe: {
+      enabled: moeEnabled,
+      forceLocal,
+      description: moeEnabled
+        ? 'Hybrid MoE: Local LLM → Cloud → Rule-based fallback'
+        : 'MoE routing disabled, using cloud LLM only',
+    },
   });
 }
 
