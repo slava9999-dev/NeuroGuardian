@@ -37,15 +37,25 @@
 - [ ] **Load Testing**: Validate system under load.
 - [ ] **Deploy**: Final push to `main` and Vercel.
 
-### Phase 6: Post-Launch (Sprint 3)
+### Phase 5: Infrastructure & AI Evolution (Next Sprint)
 
-- [ ] **Advanced Onboarding**: Interactive tutorial.
-- [ ] **B-004**: Ozon Competitor Scraping (requires external service).
-- [ ] **Advanced Analytics**: Cohort analysis, LTV.
+#### 🔧 Scalability (100+ Users)
+
+- [ ] **P0-INFRA-002: Scalable Async Queue Architecture** (Priority: **Critical**)
+  - **Problem:** Synchronous API cannot handle 100+ concurrent Sentinel checks (DB/CPU saturation).
+  - **Solution:** Implement Asynchronous Queue (Inngest or BullMQ).
+  - **Flow:** API -> Queue -> Worker (throttled) -> DB/Marketplace.
+
+#### 🤖 AI Architecture 2.0 (Hybrid MoE)
+
+- [ ] **P1-AI-005: Hybrid Router Architecture** (Priority: **High**)
+  - **Concept:** Use local lightweight LLM (Llama-3-8B on RTX 4070) for intent classification (Router).
+  - **Execution:** Route complex tasks to Cloud LLM (Gemini), simple tasks to Local/Symbolic logic.
+  - **Goal:** Reduce costs and latency at scale.
 
 ---
 
-## ⚠️ NEXT STEPS
+## ⚠️ NEXT IMMEDIATE STEPS
 
-1. Verify system under load (if needed).
-2. Deploy to Production.
+1. **Deploy:** Final push to `main` and Vercel.
+2. **Smoke Test:** Verify Sentinel in production environment.
