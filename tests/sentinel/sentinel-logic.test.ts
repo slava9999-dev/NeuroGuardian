@@ -39,6 +39,17 @@ vi.mock('../../src/api-lib/services/notifications.js', () => ({
   },
 }));
 
+vi.mock('../../src/api-lib/services/price-shield.js', () => ({
+  priceShield: {
+    getRulesForUser: vi.fn(() => Promise.resolve([])), // Default: no rules -> regular logic
+    calculateOptimalPrice: vi.fn(),
+  },
+}));
+
+vi.mock('../../src/api-lib/services/competitor-monitor.js', () => ({
+  getCompetitorPrice: vi.fn(),
+}));
+
 // Mock index.js to re-export mocks
 vi.mock('../../src/api-lib/services/index.js', async importOriginal => {
   const marketplace = await import('../../src/api-lib/services/marketplace.js');

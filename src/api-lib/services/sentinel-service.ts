@@ -13,10 +13,14 @@ import {
   setOzonDefensePrice,
   setWbZeroStock,
   setOzonZeroStock,
+  updateWbPrices,
+  updateOzonPrices,
 } from './marketplace.js';
 import { scanProductThreats, ThreatType } from './threat-detector.js';
 import { logSentinelAction } from './database.js';
 import { sendTelegramNotification } from './notifications.js';
+import { priceShield, type PriceRule } from './price-shield.js';
+import { getCompetitorPrice } from './competitor-monitor.js';
 
 export interface SentinelRunResult {
   usersProcessed: number;
@@ -102,13 +106,25 @@ export class SentinelService {
     const products = productsRes.rows;
     if (products.length === 0) return;
 
+    // Get Active Price Rules (Smart Repricing)
+    const rules = await priceShield.getRulesForUser(user.id);
+    const rulesMap = new Map(rules.map(r => [r.product_id, r]));
+
     // --- WB Sub-cycle ---
     if (keys.wb) {
       const wbProducts = products.filter(p => p.marketplace === 'WB');
       const nmIds = wbProducts.map(p => p.nm_id).filter(Boolean);
       if (nmIds.length > 0) {
         const { priceMap } = await fetchWbPrices(keys.wb, nmIds);
-        await this.handleMarketplaceThreats(user, wbProducts, priceMap, 'WB', keys.wb, summary);
+        await this.handleMarketplaceThreats(
+          user,
+          wbProducts,
+          priceMap,
+          'WB',
+          keys.wb,
+          summary,
+          rulesMap
+        );
       }
     }
 
@@ -130,7 +146,8 @@ export class SentinelService {
           priceMap,
           'Ozon',
           keys.ozon,
-          summary
+          summary,
+          rulesMap
         );
       }
     }
@@ -145,7 +162,8 @@ export class SentinelService {
     priceMap: Map<number, number>,
     marketplace: 'WB' | 'Ozon',
     keys: any,
-    summary: SentinelRunResult
+    summary: SentinelRunResult,
+    rulesMap: Map<string, PriceRule>
   ): Promise<void> {
     for (const product of products) {
       const key =
@@ -153,6 +171,69 @@ export class SentinelService {
       const livePrice = priceMap.get(key);
       if (livePrice === undefined) continue;
 
+      // 1. SMART REPRICING (PriceShield)
+      // Check if we have active rules for this product
+      const rule = rulesMap.get(product.product_id);
+
+      if (rule && rule.auto_adjust && rule.competitor_tracking && rule.competitor_nmids) {
+        // Parse first competitor (v1 only supports single primary competitor)
+        const competitors = rule.competitor_nmids.split(',').map(s => s.trim());
+        if (competitors.length > 0) {
+          const competitorId = parseInt(competitors[0]); // Assuming numeric ID for WB
+          if (!isNaN(competitorId)) {
+            const competitorPrice = await getCompetitorPrice(marketplace, competitorId);
+
+            if (competitorPrice) {
+              const repricing = priceShield.calculateOptimalPrice(livePrice, competitorPrice, rule);
+
+              if (repricing.isChangeNeeded) {
+                console.log(
+                  `🛡️ PriceShield: Updating ${product.title} to ${repricing.newPrice}₽ (${repricing.reason})`
+                );
+
+                // Execute Repricing
+                let updateSuccess = false;
+                if (marketplace === 'WB') {
+                  const res = await updateWbPrices(keys, [
+                    { nmId: product.nm_id, price: repricing.newPrice },
+                  ]);
+                  updateSuccess = res.success;
+                } else {
+                  const res = await updateOzonPrices(keys.clientId, keys.apiKey, [
+                    {
+                      productId: parseInt(product.product_id.replace('ozon-', '')),
+                      price: repricing.newPrice,
+                    },
+                  ]);
+                  updateSuccess = res.success;
+                }
+
+                if (updateSuccess) {
+                  summary.actionsTaken++;
+                  // Log action
+                  await logSentinelAction({
+                    user_id: user.id,
+                    product_id: product.product_id,
+                    product_title: product.title,
+                    detected_price: livePrice,
+                    min_price: rule.min_price,
+                    defense_action: 'smart_reprice',
+                    saved_amount: 0, // Not a saving, but optimization
+                    marketplace,
+                    threat_type: 'competitor_match',
+                    success: true,
+                  });
+                  // Skip regular threat scan if we just repriced?
+                  // Ideally yes, to avoid double-checking our own old price.
+                  // But let's check basic threats anyway (like deep stop-loss).
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // 2. REGULAR THREAT SCAN & DEFENSE
       // --- Cooldown Check (10 mins) ---
       if (product.updated_at) {
         // const lastUpdate = new Date(product.updated_at);
