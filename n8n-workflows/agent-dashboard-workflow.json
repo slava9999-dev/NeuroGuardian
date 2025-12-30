@@ -410,8 +410,8 @@
   },
   "staticData": null,
   "tags": [],
-  "triggerCount": 1,
+  "triggerCount": 0,
   "updatedAt": "2024-12-27T17:45:00.000Z",
-  "versionId": "1",
-  "active": true
+  "active": false,
+  "versionId": "738242c6-f629-4fce-a95e-133496f2287b"
 }

@@ -83,6 +83,10 @@
             {
               "name": "Authorization",
               "value": "=Bearer {{ $('Configuration').first().json.cronSecret }}"
+            },
+            {
+              "name": "X-Telegram-Id",
+              "value": "={{ $('Configuration').first().json.adminTelegramId }}"
             }
           ]
         },
@@ -114,6 +118,10 @@
             {
               "name": "Authorization",
               "value": "=Bearer {{ $('Configuration').first().json.cronSecret }}"
+            },
+            {
+              "name": "X-Telegram-Id",
+              "value": "={{ $('Configuration').first().json.adminTelegramId }}"
             }
           ]
         },
@@ -137,7 +145,7 @@
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "// Get results from both Ozon and WB syncs\nconst ozonResult = $('Sync Ozon Products').first()?.json || {};\nconst wbResult = $input.first()?.json || {};\n\n// API returns 'count' field for synced products\nconst ozonSynced = ozonResult.count || ozonResult.synced || 0;\nconst wbSynced = wbResult.count || wbResult.synced || 0;\n\n// Check for errors (error field or non-success response)\nconst ozonError = ozonResult.error || (!ozonResult.success && ozonResult.count === undefined);\nconst wbError = wbResult.error || (!wbResult.success && wbResult.count === undefined);\nconst hasErrors = ozonError || wbError;\n\n// Build detailed error info\nlet errorDetails = '';\nif (ozonError && typeof ozonResult.error === 'string') {\n  errorDetails += `\\n❌ Ozon: ${ozonResult.error}`;\n  if (ozonResult.details) errorDetails += ` (${ozonResult.details.substring(0, 100)})`;\n}\nif (wbError && typeof wbResult.error === 'string') {\n  errorDetails += `\\n❌ WB: ${wbResult.error}`;\n  if (wbResult.details) errorDetails += ` (${wbResult.details.substring(0, 100)})`;\n}\n\nconst message = `📦 Sync Complete\\n\\n` +\n  `🔵 Ozon: ${ozonSynced} товаров` + (ozonError ? ' ❌' : ' ✅') + `\\n` +\n  `🟣 WB: ${wbSynced} товаров` + (wbError ? ' ❌' : ' ✅') +\n  (hasErrors ? errorDetails : '') + `\\n` +\n  `⏰ ${new Date().toLocaleString('ru-RU')}`;\n\nreturn {\n  json: {\n    ozonSynced: ozonSynced,\n    wbSynced: wbSynced,\n    hasErrors: !!hasErrors,\n    ozonError: ozonError ? (ozonResult.error || 'Unknown') : null,\n    wbError: wbError ? (wbResult.error || 'Unknown') : null,\n    message: message\n  }\n};"
+        "jsCode": "// Get results from both Ozon and WB syncs\nconst ozonResult = $('Sync Ozon Products').first()?.json || {};\nconst wbResult = $input.first()?.json || {};\n\n// API returns 'count' field for synced products\nconst ozonSynced = ozonResult.count || ozonResult.synced || 0;\nconst wbSynced = wbResult.count || wbResult.synced || 0;\n\n// Check for errors (error field or non-success response)\nconst ozonError = ozonResult.error || (!ozonResult.success && ozonResult.count === undefined);\nconst wbError = wbResult.error || (!wbResult.success && wbResult.count === undefined);\nconst hasErrors = ozonError || wbError;\n\n// Build detailed error info\nlet errorDetails = '';\nif (ozonError && typeof ozonResult.error === 'string') {\n  errorDetails += `\\n❌ Ozon: ${ozonResult.error}`;\n  if (ozonResult.details) errorDetails += ` (${ozonResult.details.substring(0, 100)})`;\n}\nif (wbError && typeof wbResult.error === 'string') {\n  errorDetails += `\\n❌ WB: ${wbResult.error}`;\n  if (wbResult.details) errorDetails += ` (${wbResult.details.substring(0, 100)})`;\n}\n\nconst message = `📦 Sync Complete\\n\\n` +\n  `🔵 Ozon: ${ozonSynced} товаров` + (ozonError ? ' ❌' : ' ✅') + `\\n` +\n  `🟣 WB: ${wbSynced} товаров` + (wbError ? ' ❌' : ' ✅') +\n  (hasErrors ? errorDetails : '') + `\\n` +\n  `⏰ ${new Date().toLocaleString('ru-RU')}`;\n\nreturn [{ json: {\n    ozonSynced: ozonSynced,\n    wbSynced: wbSynced,\n    hasErrors: !!hasErrors,\n    ozonError: ozonError ? (ozonResult.error || 'Unknown') : null,\n    wbError: wbError ? (wbResult.error || 'Unknown') : null,\n    message: message\n  }}];"
       },
       "id": "build-summary",
       "name": "Build Summary",
@@ -329,8 +337,8 @@
     "templateCredsSetupCompleted": true
   },
   "pinData": {},
-  "versionId": "sync-v3",
   "triggerCount": 0,
   "tags": [],
-  "active": true
+  "active": false,
+  "versionId": "a33df514-6f3d-46d3-a559-56166a10d191"
 }

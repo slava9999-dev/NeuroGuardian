@@ -5,7 +5,7 @@
 // ============================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { verifyAdminAccessAsync, extractTelegramAuth } from '../middleware/auth.js';
+import { verifyAdminAccessAsync, extractAnyAuthAsync } from '../middleware/auth.js';
 
 /**
  * Handle check-prices action (Sentinel Cron)
@@ -17,40 +17,44 @@ export async function handleCheckPrices(
   const { sentinelService } = await import('../services/sentinel-service.js');
   const { getSecret } = await import('../lib/secrets-helper.js');
 
-  // 1. Authentication - support both header and query param for cron-job.org
-  let isAdmin = await verifyAdminAccessAsync(req);
+  // 1. Authentication Strategy
+  // Priority 1: Specific User Context (Telegram, Cron+ID, Admin+ID)
+  // This supports providing X-Telegram-Id along with the Cron Secret to run for a specific user.
+  const authResult = await extractAnyAuthAsync(req);
 
-  // If not authenticated via header, check query param secret
-  if (!isAdmin) {
+  // Priority 2: Global Admin/Cron Access (No ID provided)
+  let isGlobalAdmin = await verifyAdminAccessAsync(req);
+
+  // Legacy: Check query param secret if verification failed
+  if (!isGlobalAdmin && !authResult.success) {
     const querySecret = req.query.secret as string;
     if (querySecret) {
       try {
         const expectedSecret = await getSecret('cron_secret', 'sentinel_cron');
         if (querySecret === expectedSecret || querySecret === process.env.CRON_SECRET) {
-          isAdmin = true;
+          isGlobalAdmin = true;
           console.log('✅ Authenticated via cron query param');
         }
       } catch {
-        // Fallback to env var
         if (querySecret === process.env.CRON_SECRET) {
-          isAdmin = true;
+          isGlobalAdmin = true;
           console.log('✅ Authenticated via cron query param (env fallback)');
         }
       }
     }
   }
 
-  const auth = extractTelegramAuth(req);
-
   try {
     let result;
 
-    if (isAdmin) {
+    if (authResult.success) {
+      console.log(
+        `🛡️ SENTINEL: Starting check for user ${authResult.context.userId} (Method: ${authResult.context.authMethod})...`
+      );
+      result = await sentinelService.runForUser(authResult.context.userId);
+    } else if (isGlobalAdmin) {
       console.log('🛡️ SENTINEL: Starting full global cycle (Admin/Cron)...');
       result = await sentinelService.runCycle();
-    } else if (auth.success) {
-      console.log(`🛡️ SENTINEL: Starting check for user ${auth.context.userId}...`);
-      result = await sentinelService.runForUser(auth.context.userId);
     } else {
       return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -61,7 +65,7 @@ export async function handleCheckPrices(
       triggered: result.actionsTaken,
       violations_found: result.threatsDetected,
       errors: result.errors,
-      message: isAdmin ? 'Full cycle completed' : 'User check completed',
+      message: isGlobalAdmin ? 'Full cycle completed' : 'User check completed',
     });
   } catch (error) {
     console.error('Sentinel Handler Error:', error);
@@ -99,8 +103,12 @@ export async function handleSentinelStats(
       success: true,
       recentActions: logs.rows,
       stats: summary.rows[0],
+      // Handle case where no stats exist yet (null result)
+      totalSaved: summary.rows[0]?.total_saved || 0,
+      totalActions: summary.rows[0]?.total_actions || 0,
     });
   } catch (error) {
+    console.error('Sentinel Stats Error:', error);
     return res.status(500).json({ error: 'Failed to fetch sentinel stats' });
   }
 }

@@ -67,15 +67,30 @@ services:
       - WEBHOOK_URL=http://localhost:5678/
       - GENERIC_TIMEZONE=Europe/Moscow
       - TZ=Europe/Moscow
-      # SQLite для простоты (можно переключить на PostgreSQL)
-      - DB_TYPE=sqlite
-      - DB_SQLITE_DATABASE=/home/node/.n8n/database.sqlite
-      # Секреты для шифрования credentials
-      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:-your-32-char-encryption-key-here}
+      # DB Configuration: PostgreSQL
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=n8n
+      - DB_POSTGRESDB_USER=${POSTGRES_USER:-neuroguardian}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD:-localdevpassword}
+      # SQLite (Legacy/Backup)
+      # - DB_TYPE=sqlite
+      # - DB_SQLITE_DATABASE=/home/node/.n8n/database.sqlite
+      # Ключ шифрования берется из volume (config file)
+      # - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:-...} # REMOVED to use volume key
+      # ВАЖНО: Разрешить доступ к environment variables в workflows
+      - N8N_RESTRICT_ENVIRONMENT_VARIABLES_ACCESS=false
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
       # NeuroGuardian API Settings
-      - API_URL=${API_URL:-http://host.docker.internal:3000}
-      - CRON_SECRET=${CRON_SECRET:-dev-cron-secret}
-      - ADMIN_CHAT_ID=${ADMIN_CHAT_ID:-0}
+      - API_URL=${API_URL:-http://host.docker.internal:3001}
+      - CRON_SECRET=${CRON_SECRET}
+      - ADMIN_CHAT_ID=${ADMIN_CHAT_ID}
+      - ADMIN_TELEGRAM_ID=${ADMIN_TELEGRAM_ID}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # API Key for REST API access (import/export workflows)
+      - N8N_API_KEY=${N8N_API_KEY:-neuroguardian-n8n-api-2024}
     volumes:
       - n8n_data:/home/node/.n8n
       - ../n8n-workflows:/home/node/workflows:ro
@@ -129,6 +144,8 @@ volumes:
   postgres_data:
   redis_data:
   n8n_data:
+    external: true
+    name: neuroguardian_n8n_data
 
 networks:
   ng_network:

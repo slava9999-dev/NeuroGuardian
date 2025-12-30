@@ -150,7 +150,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const user = $input.item.json;\nconst expiresAt = new Date(user.expires_at);\nconst now = new Date();\nconst daysLeft = Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24));\n\nlet message = '';\nlet emoji = '';\n\nif (daysLeft <= 1) {\n  emoji = '🔴';\n  message = `${emoji} *Подписка истекает сегодня!*\\n\\n`;\n  message += `Ваша подписка NeuroGUARDIAN заканчивается через ${daysLeft} день.\\n\\n`;\n  message += `⚠️ После окончания подписки:\\n`;\n  message += `• Сторож перестанет защищать ваши цены\\n`;\n  message += `• AI-агент будет недоступен\\n`;\n  message += `• Синхронизация товаров остановится\\n\\n`;\n  message += `💡 Продлите подписку прямо сейчас, чтобы не потерять защиту!`;\n} else if (daysLeft <= 3) {\n  emoji = '🟡';\n  message = `${emoji} *Подписка заканчивается через ${daysLeft} дня*\\n\\n`;\n  message += `Не забудьте продлить подписку NeuroGUARDIAN!\\n\\n`;\n  message += `Ваши товары под защитой ещё ${daysLeft} дня.\\n\\n`;\n  message += `Продлите сейчас со скидкой 10% по промокоду: RENEW10`;\n}\n\nreturn {\n  json: {\n    telegram_id: user.telegram_id,\n    message: message,\n    days_left: daysLeft,\n    expires_at: user.expires_at\n  }\n};"
+        "jsCode": "const user = $input.item.json;\nconst expiresAt = new Date(user.expires_at);\nconst now = new Date();\nconst daysLeft = Math.ceil((expiresAt - now) / (1000 * 60 * 60 * 24));\n\nlet message = '';\nlet emoji = '';\n\nif (daysLeft <= 1) {\n  emoji = '🔴';\n  message = `${emoji} *Подписка истекает сегодня!*\\n\\n`;\n  message += `Ваша подписка NeuroGUARDIAN заканчивается через ${daysLeft} день.\\n\\n`;\n  message += `⚠️ После окончания подписки:\\n`;\n  message += `• Сторож перестанет защищать ваши цены\\n`;\n  message += `• AI-агент будет недоступен\\n`;\n  message += `• Синхронизация товаров остановится\\n\\n`;\n  message += `💡 Продлите подписку прямо сейчас, чтобы не потерять защиту!`;\n} else if (daysLeft <= 3) {\n  emoji = '🟡';\n  message = `${emoji} *Подписка заканчивается через ${daysLeft} дня*\\n\\n`;\n  message += `Не забудьте продлить подписку NeuroGUARDIAN!\\n\\n`;\n  message += `Ваши товары под защитой ещё ${daysLeft} дня.\\n\\n`;\n  message += `Продлите сейчас со скидкой 10% по промокоду: RENEW10`;\n}\n\nreturn [{ json: {\n    telegram_id: user.telegram_id,\n    message: message,\n    days_left: daysLeft,\n    expires_at: user.expires_at\n  }}];"
       },
       "id": "code-1",
       "name": "Build Notification Message",
@@ -199,7 +199,7 @@
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const items = $input.all();\nconst totalSent = items.length;\n\nconst message = `📬 *Notification Report*\\n\\n✅ Sent: ${totalSent} reminders\\n\\nUsers notified about expiring subscriptions.`;\n\nreturn {\n  json: {\n    message: message,\n    total_sent: totalSent\n  }\n};"
+        "jsCode": "const items = $input.all();\nconst totalSent = items.length;\n\nconst message = `📬 *Notification Report*\\n\\n✅ Sent: ${totalSent} reminders\\n\\nUsers notified about expiring subscriptions.`;\n\nreturn [{ json: {\n    message: message,\n    total_sent: totalSent\n  }}];"
       },
       "id": "code-2",
       "name": "Build Admin Summary",
@@ -338,8 +338,8 @@
   },
   "staticData": null,
   "tags": [],
-  "triggerCount": 1,
+  "triggerCount": 0,
   "updatedAt": "2024-12-27T17:30:00.000Z",
-  "versionId": "1",
-  "active": true
+  "active": false,
+  "versionId": "d37db701-a70e-4b76-a532-fa64a6b054c3"
 }

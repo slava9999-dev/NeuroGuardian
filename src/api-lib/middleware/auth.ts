@@ -113,15 +113,29 @@ export function extractAdminAuth(req: VercelRequest): AuthResult {
  */
 export async function extractCronAuthAsync(req: VercelRequest): Promise<AuthResult> {
   const authHeader = req.headers.authorization || '';
-  const telegramId = req.body?.telegramId;
+
+  // SUPPORT X-Telegram-Id HEADER detailed in Sentinel workflow
+  const telegramId = req.headers['x-telegram-id'] || req.body?.telegramId || req.query?.telegramId;
 
   const cronSecret = await getSecret('cron_secret', 'cron_auth');
 
-  if (cronSecret && authHeader === `Bearer ${cronSecret}` && telegramId) {
+  // Ensure telegramId is a string
+  const tgIdStr = Array.isArray(telegramId) ? telegramId[0] : (telegramId as undefined | string);
+
+  console.log('[DEBUG] Cron Auth Check:', {
+    hasAuthHeader: !!authHeader,
+    authHeaderPrefix: authHeader.substring(0, 10) + '...',
+    hasCronSecret: !!cronSecret,
+    cronSecretMatch: cronSecret && authHeader === `Bearer ${cronSecret}`,
+    tgIdStr,
+    telegramIdRaw: telegramId,
+  });
+
+  if (cronSecret && authHeader === `Bearer ${cronSecret}` && tgIdStr) {
     return {
       success: true,
       context: {
-        userId: parseInt(telegramId),
+        userId: parseInt(tgIdStr),
         authMethod: 'cron',
       },
     };
@@ -217,8 +231,8 @@ export async function extractAnyAuthAsync(req: VercelRequest): Promise<AuthResul
   if (telegramAuth.success) return telegramAuth;
 
   // Try Admin key (async)
-  const adminAuth = await extractAdminAuthAsync(req);
-  if (adminAuth.success) return adminAuth;
+  const adminAuthRes = await extractAdminAuthAsync(req);
+  if (adminAuthRes.success) return adminAuthRes;
 
   // Try Cron token (async)
   const cronAuth = await extractCronAuthAsync(req);
@@ -267,11 +281,21 @@ export async function verifyAdminAccessAsync(req: VercelRequest): Promise<boolea
     getSecret('admin_api_key', 'admin_access_verify'),
   ]);
 
-  return !!(
-    (cronSecret && authHeader === `Bearer ${cronSecret}`) ||
-    (expectedAdminKey && authHeader === `Bearer ${expectedAdminKey}`) ||
-    (expectedAdminKey && adminKey === expectedAdminKey)
-  );
+  const cronMatch = !!(cronSecret && authHeader === `Bearer ${cronSecret}`);
+  const keyHeaderMatch = !!(expectedAdminKey && authHeader === `Bearer ${expectedAdminKey}`);
+  const keyParamMatch = !!(expectedAdminKey && adminKey === expectedAdminKey);
+
+  console.log('[DEBUG] Admin Access Check:', {
+    hasAuthHeader: !!authHeader,
+    authHeaderPrefix: authHeader.substring(0, 15) + '...',
+    hasCronSecret: !!cronSecret,
+    cronSecretPrefix: cronSecret ? cronSecret.substring(0, 5) + '...' : 'N/A',
+    cronMatch,
+    keyHeaderMatch,
+    keyParamMatch,
+  });
+
+  return cronMatch || keyHeaderMatch || keyParamMatch;
 }
 
 /**

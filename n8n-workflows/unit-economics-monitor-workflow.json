@@ -304,7 +304,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const product = $input.item.json;\nconst mpEmoji = product.marketplace.toLowerCase() === 'wildberries' || product.marketplace.toLowerCase() === 'wb' ? '🟣' : '🔵';\n\nlet message = `🚨 *КРИТИЧЕСКАЯ УГРОЗА МАРЖИ!*\\n\\n`;\nmessage += `${mpEmoji} *${product.product_title}*\\n`;\nmessage += `${product.marketplace}\\n\\n`;\n\nmessage += `📊 *UNIT ECONOMICS:*\\n`;\nconst econ = product.economics;\nmessage += `├─ Цена: ${econ.revenue}₽\\n`;\nmessage += `├─ Себестоимость: ${econ.costPrice}₽\\n`;\nmessage += `├─ Комиссия: ${econ.commission}₽ (${(econ.commissionRate * 100).toFixed(1)}%)\\n`;\nmessage += `├─ Логистика: ${econ.logistics}₽\\n`;\nif (econ.ozonCardCosts > 0) {\n  message += `├─ Ozon Card: ${econ.ozonCardCosts}₽\\n`;\n}\nmessage += `└─ ПРИБЫЛЬ: ${econ.profit}₽ (${econ.margin}%)\\n\\n`;\n\nmessage += `⚠️ *РИСКИ:*\\n`;\nproduct.warnings.forEach(w => {\n  if (w.type === 'critical') {\n    message += `🚨 ${w.message}\\n`;\n  }\n});\n\nmessage += `\\n💡 *Viktor Margin*\\n`;\nmessage += `_Срочно требуется действие!_`;\n\nreturn {\n  json: {\n    message: message,\n    chat_id: $('Configuration').first().json.adminChatId\n  }\n};"
+        "jsCode": "const product = $input.item.json;\nconst mpEmoji = product.marketplace.toLowerCase() === 'wildberries' || product.marketplace.toLowerCase() === 'wb' ? '🟣' : '🔵';\n\nlet message = `🚨 *КРИТИЧЕСКАЯ УГРОЗА МАРЖИ!*\\n\\n`;\nmessage += `${mpEmoji} *${product.product_title}*\\n`;\nmessage += `${product.marketplace}\\n\\n`;\n\nmessage += `📊 *UNIT ECONOMICS:*\\n`;\nconst econ = product.economics;\nmessage += `├─ Цена: ${econ.revenue}₽\\n`;\nmessage += `├─ Себестоимость: ${econ.costPrice}₽\\n`;\nmessage += `├─ Комиссия: ${econ.commission}₽ (${(econ.commissionRate * 100).toFixed(1)}%)\\n`;\nmessage += `├─ Логистика: ${econ.logistics}₽\\n`;\nif (econ.ozonCardCosts > 0) {\n  message += `├─ Ozon Card: ${econ.ozonCardCosts}₽\\n`;\n}\nmessage += `└─ ПРИБЫЛЬ: ${econ.profit}₽ (${econ.margin}%)\\n\\n`;\n\nmessage += `⚠️ *РИСКИ:*\\n`;\nproduct.warnings.forEach(w => {\n  if (w.type === 'critical') {\n    message += `🚨 ${w.message}\\n`;\n  }\n});\n\nmessage += `\\n💡 *Viktor Margin*\\n`;\nmessage += `_Срочно требуется действие!_`;\n\nreturn [{ json: {\n    message: message,\n    chat_id: $('Configuration').first().json.adminChatId\n  }}];"
       },
       "id": "build-critical-alert",
       "name": "Build Critical Alert",
@@ -523,6 +523,6 @@
   "tags": [],
   "triggerCount": 0,
   "updatedAt": "2025-12-29T07:37:00.000Z",
-  "versionId": "1",
-  "active": true
+  "active": false,
+  "versionId": "3eeaffa5-2fb4-4c4e-a5db-f0ef51e35dd4"
 }

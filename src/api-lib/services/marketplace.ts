@@ -930,9 +930,9 @@ export async function fetchOzonCurrentPrices(
   try {
     console.log(`📡 Ozon Prices API: Fetching for ${productIds.length} products`);
 
-    // CRITICAL FIX: Use v1/product/info/prices (old but working)
-    // v2, v3, v4 all return 404 or empty results for FBS products
-    const response = await fetchWithRetry('https://api-seller.ozon.ru/v1/product/info/prices', {
+    // Use v4/product/info/prices - current working version (Dec 2024)
+    // v1 is deprecated and returns 404
+    const response = await fetchWithRetry('https://api-seller.ozon.ru/v4/product/info/prices', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -940,7 +940,10 @@ export async function fetchOzonCurrentPrices(
         'Api-Key': apiKey,
       },
       body: JSON.stringify({
-        product_id: productIds,
+        filter: {
+          product_id: productIds,
+        },
+        limit: productIds.length,
       }),
     });
 
@@ -953,8 +956,11 @@ export async function fetchOzonCurrentPrices(
       console.log(`📦 Ozon Prices API: received ${items.length} items`);
 
       for (const p of items) {
-        // v1 response structure
-        const actualPrice = parseFloat(p.marketing_price || p.price || '0');
+        // v4 response structure: price object with price.price and price.marketing_price
+        const priceObj = p.price || {};
+        const actualPrice = parseFloat(
+          priceObj.marketing_price || priceObj.price || p.marketing_price || p.price || '0'
+        );
 
         if (p.product_id && actualPrice > 0) {
           priceMap.set(p.product_id, Math.round(actualPrice));

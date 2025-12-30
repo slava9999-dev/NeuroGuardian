@@ -21,8 +21,8 @@ console.log('🚀 Starting NeuroGUARDIAN Local API Server...');
 console.log('📁 Loading environment from .env');
 
 async function startServer() {
-  // Import the API handler
-  const { default: handler } = await import('../api/index.js');
+  // Import the API handler (use dynamic import with tsx)
+  const { default: handler } = await import('../api/index.ts');
   
   const server = createServer(async (req, res) => {
     // Parse URL

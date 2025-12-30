@@ -198,47 +198,43 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "={{ $('Configuration').first().json.apiBaseUrl }}?action=agent",
-        "authentication": "none",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
+        "model": "gpt-4o-mini",
+        "options": {
+          "temperature": 0.7,
+          "maxTokens": 1000
+        },
+        "messages": {
+          "values": [
             {
-              "name": "Authorization",
-              "value": "=Bearer {{ $('Configuration').first().json.cronSecret }}"
+              "role": "system",
+              "content": "=Ты — NeuroGUARDIAN Operations Agent, AI-ассистент для управления системой защиты цен на маркетплейсах.\n\nТвои задачи:\n1. Отвечать на вопросы о состоянии системы\n2. Помогать с диагностикой проблем\n3. Давать рекомендации по оптимизации\n4. Информировать о статусе подписок и товаров\n\nТекущее состояние системы:\n{{ JSON.stringify($json.systemContext, null, 2) }}\n\nПравила:\n- Отвечай на русском языке\n- Будь кратким и информативным\n- Используй эмодзи для наглядности\n- Если не знаешь ответа — честно скажи об этом\n- Для технических деталей предлагай обратиться к документации\n\nДоступные команды (если пользователь спрашивает):\n• /status — общий статус системы\n• /sentinel — статистика защиты цен\n• /users — информация о пользователях\n• /analytics — аналитика за 24 часа\n• /help — список команд"
             },
             {
-              "name": "X-Telegram-Id",
-              "value": "={{ $('Configuration').first().json.adminTelegramId }}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
+              "role": "user",
+              "content": "={{ $json.userMessage }}"
             }
           ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"message\": \"{{ $json.userMessage }}\",\n  \"context\": {{ JSON.stringify($json.systemContext) }},\n  \"chatId\": \"{{ $json.chatId }}\",\n  \"username\": \"{{ $json.username }}\"\n}",
-        "options": {
-          "timeout": 60000
         }
       },
       "id": "ai-agent",
-      "name": "AI Agent (API)",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.3,
+      "name": "AI Agent (OpenAI)",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.9,
       "position": [
         340,
         400
       ],
-      "continueOnFail": true
+      "credentials": {
+        "openAiApi": {
+          "id": "openai-api",
+          "name": "OpenAI API"
+        }
+      }
     },
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const aiResponse = $input.first().json;\nconst context = $('Build AI Context').first().json;\nlet responseText = aiResponse.response?.text || aiResponse.text || aiResponse.message || 'Произошла ошибка.';\nif (aiResponse.error) { responseText = 'Ошибка: ' + aiResponse.error; }\nreturn [{ json: { chat_id: context.chatId, text: responseText }}];"
+        "jsCode": "// Format AI response for Telegram\nconst aiResponse = $input.first().json;\nconst context = $('Build AI Context').first().json;\n\nlet responseText = aiResponse.message?.content || aiResponse.text || 'Произошла ошибка. Попробуйте позже.';\n\n// Escape special Markdown characters for Telegram\nresponseText = responseText\n  .replace(/([_*\\[\\]()~`>#+\\-=|{}.!])/g, '\\\\$1')\n  .replace(/\\\\\\*/g, '*')\n  .replace(/\\\\_/g, '_');\n\nreturn [{ json: {\n    chat_id: context.chatId,\n    text: responseText,\n    parse_mode: 'MarkdownV2'\n  }}];"
       },
       "id": "format-response",
       "name": "Format Response",
@@ -368,14 +364,14 @@
       "main": [
         [
           {
-            "node": "AI Agent (API)",
+            "node": "AI Agent (OpenAI)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "AI Agent (API)": {
+    "AI Agent (OpenAI)": {
       "main": [
         [
           {

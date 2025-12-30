@@ -56,6 +56,12 @@
               "name": "adminChatId",
               "value": "={{ $env.ADMIN_CHAT_ID }}",
               "type": "string"
+            },
+            {
+              "id": "id-6",
+              "name": "adminTelegramId",
+              "value": "={{ $env.ADMIN_TELEGRAM_ID }}",
+              "type": "string"
             }
           ]
         },
@@ -83,6 +89,10 @@
             {
               "name": "Authorization",
               "value": "=Bearer {{ $('Workflow Configuration').first().json.cronSecret }}"
+            },
+            {
+              "name": "X-Telegram-Id",
+              "value": "={{ $('Workflow Configuration').first().json.adminTelegramId }}"
             }
           ]
         },
@@ -620,7 +630,7 @@
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const items = $input.all();\n\nlet successCount = 0;\nlet errorCount = 0;\nlet validationFailedCount = 0;\nconst successProducts = [];\nconst errorProducts = [];\n\nfor (const item of items) {\n  const status = item.json.execution_status;\n  const marketplace = item.json.marketplace || 'unknown';\n  const productId = item.json.product_id || item.json.offer_id || 'unknown';\n  const action = item.json.defense_action || 'unknown';\n  \n  if (status === 'success') {\n    successCount++;\n    successProducts.push(`${marketplace.toUpperCase()}: ${productId} (${action})`);\n  } else if (status === 'validation_failed') {\n    validationFailedCount++;\n    errorProducts.push(`${marketplace.toUpperCase()}: ${productId} - Validation Failed`);\n  } else {\n    errorCount++;\n    const errorReason = item.json.error_reason || 'Unknown error';\n    errorProducts.push(`${marketplace.toUpperCase()}: ${productId} - ${errorReason}`);\n  }\n}\n\nlet message = `🛡️ *Defense System Report*\\n\\n`;\nmessage += `✅ Successful: ${successCount}\\n`;\nmessage += `❌ Failed: ${errorCount}\\n`;\nmessage += `⚠️ Validation Failed: ${validationFailedCount}\\n`;\nmessage += `📊 Total Processed: ${items.length}\\n\\n`;\n\nif (successProducts.length > 0) {\n  message += `*Successful Actions:*\\n`;\n  successProducts.forEach(p => message += `  • ${p}\\n`);\n  message += `\\n`;\n}\n\nif (errorProducts.length > 0) {\n  message += `*Failed Actions:*\\n`;\n  errorProducts.forEach(p => message += `  • ${p}\\n`);\n}\n\nreturn {\n  json: {\n    message: message,\n    successCount: successCount,\n    errorCount: errorCount,\n    validationFailedCount: validationFailedCount,\n    totalProcessed: items.length\n  }\n};"
+        "jsCode": "const items = $input.all();\n\nlet successCount = 0;\nlet errorCount = 0;\nlet validationFailedCount = 0;\nconst successProducts = [];\nconst errorProducts = [];\n\nfor (const item of items) {\n  const status = item.json.execution_status;\n  const marketplace = item.json.marketplace || 'unknown';\n  const productId = item.json.product_id || item.json.offer_id || 'unknown';\n  const action = item.json.defense_action || 'unknown';\n  \n  if (status === 'success') {\n    successCount++;\n    successProducts.push(`${marketplace.toUpperCase()}: ${productId} (${action})`);\n  } else if (status === 'validation_failed') {\n    validationFailedCount++;\n    errorProducts.push(`${marketplace.toUpperCase()}: ${productId} - Validation Failed`);\n  } else {\n    errorCount++;\n    const errorReason = item.json.error_reason || 'Unknown error';\n    errorProducts.push(`${marketplace.toUpperCase()}: ${productId} - ${errorReason}`);\n  }\n}\n\nlet message = `🛡️ *Defense System Report*\\n\\n`;\nmessage += `✅ Successful: ${successCount}\\n`;\nmessage += `❌ Failed: ${errorCount}\\n`;\nmessage += `⚠️ Validation Failed: ${validationFailedCount}\\n`;\nmessage += `📊 Total Processed: ${items.length}\\n\\n`;\n\nif (successProducts.length > 0) {\n  message += `*Successful Actions:*\\n`;\n  successProducts.forEach(p => message += `  • ${p}\\n`);\n  message += `\\n`;\n}\n\nif (errorProducts.length > 0) {\n  message += `*Failed Actions:*\\n`;\n  errorProducts.forEach(p => message += `  • ${p}\\n`);\n}\n\nreturn [{ json: {\n    message: message,\n    successCount: successCount,\n    errorCount: errorCount,\n    validationFailedCount: validationFailedCount,\n    totalProcessed: items.length\n  }}];"
       },
       "id": "14e58854-11d8-4dd8-a818-407ea4e64c77",
       "name": "Build Summary Message",
@@ -661,6 +671,10 @@
             {
               "name": "Authorization",
               "value": "=Bearer {{ $('Workflow Configuration').first().json.cronSecret }}"
+            },
+            {
+              "name": "X-Telegram-Id",
+              "value": "={{ $('Workflow Configuration').first().json.adminTelegramId }}"
             }
           ]
         },
@@ -931,6 +945,7 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "active": true,
-  "versionId": "75bd0045-f809-4fd6-b71f-92fc24fe9b4c"
+  "active": false,
+  "versionId": "38c4635f-7b5e-4628-bc5b-8611a16b845c",
+  "triggerCount": 0
 }

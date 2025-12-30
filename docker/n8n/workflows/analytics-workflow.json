@@ -50,6 +50,12 @@
               "name": "adminChatId",
               "value": "={{ $env.ADMIN_CHAT_ID }}",
               "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "adminTelegramId",
+              "value": "={{ $env.ADMIN_TELEGRAM_ID }}",
+              "type": "string"
             }
           ]
         },
@@ -77,6 +83,10 @@
             {
               "name": "Authorization",
               "value": "=Bearer {{ $('Configuration').first().json.cronSecret }}"
+            },
+            {
+              "name": "X-Telegram-Id",
+              "value": "={{ $('Configuration').first().json.adminTelegramId }}"
             }
           ]
         },
@@ -97,7 +107,7 @@
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const data = $input.first()?.json?.analytics || {};\n\nconst formatNumber = (num) => {\n  return new Intl.NumberFormat('ru-RU').format(num || 0);\n};\n\nconst formatMoney = (num) => {\n  return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(num || 0);\n};\n\nconst message = `📊 *NeuroGUARDIAN — Ежедневный Отчёт*\\n\\n` +\n  `📅 Период: последние 24 часа\\n` +\n  `⏰ ${new Date().toLocaleString('ru-RU')}\\n\\n` +\n  `━━━━━━━━━━━━━━━━━━━━━━\\n\\n` +\n  `👥 *Подписки*\\n` +\n  `✅ Активных: ${formatNumber(data.subscriptions?.active)}\\n` +\n  `⚠️ Истекают скоро: ${formatNumber(data.subscriptions?.expiring_soon)}\\n\\n` +\n  `🛡️ *Защищённые товары*\\n` +\n  `📦 Всего: ${formatNumber(data.products?.total_protected)}\\n` +\n  `👤 Пользователей: ${formatNumber(data.products?.users_with_protection)}\\n` +\n  `💰 Средняя мин. цена: ${formatMoney(data.products?.avg_min_price)}\\n\\n` +\n  `⚡ *Sentinel (за 24ч)*\\n` +\n  `🔧 Всего действий: ${formatNumber(data.sentinel?.total_actions)}\\n` +\n  `💵 Корректировок цен: ${formatNumber(data.sentinel?.price_corrections)}\\n` +\n  `📉 Обнулений остатков: ${formatNumber(data.sentinel?.zero_stocks)}\\n` +\n  `✅ Успешных: ${formatNumber(data.sentinel?.successful)}\\n` +\n  `❌ Ошибок: ${formatNumber(data.sentinel?.failed)}\\n` +\n  `📈 Success Rate: ${data.sentinel?.success_rate || 0}%\\n\\n` +\n  `💸 *Сохранено денег*\\n` +\n  `${formatMoney(data.money_saved?.total_rub)}\\n\\n` +\n  `👥 *Активность*\\n` +\n  `Активных пользователей: ${formatNumber(data.users?.active_last_24h)}\\n\\n` +\n  `━━━━━━━━━━━━━━━━━━━━━━`;\n\nreturn {\n  json: {\n    message: message,\n    hasData: !!data.timestamp,\n    analytics: data\n  }\n};"
+        "jsCode": "const data = $input.first()?.json?.analytics || {};\n\nconst formatNumber = (num) => {\n  return new Intl.NumberFormat('ru-RU').format(num || 0);\n};\n\nconst formatMoney = (num) => {\n  return new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(num || 0);\n};\n\nconst message = `📊 *NeuroGUARDIAN — Ежедневный Отчёт*\\n\\n` +\n  `📅 Период: последние 24 часа\\n` +\n  `⏰ ${new Date().toLocaleString('ru-RU')}\\n\\n` +\n  `━━━━━━━━━━━━━━━━━━━━━━\\n\\n` +\n  `👥 *Подписки*\\n` +\n  `✅ Активных: ${formatNumber(data.subscriptions?.active)}\\n` +\n  `⚠️ Истекают скоро: ${formatNumber(data.subscriptions?.expiring_soon)}\\n\\n` +\n  `🛡️ *Защищённые товары*\\n` +\n  `📦 Всего: ${formatNumber(data.products?.total_protected)}\\n` +\n  `👤 Пользователей: ${formatNumber(data.products?.users_with_protection)}\\n` +\n  `💰 Средняя мин. цена: ${formatMoney(data.products?.avg_min_price)}\\n\\n` +\n  `⚡ *Sentinel (за 24ч)*\\n` +\n  `🔧 Всего действий: ${formatNumber(data.sentinel?.total_actions)}\\n` +\n  `💵 Корректировок цен: ${formatNumber(data.sentinel?.price_corrections)}\\n` +\n  `📉 Обнулений остатков: ${formatNumber(data.sentinel?.zero_stocks)}\\n` +\n  `✅ Успешных: ${formatNumber(data.sentinel?.successful)}\\n` +\n  `❌ Ошибок: ${formatNumber(data.sentinel?.failed)}\\n` +\n  `📈 Success Rate: ${data.sentinel?.success_rate || 0}%\\n\\n` +\n  `💸 *Сохранено денег*\\n` +\n  `${formatMoney(data.money_saved?.total_rub)}\\n\\n` +\n  `👥 *Активность*\\n` +\n  `Активных пользователей: ${formatNumber(data.users?.active_last_24h)}\\n\\n` +\n  `━━━━━━━━━━━━━━━━━━━━━━`;\n\nreturn [{ json: {\n    message: message,\n    hasData: !!data.timestamp,\n    analytics: data\n  }}];"
       },
       "id": "build-report",
       "name": "Build Report Message",
@@ -254,6 +264,7 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "active": true,
-  "versionId": "1a367d15-1245-420b-a805-e1c0fbe5326f"
+  "active": false,
+  "versionId": "12309ae8-dcc0-494c-9b89-9fd90a93abcf",
+  "triggerCount": 0
 }
