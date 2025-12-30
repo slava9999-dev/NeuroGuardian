@@ -16,11 +16,12 @@ services:
     ports:
       - "8000:8000"
     command: >
-      --model microsoft/Phi-3-mini-4k-instruct
+      --model Qwen/Qwen2.5-1.5B-Instruct
       --trust-remote-code
       --dtype half
       --max-model-len 2048
-      --gpu-memory-utilization 0.5
+      --gpu-memory-utilization 0.7
+      --enforce-eager
       --port 8000
     networks:
       - neuro-gpu-network

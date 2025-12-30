@@ -22,7 +22,7 @@ const MOE_CONFIG = {
   MAX_RETRIES: 2,
 
   // Модели
-  LOCAL_MODEL: 'microsoft/Phi-3-mini-4k-instruct',
+  LOCAL_MODEL: 'Qwen/Qwen2.5-1.5B-Instruct',
   CLOUD_MODEL: 'gemini-1.5-flash',
 } as const;
 

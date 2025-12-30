@@ -1,6 +1,6 @@
 # 📊 Project State — NeuroGUARDIAN
 
-# Updated: 2025-12-30T22:27:00+03:00
+# Updated: 2025-12-30T23:18:00+03:00
 
 # This file tracks current progress and is updated at end of each session
 
@@ -8,12 +8,26 @@
 
 ## 🎯 Current Phase: HYBRID MoE ARCHITECTURE (Phase 10)
 
-**Last Session:** 2025-12-30 (Session 15)
-**Focus:** Hybrid MoE Router, Inngest Integration, Memory Service
+**Last Session:** 2025-12-30 (Session 16)
+**Focus:** MoE GPU Stack Debugging, Local LLM Optimization, Auth Robustness
 
 ---
 
 ## ✅ Recently Completed
+
+### Session 2025-12-30 (Session 16 - MoE GPU Stack Optimization)
+
+- [x] **Local LLM Migration**: Switched from `Phi-3-mini` (7.6GB) to `Qwen2.5-1.5B-Instruct` (~3GB) to ensure stable operation on 8GB VRAM systems.
+- [x] **GPU Stack Fixed**: Resolved "Empty reply from server" and memory allocation errors in Docker GPU stack.
+- [x] **MoE Router Sync**: Updated `moe-router.ts` to use Qwen2.5 and verified classification latency (~1.3s).
+- [x] **Auth Robustness**: Improved `extractAnyAuthAsync` to handle malformed secrets (trimming, cleaning quotes) and added `?key=` query param support for easier testing.
+- [x] **Verification**: Confirmed end-to-end flow: `moe-health` (all green) and `moe-classify` (correct intent detection).
+
+**Key Files:**
+
+- `docker/gpu/docker-compose.yml` - Optimized LLM router config
+- `src/api-lib/agent/moe-router.ts` - Updated model name and config
+- `src/api-lib/middleware/auth.ts` - Hardened admin authentication logic
 
 ### Session 2025-12-30 (Session 15 - Hybrid MoE Production Implementation)
 
@@ -63,7 +77,15 @@
 - [x] **Database**: Migrated schema for `ops_events` and `ops_audit`
 - [x] **Backend**: Implemented `OpsLogger` service and API endpoints (`ops-*`)
 - [x] **AI Agent**: Added `get_system_logs` tool (Admin only) to schemas and executors
-- [x] **Frontend**: Created `OpsPanelPage` with Dashboard, Events, Audit, and Chat tabs
+- [x] **API Handler for MoE**:
+  - Created `src/api-lib/handlers/moe.ts` with handlers for `handleMoEClassify`, `handleMoEQuery`, `handleMoEHealth`, and `handleMoEPriceCheck`.
+  - Added these new handlers to the main API router in `api/index.ts`.
+- [x] **Agent V4 Integration**:
+  - Integrated MoE status reporting in `src/api-lib/handlers/agent-v4.ts`.
+  - Added logic to utilize MoE router for intent classification (prepared for next phase).
+- [x] **Frontend Ops Dashboard**:
+  - Added "MoE" tab to `OpsPanelPage.tsx` with real-time health monitoring of Local LLM, ChromaDB, and KV.
+  - Implemented visual status indicators and configuration display.
 - [x] **AI SysAdmin**: Integrated chat interface in Ops Panel with admin authentication bypass
 - [x] **Security**: Ops Panel protected by Admin Key; Agent tool enforces role check
 

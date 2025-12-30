@@ -182,7 +182,11 @@ export async function extractAnyAuthAsync(req: VercelRequest): Promise<AuthResul
   try {
     // Admin Key Bypass: Allow testing/admin access with valid admin key
     // This is safe because ADMIN_API_KEY itself is secret
-    const adminKey = (req.headers['x-admin-key'] as string) || '';
+    const adminKey = (
+      (req.headers['x-admin-key'] as string) ||
+      (req.query.key as string) ||
+      ''
+    ).trim();
     const telegramId = req.query?.telegramId || req.body?.telegramId;
 
     if (adminKey && telegramId) {
@@ -203,15 +207,18 @@ export async function extractAnyAuthAsync(req: VercelRequest): Promise<AuthResul
         console.log('[AUTH] Using process.env.ADMIN_API_KEY fallback');
       }
 
+      // Clean the expected key (remove quotes and whitespace)
+      const cleanExpectedKey = expectedAdminKey?.replace(/['"]/g, '').trim();
+
       // Debug logging (safe - only shows first 8 chars)
       console.log('[AUTH] Key check:', {
         receivedKeyPrefix: adminKey.substring(0, 8) + '...',
-        expectedKeyPrefix: expectedAdminKey?.substring(0, 8) + '...',
-        match: adminKey === expectedAdminKey,
+        expectedKeyPrefix: cleanExpectedKey?.substring(0, 8) + '...',
+        match: adminKey === cleanExpectedKey,
         telegramId,
       });
 
-      if (expectedAdminKey && adminKey === expectedAdminKey) {
+      if (cleanExpectedKey && adminKey === cleanExpectedKey) {
         console.log(`🔧 [AUTH] Admin-key bypass for user ${telegramId}`);
         return {
           success: true,
