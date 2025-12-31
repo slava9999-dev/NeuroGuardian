@@ -95,3 +95,12 @@ export {
   warmupSecretsCache,
   clearSecretsCache,
 } from './secrets-helper.js';
+
+// Circuit Breaker
+export {
+  CircuitBreaker,
+  CircuitBreakerPresets,
+  CircuitOpenError,
+  circuitBreakers,
+  withCircuitBreaker,
+} from './circuit-breaker.js';
