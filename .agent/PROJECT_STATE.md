@@ -1,6 +1,6 @@
 # 📊 Project State — NeuroGUARDIAN
 
-# Updated: 2025-12-30T23:18:00+03:00
+# Updated: 2025-12-31T05:54:00+03:00
 
 # This file tracks current progress and is updated at end of each session
 
@@ -8,12 +8,29 @@
 
 ## 🎯 Current Phase: HYBRID MoE ARCHITECTURE (Phase 10)
 
-**Last Session:** 2025-12-30 (Session 16)
-**Focus:** MoE GPU Stack Debugging, Local LLM Optimization, Auth Robustness
+**Last Session:** 2025-12-31 (Session 17)
+**Focus:** Memory Service Hardening, Circuit Breaker Implementation, Resilience Patterns
 
 ---
 
 ## ✅ Recently Completed
+
+### Session 2025-12-31 (Session 17 - Production Resilience)
+
+- [x] **Memory Service v2.1**: Added hybrid KV storage with local Redis fallback (ioredis)
+- [x] **Local Embeddings**: Implemented ChromaDB DefaultEmbeddingFunction fallback when OpenAI unavailable
+- [x] **Circuit Breaker**: Production-ready pattern with Closed→Open→Half-Open state machine
+- [x] **Resilient Marketplace**: Wrapper for WB/Ozon APIs with cache fallback on circuit open
+- [x] **Presets**: CircuitBreakerPresets for Marketplace API, LLM, Local Services, Database
+- [x] **Tests**: 266 tests total (+19 new for Circuit Breaker)
+- [x] **Verified**: Multi-account product sync, Sentinel dashboard, ABC analysis all production-ready
+
+**Key Files:**
+
+- `src/api-lib/lib/circuit-breaker.ts` - Circuit Breaker implementation
+- `src/api-lib/services/resilient-marketplace.ts` - Resilient API wrappers
+- `src/api-lib/services/memory-service.ts` - Hybrid KV + embeddings
+- `tests/lib/circuit-breaker.test.ts` - 19 comprehensive tests
 
 ### Session 2025-12-30 (Session 16 - MoE GPU Stack Optimization)
 
