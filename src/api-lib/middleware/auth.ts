@@ -201,7 +201,7 @@ export async function extractAnyAuthAsync(req: VercelRequest): Promise<AuthResul
       }
 
       // Always check process.env as final fallback (most reliable on Vercel)
-      const envKey = process.env.ADMIN_API_KEY;
+      const envKey = process.env.ADMIN_API_KEY?.trim();
       if (!expectedAdminKey && envKey) {
         expectedAdminKey = envKey;
         console.log('[AUTH] Using process.env.ADMIN_API_KEY fallback');
@@ -288,9 +288,12 @@ export async function verifyAdminAccessAsync(req: VercelRequest): Promise<boolea
     getSecret('admin_api_key', 'admin_access_verify'),
   ]);
 
-  const cronMatch = !!(cronSecret && authHeader === `Bearer ${cronSecret}`);
-  const keyHeaderMatch = !!(expectedAdminKey && authHeader === `Bearer ${expectedAdminKey}`);
-  const keyParamMatch = !!(expectedAdminKey && adminKey === expectedAdminKey);
+  const cleanCronSecret = cronSecret?.trim();
+  const cleanAdminKey = expectedAdminKey?.trim();
+
+  const cronMatch = !!(cleanCronSecret && authHeader === `Bearer ${cleanCronSecret}`);
+  const keyHeaderMatch = !!(cleanAdminKey && authHeader === `Bearer ${cleanAdminKey}`);
+  const keyParamMatch = !!(cleanAdminKey && adminKey === cleanAdminKey);
 
   console.log('[DEBUG] Admin Access Check:', {
     hasAuthHeader: !!authHeader,
@@ -300,6 +303,15 @@ export async function verifyAdminAccessAsync(req: VercelRequest): Promise<boolea
     cronMatch,
     keyHeaderMatch,
     keyParamMatch,
+    debugComparison: {
+      received: adminKey
+        ? `${adminKey.substring(0, 5)}...${adminKey.slice(-5)} (len=${adminKey.length})`
+        : 'missing',
+      expected: expectedAdminKey
+        ? `${expectedAdminKey.substring(0, 5)}...${expectedAdminKey.slice(-5)} (len=${expectedAdminKey.length})`
+        : 'missing',
+      isMatch: adminKey === expectedAdminKey,
+    },
   });
 
   return cronMatch || keyHeaderMatch || keyParamMatch;

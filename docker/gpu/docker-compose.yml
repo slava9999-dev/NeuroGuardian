@@ -6,6 +6,20 @@ services:
     container_name: neuro-llm-router
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
+    restart: unless-stopped
+    command:
+      - --model
+      - mistralai/Mistral-Nemo-Instruct-2407
+      - --max-model-len
+      - "4096"
+      - --gpu-memory-utilization
+      - "0.85"
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+    ports:
+      - "8000:8000"
     deploy:
       resources:
         reservations:
@@ -13,19 +27,8 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
-    ports:
-      - "8000:8000"
-    command: >
-      --model Qwen/Qwen2.5-1.5B-Instruct
-      --trust-remote-code
-      --dtype half
-      --max-model-len 2048
-      --gpu-memory-utilization 0.7
-      --enforce-eager
-      --port 8000
     networks:
       - neuro-gpu-network
-    restart: unless-stopped
 
   # Redis для Inngest и кэширования контекста (Порт изменен на 6380 для избежания конфликта)
   redis:

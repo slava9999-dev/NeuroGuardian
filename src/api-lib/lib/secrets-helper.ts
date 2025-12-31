@@ -86,7 +86,7 @@ function getEnvFallback(key: string): string | undefined {
   };
 
   const envVar = envMap[key] || key.toUpperCase();
-  return process.env[envVar];
+  return process.env[envVar]?.trim();
 }
 
 /**

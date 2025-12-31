@@ -99,7 +99,7 @@ export async function checkRateLimit(
         remaining: Math.max(0, limit - current),
       };
     } catch (error) {
-      console.error('KV rate limit error:', error);
+      console.error('KV rate limit error:', error instanceof Error ? error.message : error);
       // Fall through to in-memory
     }
   }

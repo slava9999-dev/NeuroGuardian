@@ -1,0 +1,11 @@
+{
+  "model": "Qwen/Qwen2.5-1.5B-Instruct",
+  "messages": [
+    {
+      "role": "user",
+      "content": "привет"
+    }
+  ],
+  "temperature": 0.3,
+  "max_tokens": 100
+}

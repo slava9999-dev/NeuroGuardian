@@ -49,7 +49,9 @@ async function getKVClient() {
     getSecret('kv_rest_api_token', 'kv_client_init'),
   ]);
 
-  if (url && token) {
+  // Only use Vercel KV for HTTPS URLs (Upstash)
+  // For local development with redis://, return null and use in-memory fallback
+  if (url && token && url.startsWith('https://')) {
     return createClient({ url, token });
   }
   return null;
@@ -62,17 +64,22 @@ export async function handleAgentV4(
   req: VercelRequest,
   res: VercelResponse
 ): Promise<VercelResponse> {
+  console.log('[Agent V4 Handler] Request received, method:', req.method);
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  console.log('[Agent V4 Handler] Starting authentication...');
   // 1. Authentication
   let userId: number;
 
   const isAdmin = await verifyAdminAccessAsync(req);
-  if (isAdmin && req.body?.telegramId) {
+  const bypassTelegramId = req.body?.telegramId || req.query?.telegramId;
+
+  if (isAdmin && bypassTelegramId) {
     // Admin bypass for testing
-    userId = parseInt(req.body.telegramId);
+    userId = parseInt(bypassTelegramId as string);
     console.log(`🔑 Admin API access: user ${userId}`);
 
     // Audit this bypass
@@ -95,7 +102,22 @@ export async function handleAgentV4(
     userId = auth.context.userId;
   }
 
-  const user = (await getUserById(userId)) as DBUserRecord | null;
+  console.log(`[Agent V4] User ID: ${userId}, isAdmin: ${isAdmin}`);
+  let user: DBUserRecord | null = null;
+
+  // Skip database fetch for admin bypass (local development)
+  if (!isAdmin) {
+    console.log(`[Agent V4] Fetching user ${userId} from database...`);
+    try {
+      user = (await getUserById(userId)) as DBUserRecord | null;
+      console.log(`[Agent V4] User fetched:`, user ? 'found' : 'not found');
+    } catch (error) {
+      console.error(`[Agent V4] Failed to fetch user ${userId}:`, error);
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
+  } else {
+    console.log(`[Agent V4] Skipping database fetch for admin bypass`);
+  }
 
   // 2. Check subscription
   if (!isAdmin && !isSubscriptionActive(user)) {
@@ -112,13 +134,18 @@ export async function handleAgentV4(
     return res.status(400).json({ error: 'Message is required' });
   }
 
-  // 4. Rate limit
-  const agentRateLimit = await checkRateLimit(`agent:${userId}`, true);
-  if (!agentRateLimit.allowed) {
-    return res.json({
-      success: true,
-      message: '⏳ **Превышен лимит запросов.**\n\nПодождите минуту и попробуйте снова.',
-    });
+  // 4. Rate limit (skip for admin)
+  console.log(`[Agent V4] Checking rate limit (isAdmin: ${isAdmin})...`);
+  if (!isAdmin) {
+    const agentRateLimit = await checkRateLimit(`agent:${userId}`, true);
+    if (!agentRateLimit.allowed) {
+      return res.json({
+        success: true,
+        message: '⏳ **Превышен лимит запросов.**\n\nПодождите минуту и попробуйте снова.',
+      });
+    }
+  } else {
+    console.log(`[Agent V4] Skipping rate limit for admin bypass`);
   }
 
   // 5. Load conversation history
@@ -136,12 +163,19 @@ export async function handleAgentV4(
       console.warn('⚠️ Failed to load chat history:', e);
     }
   }
+  console.log(`[Agent V4] Conversation history loaded, length: ${conversationHistory.length}`);
 
-  // 6. Fetch user products for context
-  const products = await getProductsByUserId(userId);
-  const protectedCount = products.filter(
-    (p: { min_price?: number }) => (p.min_price || 0) > 0
-  ).length;
+  // 6. Fetch user products for context (skip for admin)
+  console.log(`[Agent V4] Fetching products (isAdmin: ${isAdmin})...`);
+  let products: any[] = [];
+  let protectedCount = 0;
+
+  if (!isAdmin) {
+    products = await getProductsByUserId(userId);
+    protectedCount = products.filter((p: { min_price?: number }) => (p.min_price || 0) > 0).length;
+  } else {
+    console.log(`[Agent V4] Skipping product fetch for admin bypass`);
+  }
 
   console.log(`🚀 V4 Agent Request from User ${userId}: "${message.substring(0, 50)}..."`);
 

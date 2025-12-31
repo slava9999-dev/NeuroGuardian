@@ -77,6 +77,19 @@ async function getAvailableProviders(): Promise<LLMProvider[]> {
     });
   }
 
+  // Fallback to local LLM if no cloud providers configured
+  if (providers.length === 0) {
+    const localLLMUrl = process.env.LOCAL_LLM_URL || 'http://localhost:8000/v1';
+    console.log('[Orchestrator] No cloud LLM providers configured, using local LLM:', localLLMUrl);
+    providers.push({
+      name: 'LocalLLM',
+      url: `${localLLMUrl}/chat/completions`,
+      apiKey: 'not-needed', // vLLM doesn't require API key
+      model: 'mistralai/Mistral-Nemo-Instruct-2407',
+      supportsStructuredOutput: false, // Local model doesn't support json_schema
+    });
+  }
+
   return providers;
 }
 
@@ -237,17 +250,23 @@ export async function orchestrateV4(
   const startTime = Date.now();
   let tokensUsed = 0;
 
+  console.log('[Orchestrator V4] Starting with message:', message.substring(0, 50));
+
   // Check for simple intents that don't need tools
+  console.log('[Orchestrator V4] Checking for simple intent...');
   const simpleResponse = await handleSimpleIntent(message);
   if (simpleResponse) {
+    console.log('[Orchestrator V4] Simple intent matched, returning quick response');
     return createSimpleResult(simpleResponse, startTime);
   }
+  console.log('[Orchestrator V4] No simple intent match, proceeding to planning phase');
 
   // ========================================
   // PHASE 1: PLANNING
   // ========================================
   const planStart = Date.now();
   logger.info('V4 Phase 1: Planning');
+  console.log('[Orchestrator V4] Phase 1: Planning started');
 
   const planResult = await callPlanner(message, context, conversationHistory);
   const planningTimeMs = Date.now() - planStart;

@@ -13,12 +13,17 @@ import { dirname, join } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 config({ path: join(__dirname, '..', '.env') });
+config({ path: join(__dirname, '..', '.env.local'), override: true });
 
 // Dynamic import of the API handler
 const PORT = process.env.API_PORT || 3001;
 
 console.log('🚀 Starting NeuroGUARDIAN Local API Server...');
 console.log('📁 Loading environment from .env');
+
+// Force permissive mode for local dev to avoid Vault requirements
+process.env.SECURITY_PERMISSIVE_MODE = 'true';
+console.log('🛡️ SECURITY_PERMISSIVE_MODE forced to true for local dev');
 
 async function startServer() {
   // Import the API handler (use dynamic import with tsx)
@@ -55,6 +60,8 @@ async function startServer() {
         const telegramId = req.headers['x-telegram-id'];
         const cronSecret = req.headers['x-cron-secret'];
         const isAdminBypass = cronSecret === process.env.CRON_SECRET;
+
+        console.log('📨 Incoming Headers:', JSON.stringify(req.headers, null, 2));
 
         // Resolve userId if telegramId is provided (Admin/n8n context)
         let resolvedUserId = null;
