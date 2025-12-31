@@ -22,11 +22,68 @@ import {
   type SecurityAgentConfig,
 } from './types.js';
 
-// Vault client type (we'll use node-vault)
+// Native Vault client interface (no node-vault dependency)
 interface VaultClient {
   read(path: string): Promise<{ data: { data: Record<string, string> } }>;
   write(path: string, data: Record<string, unknown>): Promise<unknown>;
   delete(path: string): Promise<void>;
+}
+
+// Native fetch-based Vault client implementation
+class NativeVaultClient implements VaultClient {
+  private readonly endpoint: string;
+  private readonly token: string;
+  private readonly namespace: string | undefined;
+
+  constructor(options: { endpoint: string; token: string; namespace?: string | undefined }) {
+    this.endpoint = options.endpoint.replace(/\/$/, '');
+    this.token = options.token;
+    this.namespace = options.namespace;
+  }
+
+  private getHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'X-Vault-Token': this.token,
+    };
+    if (this.namespace) {
+      headers['X-Vault-Namespace'] = this.namespace;
+    }
+    return headers;
+  }
+
+  async read(path: string): Promise<{ data: { data: Record<string, string> } }> {
+    const response = await fetch(`${this.endpoint}/v1/${path}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error(`Vault read failed: ${response.status} ${response.statusText}`);
+    }
+    return (await response.json()) as { data: { data: Record<string, string> } };
+  }
+
+  async write(path: string, data: Record<string, unknown>): Promise<unknown> {
+    const response = await fetch(`${this.endpoint}/v1/${path}`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      throw new Error(`Vault write failed: ${response.status} ${response.statusText}`);
+    }
+    return response.json();
+  }
+
+  async delete(path: string): Promise<void> {
+    const response = await fetch(`${this.endpoint}/v1/${path}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error(`Vault delete failed: ${response.status} ${response.statusText}`);
+    }
+  }
 }
 
 // In-memory lease tracking
@@ -78,21 +135,16 @@ export class SecretsGuard {
     }
 
     try {
-      // Dynamic import for node-vault
-      const vault = await import('node-vault');
+      // Use native fetch-based Vault client (no node-vault dependency)
+      if (!this.config.vault.token) {
+        throw new Error('Vault token is required');
+      }
 
-      const vaultOptions: Record<string, unknown> = {
-        apiVersion: 'v1',
+      this.client = new NativeVaultClient({
         endpoint: this.config.vault.address,
-      };
-      if (this.config.vault.token) {
-        vaultOptions.token = this.config.vault.token;
-      }
-      if (this.config.vault.namespace) {
-        vaultOptions.namespace = this.config.vault.namespace;
-      }
-
-      this.client = vault.default(vaultOptions);
+        token: this.config.vault.token,
+        namespace: this.config.vault.namespace,
+      });
 
       // Verify connection
       await this.client.read('sys/health');
