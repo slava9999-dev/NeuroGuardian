@@ -1,4 +1,5 @@
 import { logOpsEvent } from './ops-logger.js';
+import type { N8nWorkflow } from '../lib/types.js';
 
 // API Configuration
 const N8N_API_BASE = process.env.N8N_API_BASE_URL;
@@ -36,8 +37,8 @@ export async function getN8nSystemHealth(): Promise<N8nHealth> {
 
     if (!response.ok) throw new Error(`API Error: ${response.status}`);
 
-    const data = (await response.json()) as { data: any[] };
-    const workflows: any[] = data.data || [];
+    const data = (await response.json()) as { data: N8nWorkflow[] };
+    const workflows: N8nWorkflow[] = data.data || [];
 
     const activeWorkflows = workflows.filter(w => w.active);
     const missingCritical = CRITICAL_WORKFLOWS.filter(
@@ -69,7 +70,7 @@ const N8N_URL = process.env.N8N_WEBHOOK_URL || process.env.N8N_WEBHOOK_BASE;
 export interface N8nActionPayload {
   action: string;
   userId: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**

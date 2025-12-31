@@ -55,7 +55,40 @@ export interface PaymentResult {
     price: number;
     durationDays: number;
   };
-} /**
+}
+
+export interface YookassaPayment {
+  id: string;
+  status: string;
+  paid: boolean;
+  amount: {
+    value: string;
+    currency: string;
+  };
+  confirmation?: {
+    type: string;
+    confirmation_token?: string;
+    confirmation_url?: string;
+    return_url?: string;
+  };
+  created_at: string;
+  description?: string;
+  metadata?: Record<string, string>;
+  payment_method?: {
+    type: string;
+    id: string;
+    saved: boolean;
+    title?: string;
+  };
+  recipient?: {
+    account_id: string;
+    gateway_id: string;
+  };
+  refundable: boolean;
+  test: boolean;
+}
+
+/**
  * Create YooKassa payment
  */
 export async function createYookassaPayment(
@@ -124,7 +157,7 @@ export async function createYookassaPayment(
       return { success: false, error: 'Payment creation failed' };
     }
 
-    const payment = (await response.json()) as any;
+    const payment = (await response.json()) as YookassaPayment;
 
     // Create transaction record
     await createTransaction({
@@ -186,7 +219,7 @@ export async function getPaymentStatus(paymentId: string): Promise<{
       return null;
     }
 
-    const payment = (await response.json()) as any;
+    const payment = (await response.json()) as YookassaPayment;
     return {
       status: payment.status,
       paid: payment.paid === true,

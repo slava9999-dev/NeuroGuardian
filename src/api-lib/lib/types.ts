@@ -140,16 +140,20 @@ export interface DBProduct {
   product_id: string; // VARCHAR(255) NOT NULL
   nm_id: number | null; // BIGINT (WB nmId)
   offer_id: string | null; // VARCHAR(255) (Ozon offer_id - migration 007)
+  official_sku: string | null; // VARCHAR(255)
   title: string; // VARCHAR(500) NOT NULL
   image_url: string | null; // TEXT
   current_price: number; // INTEGER NOT NULL
   min_price: number; // INTEGER DEFAULT 0
   current_stock: number; // INTEGER DEFAULT 0
   marketplace: 'WB' | 'Ozon'; // VARCHAR(10) NOT NULL
+  account_id: number | null; // INTEGER REFERENCES marketplace_accounts(id)
   status: string; // VARCHAR(50) DEFAULT 'active'
   is_monitored: boolean; // BOOLEAN DEFAULT true
   // Price protection buffer (overrides user setting if > 0)
   card_discount_buffer: number | null; // INTEGER DEFAULT 0 — per-product card discount buffer
+  cost_price?: number | null; // INTEGER (Unit Economics)
+  category?: string | null; // VARCHAR(255)
   // Pending price tracking fields (Dec 2024 Audit)
   pending_price: number | null; // INTEGER
   pending_task_id: number | null; // BIGINT
@@ -165,4 +169,39 @@ export interface PendingPriceUpdate {
   pendingPrice: number;
   taskId: number;
   marketplace: 'WB' | 'Ozon';
+}
+
+/**
+ * Database Price Rule type — matches `price_rules` table
+ */
+export interface DBPriceRule {
+  id: number;
+  user_id: number;
+  product_id: string;
+  min_price: number | string; // Postgres numeric often comes as string
+  max_price: number | string;
+  target_margin: number | string;
+  competitor_tracking: boolean;
+  competitor_nmids: string | null;
+  price_match_strategy: 'none' | 'match' | 'undercut' | 'premium';
+  undercut_amount: number | string;
+  undercut_type: 'percent' | 'absolute';
+  auto_adjust: boolean;
+  active: boolean;
+  created_at?: Date;
+  updated_at?: Date;
+}
+
+/**
+ * N8n Workflow type
+ */
+export interface N8nWorkflow {
+  id: string;
+  name: string;
+  active: boolean;
+  nodes: unknown[];
+  connections: unknown;
+  settings?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
 }

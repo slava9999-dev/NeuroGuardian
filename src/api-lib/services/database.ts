@@ -5,6 +5,7 @@
 // ============================================
 
 // Use local pg driver for local development, @vercel/postgres for production
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let sql: any;
 
 if (process.env.NODE_ENV === 'production' && !process.env.LOCAL_DEV) {
@@ -16,6 +17,7 @@ if (process.env.NODE_ENV === 'production' && !process.env.LOCAL_DEV) {
 }
 
 import { logger } from '../lib/index.js';
+import type { DBProduct, PendingPriceUpdate } from '../lib/types.js';
 
 export interface TelegramUser {
   id: number;
@@ -61,6 +63,22 @@ export interface MarketplaceOrder {
   logistics: number;
   cost_price: number;
   region?: string | null;
+}
+
+export interface TransactionData {
+  id: string;
+  user_id: number;
+  yookassa_payment_id?: string | null;
+  amount: number;
+  currency: string;
+  status: string;
+  plan: string;
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp?: string;
 }
 
 /**
@@ -332,11 +350,11 @@ export async function updateProductPrice(
   await sql`UPDATE products SET current_price = ${price}, updated_at = NOW() WHERE user_id = ${userId} AND product_id = ${productId}`;
 }
 
-export async function batchUpdateWbPrices(_userId: number, _updates: any[]): Promise<void> {
+export async function batchUpdateWbPrices(_userId: number, _updates: unknown[]): Promise<void> {
   // Placeholder - logic in marketplace service usually
 }
 
-export async function batchUpdateOzonPrices(_userId: number, _updates: any[]): Promise<void> {
+export async function batchUpdateOzonPrices(_userId: number, _updates: unknown[]): Promise<void> {
   // Placeholder
 }
 
@@ -350,7 +368,7 @@ export async function activateSubscription(
   await sql`UPDATE users SET subscription_plan = ${plan}, subscription_end = ${endDate.toISOString()}, subscription_active = true, updated_at = NOW() WHERE id = ${userId}`;
 }
 
-export async function createTransaction(tx: any): Promise<void> {
+export async function createTransaction(tx: TransactionData): Promise<void> {
   await sql`
     INSERT INTO transactions (id, user_id, yookassa_payment_id, amount, currency, status, plan, created_at)
     VALUES (${tx.id}, ${tx.user_id}, ${tx.yookassa_payment_id || null}, ${tx.amount}, ${tx.currency}, ${tx.status}, ${tx.plan}, NOW())
@@ -372,7 +390,7 @@ export async function updateTransactionStatus(
 export async function isFirstPayment(userId: number): Promise<boolean> {
   const result =
     await sql`SELECT COUNT(*) as count FROM transactions WHERE user_id = ${userId} AND status = 'succeeded'`;
-  return parseInt((result.rows[0] as any).count) === 0;
+  return parseInt((result.rows[0] as { count: string }).count) === 0;
 }
 
 export async function getUsersWithExpiringSubscriptions(days: number): Promise<TelegramUser[]> {
@@ -432,11 +450,11 @@ export async function confirmPendingPrice(userId: number, productId: string): Pr
 
 export async function batchSetPendingPrices(
   userId: number,
-  updates: any[],
+  updates: PendingPriceUpdate[],
   taskId?: string
 ): Promise<void> {
   for (const u of updates) {
-    await setPendingPrice(userId, u.product_id, u.price, taskId);
+    await setPendingPrice(userId, u.productId, u.pendingPrice, taskId);
   }
 }
 
@@ -461,6 +479,10 @@ export async function migrateAddPendingColumns(): Promise<void> {
   await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS pending_task_id BIGINT`;
   await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS pending_status VARCHAR(50)`;
   await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS pending_since TIMESTAMP`;
+
+  // Ensure Unit Economics columns exist
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS cost_price INTEGER`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS category VARCHAR(255)`;
 }
 
 export async function clearChatHistory(userId: number): Promise<void> {
@@ -470,7 +492,7 @@ export async function clearChatHistory(userId: number): Promise<void> {
 /**
  * Save products (bulk upsert)
  */
-export async function saveProducts(userId: number, products: any[]): Promise<void> {
+export async function saveProducts(userId: number, products: Partial<DBProduct>[]): Promise<void> {
   for (const p of products) {
     await sql`
       INSERT INTO products (
@@ -531,7 +553,7 @@ export async function logSentinelAction(log: {
   marketplace: string;
   threat_type?: string;
   success?: boolean;
-  details?: any;
+  details?: Record<string, unknown>;
 }): Promise<void> {
   await sql`
     INSERT INTO sentinel_logs (
@@ -570,7 +592,7 @@ export async function getAllUsers(): Promise<TelegramUser[]> {
 /**
  * Manage chat history
  */
-export async function saveChatHistory(userId: number, messages: any[]): Promise<void> {
+export async function saveChatHistory(userId: number, messages: ChatMessage[]): Promise<void> {
   await sql`
     INSERT INTO chat_history (user_id, messages, updated_at)
     VALUES (${userId}, ${JSON.stringify(messages)}, NOW())
@@ -580,7 +602,7 @@ export async function saveChatHistory(userId: number, messages: any[]): Promise<
   `;
 }
 
-export async function getChatHistory(userId: number): Promise<any[]> {
+export async function getChatHistory(userId: number): Promise<ChatMessage[]> {
   const result = await sql`SELECT messages FROM chat_history WHERE user_id = ${userId}`;
   return result.rows[0]?.messages || [];
 }
@@ -588,7 +610,7 @@ export async function getChatHistory(userId: number): Promise<any[]> {
 /**
  * Upsert marketplace orders
  */
-export async function upsertMarketplaceOrders(userId: number, orders: any[]) {
+export async function upsertMarketplaceOrders(userId: number, orders: MarketplaceOrder[]) {
   let inserted = 0;
   let updated = 0;
 

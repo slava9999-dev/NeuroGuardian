@@ -34,9 +34,17 @@ export async function fetchWbCompetitorData(nmId: number | string): Promise<Comp
       throw new Error(`WB API Error: ${response.status} ${response.statusText}`);
     }
 
-    const data = (await response.json()) as any;
+    interface WbPublicProduct {
+      salePriceU?: number;
+      priceU?: number;
+      sizes?: Array<{
+        stocks?: Array<{ qty: number }>;
+      }>;
+    }
 
-    if (!data.data || !data.data.products || data.data.products.length === 0) {
+    const data = (await response.json()) as { data?: { products?: WbPublicProduct[] } };
+
+    if (!data.data?.products?.length) {
       console.warn(`Competitor monitor: Product ${nmId} not found on WB`);
       return null;
     }
@@ -48,8 +56,8 @@ export async function fetchWbCompetitorData(nmId: number | string): Promise<Comp
     // priceU - базовая цена (зачеркнутая)
 
     // Fallback: иногда salePriceU нет, берем priceU
-    const finalPrice = (product.salePriceU || product.priceU) / 100;
-    const basicPrice = (product.priceU || product.salePriceU) / 100;
+    const finalPrice = ((product.salePriceU || product.priceU) ?? 0) / 100;
+    const basicPrice = ((product.priceU || product.salePriceU) ?? 0) / 100;
 
     // Calculate total stock across all sizes/warehouses
     let totalStock = 0;

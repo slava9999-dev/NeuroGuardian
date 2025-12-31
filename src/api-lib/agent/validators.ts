@@ -119,6 +119,7 @@ export const UpdatePricesArgsSchema = z.object({
     .min(-50, 'Cannot decrease by more than 50%')
     .max(100, 'Cannot increase by more than 100%')
     .optional(),
+  account_id: z.number().optional(),
 });
 
 export const UpdateStocksArgsSchema = z.object({
@@ -129,6 +130,7 @@ export const UpdateStocksArgsSchema = z.object({
     })
   ),
   marketplace: z.enum(['WB', 'Ozon']),
+  account_id: z.number().optional(),
 });
 
 // === CONFIRMATION DETAILS SCHEMAS (for handleConfirmation) ===

@@ -1,4 +1,5 @@
 import { sql } from '@vercel/postgres';
+import type { DBUser } from '../lib/types.js';
 
 export interface MarketplaceAccount {
   id: number;
@@ -84,9 +85,9 @@ export async function getUsersStats() {
     await sql`SELECT COUNT(*) as count FROM users WHERE created_at > NOW() - INTERVAL '24 hours'`;
 
   return {
-    total: parseInt(total.rows[0].count),
-    active: parseInt(active.rows[0].count),
-    newToday: parseInt(newToday.rows[0].count),
+    total: parseInt(total.rows[0].count as string),
+    active: parseInt(active.rows[0].count as string),
+    newToday: parseInt(newToday.rows[0].count as string),
   };
 }
 
@@ -96,13 +97,17 @@ export interface UserSummary {
   last_name?: string;
   username?: string;
   is_active: boolean;
-  created_at: string;
+  created_at: string; // The DBUser uses Date, but frontend might expect string. Keeping string for now or converting? Standardizing on Date is better but check usage.
   subscription_plan: string;
   total_products: number;
   platforms: string[];
 }
 
-export async function getUsersPaginated(limit: number, offset: number, search?: string) {
+export async function getUsersPaginated(
+  limit: number,
+  offset: number,
+  search?: string
+): Promise<UserSummary[]> {
   let query;
 
   if (search) {
@@ -129,15 +134,17 @@ export async function getUsersPaginated(limit: number, offset: number, search?: 
 
   const { rows } = await query;
 
-  return rows.map((row: any) => ({
-    id: row.id,
+  return (rows as DBUser[]).map(row => ({
+    id: Number(row.id), // Ensure number
     first_name: row.first_name,
-    last_name: row.last_name,
-    username: row.username,
+    last_name: row.last_name || undefined,
+    username: row.username || undefined,
     is_active: row.is_active,
-    created_at: row.created_at,
-    subscription_plan: row.subscription_plan,
+    created_at: new Date(row.created_at).toISOString(),
+    subscription_plan: row.subscription_plan || 'trial',
     total_products: row.total_products,
-    platforms: [row.api_key_wb ? 'wb' : null, row.api_key_ozon ? 'ozon' : null].filter(Boolean),
+    platforms: [row.api_key_wb ? 'wb' : null, row.api_key_ozon ? 'ozon' : null].filter(
+      (p): p is string => p !== null
+    ),
   }));
 }

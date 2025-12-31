@@ -440,15 +440,15 @@ export async function checkProductPrice(
     return null;
   }
 
-  const mockProduct: MarketplaceProduct = {
+  const proxyProduct: MarketplaceProduct = {
     product_id: externalId,
     nm_id: marketplace === 'wb' ? parseInt(externalId) : undefined,
-    title: 'Product ' + externalId,
+    title: 'Product ' + externalId, // Placeholder title as we don't have full data here
     image_url: null,
     current_price: currentPrice,
     current_stock: 0,
     marketplace: marketplace === 'wb' ? 'WB' : 'Ozon',
   };
 
-  return analyzeProduct(mockProduct, rule);
+  return analyzeProduct(proxyProduct, rule);
 }

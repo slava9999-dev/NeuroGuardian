@@ -1,7 +1,7 @@
 // ============================================
 // NeuroGUARDIAN — Sentinel Service
 // 30-minute monitoring & price protection cycle
-// Version: 2.0.0 | Date: December 2024
+// Version: 2.1.0 | Date: December 2024
 // ============================================
 
 import { sql } from '@vercel/postgres';
@@ -15,12 +15,14 @@ import {
   setOzonZeroStock,
   updateWbPrices,
   updateOzonPrices,
+  type MarketplaceApiKeys,
 } from './marketplace.js';
-import { scanProductThreats, ThreatType } from './threat-detector.js';
+import { scanProductThreats, ThreatType, type Threat } from './threat-detector.js'; // Threat renamed from ProductThreat if it was mismatch
 import { logSentinelAction } from './database.js';
 import { sendTelegramNotification } from './notifications.js';
 import { priceShield, type PriceRule } from './price-shield.js';
 import { getCompetitorPrice } from './competitor-monitor.js';
+import type { DBUser, DBProduct } from '../lib/types.js';
 
 export interface SentinelRunResult {
   usersProcessed: number;
@@ -48,7 +50,8 @@ export class SentinelService {
         WHERE (protection_enabled = true OR subscription_active = true)
         AND is_active = true
       `;
-      const users = usersRes.rows as any[];
+      // We safely cast here because we know the schema matches DBUser
+      const users = usersRes.rows as DBUser[];
       result.usersProcessed = users.length;
 
       console.log(`🛡️ Sentinel Cycle: Processing ${users.length} users...`);
@@ -82,7 +85,7 @@ export class SentinelService {
     };
 
     const userRes = await sql`SELECT * FROM users WHERE id = ${userId}`;
-    const user = userRes.rows[0];
+    const user = userRes.rows[0] as DBUser;
     if (user) {
       await this.processUser(user, result);
     }
@@ -93,7 +96,7 @@ export class SentinelService {
   /**
    * Process a single user's products
    */
-  public async processUser(user: any, summary: SentinelRunResult): Promise<void> {
+  public async processUser(user: DBUser, summary: SentinelRunResult): Promise<void> {
     const keys = await getMarketplaceKeys(user.id);
     if (!keys.wb && !keys.ozon) return;
 
@@ -103,7 +106,7 @@ export class SentinelService {
       WHERE user_id = ${user.id} 
       AND (is_monitored = true OR min_price > 0)
     `;
-    const products = productsRes.rows;
+    const products = productsRes.rows as DBProduct[];
     if (products.length === 0) return;
 
     // Get Active Price Rules (Smart Repricing)
@@ -113,7 +116,7 @@ export class SentinelService {
     // --- WB Sub-cycle ---
     if (keys.wb) {
       const wbProducts = products.filter(p => p.marketplace === 'WB');
-      const nmIds = wbProducts.map(p => p.nm_id).filter(Boolean);
+      const nmIds = wbProducts.map(p => p.nm_id).filter((id): id is number => id !== null);
       if (nmIds.length > 0) {
         const { priceMap } = await fetchWbPrices(keys.wb, nmIds);
         await this.handleMarketplaceThreats(
@@ -134,18 +137,17 @@ export class SentinelService {
       const ozonIds = ozonProducts
         .map(p => parseInt(p.product_id.replace('ozon-', '')))
         .filter(Boolean);
-      if (ozonIds.length > 0) {
-        const priceMap = await fetchOzonCurrentPrices(
-          keys.ozon.clientId,
-          keys.ozon.apiKey,
-          ozonIds
-        );
+      if (ozonIds.length > 0 && keys.ozon) {
+        // TS check for keys.ozon being truthy inside block
+        const ozonKeys = keys.ozon;
+
+        const priceMap = await fetchOzonCurrentPrices(ozonKeys.clientId, ozonKeys.apiKey, ozonIds);
         await this.handleMarketplaceThreats(
           user,
           ozonProducts,
           priceMap,
           'Ozon',
-          keys.ozon,
+          ozonKeys,
           summary,
           rulesMap
         );
@@ -157,17 +159,20 @@ export class SentinelService {
    * Scan threats and enact defense for a set of products
    */
   private async handleMarketplaceThreats(
-    user: any,
-    products: any[],
+    user: DBUser,
+    products: DBProduct[],
     priceMap: Map<number, number>,
     marketplace: 'WB' | 'Ozon',
-    keys: any,
+    keys: string | NonNullable<MarketplaceApiKeys['ozon']>,
     summary: SentinelRunResult,
     rulesMap: Map<string, PriceRule>
   ): Promise<void> {
     for (const product of products) {
       const key =
         marketplace === 'WB' ? product.nm_id : parseInt(product.product_id.replace('ozon-', ''));
+
+      if (!key) continue;
+
       const livePrice = priceMap.get(key);
       if (livePrice === undefined) continue;
 
@@ -193,12 +198,12 @@ export class SentinelService {
 
                 // Execute Repricing
                 let updateSuccess = false;
-                if (marketplace === 'WB') {
+                if (marketplace === 'WB' && product.nm_id && typeof keys === 'string') {
                   const res = await updateWbPrices(keys, [
                     { nmId: product.nm_id, price: repricing.newPrice },
                   ]);
                   updateSuccess = res.success;
-                } else {
+                } else if (marketplace === 'Ozon' && typeof keys !== 'string') {
                   const res = await updateOzonPrices(keys.clientId, keys.apiKey, [
                     {
                       productId: parseInt(product.product_id.replace('ozon-', '')),
@@ -224,9 +229,6 @@ export class SentinelService {
                     success: true,
                     details: { reason: repricing.reason, competitorPrice },
                   });
-                  // Skip regular threat scan if we just repriced?
-                  // Ideally yes, to avoid double-checking our own old price.
-                  // But let's check basic threats anyway (like deep stop-loss).
                 }
               }
             }
@@ -237,10 +239,7 @@ export class SentinelService {
       // 2. REGULAR THREAT SCAN & DEFENSE
       // --- Cooldown Check (10 mins) ---
       if (product.updated_at) {
-        // const lastUpdate = new Date(product.updated_at);
-        // const diffMs = Date.now() - lastUpdate.getTime();
-        // Cooldown logic is deferred to ACTIONS phase if needed.
-        // Currently we scan always on every cycle if price was fetched.
+        // Cooldown deferred
       }
 
       const scan = scanProductThreats(product, livePrice, marketplace);
@@ -267,15 +266,10 @@ export class SentinelService {
             stopLossThreat.type
           );
         } else if (erosionThreat && user.protection_enabled) {
-          // Trigger Defense for Erosion if enabled (e.g. notify or auto-correct if mode supports it)
-          // Currently we just notify for erosion unless it hits min_price (which is covered by stop-loss usually)
-          // But strict mode might want to zero stock if profit < 0
+          // Trigger Defense for Erosion if critical
           if (erosionThreat.severity === 'critical') {
-            // For critical erosion (negative profit), we might want to defend too.
-            // For now, let's notify.
             await this.notifyThreat(user, product, erosionThreat, marketplace);
 
-            // Log it as action=notify?
             await logSentinelAction({
               user_id: user.id,
               product_id: product.product_id,
@@ -306,11 +300,11 @@ export class SentinelService {
    * Execute defense action (Set price to min or set stock to 0)
    */
   private async executeDefense(
-    user: any,
-    product: any,
+    user: DBUser,
+    product: DBProduct,
     livePrice: number,
     marketplace: 'WB' | 'Ozon',
-    keys: any,
+    keys: string | NonNullable<MarketplaceApiKeys['ozon']>,
     summary: SentinelRunResult,
     threatType: string
   ): Promise<void> {
@@ -320,25 +314,34 @@ export class SentinelService {
     let errorMsg = '';
 
     if (marketplace === 'WB') {
-      if (defenseMode === 'zero_stock') {
-        const res = await setWbZeroStock(keys, [product.vendor_code || String(product.nm_id)]);
+      // WB uses nmId or vendorCode. nmId is cleaner if available.
+      // The DBProduct.nm_id is number | null
+      const sku = product.nm_id ? String(product.nm_id) : product.product_id;
+
+      if (defenseMode === 'zero_stock' && typeof keys === 'string') {
+        const res = await setWbZeroStock(keys, [sku]);
         success = res.success;
         errorMsg = res.error || '';
       } else {
-        const res = await setWbDefensePrice(keys, [{ nmId: product.nm_id, price: minPrice }]);
-        success = res.success;
-        errorMsg = res.error || '';
+        if (product.nm_id && typeof keys === 'string') {
+          const res = await setWbDefensePrice(keys, [{ nmId: product.nm_id, price: minPrice }]);
+          success = res.success;
+          errorMsg = res.error || '';
+        } else {
+          errorMsg = 'NM ID missing for WB defense';
+          success = false;
+        }
       }
     } else {
-      const offerId = product.offer_id;
+      const offerId = product.offer_id || product.product_id; // fallback to product_id if offer_id missing (usually offer_id is in product_id for some legacy imports)
       const ozonId = parseInt(product.product_id.replace('ozon-', ''));
-      if (defenseMode === 'zero_stock') {
+      if (defenseMode === 'zero_stock' && typeof keys !== 'string') {
         const res = await setOzonZeroStock(keys.clientId, keys.apiKey, [
           { productId: ozonId, offerId },
         ]);
         success = res.success;
         errorMsg = res.error || '';
-      } else {
+      } else if (typeof keys !== 'string') {
         const res = await setOzonDefensePrice(keys.clientId, keys.apiKey, [
           { productId: ozonId, offerId, price: minPrice },
         ]);
@@ -374,9 +377,9 @@ export class SentinelService {
   }
 
   private async notifyThreat(
-    user: any,
-    product: any,
-    threat: any,
+    user: DBUser,
+    product: DBProduct,
+    threat: Threat,
     marketplace: string
   ): Promise<void> {
     const message =
@@ -384,14 +387,14 @@ export class SentinelService {
       `📦 ${product.title}\n` +
       `${marketplace === 'WB' ? '🟣' : '🔵'} ${marketplace}\n\n` +
       `🔍 ${threat.message}\n` +
-      `💰 Текущая цена: ${threat.data.livePrice || product.current_price}₽`;
+      `💰 Текущая цена: ${(threat.data as { livePrice?: number })?.livePrice || product.current_price}₽`;
 
     await sendTelegramNotification(user.id, message);
   }
 
   private async notifyDefenseSuccess(
-    user: any,
-    product: any,
+    user: DBUser,
+    product: DBProduct,
     livePrice: number,
     minPrice: number,
     mode: string,

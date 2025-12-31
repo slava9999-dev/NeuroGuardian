@@ -130,6 +130,36 @@ export interface WbStockItem {
   amount: number;
 }
 
+/**
+ * WB Statistics API - Stocks
+ * From: statistics-api.wildberries.ru/api/v1/supplier/stocks
+ */
+export interface WbStatisticsStock {
+  nmId?: number;
+  quantity?: number;
+  quantityFull?: number;
+  warehouseName?: string;
+  lastChangeDate?: string;
+}
+
+/**
+ * WB Statistics API - Sales
+ * From: statistics-api.wildberries.ru/api/v1/supplier/sales
+ */
+export interface WbStatisticsSale {
+  nmId?: number;
+  finishedPrice?: number;
+  priceWithDisc?: number;
+  date?: string;
+  saleID?: string;
+  srid?: string;
+  subject?: string;
+  brand?: string;
+  isStorned?: boolean;
+  isCancel?: boolean;
+  regionName?: string;
+}
+
 // ============================================
 // OZON API TYPES
 // ============================================
@@ -224,4 +254,65 @@ export interface OzonAnalyticsRow {
 export interface OzonDimension {
   id?: string;
   name?: string;
+}
+
+/**
+ * Ozon Warehouse List Response
+ * From: api-seller.ozon.ru/v1/warehouse/list
+ */
+export interface OzonWarehouse {
+  warehouse_id: number;
+  name: string;
+  is_rfbs?: boolean;
+}
+
+/**
+ * Ozon Order (FBO/FBS)
+ * From: api-seller.ozon.ru/v2/posting/fbo/list or v3/posting/fbs/list
+ */
+export interface OzonOrder {
+  posting_number: string;
+  products?: OzonOrderProduct[];
+  in_process_at?: string;
+  created_at: string;
+  status: string;
+  financial_data?: {
+    products?: OzonFinancialProduct[];
+  };
+  analytics_data?: {
+    region?: string;
+  };
+  region?: string;
+}
+
+export interface OzonOrderProduct {
+  sku?: number;
+  offer_id?: string;
+  name?: string;
+  quantity?: number;
+}
+
+export interface OzonFinancialProduct {
+  price?: string;
+  commission_amount?: string;
+  payout?: string;
+  client_price?: string;
+}
+
+export interface OzonStockV3Item {
+  product_id: number;
+  offer_id: string;
+  stocks: Array<{
+    type: string;
+    present: number;
+    reserved: number;
+  }>;
+}
+
+export interface OzonStockV3Response {
+  result: {
+    items: OzonStockV3Item[];
+    total: number;
+    last_id: string;
+  };
 }

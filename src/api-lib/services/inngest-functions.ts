@@ -61,9 +61,10 @@ export const processMoEQuery = inngest.createFunction(
           shortTerm: Array.isArray(shortTerm) ? shortTerm : [],
           longTerm: Array.isArray(longTerm) ? longTerm : [],
         };
-      } catch (e: any) {
+      } catch (e) {
+        const errorMessage = e instanceof Error ? e.message : String(e);
         logger.warn('[Inngest] Memory fetch failed, continuing without context', {
-          error: e.message,
+          error: errorMessage,
         });
         return { shortTerm: [], longTerm: [] };
       }
@@ -141,8 +142,9 @@ export const processMoEQuery = inngest.createFunction(
 
         // Trigger memory pack if needed
         await memoryService.packAndMigrate(sessionId);
-      } catch (e: any) {
-        logger.warn('[Inngest] Memory save failed', { error: e.message });
+      } catch (e) {
+        const errorMessage = e instanceof Error ? e.message : String(e);
+        logger.warn('[Inngest] Memory save failed', { error: errorMessage });
       }
     });
 
@@ -199,16 +201,17 @@ export const backgroundPriceCheck = inngest.createFunction(
       try {
         const sentinelResult = await sentinelService.runForUser(userId);
         return sentinelResult;
-      } catch (e: any) {
+      } catch (e) {
+        const errorMessage = e instanceof Error ? e.message : String(e);
         logger.error('[Inngest] Sentinel run failed', {
           userId,
-          error: e.message,
+          error: errorMessage,
         });
         return {
           usersProcessed: 0,
           threatsDetected: 0,
           actionsTaken: 0,
-          errors: [e.message],
+          errors: [errorMessage],
         };
       }
     });
@@ -304,10 +307,10 @@ async function handleStatsQuery(params: {
         data: result.data,
       },
     };
-  } catch (e: any) {
+  } catch (e) {
     return {
       success: false,
-      error: e.message,
+      error: e instanceof Error ? e.message : String(e),
     };
   }
 }
@@ -394,11 +397,12 @@ async function handleComplexQuery(params: {
         toolsCalled: result.toolsCalled,
       },
     };
-  } catch (e: any) {
-    logger.error('[Inngest] Complex query failed', { error: e.message });
+  } catch (e) {
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    logger.error('[Inngest] Complex query failed', { error: errorMessage });
     return {
       success: false,
-      error: e.message,
+      error: errorMessage,
     };
   }
 }

@@ -15,6 +15,18 @@ import type {
   OzonStockItem,
   OzonPriceUpdateResult,
   OzonError,
+  WbWarehouse,
+  WbStockItem,
+  WbUploadTaskResponse,
+  OzonProductListItem,
+  OzonPriceInfo,
+  OzonAnalyticsRow,
+  OzonPrice,
+  OzonWarehouse,
+  OzonOrder,
+  WbStatisticsStock,
+  WbStatisticsSale,
+  OzonStockV3Response,
 } from '../lib/marketplace-types.js';
 
 // ============================================
@@ -131,16 +143,14 @@ export async function fetchWbStocks(apiKey: string, nmIds: number[]): Promise<Ma
     console.log(`📡 WB Warehouses API: status=${warehousesRes.status}`);
 
     if (warehousesRes.ok) {
-      const warehouses = (await warehousesRes.json()) as any;
+      const warehouses = (await warehousesRes.json()) as WbWarehouse[];
       console.log(
         `📦 WB FBS: Found ${Array.isArray(warehouses) ? warehouses.length : 0} warehouses`
       );
 
       if (Array.isArray(warehouses) && warehouses.length > 0) {
         // Log warehouse names
-        console.log(
-          `📦 WB Warehouses: ${warehouses.map((w: { id: number; name?: string }) => `${w.name || w.id}`).join(', ')}`
-        );
+        console.log(`📦 WB Warehouses: ${warehouses.map(w => `${w.name || w.id}`).join(', ')}`);
 
         // FBS mode - get stocks from seller's warehouses
         // Prepare SKUs from nmIds (WB uses nmId as SKU string)
@@ -167,7 +177,7 @@ export async function fetchWbStocks(apiKey: string, nmIds: number[]): Promise<Ma
             console.log(`📡 WB Stocks API (wh ${wh.id}): status=${stocksRes.status}`);
 
             if (stocksRes.ok) {
-              const stocksData = (await stocksRes.json()) as any;
+              const stocksData = (await stocksRes.json()) as { stocks: WbStockItem[] };
               const stocks = stocksData.stocks || [];
               console.log(`📦 WB Warehouse ${wh.id}: ${stocks.length} stock items`);
 
@@ -222,7 +232,9 @@ export async function fetchWbStocks(apiKey: string, nmIds: number[]): Promise<Ma
     console.log(`📡 WB FBO Statistics API: status=${fboRes.status}`);
 
     if (fboRes.ok) {
-      const fboStocks = (await fboRes.json()) as any;
+      // FBO statistics often returns array of simple objects, let's define ad-hoc or allow any for now if structure is complex/unknown
+      // But standard statistics API usually returns array of items with quantityFull
+      const fboStocks = (await fboRes.json()) as WbStatisticsStock[];
       console.log(
         `📦 WB FBO API: Got ${Array.isArray(fboStocks) ? fboStocks.length : 0} stock items from Statistics API`
       );
@@ -275,7 +287,7 @@ export async function fetchWbProducts(apiKey: string, limit = 100): Promise<Mark
     throw new Error(`WB Content API error: ${cardsResponse.status}`);
   }
 
-  const cardsData = (await cardsResponse.json()) as any;
+  const cardsData = (await cardsResponse.json()) as { cards: WbCard[] };
 
   const cards: WbCard[] = cardsData.cards || [];
   const nmIds = cards.map(card => card.nmID);
@@ -325,7 +337,7 @@ export async function fetchWbPrices(
     });
 
     if (response.ok) {
-      const data = (await response.json()) as any;
+      const data = (await response.json()) as { data: { listGoods: WbGoodsItem[] } };
       const goods = data.data?.listGoods || [];
 
       console.log(`📦 WB Prices API: received ${goods.length} goods`);
@@ -371,7 +383,7 @@ export async function fetchWbPrices(
         );
 
         if (salesRes.ok) {
-          const sales = (await salesRes.json()) as any;
+          const sales = (await salesRes.json()) as WbStatisticsSale[];
           const missingSet = new Set(missing);
 
           if (Array.isArray(sales)) {
@@ -511,7 +523,7 @@ export async function updateWbPrices(
     );
 
     if (response.ok) {
-      const responseBody = (await response.json()) as any;
+      const responseBody = (await response.json()) as WbUploadTaskResponse;
 
       if (responseBody.error) {
         console.error(
@@ -569,7 +581,7 @@ export async function checkWbTaskStatus(
       return { completed: false, hasErrors: true, errors: ['Failed to fetch task status'] };
     }
 
-    const data = (await response.json()) as any;
+    const data = (await response.json()) as { data: WbTaskHistoryItem[] };
     const tasks: WbTaskHistoryItem[] = data.data || [];
     const task = tasks.find(t => t.id === taskId);
 
@@ -633,15 +645,14 @@ export async function fetchOzonProducts(
     throw new Error(`Ozon API error: ${listResponse.status} - ${errorText}`);
   }
 
-  const listData = (await listResponse.json()) as any;
+  const listData = (await listResponse.json()) as { result: { items: OzonProductListItem[] } };
 
   const items = listData.result?.items || [];
 
   if (items.length === 0) return [];
 
   // Step 2: Get product details
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const productIds = items.map((item: any) => item.product_id);
+  const productIds = items.map(item => item.product_id);
   const detailResponse = await fetch('https://api-seller.ozon.ru/v3/product/info/list', {
     method: 'POST',
     headers: {
@@ -656,7 +667,10 @@ export async function fetchOzonProducts(
     throw new Error(`Ozon Product Info API error: ${detailResponse.status}`);
   }
 
-  const detailData = (await detailResponse.json()) as any;
+  const detailData = (await detailResponse.json()) as {
+    result: { items: OzonProductInfo[] };
+    items?: OzonProductInfo[];
+  };
   const detailItems: OzonProductInfo[] = detailData.result?.items || detailData.items || [];
 
   // Step 3: Map to unified format
@@ -748,7 +762,7 @@ export async function updateOzonPrices(
     });
 
     if (response.ok) {
-      const responseData = (await response.json()) as any;
+      const responseData = (await response.json()) as { result: OzonPriceUpdateResult[] };
       const results: OzonPriceUpdateResult[] = responseData.result || [];
 
       // Check for per-item errors (Ozon can return 200 OK with errors in result)
@@ -832,7 +846,7 @@ export async function fetchOzonSalesStats(
     });
 
     if (response.ok) {
-      const data = (await response.json()) as any;
+      const data = (await response.json()) as { result: { data: OzonAnalyticsRow[] } };
 
       const result = data.result?.data || [];
 
@@ -879,7 +893,7 @@ export async function fetchWbSalesStats(
     );
 
     if (response.ok) {
-      const sales = (await response.json()) as any;
+      const sales = (await response.json()) as WbStatisticsSale[];
 
       let revenue = 0,
         orders = 0,
@@ -950,17 +964,18 @@ export async function fetchOzonCurrentPrices(
     console.log(`📡 Ozon Prices API: status=${response.status}`);
 
     if (response.ok) {
-      const data = (await response.json()) as any;
+      const data = (await response.json()) as {
+        result: { items: OzonPriceInfo[] };
+        items?: OzonPriceInfo[];
+      };
       const items = data.result?.items || data.items || [];
 
       console.log(`📦 Ozon Prices API: received ${items.length} items`);
 
       for (const p of items) {
         // v4 response structure: price object with price.price and price.marketing_price
-        const priceObj = p.price || {};
-        const actualPrice = parseFloat(
-          priceObj.marketing_price || priceObj.price || p.marketing_price || p.price || '0'
-        );
+        const priceObj = p.price || ({} as OzonPrice);
+        const actualPrice = parseFloat(priceObj.marketing_price || priceObj.price || '0');
 
         if (p.product_id && actualPrice > 0) {
           priceMap.set(p.product_id, Math.round(actualPrice));
@@ -1004,7 +1019,10 @@ export async function fetchOzonProductInfo(
     });
 
     if (response.ok) {
-      const data = (await response.json()) as any;
+      const data = (await response.json()) as {
+        result: { items: OzonProductInfo[] };
+        items?: OzonProductInfo[];
+      };
       const items = data.result?.items || data.items || [];
 
       for (const item of items) {
@@ -1137,7 +1155,7 @@ export async function setWbZeroStock(
       return { success: false, error: 'Failed to fetch warehouses' };
     }
 
-    const warehouses = (await warehousesRes.json()) as any;
+    const warehouses = (await warehousesRes.json()) as WbWarehouse[];
 
     // Zero stock on all warehouses for these SKUs
     for (const wh of warehouses || []) {
@@ -1267,7 +1285,10 @@ export async function updateWbStockFbs(
       console.log(`✅ WB Stock: Updated ${validUpdates.length} FBS items`);
       return { success: true, count: validUpdates.length };
     } else {
-      const errorData = (await response.json().catch(() => ({}))) as any;
+      const errorData = (await response.json().catch(() => ({}))) as {
+        message?: string;
+        error?: string;
+      };
       const errorText = errorData.message || errorData.error || `HTTP ${response.status}`;
       console.error(`❌ WB Stock Update Failed: ${errorText}`);
       return { success: false, count: 0, error: errorText };
@@ -1296,9 +1317,8 @@ export async function getWbFbsWarehouses(
     );
 
     if (response.ok) {
-      const data = (await response.json()) as any;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const warehouses = (data || []).map((w: any) => ({
+      const data = (await response.json()) as WbWarehouse[];
+      const warehouses = (data || []).map(w => ({
         id: w.id,
         name: w.name || `Склад ${w.id}`,
       }));
@@ -1366,12 +1386,11 @@ export async function updateOzonStockFbs(
     });
 
     if (response.ok) {
-      const responseData = (await response.json()) as any;
+      const responseData = (await response.json()) as { result: OzonPriceUpdateResult[] };
       const results = responseData.result || [];
 
       // Check for per-item errors
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const failedItems = results.filter((r: any) => r.updated === false || r.errors?.length > 0);
+      const failedItems = results.filter(r => r.updated === false || (r.errors?.length ?? 0) > 0);
 
       if (failedItems.length > 0) {
         console.warn(`⚠️ Ozon Stock: ${failedItems.length} items failed`);
@@ -1388,7 +1407,7 @@ export async function updateOzonStockFbs(
       console.log(`✅ Ozon Stock: Updated ${validUpdates.length} FBS items`);
       return { success: true, count: validUpdates.length };
     } else {
-      const errorData = (await response.json().catch(() => ({}))) as any;
+      const errorData = (await response.json().catch(() => ({}))) as { message?: string };
       const errorText = errorData.message || `HTTP ${response.status}`;
       console.error(`❌ Ozon Stock Update Failed: ${errorText}`);
       return { success: false, count: 0, error: errorText };
@@ -1419,9 +1438,8 @@ export async function getOzonFbsWarehouses(
     });
 
     if (response.ok) {
-      const data = (await response.json()) as any;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const warehouses = (data.result || []).map((w: any) => ({
+      const data = (await response.json()) as { result: OzonWarehouse[] };
+      const warehouses = (data.result || []).map(w => ({
         id: w.warehouse_id,
         name: w.name || `Склад ${w.warehouse_id}`,
       }));
@@ -1461,22 +1479,25 @@ export async function syncSalesHistory(
     if (keys.wb) {
       try {
         const wbOrders = await fetchWbOrders(keys.wb, dateFrom);
-        const mappedWb = wbOrders.map(o => ({
-          order_id: o.srid || o.saleID, // Unique sale ID
-          user_id: userId,
-          marketplace_product_id: String(o.nmId),
-          title: o.subject || `Товар ${o.nmId}`,
-          marketplace: 'WB' as const,
-          order_date: new Date(o.date),
-          status: (o.saleID && o.saleID.startsWith('R')) || o.isStorned ? 'returned' : 'delivered',
-          price_total: o.finishedPrice || o.priceWithDisc || 0,
-          quantity: 1, // Sales API returns single items
-          commission: 0, // TODO: Calculate from report or use defaults
-          logistics: 0, // TODO: Calculate from report
-          cost_price: 0, // Will be filled from products table join later
-          region: o.regionName,
-          account_id: accountId || null,
-        }));
+        const mappedWb = wbOrders
+          .filter(o => o.nmId && (o.srid || o.saleID))
+          .map(o => ({
+            order_id: o.srid || o.saleID || 'unknown', // Unique sale ID
+            user_id: userId,
+            marketplace_product_id: String(o.nmId),
+            title: o.subject || `Товар ${o.nmId}`,
+            marketplace: 'WB' as const,
+            order_date: new Date(o.date || 0),
+            status:
+              (o.saleID && o.saleID.startsWith('R')) || o.isStorned ? 'returned' : 'delivered',
+            price_total: o.finishedPrice || o.priceWithDisc || 0,
+            quantity: 1, // Sales API returns single items
+            commission: 0, // TODO: Calculate from report or use defaults
+            logistics: 0, // TODO: Calculate from report
+            cost_price: 0, // Will be filled from products table join later
+            region: o.regionName || null,
+            account_id: accountId || null,
+          }));
         orders.push(...mappedWb);
         console.log(`📥 Sync: Fetched ${mappedWb.length} WB orders`);
       } catch (e) {
@@ -1540,7 +1561,7 @@ export async function fetchWbOrders(apiKey: string, dateFrom: Date) {
   );
 
   if (response.ok) {
-    const data = (await response.json()) as any;
+    const data = (await response.json()) as WbStatisticsSale[];
     if (Array.isArray(data)) {
       return data;
     }
@@ -1556,8 +1577,7 @@ export async function fetchWbOrders(apiKey: string, dateFrom: Date) {
  * Fetch raw Ozon orders (FBO + FBS)
  */
 export async function fetchOzonOrders(clientId: string, apiKey: string, dateFrom: Date) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const allOrders: any[] = [];
+  const allOrders: OzonOrder[] = [];
 
   const headers = {
     'Content-Type': 'application/json',
@@ -1581,7 +1601,7 @@ export async function fetchOzonOrders(clientId: string, apiKey: string, dateFrom
     });
 
     if (fboRes.ok) {
-      const data = (await fboRes.json()) as any;
+      const data = (await fboRes.json()) as { result: OzonOrder[] };
       allOrders.push(...(data.result || []));
     }
   } catch (e) {
@@ -1604,7 +1624,7 @@ export async function fetchOzonOrders(clientId: string, apiKey: string, dateFrom
     });
 
     if (fbsRes.ok) {
-      const data = (await fbsRes.json()) as any;
+      const data = (await fbsRes.json()) as { result: { postings: OzonOrder[] } };
       allOrders.push(...(data.result?.postings || []));
     }
   } catch (e) {
@@ -1641,7 +1661,7 @@ export async function fetchOzonFbsUnfulfilledOrders(clientId: string, apiKey: st
     );
 
     if (response.ok) {
-      const data = (await response.json()) as any;
+      const data = (await response.json()) as { result: { postings: OzonOrder[] } };
       return data.result?.postings || [];
     }
   } catch (e) {
@@ -1669,7 +1689,7 @@ export async function fetchOzonStocksV3(clientId: string, apiKey: string, limit 
     });
 
     if (response.ok) {
-      const data = (await response.json()) as any;
+      const data = (await response.json()) as OzonStockV3Response;
       return data.result?.items || [];
     }
   } catch (e) {
@@ -1706,7 +1726,7 @@ export async function fetchOzonAnalytics(
     });
 
     if (response.ok) {
-      const data = (await response.json()) as any;
+      const data = (await response.json()) as { result: { data: OzonAnalyticsRow[] } };
       return data.result?.data || [];
     }
   } catch (e) {

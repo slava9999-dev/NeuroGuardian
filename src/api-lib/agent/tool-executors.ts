@@ -40,6 +40,7 @@ import {
   BulkProtectProductsArgsSchema,
   GetSystemLogsArgsSchema,
 } from './validators.js';
+import type { DBProduct } from '../lib/types.js';
 
 // Unified product matching
 import { filterProducts } from '../utils/product-matcher.js';
@@ -89,13 +90,13 @@ export async function executeGetProducts(userId: number, rawArgs: unknown): Prom
     const products = await getProductsByUserId(userId, args.account_id);
 
     const marketplace = args.marketplace === 'all' ? undefined : args.marketplace;
-    let filtered = filterProducts(products as any, marketplace);
+    let filtered = filterProducts(products, marketplace);
 
     // Sort
     if (args.sort_by === 'price') {
       filtered.sort((a, b) => (b.current_price || 0) - (a.current_price || 0));
     } else if (args.sort_by === 'stock') {
-      filtered.sort((a, b) => ((b as any).current_stock || 0) - ((a as any).current_stock || 0));
+      filtered.sort((a, b) => (b.current_stock || 0) - (a.current_stock || 0));
     } else if (args.sort_by === 'name') {
       filtered.sort((a, b) => a.title.localeCompare(b.title));
     }
@@ -428,9 +429,9 @@ export async function executeGetOrders(userId: number, rawArgs: unknown): Promis
       for (const order of wbOrders) {
         if (args.status === 'new' || (order.saleID && !order.saleID.startsWith('R'))) {
           orders.push({
-            id: order.srid || order.saleID,
-            date: order.date,
-            product: order.subject || order.brand,
+            id: order.srid || order.saleID || 'unknown',
+            date: order.date || new Date().toISOString(),
+            product: order.subject || order.brand || 'Товар WB',
             price: order.finishedPrice || order.priceWithDisc || 0,
             status: order.isCancel ? 'cancelled' : 'delivered',
             marketplace: 'WB',
@@ -553,7 +554,7 @@ export async function executeCalculateUnitEconomics(
 
   let targetProducts = products;
   if (args.product_id) {
-    targetProducts = filterProducts(products as any, args.marketplace, args.product_id);
+    targetProducts = filterProducts(products, args.marketplace, args.product_id);
   }
 
   if (targetProducts.length === 0) {
@@ -569,7 +570,7 @@ export async function executeCalculateUnitEconomics(
   const costDataCoverage = Math.round((productsWithCost.length / targetProducts.length) * 100);
 
   const calculations = await Promise.all(
-    targetProducts.slice(0, 10).map(async (p: any) => {
+    targetProducts.slice(0, 10).map(async (p: DBProduct) => {
       const mp = (p.marketplace || 'WB') as 'WB' | 'Ozon';
 
       // Call the centralized service
@@ -578,12 +579,12 @@ export async function executeCalculateUnitEconomics(
       // Use real cost_price if available in DB, then from args, then estimate (30%)
       const costPrice = p.cost_price || args.cost_price || Math.round((p.current_price || 0) * 0.3);
       const costSource =
-        p.cost_price > 0 ? 'из БД' : args.cost_price ? 'указана вами' : '⚠️ оценка 30%';
+        (p.cost_price ?? 0) > 0 ? 'из БД' : args.cost_price ? 'указана вами' : '⚠️ оценка 30%';
 
       const result = calculateUnitEconomics({
         price: p.current_price || 0,
         costPrice,
-        category: p.category,
+        category: p.category ?? undefined,
         marketplace: mp,
         useOzonCard: true, // Account for Ozon Card by default as per TZ 2.0
       });
@@ -862,7 +863,7 @@ export async function executeGetStockForecast(
 
   let filtered = products;
   if (args.product_id) {
-    filtered = filterProducts(products as any, undefined, args.product_id);
+    filtered = filterProducts(products, undefined, args.product_id);
   }
 
   if (filtered.length === 0) {
@@ -1106,30 +1107,6 @@ export async function executeSearchWeb(_userId: number, rawArgs: unknown): Promi
   if (!apiKey) {
     console.warn('⚠️ Web Search: SERPER_API_KEY not found');
 
-    // Fallback for development/demo (mock data)
-    if (process.env.NODE_ENV === 'development' || !process.env.NODE_ENV) {
-      return {
-        success: true,
-        data: {
-          query: args.query,
-          answer: 'Это демонстрационный ответ (Serper API ключ не настроен).',
-          results: [
-            {
-              title: 'Анализ конкурентов на Wildberries (Demo)',
-              link: 'https://mpstats.io/blog/competitor-analysis',
-              snippet: `Для анализа конкурентов по запросу "${args.query}" рекомендуем использовать внешние сервисы аналитики...`,
-            },
-            {
-              title: 'Тренды Wildberries 2024 (Demo)',
-              link: 'https://vc.ru/marketplace/trends',
-              snippet:
-                'Основные тренды: снижение среднего чека, рост комиссий, важность SEO оптимизации карточек...',
-            },
-          ],
-          note: '⚠️ ПОИСК РАБОТАЕТ В ДЕМО-РЕЖИМЕ (нет API ключа)',
-        },
-      };
-    }
     return {
       success: false,
       error: 'Web search is disabled (API key missing). Please contact support.',
@@ -1300,7 +1277,7 @@ export async function executeUpdatePrices(userId: number, rawArgs: unknown): Pro
     // Case 1: Specific products from array
     if (args.products && args.products.length > 0) {
       for (const item of args.products) {
-        const filtered = filterProducts(products as any, args.marketplace, item.product_id);
+        const filtered = filterProducts(products, args.marketplace, item.product_id);
         if (filtered.length > 0) {
           const p = filtered[0];
           updates.push({
@@ -1317,7 +1294,7 @@ export async function executeUpdatePrices(userId: number, rawArgs: unknown): Pro
     // Case 2: Percentage change for all/marketplace
     else if (args.change_value !== undefined) {
       const targetMarketplace = args.marketplace === 'all' ? undefined : args.marketplace;
-      const filtered = filterProducts(products as any, targetMarketplace);
+      const filtered = filterProducts(products, targetMarketplace);
 
       for (const p of filtered) {
         const diff = Math.round(p.current_price * (args.change_value / 100));
@@ -1370,7 +1347,7 @@ export async function executeUpdateStocks(userId: number, rawArgs: unknown): Pro
     }> = [];
 
     for (const item of args.products) {
-      const filtered = filterProducts(products as any, args.marketplace, item.product_id);
+      const filtered = filterProducts(products, args.marketplace, item.product_id);
       if (filtered.length > 0) {
         const p = filtered[0];
         stockUpdates.push({
@@ -1412,7 +1389,7 @@ export async function executeSetStopLoss(userId: number, rawArgs: unknown): Prom
 
   try {
     const products = await getProductsByUserId(userId);
-    const filtered = filterProducts(products as any, undefined, args.product_id);
+    const filtered = filterProducts(products, undefined, args.product_id);
 
     if (filtered.length === 0) {
       return { success: false, error: `Товар "${args.product_id}" не найден` };

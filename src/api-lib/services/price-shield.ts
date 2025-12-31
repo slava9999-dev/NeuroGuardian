@@ -5,6 +5,7 @@
 // ============================================
 
 import { sql } from '@vercel/postgres';
+import type { DBPriceRule } from '../lib/types.js';
 
 export interface PriceRule {
   id: number;
@@ -116,16 +117,21 @@ export class PriceShieldService {
       WHERE user_id = ${userId} 
       AND active = true
     `;
-    return rows.map((row: any) => ({
+    const dbRules = rows as DBPriceRule[];
+    return dbRules.map(row => ({
       id: row.id,
       product_id: row.product_id,
-      min_price: parseFloat(row.min_price),
-      max_price: parseFloat(row.max_price),
-      target_margin: parseFloat(row.target_margin),
+      min_price: typeof row.min_price === 'string' ? parseFloat(row.min_price) : row.min_price,
+      max_price: typeof row.max_price === 'string' ? parseFloat(row.max_price) : row.max_price,
+      target_margin:
+        typeof row.target_margin === 'string' ? parseFloat(row.target_margin) : row.target_margin,
       competitor_tracking: row.competitor_tracking,
-      competitor_nmids: row.competitor_nmids,
+      competitor_nmids: row.competitor_nmids || undefined,
       price_match_strategy: row.price_match_strategy,
-      undercut_amount: parseFloat(row.undercut_amount),
+      undercut_amount:
+        typeof row.undercut_amount === 'string'
+          ? parseFloat(row.undercut_amount)
+          : row.undercut_amount,
       undercut_type: row.undercut_type,
       auto_adjust: row.auto_adjust,
     }));

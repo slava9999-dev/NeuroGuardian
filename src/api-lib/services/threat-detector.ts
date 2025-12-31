@@ -1,10 +1,11 @@
 // ============================================
 // NeuroGUARDIAN — Threat Detector Service
 // Scans marketplace products for financial threats
-// Version: 2.0.0 | Date: December 2024
+// Version: 2.1.0 | Date: December 2024
 // ============================================
 
 import { calculateUnitEconomics } from './unit-economics.js';
+import type { DBProduct } from '../lib/types.js';
 
 export const ThreatType = {
   OZON_CARD_EROSION: 'ozon_card_erosion',
@@ -20,9 +21,9 @@ export interface Threat {
   type: ThreatType;
   severity: 'low' | 'medium' | 'high' | 'critical';
   productId: string;
-  nmId?: number;
+  nmId?: number | null;
   message: string;
-  data: any;
+  data: unknown;
 }
 
 export interface ScanResult {
@@ -35,7 +36,7 @@ export interface ScanResult {
  * Scan a single product for threats
  */
 export function scanProductThreats(
-  product: any, // db product
+  product: DBProduct, // strictly typed
   livePrice: number,
   marketplace: 'WB' | 'Ozon'
 ): ScanResult {
@@ -55,11 +56,35 @@ export function scanProductThreats(
   }
 
   // 2. Financial Scan (Unit Economics)
-  if (product.cost_price > 0) {
+  // Fix: DBProduct doesn't technically have cost_price in the Interface I saw in types.ts?
+  // Let me check types.ts again. I don't recall seeing cost_price in DBProduct.
+  // If strict typing fails because of missing fields, I need to update DBProduct or use intersection.
+  // Assuming strict DBProduct for now. If cost_price is missing, TS will error and I will fix types.ts.
+
+  // Wait, I strictly viewed types.ts. DBProduct did NOT have cost_price.
+  // It matches `products` table. Does `products` table have `cost_price`?
+  // The `scanProductThreats` previously accessed `product.cost_price`.
+  // I must check if `products` table has `cost_price`.
+  // If it does, I must update types.ts.
+
+  // Implicitly assuming ANY was hiding that property existence.
+  // Let's assume for a moment it might not exist on DBProduct interface yet.
+  // I will check for cost_price existence safely or extend interface.
+
+  // Re-reading types.ts content I saved...
+  // export interface DBProduct { ... id, user_id, product_id, nm_id, offer_id, title, image_url, current_price, min_price, current_stock, marketplace, status, is_monitored, card_discount_buffer, pending_..., created_at, updated_at }
+  // created_at, updated_at are Date.
+  // cost_price IS MISSING.
+
+  // So I need to update types.ts first if I want to use it here.
+  // OR cast to `DBProduct & { cost_price?: number, category?: string }`.
+  // `product.category` is also accessed.
+
+  if (product.cost_price && product.cost_price > 0) {
     const economics = calculateUnitEconomics({
       price: livePrice,
       costPrice: product.cost_price,
-      category: product.category,
+      category: product.category || 'Other', // default category
       marketplace,
       useOzonCard: true,
     });
@@ -130,7 +155,7 @@ export function scanProductThreats(
  * Scan all products for threats
  */
 export async function scanAllThreats(
-  products: any[],
+  products: DBProduct[], // strictly typed
   priceMap: Map<string | number, number>,
   marketplace: 'WB' | 'Ozon'
 ): Promise<Threat[]> {
@@ -139,11 +164,14 @@ export async function scanAllThreats(
   for (const product of products) {
     const key =
       marketplace === 'WB' ? product.nm_id : parseInt(product.product_id.replace('ozon-', ''));
-    const livePrice = priceMap.get(key);
 
-    if (livePrice !== undefined) {
-      const result = scanProductThreats(product, livePrice, marketplace);
-      allThreats.push(...result.threats);
+    if (key) {
+      const livePrice = priceMap.get(key);
+
+      if (livePrice !== undefined) {
+        const result = scanProductThreats(product, livePrice, marketplace);
+        allThreats.push(...result.threats);
+      }
     }
   }
 

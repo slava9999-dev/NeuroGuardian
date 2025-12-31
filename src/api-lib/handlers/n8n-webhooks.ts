@@ -160,7 +160,7 @@ export async function handleN8nSyncProducts(
                 price: p.current_price,
                 stocks: p.current_stock,
                 image_url: p.image_url,
-                marketplace: 'WB',
+                marketplace: 'WB' as const,
               }));
 
               await saveProducts(user.id, productsToSave);
@@ -193,7 +193,7 @@ export async function handleN8nSyncProducts(
                 price: p.current_price,
                 stocks: p.current_stock,
                 image_url: p.image_url,
-                marketplace: 'Ozon',
+                marketplace: 'Ozon' as const,
               }));
 
               await saveProducts(user.id, productsToSave);

@@ -108,10 +108,11 @@ export class MemoryService {
       await this.chroma.heartbeat();
       this.state.chromaHealthy = true;
       logger.info('[MemoryService] ChromaDB connected', { url: chromaUrl });
-    } catch (e: any) {
+    } catch (e) {
+      const error = e instanceof Error ? e.message : String(e);
       logger.warn('[MemoryService] ChromaDB unavailable, long-term memory disabled', {
         url: chromaUrl,
-        error: e.message,
+        error,
       });
       this.state.chromaHealthy = false;
     }
@@ -126,8 +127,9 @@ export class MemoryService {
         });
         this.state.embeddingsProvider = 'openai';
         logger.info('[MemoryService] OpenAI Embeddings initialized');
-      } catch (e: any) {
-        logger.warn('[MemoryService] OpenAI Embeddings failed', { error: e.message });
+      } catch (e) {
+        const error = e instanceof Error ? e.message : String(e);
+        logger.warn('[MemoryService] OpenAI Embeddings failed', { error });
       }
     }
 
@@ -137,8 +139,9 @@ export class MemoryService {
         this.embeddings = new LocalEmbeddingProvider();
         this.state.embeddingsProvider = 'local';
         logger.info('[MemoryService] Local Embeddings initialized (Chroma default)');
-      } catch (e: any) {
-        logger.warn('[MemoryService] Local Embeddings failed', { error: e.message });
+      } catch (e) {
+        const error = e instanceof Error ? e.message : String(e);
+        logger.warn('[MemoryService] Local Embeddings failed', { error });
         this.state.embeddingsProvider = 'none';
       }
     }
@@ -157,9 +160,10 @@ export class MemoryService {
       this.state.kvProvider = 'vercel';
       logger.info('[MemoryService] Vercel KV connected');
       return;
-    } catch (e: any) {
+    } catch (e) {
+      const error = e instanceof Error ? e.message : String(e);
       logger.debug('[MemoryService] Vercel KV unavailable, trying local Redis', {
-        error: e.message,
+        error,
       });
     }
 
@@ -182,10 +186,11 @@ export class MemoryService {
       logger.info('[MemoryService] Local Redis connected', {
         url: redisUrl.replace(/:[^:@]+@/, ':***@'),
       });
-    } catch (e: any) {
+    } catch (e) {
+      const error = e instanceof Error ? e.message : String(e);
       logger.warn('[MemoryService] Local Redis unavailable, short-term memory disabled', {
         url: redisUrl.replace(/:[^:@]+@/, ':***@'),
-        error: e.message,
+        error,
       });
       this.state.kvHealthy = false;
       this.state.kvProvider = 'none';
@@ -217,10 +222,11 @@ export class MemoryService {
       }
 
       return [];
-    } catch (e: any) {
+    } catch (e) {
+      const error = e instanceof Error ? e.message : String(e);
       logger.error('[MemoryService] Failed to get session history', {
         sessionId,
-        error: e.message,
+        error,
       });
       return [];
     }
@@ -252,10 +258,11 @@ export class MemoryService {
         await this.localRedis.setex(key, MEMORY_CONFIG.SESSION_TTL, JSON.stringify(history));
       }
       return true;
-    } catch (e: any) {
+    } catch (e) {
+      const error = e instanceof Error ? e.message : String(e);
       logger.error('[MemoryService] Failed to add to session history', {
         sessionId,
-        error: e.message,
+        error,
       });
       return false;
     }
@@ -274,10 +281,11 @@ export class MemoryService {
         await this.localRedis.del(key);
       }
       return true;
-    } catch (e: any) {
+    } catch (e) {
+      const error = e instanceof Error ? e.message : String(e);
       logger.error('[MemoryService] Failed to clear session history', {
         sessionId,
-        error: e.message,
+        error,
       });
       return false;
     }
@@ -305,10 +313,11 @@ export class MemoryService {
       });
       this.collectionsCache.set(collectionName, collection);
       return collection;
-    } catch (e: any) {
+    } catch (e) {
+      const error = e instanceof Error ? e.message : String(e);
       logger.error('[MemoryService] Failed to get/create collection', {
         sessionId,
-        error: e.message,
+        error,
       });
       return null;
     }
@@ -346,10 +355,11 @@ export class MemoryService {
       });
 
       return true;
-    } catch (e: any) {
+    } catch (e) {
+      const error = e instanceof Error ? e.message : String(e);
       logger.error('[MemoryService] Failed to save to long-term memory', {
         sessionId,
-        error: e.message,
+        error,
       });
       return false;
     }
@@ -378,10 +388,11 @@ export class MemoryService {
       });
 
       return (results.documents?.[0] || []).filter((doc): doc is string => doc !== null);
-    } catch (e: any) {
+    } catch (e) {
+      const error = e instanceof Error ? e.message : String(e);
       logger.error('[MemoryService] Failed to search context', {
         sessionId,
-        error: e.message,
+        error,
       });
       return [];
     }
@@ -430,10 +441,11 @@ export class MemoryService {
       });
 
       return true;
-    } catch (e: any) {
+    } catch (e) {
+      const error = e instanceof Error ? e.message : String(e);
       logger.error('[MemoryService] Migration failed', {
         sessionId,
-        error: e.message,
+        error,
       });
       return false;
     }
