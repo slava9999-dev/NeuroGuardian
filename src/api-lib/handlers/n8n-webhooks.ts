@@ -6,7 +6,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql } from '@vercel/postgres';
 import { runPriceProtection } from '../agent/price-protection.js';
-import { fetchWbProducts, fetchOzonProducts, getMarketplaceKeys } from '../services/marketplace.js';
+import { getMarketplaceKeys } from '../services/marketplace.js';
+import {
+  fetchWbProductsResilient,
+  fetchOzonProductsResilient,
+} from '../services/resilient-marketplace.js';
 import { logOpsEvent } from '../services/ops-logger.js';
 import { notificationService } from '../services/notifications.js';
 import { getAllUsers } from '../services/users.js';
@@ -145,20 +149,29 @@ export async function handleN8nSyncProducts(
         // Sync WB products
         if (keys.wb) {
           try {
-            const wbProducts = await fetchWbProducts(keys.wb);
+            const result = await fetchWbProductsResilient(keys.wb);
 
-            // Convert to format expected by saveProducts
-            const productsToSave = wbProducts.map(p => ({
-              nm_id: p.nm_id,
-              title: p.title,
-              price: p.current_price,
-              stocks: p.current_stock,
-              image_url: p.image_url,
-              marketplace: 'WB',
-            }));
+            if (result.success && result.data) {
+              const wbProducts = result.data;
+              // Convert to format expected by saveProducts
+              const productsToSave = wbProducts.map(p => ({
+                nm_id: p.nm_id,
+                title: p.title,
+                price: p.current_price,
+                stocks: p.current_stock,
+                image_url: p.image_url,
+                marketplace: 'WB',
+              }));
 
-            await saveProducts(user.id, productsToSave);
-            totalSynced += wbProducts.length;
+              await saveProducts(user.id, productsToSave);
+              totalSynced += wbProducts.length;
+
+              if (result.fromFallback) {
+                errors.push(`WB sync for user ${user.id}: used cached data (API unavailable)`);
+              }
+            } else {
+              errors.push(`WB sync failed for user ${user.id}: ${result.error || 'No data'}`);
+            }
           } catch (error) {
             errors.push(
               `WB sync failed for user ${user.id}: ${error instanceof Error ? error.message : 'Unknown'}`
@@ -169,20 +182,29 @@ export async function handleN8nSyncProducts(
         // Sync Ozon products
         if (keys.ozon?.clientId && keys.ozon?.apiKey) {
           try {
-            const ozonProducts = await fetchOzonProducts(keys.ozon.clientId, keys.ozon.apiKey);
+            const result = await fetchOzonProductsResilient(keys.ozon.clientId, keys.ozon.apiKey);
 
-            // Convert to format expected by saveProducts
-            const productsToSave = ozonProducts.map(p => ({
-              offer_id: p.product_id,
-              title: p.title,
-              price: p.current_price,
-              stocks: p.current_stock,
-              image_url: p.image_url,
-              marketplace: 'Ozon',
-            }));
+            if (result.success && result.data) {
+              const ozonProducts = result.data;
+              // Convert to format expected by saveProducts
+              const productsToSave = ozonProducts.map(p => ({
+                offer_id: p.product_id,
+                title: p.title,
+                price: p.current_price,
+                stocks: p.current_stock,
+                image_url: p.image_url,
+                marketplace: 'Ozon',
+              }));
 
-            await saveProducts(user.id, productsToSave);
-            totalSynced += ozonProducts.length;
+              await saveProducts(user.id, productsToSave);
+              totalSynced += ozonProducts.length;
+
+              if (result.fromFallback) {
+                errors.push(`Ozon sync for user ${user.id}: used cached data (API unavailable)`);
+              }
+            } else {
+              errors.push(`Ozon sync failed for user ${user.id}: ${result.error || 'No data'}`);
+            }
           } catch (error) {
             errors.push(
               `Ozon sync failed for user ${user.id}: ${error instanceof Error ? error.message : 'Unknown'}`
