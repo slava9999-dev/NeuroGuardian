@@ -1,12 +1,13 @@
 // ============================================
-// NeuroGUARDIAN — Memory Service
-// Long-term and short-term memory for AI context management
-// Version: 2.0.0 | Date: December 2024
+// NeuroGUARDIAN — Memory Service v2.1.0
+// Hybrid memory: Vercel KV (production) + Local Redis (development)
+// Long-term: ChromaDB with local embeddings fallback
 // ============================================
 
-import { ChromaClient, type Collection, type Metadata } from 'chromadb';
+import { ChromaClient, type Collection, type Metadata, DefaultEmbeddingFunction } from 'chromadb';
 import { OpenAIEmbeddings } from '@langchain/openai';
 import { kv } from '@vercel/kv';
+import Redis from 'ioredis';
 import { logger } from '../lib/logger.js';
 
 // ============================================
@@ -49,6 +50,30 @@ interface MemoryServiceState {
   initialized: boolean;
   chromaHealthy: boolean;
   kvHealthy: boolean;
+  kvProvider: 'vercel' | 'redis' | 'none';
+  embeddingsProvider: 'openai' | 'local' | 'none';
+}
+
+// ============================================
+// EMBEDDING INTERFACE
+// ============================================
+
+interface EmbeddingProvider {
+  embedQuery(text: string): Promise<number[]>;
+}
+
+// Wrapper for Chroma's DefaultEmbeddingFunction
+class LocalEmbeddingProvider implements EmbeddingProvider {
+  private embedder: DefaultEmbeddingFunction;
+
+  constructor() {
+    this.embedder = new DefaultEmbeddingFunction();
+  }
+
+  async embedQuery(text: string): Promise<number[]> {
+    const results = await this.embedder.generate([text]);
+    return results[0];
+  }
 }
 
 // ============================================
@@ -57,12 +82,15 @@ interface MemoryServiceState {
 
 export class MemoryService {
   private chroma: ChromaClient | null = null;
-  private embeddings: OpenAIEmbeddings | null = null;
+  private embeddings: EmbeddingProvider | null = null;
+  private localRedis: Redis | null = null;
   private collectionsCache: Map<string, Collection> = new Map();
   private state: MemoryServiceState = {
     initialized: false,
     chromaHealthy: false,
     kvHealthy: false,
+    kvProvider: 'none',
+    embeddingsProvider: 'none',
   };
 
   constructor() {
@@ -74,10 +102,9 @@ export class MemoryService {
 
     const chromaUrl = process.env.CHROMA_URL || 'http://localhost:8001';
 
+    // ===== Initialize ChromaDB =====
     try {
       this.chroma = new ChromaClient({ path: chromaUrl });
-
-      // Check ChromaDB health
       await this.chroma.heartbeat();
       this.state.chromaHealthy = true;
       logger.info('[MemoryService] ChromaDB connected', { url: chromaUrl });
@@ -89,7 +116,7 @@ export class MemoryService {
       this.state.chromaHealthy = false;
     }
 
-    // Initialize embeddings if OpenAI key available
+    // ===== Initialize Embeddings (OpenAI -> Local fallback) =====
     const openaiKey = process.env.OPENAI_API_KEY;
     if (openaiKey && this.state.chromaHealthy) {
       try {
@@ -97,25 +124,76 @@ export class MemoryService {
           modelName: 'text-embedding-3-small',
           openAIApiKey: openaiKey,
         });
-        logger.info('[MemoryService] Embeddings initialized');
+        this.state.embeddingsProvider = 'openai';
+        logger.info('[MemoryService] OpenAI Embeddings initialized');
       } catch (e: any) {
-        logger.warn('[MemoryService] Embeddings unavailable', { error: e.message });
+        logger.warn('[MemoryService] OpenAI Embeddings failed', { error: e.message });
       }
     }
 
-    // Check KV health
+    // Fallback to local embeddings if OpenAI unavailable
+    if (!this.embeddings && this.state.chromaHealthy) {
+      try {
+        this.embeddings = new LocalEmbeddingProvider();
+        this.state.embeddingsProvider = 'local';
+        logger.info('[MemoryService] Local Embeddings initialized (Chroma default)');
+      } catch (e: any) {
+        logger.warn('[MemoryService] Local Embeddings failed', { error: e.message });
+        this.state.embeddingsProvider = 'none';
+      }
+    }
+
+    // ===== Initialize KV (Vercel KV -> Local Redis fallback) =====
+    await this.initializeKV();
+
+    this.state.initialized = true;
+  }
+
+  private async initializeKV(): Promise<void> {
+    // Try Vercel KV first
     try {
       await kv.ping();
       this.state.kvHealthy = true;
+      this.state.kvProvider = 'vercel';
       logger.info('[MemoryService] Vercel KV connected');
+      return;
     } catch (e: any) {
-      logger.warn('[MemoryService] Vercel KV unavailable, short-term memory disabled', {
+      logger.debug('[MemoryService] Vercel KV unavailable, trying local Redis', {
+        error: e.message,
+      });
+    }
+
+    // Fallback to local Redis
+    const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+    try {
+      this.localRedis = new Redis(redisUrl, {
+        maxRetriesPerRequest: 3,
+        retryStrategy: times => {
+          if (times > 3) return null;
+          return Math.min(times * 100, 1000);
+        },
+        lazyConnect: true,
+      });
+
+      await this.localRedis.connect();
+      await this.localRedis.ping();
+      this.state.kvHealthy = true;
+      this.state.kvProvider = 'redis';
+      logger.info('[MemoryService] Local Redis connected', {
+        url: redisUrl.replace(/:[^:@]+@/, ':***@'),
+      });
+    } catch (e: any) {
+      logger.warn('[MemoryService] Local Redis unavailable, short-term memory disabled', {
+        url: redisUrl.replace(/:[^:@]+@/, ':***@'),
         error: e.message,
       });
       this.state.kvHealthy = false;
+      this.state.kvProvider = 'none';
+      if (this.localRedis) {
+        this.localRedis.disconnect();
+        this.localRedis = null;
+      }
     }
-
-    this.state.initialized = true;
   }
 
   // ============================================
@@ -129,8 +207,16 @@ export class MemoryService {
 
     try {
       const key = `history_${sessionId}`;
-      const history = await kv.get<ChatMessage[]>(key);
-      return history || [];
+
+      if (this.state.kvProvider === 'vercel') {
+        const history = await kv.get<ChatMessage[]>(key);
+        return history || [];
+      } else if (this.localRedis) {
+        const data = await this.localRedis.get(key);
+        return data ? JSON.parse(data) : [];
+      }
+
+      return [];
     } catch (e: any) {
       logger.error('[MemoryService] Failed to get session history', {
         sessionId,
@@ -160,7 +246,11 @@ export class MemoryService {
         history.shift();
       }
 
-      await kv.set(key, history, { ex: MEMORY_CONFIG.SESSION_TTL });
+      if (this.state.kvProvider === 'vercel') {
+        await kv.set(key, history, { ex: MEMORY_CONFIG.SESSION_TTL });
+      } else if (this.localRedis) {
+        await this.localRedis.setex(key, MEMORY_CONFIG.SESSION_TTL, JSON.stringify(history));
+      }
       return true;
     } catch (e: any) {
       logger.error('[MemoryService] Failed to add to session history', {
@@ -177,7 +267,12 @@ export class MemoryService {
     }
 
     try {
-      await kv.del(`history_${sessionId}`);
+      const key = `history_${sessionId}`;
+      if (this.state.kvProvider === 'vercel') {
+        await kv.del(key);
+      } else if (this.localRedis) {
+        await this.localRedis.del(key);
+      }
       return true;
     } catch (e: any) {
       logger.error('[MemoryService] Failed to clear session history', {
@@ -321,9 +416,12 @@ export class MemoryService {
       });
 
       // Update short-term
-      await kv.set(`history_${sessionId}`, history, {
-        ex: MEMORY_CONFIG.SESSION_TTL,
-      });
+      const key = `history_${sessionId}`;
+      if (this.state.kvProvider === 'vercel') {
+        await kv.set(key, history, { ex: MEMORY_CONFIG.SESSION_TTL });
+      } else if (this.localRedis) {
+        await this.localRedis.setex(key, MEMORY_CONFIG.SESSION_TTL, JSON.stringify(history));
+      }
 
       logger.info('[MemoryService] Memory migrated', {
         sessionId,
@@ -349,6 +447,8 @@ export class MemoryService {
     chromaHealthy: boolean;
     kvHealthy: boolean;
     embeddingsAvailable: boolean;
+    kvProvider: 'vercel' | 'redis' | 'none';
+    embeddingsProvider: 'openai' | 'local' | 'none';
   }> {
     // Re-check health
     if (this.chroma) {
@@ -360,17 +460,29 @@ export class MemoryService {
       }
     }
 
-    try {
-      await kv.ping();
-      this.state.kvHealthy = true;
-    } catch {
-      this.state.kvHealthy = false;
+    // Check KV health based on provider
+    if (this.state.kvProvider === 'vercel') {
+      try {
+        await kv.ping();
+        this.state.kvHealthy = true;
+      } catch {
+        this.state.kvHealthy = false;
+      }
+    } else if (this.localRedis) {
+      try {
+        await this.localRedis.ping();
+        this.state.kvHealthy = true;
+      } catch {
+        this.state.kvHealthy = false;
+      }
     }
 
     return {
       chromaHealthy: this.state.chromaHealthy,
       kvHealthy: this.state.kvHealthy,
       embeddingsAvailable: !!this.embeddings,
+      kvProvider: this.state.kvProvider,
+      embeddingsProvider: this.state.embeddingsProvider,
     };
   }
 }
