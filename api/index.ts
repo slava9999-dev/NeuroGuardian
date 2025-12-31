@@ -58,7 +58,11 @@ import {
 import { handleCreatePayment, handlePaymentWebhook } from '../src/api-lib/handlers/payments.js';
 
 // Sentinel handlers
-import { handleCheckPrices } from '../src/api-lib/handlers/sentinel.js';
+import {
+  handleCheckPrices,
+  handleSentinelStats,
+  handleSentinelDashboard,
+} from '../src/api-lib/handlers/sentinel.js';
 import {
   handleSentinelStatus,
   handleDefenseHistory,
@@ -314,6 +318,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       case 'bulk-log-defense':
         return handleBulkLogDefense(req, res);
+
+      case 'sentinel-stats':
+      case 'sentinel-dashboard': {
+        const auth = await extractAnyAuthAsync(req);
+        if (auth.success === false) {
+          return sendAuthError(res, auth.error, auth.statusCode);
+        }
+        if (action === 'sentinel-stats') {
+          return handleSentinelStats(req, res, auth.context.userId);
+        }
+        return handleSentinelDashboard(req, res, auth.context.userId);
+      }
 
       // ========== AI AGENT ENDPOINTS ==========
       case 'agent':

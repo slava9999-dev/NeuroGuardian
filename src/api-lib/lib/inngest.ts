@@ -11,15 +11,30 @@ export const inngest = new Inngest({
 export type NeuroEvents = {
   'ai/query.received': {
     data: {
-      userId: string;
+      userId: number;
       query: string;
-      context?: any;
+      sessionId: string;
+      marketplace?: 'WB' | 'Ozon' | 'all';
+      wbApiKey?: string;
+      ozonClientId?: string;
+      ozonApiKey?: string;
     };
   };
   'marketplace/price.check': {
     data: {
-      items: string[];
-      forceLocal?: boolean;
+      userId: number;
+      accountId?: number;
+      items?: string[];
+    };
+  };
+  'sentinel/threat.detected': {
+    data: {
+      userId: number;
+      productId: string;
+      threatType: string;
+      severity: 'warning' | 'critical';
+      currentPrice: number;
+      minPrice: number;
     };
   };
 };

@@ -16,6 +16,8 @@ export const ROUTE_GROUPS = {
     'check-prices',
     'sentinel-logs',
     'sentinel-status',
+    'sentinel-stats',
+    'sentinel-dashboard',
     'defense-history',
     'toggle-protection',
     'update-sentinel-status',
