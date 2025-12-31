@@ -108,11 +108,24 @@ function getAuthHeaders(): HeadersInit {
     'Content-Type': 'application/json',
   };
 
+  // DEBUG: Log auth state
+  console.log('🔐 [getAuthHeaders] Debug:', {
+    hasInitData: !!initData,
+    initDataLength: initData?.length,
+    VITE_DEV_MODE: import.meta.env.VITE_DEV_MODE,
+    hasAdminKey: !!import.meta.env.VITE_ADMIN_API_KEY,
+    adminKeyPrefix: import.meta.env.VITE_ADMIN_API_KEY?.substring(0, 8),
+  });
+
   if (initData) {
     headers['X-Init-Data'] = initData;
+    console.log('🔐 Using Telegram initData');
   } else if (import.meta.env.VITE_DEV_MODE === 'true' && import.meta.env.VITE_ADMIN_API_KEY) {
     // Dev mode: use admin key
     headers['X-Admin-Key'] = import.meta.env.VITE_ADMIN_API_KEY;
+    console.log('🔐 Using Admin API Key');
+  } else {
+    console.warn('⚠️ No auth method available!');
   }
 
   return headers;

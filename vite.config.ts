@@ -28,7 +28,7 @@ const LOCAL_BACKEND =
   process.env.VITE_LOCAL_BACKEND === 'true' || process.env.LOCAL_BACKEND === 'true';
 
 // Default to local backend for development
-const API_TARGET = LOCAL_BACKEND ? 'http://localhost:3000' : 'https://neuro-guardian.vercel.app';
+const API_TARGET = LOCAL_BACKEND ? 'http://localhost:3001' : 'https://neuro-guardian.vercel.app';
 
 console.log(`📡 Vite API Proxy Target: ${API_TARGET}`);
 
