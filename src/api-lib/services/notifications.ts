@@ -140,6 +140,65 @@ const URGENCY_EMOJI: Record<AlertUrgency, string> = {
   critical: '🚨',
 };
 
+function escapeMarkdown(text: string): string {
+  // Only escape characters that are special in MarkdownV2 UNLESS inside code blocks
+  // For basic Markdown (which we use), we need less escaping
+  return text.replace(/[_*`[\]]/g, '\\$&');
+}
+
+/**
+ * Generate smart action buttons for alerts
+ */
+function getAlertButtons(alert: Alert): Record<string, unknown> | undefined {
+  const buttons: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
+
+  // Price Protection Actions
+  if (alert.type === 'price_protection' && alert.product && alert.analysis) {
+    const { recommendedPrice } = alert.analysis;
+    const { externalId, marketplace } = alert.product;
+
+    // Action Button: Apply Price
+    buttons.push([
+      {
+        text: `✅ Применить ${recommendedPrice}₽`,
+        callback_data: `apply_price:${marketplace}:${externalId}:${recommendedPrice}`,
+      },
+    ]);
+
+    // Link to Marketplace
+    const link =
+      marketplace === 'wb'
+        ? `https://www.wildberries.ru/catalog/${externalId}/detail.aspx`
+        : `https://www.ozon.ru/product/${externalId}`;
+    
+    buttons.push([
+      { text: '🔗 Открыть товар', url: link },
+    ]);
+  }
+
+  // Sentinel Alerts
+  if (alert.type === 'sentinel_alert' && alert.product) {
+    buttons.push([
+      {
+        text: '🛡️ Проверить защиту',
+        callback_data: `check_protection:${alert.product.externalId}`,
+      },
+    ]);
+  }
+  
+  // Subscription Alerts
+  if (alert.type === 'subscription_expired') {
+     buttons.push([
+      {
+        text: '💎 Продлить подписку',
+        callback_data: 'buy_subscription',
+      },
+    ]);
+  }
+
+  return buttons.length > 0 ? { inline_keyboard: buttons } : undefined;
+}
+
 function formatAlert(alert: Alert): string {
   const emoji = URGENCY_EMOJI[alert.urgency];
 
@@ -152,8 +211,8 @@ function formatAlert(alert: Alert): string {
       `💰 Текущая цена: ${alert.analysis.currentPrice}₽`,
       `📊 Рекомендация: ${alert.analysis.recommendedPrice}₽`,
       ``,
-      `📝 Причина: ${escapeMarkdown(alert.analysis.reason)}`,
-      `🎯 Действие: ${alert.analysis.action}`,
+      `📝 *Причина:* ${escapeMarkdown(alert.analysis.reason)}`,
+      `🎯 *Действие:* ${alert.analysis.action}`,
     ].join('\n');
   }
 
@@ -180,10 +239,6 @@ function formatAlert(alert: Alert): string {
   return `${emoji} *${alert.type}*\n\n${alert.message || 'No details'}`;
 }
 
-function escapeMarkdown(text: string): string {
-  return text.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
-}
-
 // ============================================
 // NOTIFICATION SERVICE
 // ============================================
@@ -196,7 +251,11 @@ export async function sendAlertToAdmin(alert: Alert): Promise<boolean> {
   if (!adminChatId) return false;
 
   const message = formatAlert(alert);
-  const success = await sendTelegramMessage(adminChatId, message);
+  const replyMarkup = getAlertButtons(alert);
+  
+  const success = await sendTelegramMessage(adminChatId, message, {
+    replyMarkup: replyMarkup as Record<string, unknown>
+  });
 
   // Log notification
   await logOpsEvent({
@@ -219,12 +278,25 @@ export async function sendAlertToAdmin(alert: Alert): Promise<boolean> {
 export async function sendAlertToUser(userId: number, alert: Alert): Promise<boolean> {
   const chatId = await getUserChatId(userId);
   if (!chatId) {
-    console.warn(`No chat ID for user ${userId}, skipping notification`);
+    console.warn(`No Telegram chat ID found for user ${userId}`);
     return false;
   }
 
+  // Log to ops DB
+  if (alert.urgency === 'high' || alert.urgency === 'critical') {
+    logOpsEvent({
+      eventType: 'sentinel_alert',
+      eventSource: 'sentinel',
+      payload: { userId, type: alert.type, urgency: alert.urgency, product: alert.product },
+    });
+  }
+
   const message = formatAlert(alert);
-  const success = await sendTelegramMessage(chatId, message);
+  const replyMarkup = getAlertButtons(alert);
+
+  const success = await sendTelegramMessage(chatId, message, {
+    replyMarkup: replyMarkup as Record<string, unknown>
+  });
 
   // Log notification
   await logOpsEvent({

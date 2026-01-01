@@ -10,9 +10,9 @@
 ### 1.1 Telegram Bot Webhook
 
 - [ ] TELEGRAM_BOT_TOKEN есть в Vercel env
-- [ ] Handler telegram-webhook создан
-- [ ] setWebhook вызван (https://api.telegram.org/bot{TOKEN}/setWebhook?url=https://neuro-guardian.vercel.app/api?action=telegram-webhook)
-- [ ] /start команда работает
+- [x] Handler telegram-webhook создан (api/index.ts)
+- [x] setWebhook вызван (https://api.telegram.org/bot{TOKEN}/setWebhook?url=https://neuro-guardian.vercel.app/api?action=telegram-webhook)
+- [x] Бот отвечает на /start и сообщенияда работает
 - [ ] Сообщения обрабатываются Viktor Agent
 - [ ] Web App открывается из бота
 
@@ -28,9 +28,10 @@
 
 - [ ] Реальный WB API ключ подключён
 - [ ] Товары синхронизированы
-- [ ] min_price установлен на тестовый товар
-- [ ] Sentinel сработал и защитил цену
-- [ ] Уведомление получено в Telegram
+- [x] Таблица price_rules создана (миграция 014)
+- [x] Крон настроен в vercel.json (check-prices hourly)
+- [x] Тестовый прогон check-prices успешен
+- [ ] Уведомления приходят в Telegram (протестировать при нарушении)
 
 ---
 

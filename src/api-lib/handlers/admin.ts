@@ -9,6 +9,7 @@ import { sql } from '@vercel/postgres';
 import { getUserById, initializeDatabase } from '../services/index.js';
 import { getSecret } from '../lib/index.js';
 import { verifyAdminAccessAsync } from '../middleware/auth.js';
+import { sendAlertToUser } from '../services/notifications.js';
 
 /**
  * Helper to get Telegram secrets
@@ -571,35 +572,39 @@ export async function handleAdminTestTelegram(
     return res.status(403).json({ error: 'Admin access required' });
   }
 
-  const userId = req.query.userId || req.body?.userId;
-  const { token } = await getTelegramSecrets();
-
-  if (!token) {
-    return res.status(500).json({ error: 'ENV: TELEGRAM_BOT_TOKEN missing on server' });
-  }
+  const userId = Number(req.query.userId || req.body?.userId);
+  
   if (!userId) {
     return res.status(400).json({ error: 'userId required' });
   }
 
   try {
-    const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: userId,
-        text: '🔔 <b>ТЕСТОВАЯ ПРОВЕРКА СВЯЗИ</b>\n\nЕсли вы это читаете, значит бот настроен верно!',
-        parse_mode: 'HTML',
-      }),
+    // Send a real-like Price Protection Alert
+    const success = await sendAlertToUser(userId, {
+      type: 'price_protection',
+      urgency: 'high',
+      message: 'Тестовое уведомление о демпинге',
+      product: {
+        name: 'Тестовый Товар 123',
+        marketplace: 'WB',
+        externalId: '12345678',
+        userId
+      },
+      analysis: {
+        currentPrice: 1000,
+        recommendedPrice: 900,
+        reason: 'Конкурент снизил цену на 15%',
+        action: 'Снизить цену'
+      }
     });
-    const tgData = (await tgRes.json()) as any;
+
     return res.json({
-      success: tgRes.ok,
-      telegram_response: tgData,
-      token_masked: token.substring(0, 5) + '...',
+      success,
+      message: 'Smart Alert sent via sendAlertToUser'
     });
   } catch (e) {
     const errorMessage = e instanceof Error ? e.message : 'Unknown error';
-    return res.status(500).json({ error: 'Fetch Error', details: errorMessage });
+    return res.status(500).json({ error: 'Alert Error', details: errorMessage });
   }
 }
 
