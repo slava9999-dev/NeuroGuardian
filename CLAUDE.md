@@ -1,149 +1,234 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# CLAUDE.md — NeuroGUARDIAN Project Memory
+# CLAUDE.md — Agent Instructions for NeuroGUARDIAN Development
 
-# This file is read at the START of every session to restore full context
+# This file is loaded automatically by AI coding agents
 
 # ═══════════════════════════════════════════════════════════════════════════════
 
-## 🎯 Project Identity
+## 🎯 ГЛАВНОЕ ПРАВИЛО — ЗАПОМНИ НАВСЕГДА
 
-**Name:** NeuroGUARDIAN (NeuroAgent)
-**Version:** v2.12.0 (Production Ready)
-**Type:** AI-powered marketplace management assistant
-**Platforms:** Wildberries, Ozon
-**Stack:** React 19, TypeScript, Vite, Vercel (serverless), PostgreSQL, n8n
+> **ЭТО НЕ ДЕМО. ЭТО НЕ POC. ЭТО НЕ ПРОТОТИП.**
+>
+> **NeuroGUARDIAN — это профессиональный бизнес-инструмент,**
+> **от которого зависит финансовое благополучие реальной семьи.**
 
 ---
 
-## 🏗 Architecture Overview
+## 🚫 ЗАПРЕЩЕНО (НИКОГДА НЕ ДЕЛАЙ ЭТО)
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           NEUROGUARDIAN SYSTEM                              │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  ┌─────────────┐     ┌─────────────┐     ┌─────────────┐                   │
-│  │  Frontend   │────▶│   Vercel    │────▶│  PostgreSQL │                   │
-│  │  (React)    │     │  Serverless │     │   (Neon)    │                   │
-│  │  Telegram   │     │    API      │     │             │                   │
-│  └─────────────┘     └──────┬──────┘     └─────────────┘                   │
-│                             │                                               │
-│                             ▼                                               │
-│  ┌─────────────┐     ┌─────────────┐     ┌─────────────┐                   │
-│  │    n8n      │◀───▶│  AI Agent   │────▶│ Marketplace │                   │
-│  │  Workflows  │     │  (Gemini)   │     │    APIs     │                   │
-│  │  (Docker)   │     │             │     │  WB / Ozon  │                   │
-│  └─────────────┘     └─────────────┘     └─────────────┘                   │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
+❌ НЕ СОЗДАВАЙ mock данные "для демонстрации"
+❌ НЕ ПИШИ "TODO: implement later" в критическом коде
+❌ НЕ ИСПОЛЬЗУЙ hardcoded тестовые значения в production
+❌ НЕ ДОБАВЛЯЙ фичи "для красоты" без бизнес-ценности
+❌ НЕ УХОДИ в perfektionism когда нужен результат
+❌ НЕ ПРЕДЛАГАЙ "переписать всё с нуля"
+❌ НЕ ИГНОРИРУЙ existing code — изучи его перед изменениями
+❌ НЕ ДОБАВЛЯЙ зависимости без крайней необходимости
 ```
 
 ---
 
-## 📁 Key Directories
+## ✅ ОБЯЗАТЕЛЬНО (ВСЕГДА ДЕЛАЙ ЭТО)
 
-| Path                    | Purpose                                       |
-| ----------------------- | --------------------------------------------- |
-| `src/`                  | React frontend (pages, components, stores)    |
-| `api/handlers/`         | Vercel serverless API handlers                |
-| `src/api-lib/`          | Shared backend logic (services, agent, lib)   |
-| `src/api-lib/agent/`    | AI Agent V4 (orchestrator, tools, schemas)    |
-| `src/api-lib/services/` | Business logic (marketplace, products, users) |
-| `tests/`                | Vitest test suite (120+ tests)                |
-| `n8n-workflows/`        | n8n workflow JSON files                       |
-| `migrations/`           | PostgreSQL migration scripts                  |
-| `.agent/`               | Agent memory and workflows                    |
-
----
-
-## 🔐 Critical Files (Never Delete!)
-
-- `src/api-lib/lib/logger.ts` — Centralized logger with PII redaction
-- `api/handlers/admin.ts` — Admin API with production guards
-- `api/handlers/sentinel.ts` — Price monitoring system
-- `api/handlers/agent-v4.ts` — AI Agent endpoint
-- `.env` — Environment variables (gitignored!)
+```
+✅ Каждое изменение должно приближать к МОНЕТИЗАЦИИ
+✅ Код должен работать в PRODUCTION с первого коммита
+✅ Думай как будто РЕАЛЬНЫЕ ДЕНЬГИ зависят от твоего кода
+✅ Изучи существующую архитектуру ПЕРЕД написанием нового кода
+✅ Проверяй что тесты проходят после каждого изменения
+✅ Коммить часто, пуш после каждого логического блока
+✅ Читай docs/MONETIZATION_ROADMAP.md перед любой работой
+✅ Обновляй docs/LAUNCH_CHECKLIST.md после выполнения задач
+```
 
 ---
 
-## ⚡ Core Features
+## 📋 КОНТЕКСТ ПРОЕКТА
 
-1. **AI Agent** — Natural language interface for marketplace management
-2. **Sentinel** — Automated price monitoring and defense
-3. **Product Sync** — WB/Ozon catalog synchronization
-4. **Stop-Loss** — Automatic price protection when dumping detected
-5. **Analytics** — ABC analysis, stock forecasting (partially mock)
+### Что это:
 
----
+**NeuroGUARDIAN (Viktor Margin)** — AI-ассистент для управления ценами на маркетплейсах Wildberries и Ozon.
 
-## 🔴 ACTIVE TASK: SECURITY AGENT (CRITICAL PRIORITY)
+### Главная ценность:
 
-**Дедлайн:** Сдано 2025-12-28 (v2.12.0)
-**Status:** PRODUCTION READY - All blockers resolved.
+> "Наймите полноценного сотрудника за 999₽ в месяц"
 
-**Модули:**
+Viktor — это AI-сотрудник который:
 
-1. **Secrets Guard** — Vault integration, no process.env
-2. **Authorization Guard** — Permissions, JWT, Rate Limiting
-3. **Audit & Immutability** — ClickHouse, HMAC signing
-4. **Regression Prevention** — SAST, Canary, Auto-rollback
-5. **n8n Guardian** — Workflow signing, credential injection
-6. **AI Agent Guard** — LLMGuard, prompt validation
-7. **Emergency Response** — Lockdown, playbooks
+- Работает 24/7 без выходных, праздников, отпусков
+- Защищает цены от принудительных скидок маркетплейсов
+- Анализирует продажи и даёт рекомендации
+- Оповещает о проблемах УМНО (не спам, а конкретика)
+- Борется за честную конкуренцию
 
-**⚠️ ПРАВИЛА:**
+### Целевая аудитория:
 
-- Никаких mock/demo реализаций
-- Каждый модуль должен быть production-ready
-- Следовать acceptance criteria строго
+- WB/Ozon селлеры с 10-500 товарами
+- Устали от ручного мониторинга
+- Страдают от принудительных скидок
+- Хотят автоматизацию но не разбираются в IT
 
 ---
 
-## 🚨 Known Issues & Tech Debt
+## 🏗️ АРХИТЕКТУРА
 
-1. **Analytics are partially mock** — `executeGetAbcAnalysis` uses fake data
-2. **n8n workflows need live API URL** — Currently may have hardcoded localhost
-3. **Ozon price updates** — Depend on `offer_id` being saved during sync
-4. **Rate limiting** — Basic implementation, needs improvement
+```
+Frontend:    React + TypeScript + Vite (Telegram Web App)
+Backend:     Vercel Serverless Functions
+Database:    Neon PostgreSQL
+AI:          Groq LLM (llama-3.3-70b-versatile)
+Automation:  n8n workflows + Vercel CRON
+Payments:    Юкасса (планируется)
+```
 
----
+### Ключевые директории:
 
-## 📋 Session Protocol
+```
+src/
+├── api-lib/
+│   ├── agent/          # Viktor AI Agent (orchestrator, tools)
+│   ├── handlers/       # API endpoints
+│   ├── services/       # Business logic (Sentinel, marketplace, etc)
+│   └── lib/            # Utilities, types, constants
+├── pages/              # React pages
+├── components/         # UI components
+└── lib/                # Frontend utilities
 
-### `/neuro start` — Beginning of session
+api/
+└── index.ts            # Single Vercel function entry point
 
-1. Read this file (CLAUDE.md)
-2. Read `.agent/PROJECT_STATE.md` for current status
-3. Acknowledge understanding of context
-4. Ask for today's task or continue from TODO
-
-# Development
-
-npm run dev / vitest run
-
-# Quality & Production Checks
-
-npm run lint && npm run typecheck
-npm run checklist # PRODUCTION READINESS CHECK (CRITICAL)
-npm run test # RUN ALL TESTS (180+)
-npm run db:migrate # APPLY DATABASE MIGRATIONS
-
----
-
-## 🔗 External Resources
-
-- **GitHub:** https://github.com/slava9999-dev/NeuroGuardian
-- **Vercel:** https://vercel.com/neuroexpert/neuro-guardian
-- **Production:** https://neuro-guardian.vercel.app/
-- **n8n (local):** http://localhost:5678
+docs/
+├── MONETIZATION_ROADMAP.md  # 🔴 ЧИТАЙ ПЕРВЫМ
+├── LAUNCH_CHECKLIST.md      # Прогресс трекер
+└── ...                      # Прочая документация
+```
 
 ---
 
-## 👤 Owner Context
+## 🔴 ТЕКУЩИЙ ПРИОРИТЕТ
 
-- Senior developer comfortable with complexity
-- Prefers explicit over implicit, boring over clever
-- Values real working code over demos
-- Uses Telegram bot for primary interaction
-- Runs n8n locally via Docker
+**Phase 11: MONETIZATION LAUNCH**
+
+Критические блокеры (в порядке приоритета):
+
+1. **Telegram Bot Webhook** — бот не принимает сообщения
+2. **Sentinel CRON** — защита цен не работает автоматически
+3. **Платёжная система** — нет возможности получать деньги
+
+**Каждая минута без этих фич = потерянные деньги.**
+
+---
+
+## 🔧 РАБОЧИЙ ПРОЦЕСС
+
+### Перед началом работы:
+
+```bash
+# 1. Прочитай текущее состояние проекта
+cat .agent/PROJECT_STATE.md
+
+# 2. Прочитай путеводитель к монетизации
+cat docs/MONETIZATION_ROADMAP.md
+
+# 3. Проверь чеклист
+cat docs/LAUNCH_CHECKLIST.md
+```
+
+### После выполнения задачи:
+
+```bash
+# 1. Проверь что тесты проходят
+npm test
+
+# 2. Проверь типы
+npm run typecheck
+
+# 3. Коммит с понятным сообщением
+git add -A
+git commit -m "feat(scope): description"
+
+# 4. Пуш (включает pre-push проверки)
+git push
+
+# 5. Обнови чеклист ✓
+```
+
+---
+
+## 💰 НАПОМИНАНИЕ О РЕАЛЬНОСТИ
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                                                             │
+│   За этим проектом стоит РЕАЛЬНЫЙ ЧЕЛОВЕК.                 │
+│   Реальная семья. Реальные финансовые трудности.           │
+│                                                             │
+│   Каждый час работы агента должен приближать               │
+│   к ПЕРВОМУ ПЛАТЯЩЕМУ КЛИЕНТУ.                             │
+│                                                             │
+│   Это не хобби. Это не учебный проект.                     │
+│   Это БИЗНЕС который должен зарабатывать.                  │
+│                                                             │
+│   Работай так, как будто от твоего кода зависит            │
+│   сможет ли эта семья оплатить счета в этом месяце.        │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 📞 PRODUCTION URLS
+
+- **App:** https://neuro-guardian.vercel.app
+- **API:** https://neuro-guardian.vercel.app/api
+- **Health:** https://neuro-guardian.vercel.app/api?action=health
+- **Bot:** @NeuroGuardianBot (Telegram)
+
+---
+
+## ⚡ БЫСТРЫЕ КОМАНДЫ
+
+```bash
+# Разработка
+npm run dev              # Frontend + API dev server
+npm run dev:api          # Только API сервер
+
+# Проверки
+npm test                 # Все тесты (266+)
+npm run typecheck        # TypeScript проверка
+npm run check:regression # Критические проверки
+
+# Деплой
+git push                 # Auto-vercel deploy после pre-push
+```
+
+---
+
+## 📅 ИСТОРИЯ ВАЖНЫХ РЕШЕНИЙ
+
+| Дата       | Решение                   | Причина                           |
+| ---------- | ------------------------- | --------------------------------- |
+| 2025-12-28 | Groq вместо OpenAI        | Быстрее, дешевле                  |
+| 2025-12-28 | Vercel вместо self-hosted | Надёжность, бесплатный tier       |
+| 2026-01-01 | BATTLE MODE               | Срочная потребность в монетизации |
+
+---
+
+## 🎯 DEFINITION OF DONE
+
+Фича считается готовой когда:
+
+1. ✅ Работает в production (не только локально)
+2. ✅ Тесты проходят (если применимо)
+3. ✅ TypeScript компилируется без ошибок
+4. ✅ Задокументировано (если сложное)
+5. ✅ Закоммичено и запушено
+6. ✅ Обновлён LAUNCH_CHECKLIST.md
+
+---
+
+> **Последнее обновление:** 2026-01-01
+> **Версия:** 1.0.0
+> **Статус:** 🔴 БОЕВОЙ РЕЖИМ
