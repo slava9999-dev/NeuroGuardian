@@ -1,52 +1,52 @@
 # 📊 Project State — NeuroGUARDIAN
 
-# Updated: 2026-01-01T13:25:00+03:00
+# Updated: 2026-01-01T18:30:00+03:00
 
 # This file tracks current progress and is updated at end of each session
 
 ---
 
-## 🎯 Current Phase: MONETIZATION LAUNCH (Phase 11) 🔴 БОЕВОЙ РЕЖИМ
+## 🎯 Current Phase: MONETIZATION LAUNCH (Phase 11) 🟢 PRODUCTION READY
 
-**Last Session:** 2026-01-01 (Session 20)
-**Focus:** 💰 МОНЕТИЗАЦИЯ — Telegram Bot, Sentinel CRON, Платёжка
+**Last Session:** 2026-01-01 (Session 21)
+**Focus:** 🔔 Smart Notifications + Telegram Callback + UX Improvements
 
 **📋 Ключевые документы:**
 
 - `docs/MONETIZATION_ROADMAP.md` — Полный путеводитель
 - `docs/LAUNCH_CHECKLIST.md` — Интерактивный чеклист
 
-**🔴 Критические блокеры:**
+**🟡 Следующие шаги:**
 
-1. Telegram Bot Webhook не настроен
-2. Sentinel CRON не запущен
-3. Платёжная система не интегрирована
+1. YooKassa интеграция для платежей
+2. Onboarding через Telegram бота (API ключи)
+3. Sentinel CRON с реальными товарами
 
 ---
 
 ## ✅ Recently Completed
 
-### Session 2025-12-31 (Session 19 - Local Agent Debugging)
+### Session 2026-01-01 (Session 21 - Smart Notifications & UX)
 
-- [x] **Vercel Sync**: Verified Vercel CLI connected to neuroexpertai-2561 account
-- [x] **ADMIN_API_KEY Fix**: Cleaned corrupted key (had `\r\n`) in .env.local
-- [x] **Production API Verified**: agent-v4 works via curl with correct key
-- [x] **Products API Working**: 33 products loaded successfully
-- [x] **Debug Logging Added**: getAuthHeaders() now logs auth method used
+- [x] **Smart Notifications**: Уведомления с кнопками действий
+- [x] **Two-Step Confirmation**: Подтверждение изменения цен
+- [x] **Sentinel Branding**: Брендинг "SENTINEL — Автоматический мониторинг"
+- [x] **SKU/Article Display**: Артикул товара в уведомлениях
+- [x] **Ignore Button**: Кнопка "Игнорировать" для алертов
+- [x] **Telegram Callbacks**: apply_price, ignore_alert, check_protection, cancel_action
+- [x] **Vercel Cron Fix**: Исправлен лимит Hobby плана (1 job daily)
+- [x] **price_rules Migration**: Миграция 014 применена
+- [x] **Groq Model Fix**: llama-3.1 → llama-3.3-70b-versatile
 
-**Issues Identified:**
+**Commits:**
 
-- ⚠️ PostgreSQL timeout when using local dev:api (Neon connection issue)
-- ⚠️ Frontend 401 Unauthorized - X-Admin-Key header not being sent correctly
-- ⚠️ Vercel ADMIN_API_KEY was corrupted with `\r\n`
+- `feat(notifications): add smart action buttons to alerts`
+- `feat(telegram): implement Smart Action callbacks`
+- `fix(cron): revert to daily schedule for Vercel Hobby plan`
+- `fix(cron): remove legacy cron to satisfy Vercel limit`
+- `feat(ux): enhanced alert format with Sentinel branding and two-step confirmation`
 
-**Next Steps for Session 20:**
-
-1. Fix frontend auth header sending (debug logs should reveal issue)
-2. Configure local PostgreSQL or fix Neon connection for dev:api
-3. Start n8n Docker with full workflow automation
-4. Connect GPU stack (vLLM + ChromaDB + Redis) for local AI
-5. End-to-end test: UI → Agent → AI → Response
+### Session 2025-12-31 (Session 19-20 - Local Agent Debugging)
 
 ### Session 2025-12-31 (Session 18 - Project Cleanup & Production Prep)
 
