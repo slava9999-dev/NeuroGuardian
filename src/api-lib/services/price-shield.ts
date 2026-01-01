@@ -112,29 +112,39 @@ export class PriceShieldService {
    * Fetch Active Rules for a User
    */
   public async getRulesForUser(userId: number): Promise<PriceRule[]> {
-    const { rows } = await sql`
-      SELECT * FROM price_rules 
-      WHERE user_id = ${userId} 
-      AND active = true
-    `;
-    const dbRules = rows as DBPriceRule[];
-    return dbRules.map(row => ({
-      id: row.id,
-      product_id: row.product_id,
-      min_price: typeof row.min_price === 'string' ? parseFloat(row.min_price) : row.min_price,
-      max_price: typeof row.max_price === 'string' ? parseFloat(row.max_price) : row.max_price,
-      target_margin:
-        typeof row.target_margin === 'string' ? parseFloat(row.target_margin) : row.target_margin,
-      competitor_tracking: row.competitor_tracking,
-      competitor_nmids: row.competitor_nmids || undefined,
-      price_match_strategy: row.price_match_strategy,
-      undercut_amount:
-        typeof row.undercut_amount === 'string'
-          ? parseFloat(row.undercut_amount)
-          : row.undercut_amount,
-      undercut_type: row.undercut_type,
-      auto_adjust: row.auto_adjust,
-    }));
+    try {
+      const { rows } = await sql`
+        SELECT * FROM price_rules 
+        WHERE user_id = ${userId} 
+        AND active = true
+      `;
+      const dbRules = rows as DBPriceRule[];
+      return dbRules.map(row => ({
+        id: row.id,
+        product_id: row.product_id,
+        min_price: typeof row.min_price === 'string' ? parseFloat(row.min_price) : row.min_price,
+        max_price: typeof row.max_price === 'string' ? parseFloat(row.max_price) : row.max_price,
+        target_margin:
+          typeof row.target_margin === 'string' ? parseFloat(row.target_margin) : row.target_margin,
+        competitor_tracking: row.competitor_tracking,
+        competitor_nmids: row.competitor_nmids || undefined,
+        price_match_strategy: row.price_match_strategy,
+        undercut_amount:
+          typeof row.undercut_amount === 'string'
+            ? parseFloat(row.undercut_amount)
+            : row.undercut_amount,
+        undercut_type: row.undercut_type,
+        auto_adjust: row.auto_adjust,
+      }));
+    } catch (error) {
+      // Table might not exist yet - return empty array gracefully
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('does not exist')) {
+        console.warn('[PriceShield] price_rules table not found, returning empty rules');
+        return [];
+      }
+      throw error; // Re-throw if it's a different error
+    }
   }
 }
 

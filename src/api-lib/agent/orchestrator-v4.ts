@@ -717,7 +717,7 @@ ${JSON.stringify(toolResultsSummary, null, 2)}
     const preferredModel = groqKey
       ? useAdvancedModel
         ? 'llama-3.3-70b-versatile'
-        : 'llama-3.1-70b-versatile'
+        : 'llama-3.3-70b-versatile'
       : useAdvancedModel
         ? 'gpt-4o'
         : 'gpt-4o-mini';
