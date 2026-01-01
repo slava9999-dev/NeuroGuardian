@@ -148,31 +148,37 @@ function escapeMarkdown(text: string): string {
 
 /**
  * Generate smart action buttons for alerts
+ * Uses two-step confirmation for price changes (confirm:apply_price)
  */
 function getAlertButtons(alert: Alert): Record<string, unknown> | undefined {
   const buttons: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
 
-  // Price Protection Actions
+  // Price Protection Actions - TWO-STEP CONFIRMATION
   if (alert.type === 'price_protection' && alert.product && alert.analysis) {
     const { recommendedPrice } = alert.analysis;
     const { externalId, marketplace } = alert.product;
 
-    // Action Button: Apply Price
+    // Row 1: Confirm Apply + Ignore
     buttons.push([
       {
         text: `✅ Применить ${recommendedPrice}₽`,
-        callback_data: `apply_price:${marketplace}:${externalId}:${recommendedPrice}`,
+        // confirm: prefix triggers confirmation dialog
+        callback_data: `confirm:apply_price:${marketplace}:${externalId}:${recommendedPrice}`,
+      },
+      {
+        text: `❌ Игнорировать`,
+        callback_data: `ignore_alert:${externalId}`,
       },
     ]);
 
-    // Link to Marketplace
+    // Row 2: View Product Link
     const link =
-      marketplace === 'wb'
+      marketplace.toLowerCase() === 'wb'
         ? `https://www.wildberries.ru/catalog/${externalId}/detail.aspx`
         : `https://www.ozon.ru/product/${externalId}`;
     
     buttons.push([
-      { text: '🔗 Открыть товар', url: link },
+      { text: '🔗 Открыть товар на маркетплейсе', url: link },
     ]);
   }
 
@@ -180,8 +186,12 @@ function getAlertButtons(alert: Alert): Record<string, unknown> | undefined {
   if (alert.type === 'sentinel_alert' && alert.product) {
     buttons.push([
       {
-        text: '🛡️ Проверить защиту',
+        text: '🛡️ Настроить защиту',
         callback_data: `check_protection:${alert.product.externalId}`,
+      },
+      {
+        text: `❌ Игнорировать`,
+        callback_data: `ignore_alert:${alert.product.externalId}`,
       },
     ]);
   }
@@ -202,27 +212,36 @@ function getAlertButtons(alert: Alert): Record<string, unknown> | undefined {
 function formatAlert(alert: Alert): string {
   const emoji = URGENCY_EMOJI[alert.urgency];
 
-  // Price protection alert
+  // Price protection alert - ENHANCED UX
   if (alert.type === 'price_protection' && alert.analysis && alert.product) {
+    const mpEmoji = alert.product.marketplace.toUpperCase() === 'WB' ? '🟣' : '🔵';
+    const priceDiff = alert.analysis.currentPrice - alert.analysis.recommendedPrice;
+    const priceDiffPercent = Math.round((priceDiff / alert.analysis.currentPrice) * 100);
+    
     return [
-      `${emoji} *Price Alert: ${escapeMarkdown(alert.product.name)}*`,
+      `🛡️ *SENTINEL — Автоматический мониторинг*`,
       ``,
-      `📍 Маркетплейс: ${alert.product.marketplace}`,
-      `💰 Текущая цена: ${alert.analysis.currentPrice}₽`,
-      `📊 Рекомендация: ${alert.analysis.recommendedPrice}₽`,
+      `${emoji} *Обнаружен демпинг конкурента!*`,
       ``,
-      `📝 *Причина:* ${escapeMarkdown(alert.analysis.reason)}`,
-      `🎯 *Действие:* ${alert.analysis.action}`,
+      `📦 *Товар:* ${escapeMarkdown(alert.product.name)}`,
+      `🔢 *Артикул:* \`${alert.product.externalId}\``,
+      `${mpEmoji} *Маркетплейс:* ${alert.product.marketplace.toUpperCase()}`,
+      ``,
+      `💰 Ваша цена: *${alert.analysis.currentPrice}₽*`,
+      `📉 Рекомендация: *${alert.analysis.recommendedPrice}₽* (${priceDiffPercent > 0 ? '-' : '+'}${Math.abs(priceDiffPercent)}%)`,
+      ``,
+      `💡 *Причина:* ${escapeMarkdown(alert.analysis.reason)}`,
     ].join('\n');
   }
 
-  // Sentinel alert
+  // Sentinel alert - general
   if (alert.type === 'sentinel_alert' && alert.product) {
     return [
-      `${emoji} *Sentinel Alert*`,
+      `🛡️ *SENTINEL — Уведомление*`,
       ``,
-      `📦 ${escapeMarkdown(alert.product.name)}`,
-      `📍 ${alert.product.marketplace}`,
+      `${emoji} ${escapeMarkdown(alert.product.name)}`,
+      `🔢 Артикул: \`${alert.product.externalId}\``,
+      `📍 ${alert.product.marketplace.toUpperCase()}`,
       ``,
       alert.message || 'Обнаружена нежелательная акция',
     ].join('\n');
@@ -230,9 +249,11 @@ function formatAlert(alert: Alert): string {
 
   // System error
   if (alert.type === 'system_error') {
-    return [`${emoji} *System Error*`, ``, alert.message || 'Произошла системная ошибка'].join(
-      '\n'
-    );
+    return [
+      `⚙️ *Системное уведомление*`,
+      ``,
+      `${emoji} ${alert.message || 'Произошла системная ошибка'}`,
+    ].join('\n');
   }
 
   // Default format

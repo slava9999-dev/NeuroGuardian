@@ -413,8 +413,39 @@ async function handleCallbackQuery(query: TelegramCallbackQuery): Promise<void> 
   const data = query.data || '';
   await answerCallbackQuery(query.id); // Acknowledge immediately
 
-  // --- Dynamic Actions ---
+  // --- TWO-STEP CONFIRMATION ---
+  
+  // Step 1: User clicked "Применить" → Show confirmation
+  if (data.startsWith('confirm:apply_price:')) {
+    // Format: confirm:apply_price:marketplace:externalId:price
+    const parts = data.replace('confirm:', '').split(':');
+    if (parts.length >= 4) {
+      const marketplace = parts[1];
+      const externalId = parts[2];
+      const price = parts[3];
 
+      await sendTelegramMessage(chatId, 
+        `⚠️ *Подтвердите изменение цены*\n\n` +
+        `📦 Артикул: \`${externalId}\`\n` +
+        `💰 Новая цена: *${price}₽*\n\n` +
+        `Вы уверены?`,
+        {
+          parseMode: 'Markdown',
+          replyMarkup: {
+            inline_keyboard: [
+              [
+                { text: '✅ Да, применить', callback_data: `apply_price:${marketplace}:${externalId}:${price}` },
+                { text: '❌ Отмена', callback_data: `cancel_action` },
+              ],
+            ],
+          },
+        }
+      );
+    }
+    return;
+  }
+
+  // Step 2: User confirmed → Execute price change
   if (data.startsWith('apply_price:')) {
     // Format: apply_price:marketplace:externalId:price
     const parts = data.split(':');
@@ -424,34 +455,71 @@ async function handleCallbackQuery(query: TelegramCallbackQuery): Promise<void> 
       const price = parts[3];
       const userId = query.from.id;
 
-      await sendTelegramMessage(chatId, `⏳ Применяю цену ${price}₽ для товара ${externalId}...`);
+      await sendTelegramMessage(chatId, `⏳ Применяю цену ${price}₽...`);
       await sendTypingAction(chatId);
 
       // Delegate to Viktor AI
-      const command = `Установи цену ${price} для товара ${externalId} на ${marketplace} (Price Alert Action)`;
+      const command = `Установи цену ${price} для товара с артикулом ${externalId} на ${marketplace}`;
       
       try {
         const result = await orchestrateV4(command, { userId, marketplace: 'all' });
         
         if (result.success) {
-           await sendTelegramMessage(chatId, `✅ Цена ${price}₽ успешно установлена!\n\n${result.message}`, { parseMode: 'HTML' });
+           await sendTelegramMessage(chatId, 
+             `✅ *Цена обновлена!*\n\n` +
+             `📦 Артикул: \`${externalId}\`\n` +
+             `💰 Новая цена: *${price}₽*\n\n` +
+             `${result.message}`, 
+             { parseMode: 'Markdown' }
+           );
         } else {
-           await sendTelegramMessage(chatId, `❌ Ошибка применения цены: ${result.message}`, { parseMode: 'HTML' });
+           await sendTelegramMessage(chatId, 
+             `❌ *Ошибка обновления цены*\n\n${result.message}`, 
+             { parseMode: 'Markdown' }
+           );
         }
       } catch (e) {
          logger.error('Failed to apply price via callback', e);
-         await sendTelegramMessage(chatId, `❌ Системная ошибка при обновлении цены.`);
+         await sendTelegramMessage(chatId, `❌ Системная ошибка при обновлении цены. Попробуйте позже.`);
       }
     }
     return;
   }
 
+  // --- IGNORE ALERT ---
+  if (data.startsWith('ignore_alert:')) {
+    const externalId = data.split(':')[1];
+    await sendTelegramMessage(chatId, 
+      `👌 Уведомление проигнорировано.\n\n` +
+      `Товар \`${externalId}\` останется с текущей ценой.\n` +
+      `Sentinel продолжит мониторинг.`,
+      { parseMode: 'Markdown' }
+    );
+    return;
+  }
+
+  // --- CANCEL ACTION ---
+  if (data === 'cancel_action') {
+    await sendTelegramMessage(chatId, `❌ Действие отменено.`);
+    return;
+  }
+
+  // --- CHECK PROTECTION ---
   if (data.startsWith('check_protection:')) {
-    const parts = data.split(':');
-    const externalId = parts[1];
+    const externalId = data.split(':')[1];
     
-    await sendTelegramMessage(chatId, `🛡️ Проверяю настройки защиты для ${externalId}...`);
-    // TODO: Implement direct check or call agent
+    await sendTelegramMessage(chatId, 
+      `🛡️ *Настройка защиты*\n\n` +
+      `Откройте приложение для настройки правил защиты товара \`${externalId}\`.`,
+      {
+        parseMode: 'Markdown',
+        replyMarkup: {
+          inline_keyboard: [[
+            { text: '⚙️ Открыть настройки', web_app: { url: `${process.env.WEBAPP_URL || 'https://neuro-guardian.vercel.app'}?page=products` } },
+          ]],
+        },
+      }
+    );
     return;
   }
 
