@@ -119,6 +119,13 @@ import {
   handleMoEPriceCheck,
 } from '../src/api-lib/handlers/moe.js';
 
+// Telegram Bot Webhook
+import {
+  handleTelegramWebhook,
+  setTelegramWebhook,
+  getTelegramWebhookInfo,
+} from '../src/api-lib/handlers/telegram.js';
+
 // Utilities
 import {
   sanitizeInput,
@@ -250,6 +257,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       case 'payment-webhook':
         return handlePaymentWebhook(req, res);
+
+      // ========== TELEGRAM BOT WEBHOOK ==========
+      case 'telegram-webhook':
+        return handleTelegramWebhook(req, res);
+
+      case 'telegram-set-webhook': {
+        // Admin only - set webhook URL
+        const auth = await extractAnyAuthAsync(req);
+        if (!auth.success || auth.context.authMethod !== 'admin') {
+          return sendAuthError(res, 'Admin access required', 403);
+        }
+        const webhookUrl = req.body?.url || `https://neuro-guardian.vercel.app/api?action=telegram-webhook`;
+        const result = await setTelegramWebhook(webhookUrl);
+        return res.status(result.success ? 200 : 500).json(result);
+      }
+
+      case 'telegram-webhook-info': {
+        // Admin only - get webhook info
+        const auth = await extractAnyAuthAsync(req);
+        if (!auth.success || auth.context.authMethod !== 'admin') {
+          return sendAuthError(res, 'Admin access required', 403);
+        }
+        const info = await getTelegramWebhookInfo();
+        return res.status(200).json(info);
+      }
 
       // ========== AUTH ENDPOINTS ==========
       case 'auth': {
