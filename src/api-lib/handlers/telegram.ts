@@ -410,9 +410,54 @@ async function handleCallbackQuery(query: TelegramCallbackQuery): Promise<void> 
   const chatId = query.message?.chat.id;
   if (!chatId) return;
 
-  await answerCallbackQuery(query.id);
+  const data = query.data || '';
+  await answerCallbackQuery(query.id); // Acknowledge immediately
 
-  switch (query.data) {
+  // --- Dynamic Actions ---
+
+  if (data.startsWith('apply_price:')) {
+    // Format: apply_price:marketplace:externalId:price
+    const parts = data.split(':');
+    if (parts.length >= 4) {
+      const marketplace = parts[1];
+      const externalId = parts[2];
+      const price = parts[3];
+      const userId = query.from.id;
+
+      await sendTelegramMessage(chatId, `⏳ Применяю цену ${price}₽ для товара ${externalId}...`);
+      await sendTypingAction(chatId);
+
+      // Delegate to Viktor AI
+      const command = `Установи цену ${price} для товара ${externalId} на ${marketplace} (Price Alert Action)`;
+      
+      try {
+        const result = await orchestrateV4(command, { userId, marketplace: 'all' });
+        
+        if (result.success) {
+           await sendTelegramMessage(chatId, `✅ Цена ${price}₽ успешно установлена!\n\n${result.message}`, { parseMode: 'HTML' });
+        } else {
+           await sendTelegramMessage(chatId, `❌ Ошибка применения цены: ${result.message}`, { parseMode: 'HTML' });
+        }
+      } catch (e) {
+         logger.error('Failed to apply price via callback', e);
+         await sendTelegramMessage(chatId, `❌ Системная ошибка при обновлении цены.`);
+      }
+    }
+    return;
+  }
+
+  if (data.startsWith('check_protection:')) {
+    const parts = data.split(':');
+    const externalId = parts[1];
+    
+    await sendTelegramMessage(chatId, `🛡️ Проверяю настройки защиты для ${externalId}...`);
+    // TODO: Implement direct check or call agent
+    return;
+  }
+
+  // --- Static Commands ---
+
+  switch (data) {
     case 'help':
       await handleHelpCommand(chatId);
       break;
@@ -422,8 +467,11 @@ async function handleCallbackQuery(query: TelegramCallbackQuery): Promise<void> 
     case 'status':
       await handleStatusCommand(chatId, query.from.id);
       break;
+    case 'buy_subscription':
+       await sendTelegramMessage(chatId, '💳 Оплата подписки скоро будет доступна. Сейчас у вас действует пробный период.');
+       break;
     default:
-      // Handle other callbacks
+      // Unknown callback
       break;
   }
 }

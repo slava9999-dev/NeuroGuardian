@@ -31,7 +31,9 @@
 - [x] Таблица price_rules создана (миграция 014)
 - [x] Крон настроен в vercel.json (check-prices hourly)
 - [x] Тестовый прогон check-prices успешен
-- [ ] Уведомления приходят в Telegram (протестировать при нарушении)
+- [x] Уведомления приходят в Telegram (Smart Actions implemented)
+- [x] Обработка кнопок (apply_price) реализована в telegram.ts
+- [ ] Отрисовка графика цен в сообщении (Nice to have)
 
 ---
 
