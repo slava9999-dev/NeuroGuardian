@@ -288,12 +288,13 @@ export async function verifyAdminAccessAsync(req: VercelRequest): Promise<boolea
     getSecret('admin_api_key', 'admin_access_verify'),
   ]);
 
-  const cleanCronSecret = cronSecret?.trim();
-  const cleanAdminKey = expectedAdminKey?.trim();
+  const cleanCronSecret = cronSecret?.replace(/['"]/g, '').trim();
+  const cleanAdminKey = expectedAdminKey?.replace(/['"]/g, '').trim();
+  const cleanReceivedKey = adminKey?.replace(/['"]/g, '').trim();
 
   const cronMatch = !!(cleanCronSecret && authHeader === `Bearer ${cleanCronSecret}`);
   const keyHeaderMatch = !!(cleanAdminKey && authHeader === `Bearer ${cleanAdminKey}`);
-  const keyParamMatch = !!(cleanAdminKey && adminKey === cleanAdminKey);
+  const keyParamMatch = !!(cleanAdminKey && cleanReceivedKey === cleanAdminKey);
 
   console.log('[DEBUG] Admin Access Check:', {
     hasAuthHeader: !!authHeader,

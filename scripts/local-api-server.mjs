@@ -25,13 +25,85 @@ console.log('📁 Loading environment from .env');
 process.env.SECURITY_PERMISSIVE_MODE = 'true';
 console.log('🛡️ SECURITY_PERMISSIVE_MODE forced to true for local dev');
 
+// ======================================
+// PATCH: Override @vercel/postgres with local pg
+// ======================================
+import pg from 'pg';
+const { Pool } = pg;
+
+const pool = new Pool({
+  connectionString: process.env.POSTGRES_URL?.replace(/^"|"$/g, ''),  // Remove quotes if present
+  ssl: { rejectUnauthorized: false },
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
+});
+
+// Create sql tagged template function compatible with @vercel/postgres
+const sql = async (strings, ...values) => {
+  const text = strings.reduce(
+    (acc, str, i) => acc + str + (i < values.length ? `$${i + 1}` : ''),
+    ''
+  );
+  const client = await pool.connect();
+  try {
+    return await client.query(text, values);
+  } finally {
+    client.release();
+  }
+};
+
+// Inject into global for module resolution hack
+globalThis.__VERCEL_POSTGRES_MOCK__ = { sql, pool };
+
+// Patch require/import to intercept @vercel/postgres
+import Module from 'module';
+const originalRequire = Module.prototype.require;
+Module.prototype.require = function(id) {
+  if (id === '@vercel/postgres') {
+    console.log('🔧 Intercepted @vercel/postgres, using local pg');
+    return globalThis.__VERCEL_POSTGRES_MOCK__;
+  }
+  return originalRequire.apply(this, arguments);
+};
+
+console.log('✅ @vercel/postgres patched to use local pg driver');
+// ======================================
+
 async function startServer() {
   // Import the API handler (use dynamic import with tsx)
   const { default: handler } = await import('../api/index.ts');
   
   const server = createServer(async (req, res) => {
+    console.log(`📡 [Server] Incoming ${req.method} request to ${req.url}`);
+    
     // Parse URL
     const parsedUrl = parse(req.url || '', true);
+    
+    // Quick local health check - bypass main handler
+    if (parsedUrl.query?.action === 'health') {
+      try {
+        const client = await pool.connect();
+        const result = await client.query('SELECT 1 as ok');
+        client.release();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          status: 'ok',
+          timestamp: new Date().toISOString(),
+          database: result.rows[0]?.ok === 1 ? 'connected' : 'error',
+          mode: 'local-dev',
+        }));
+        return;
+      } catch (error) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          status: 'degraded',
+          database: 'error',
+          error: error.message,
+        }));
+        return;
+      }
+    }
     
     // Only handle /api routes
     if (!parsedUrl.pathname?.startsWith('/api')) {

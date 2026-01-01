@@ -100,10 +100,13 @@ export async function routeMessage(
   }
 
   // Step 2: Use LLM for complex classification
-  const openaiKey = await getSecret('openai_api_key', 'router_llm_inference');
+  const [openaiKey, groqKey] = await Promise.all([
+    getSecret('openai_api_key', 'router_llm_inference'),
+    getSecret('groq_api_key', 'router_llm_inference'),
+  ]);
 
-  if (!openaiKey) {
-    console.warn('⚠️ No OpenAI key, falling back to general');
+  if (!openaiKey && !groqKey) {
+    console.warn('⚠️ No AI keys (OpenAI/Groq), falling back to general');
     return {
       category: 'general',
       confidence: 0.5,
@@ -122,16 +125,24 @@ export async function routeMessage(
         ? `Контекст диалога:\n${contextMessages.map(m => `${m.role}: ${m.content}`).join('\n')}\n\n`
         : '';
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    // Choose provider (Groq is usually faster and accessible in restricted regions)
+    const useGroq = !!groqKey;
+    const apiUrl = useGroq
+      ? 'https://api.groq.com/openai/v1/chat/completions'
+      : 'https://api.openai.com/v1/chat/completions';
+    const apiKey = useGroq ? groqKey : openaiKey;
+    const model = useGroq ? 'llama-3.1-8b-instant' : ROUTER_CONFIG.model;
+
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${openaiKey}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: ROUTER_CONFIG.model,
+        model,
         messages: [
-          { role: 'system', content: ROUTER_PROMPT },
+          { role: 'system', content: ROUTER_PROMPT + '\n\nОТВЕТЬ СТРОГО В ФОРМАТЕ JSON.' },
           { role: 'user', content: contextStr + message },
         ],
         response_format: { type: 'json_object' },

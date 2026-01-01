@@ -43,7 +43,8 @@ interface LLMProvider {
   url: string;
   apiKey: string;
   model: string;
-  supportsStructuredOutput: boolean;
+  supportsStructuredOutput: boolean; // json_schema support
+  supportsJsonMode: boolean; // response_format: { type: 'json_object' }
 }
 
 import { logger, getSecret } from '../lib/index.js';
@@ -57,6 +58,17 @@ async function getAvailableProviders(): Promise<LLMProvider[]> {
     getSecret('groq_api_key', 'llm_inference'),
   ]);
 
+  if (groqKey) {
+    providers.push({
+      name: 'Groq',
+      url: 'https://api.groq.com/openai/v1/chat/completions',
+      apiKey: groqKey,
+      model: 'llama-3.3-70b-versatile', // Latest top-tier model on Groq
+      supportsStructuredOutput: false,
+      supportsJsonMode: true,
+    });
+  }
+
   if (openaiKey) {
     providers.push({
       name: 'OpenAI',
@@ -64,16 +76,7 @@ async function getAvailableProviders(): Promise<LLMProvider[]> {
       apiKey: openaiKey,
       model: 'gpt-4o-mini',
       supportsStructuredOutput: true,
-    });
-  }
-
-  if (groqKey) {
-    providers.push({
-      name: 'Groq',
-      url: 'https://api.groq.com/openai/v1/chat/completions',
-      apiKey: groqKey,
-      model: 'llama-3.1-70b-versatile',
-      supportsStructuredOutput: false, // Groq doesn't support json_schema
+      supportsJsonMode: true,
     });
   }
 
@@ -87,9 +90,14 @@ async function getAvailableProviders(): Promise<LLMProvider[]> {
       apiKey: 'not-needed', // vLLM doesn't require API key
       model: 'mistralai/Mistral-Nemo-Instruct-2407',
       supportsStructuredOutput: false, // Local model doesn't support json_schema
+      supportsJsonMode: false, // Local model may not support json_object mode
     });
   }
 
+  console.log(
+    '[Orchestrator] Providers found:',
+    providers.map(p => p.name)
+  );
   return providers;
 }
 
@@ -126,12 +134,20 @@ async function callLLMWithFallback(
           max_tokens: options.maxTokens ?? 1500,
         };
 
-        // Add structured output only if provider supports it
+        // Structured output strategy
         if (options.jsonSchema && provider.supportsStructuredOutput) {
           body.response_format = {
             type: 'json_schema',
             json_schema: options.jsonSchema,
           };
+        } else if (options.jsonSchema && provider.supportsJsonMode) {
+          body.response_format = { type: 'json_object' };
+          // Add explicit JSON instruction to system prompt for non-structured providers
+          const systemMsg = messages.find(m => m.role === 'system');
+          if (systemMsg) {
+            systemMsg.content +=
+              '\n\nIMPORTANT: You must respond with a valid JSON object matching the requested schema. Do not include any other text or explanation.';
+          }
         } else if (options.jsonSchema) {
           // Fallback: add JSON instruction to system prompt
           const systemMsg = messages.find(m => m.role === 'system');
@@ -151,6 +167,7 @@ async function callLLMWithFallback(
 
         if (!response.ok) {
           const errorText = await response.text();
+          console.error(`[Orchestrator] ${provider.name} error: ${response.status}`, errorText);
 
           // Rate limit - wait and retry
           if (response.status === 429) {
@@ -166,6 +183,14 @@ async function callLLMWithFallback(
         const data = (await response.json()) as any;
         const content = data.choices[0]?.message?.content;
         const tokensUsed = data.usage?.total_tokens || 0;
+
+        // DEBUG: Write to file
+        try {
+          const fs = await import('fs');
+          const path = await import('path');
+          const logMsg = `\n[${new Date().toISOString()}] ${provider.name} (${body.model})\nRequest: ${JSON.stringify(messages.slice(-1))}\nResponse: ${content}\n---\n`;
+          fs.appendFileSync(path.join(process.cwd(), 'llm_debug.log'), logMsg);
+        } catch (e) {}
 
         if (!content) {
           throw new Error('Empty response from LLM');
@@ -514,7 +539,6 @@ async function callPlanner(
       temperature: 0.1, // Low randomness for consistency
       maxTokens: 500,
       jsonSchema: PLAN_JSON_SCHEMA,
-      preferredModel: 'gpt-4o-mini', // Fast model for planning
     });
 
     // Safe JSON parse with fallback
@@ -689,10 +713,18 @@ ${JSON.stringify(toolResultsSummary, null, 2)}
     // - Multiple tool results (need to combine data from different sources)
     const useAdvancedModel = hasSearchWeb || hasComplexAnalytics || hasMultipleTools;
 
-    const preferredModel = useAdvancedModel ? 'gpt-4o' : 'gpt-4o-mini';
+    const groqKey = await getSecret('groq_api_key', 'llm_inference');
+    const preferredModel = groqKey
+      ? useAdvancedModel
+        ? 'llama-3.3-70b-versatile'
+        : 'llama-3.1-70b-versatile'
+      : useAdvancedModel
+        ? 'gpt-4o'
+        : 'gpt-4o-mini';
 
     logger.info('Answerer model selected', {
       preferredModel,
+      provider: groqKey ? 'Groq' : 'OpenAI',
       hasSearchWeb,
       hasComplexAnalytics,
       toolsCount: toolResults.length,
