@@ -579,6 +579,7 @@ export async function handleAdminTestTelegram(
   }
 
   try {
+    // FORCE CACHE DEPLOY BUST 2026-01-01-16-20
     // Send a real-like Price Protection Alert
     const success = await sendAlertToUser(userId, {
       type: 'price_protection',

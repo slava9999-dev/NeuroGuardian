@@ -1,7 +1,7 @@
 // ============================================
 // NeuroGUARDIAN — Unified API Handler
 // Refactored: Uses middleware for auth, cleaner routing
-// Version: 3.0.0 | Date: December 2024
+// Version: 3.0.1 | Date: January 2026
 // ============================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
