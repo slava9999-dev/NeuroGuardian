@@ -33,6 +33,7 @@ import {
   executeSetStopLoss,
   executeBulkProtectProducts,
   executeGetSystemLogs,
+  executeGetCompetitorPrice,
 } from './tool-executors.js';
 // ============================================
 // LLM PROVIDER CONFIG
@@ -600,6 +601,8 @@ async function executeTool(
         return executeGetMarketplaceInfo(args);
       case 'get_marketplace_accounts':
         return await executeGetMarketplaceAccounts(userId, args);
+      case 'get_competitor_price':
+        return await executeGetCompetitorPrice(userId, args);
       case 'search_web':
         return await executeSearchWeb(userId, args);
       case 'update_prices':

@@ -74,6 +74,11 @@ export const SearchWebArgsSchema = z.object({
   topic: z.enum(['competitors', 'market', 'news', 'general']).optional().default('general'),
 });
 
+export const GetCompetitorPriceArgsSchema = z.object({
+  nm_id: z.union([z.string(), z.number()]).transform(val => String(val)),
+  marketplace: z.enum(['WB', 'Ozon']).optional().default('WB'),
+});
+
 export const GetMarketplaceAccountsArgsSchema = z.object({
   marketplace: z.enum(['WB', 'Ozon', 'all']).optional().default('all'),
 });
@@ -197,6 +202,7 @@ export type GetOrdersArgs = z.infer<typeof GetOrdersArgsSchema>;
 export type GetWarehouseStocksArgs = z.infer<typeof GetWarehouseStocksArgsSchema>;
 export type GetMarketplaceInfoArgs = z.infer<typeof GetMarketplaceInfoArgsSchema>;
 export type SearchWebArgs = z.infer<typeof SearchWebArgsSchema>;
+export type GetCompetitorPriceArgs = z.infer<typeof GetCompetitorPriceArgsSchema>;
 export type SetStopLossArgs = z.infer<typeof SetStopLossArgsSchema>;
 export type BulkProtectProductsArgs = z.infer<typeof BulkProtectProductsArgsSchema>;
 export type UpdatePricesArgs = z.infer<typeof UpdatePricesArgsSchema>;

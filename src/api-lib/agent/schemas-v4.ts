@@ -23,6 +23,7 @@ export const ToolNameEnum = z.enum([
   'get_stock_forecast',
   'get_marketplace_info',
   'get_marketplace_accounts',
+  'get_competitor_price',
   'search_web',
   'update_prices',
   'update_stocks',
@@ -339,6 +340,7 @@ export const PLAN_JSON_SCHEMA = {
                 'get_stock_forecast',
                 'get_marketplace_info',
                 'get_marketplace_accounts',
+                'get_competitor_price',
                 'search_web',
                 'update_prices',
                 'update_stocks',
@@ -447,6 +449,10 @@ export const PLAN_JSON_SCHEMA = {
                   type: 'string',
                   enum: ['info', 'warning', 'error', 'critical'],
                   description: 'Log severity level',
+                },
+                nm_id: {
+                  type: 'string',
+                  description: 'Артикул товара конкурента (nm_id для WB)',
                 },
                 entity_type: {
                   type: 'string',
