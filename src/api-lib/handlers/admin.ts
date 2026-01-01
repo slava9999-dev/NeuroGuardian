@@ -166,6 +166,48 @@ export async function handleRunMigration(
       console.log('✅ Migration 008 complete');
     }
 
+    if (migrationId === '014' || migrationId === 'all') {
+      // Migration 014: Price Rules
+      console.log('🔄 Applying migration 014: price_rules table...');
+
+      await sql`
+        CREATE TABLE IF NOT EXISTS price_rules (
+            id SERIAL PRIMARY KEY,
+            product_id VARCHAR(100) NOT NULL,
+            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+            min_price DECIMAL(12, 2) NOT NULL,
+            max_price DECIMAL(12, 2) NOT NULL,
+            cost_price DECIMAL(12, 2),
+            target_margin DECIMAL(5, 2) DEFAULT 20.00,
+            min_margin DECIMAL(5, 2) DEFAULT 10.00,
+            competitor_tracking BOOLEAN DEFAULT false,
+            competitor_nmids TEXT,
+            price_match_strategy VARCHAR(20) DEFAULT 'none',
+            undercut_amount DECIMAL(5, 2) DEFAULT 1.00,
+            undercut_type VARCHAR(10) DEFAULT 'percent',
+            auto_adjust BOOLEAN DEFAULT false,
+            auto_protect BOOLEAN DEFAULT true,
+            notification_enabled BOOLEAN DEFAULT true,
+            alert_threshold_percent DECIMAL(5, 2) DEFAULT 10.00,
+            active BOOLEAN DEFAULT true,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            CONSTRAINT price_rules_product_unique UNIQUE(product_id),
+            CONSTRAINT price_range_valid CHECK (min_price <= max_price),
+            CONSTRAINT margin_valid CHECK (target_margin >= 0 AND target_margin <= 100),
+            CONSTRAINT min_margin_valid CHECK (min_margin >= 0 AND min_margin <= target_margin)
+        );
+      `;
+      results.push('Table price_rules created');
+
+      // Indexes
+      await sql`CREATE INDEX IF NOT EXISTS idx_price_rules_product ON price_rules(product_id)`;
+      await sql`CREATE INDEX IF NOT EXISTS idx_price_rules_user ON price_rules(user_id)`;
+      await sql`CREATE INDEX IF NOT EXISTS idx_price_rules_active ON price_rules(active) WHERE active = true`;
+
+      console.log('✅ Migration 014 complete');
+    }
+
     return res.json({
       success: true,
       migration: migrationId,
