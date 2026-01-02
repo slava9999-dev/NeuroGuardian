@@ -123,10 +123,7 @@ async function sendTypingAction(chatId: number): Promise<void> {
   }
 }
 
-async function answerCallbackQuery(
-  callbackQueryId: string,
-  text?: string
-): Promise<void> {
+async function answerCallbackQuery(callbackQueryId: string, text?: string): Promise<void> {
   try {
     const token = getBotToken();
     await fetch(`${TELEGRAM_API}${token}/answerCallbackQuery`, {
@@ -189,9 +186,9 @@ async function ensureUserExists(telegramUser: TelegramUser): Promise<number> {
       )
     `;
 
-    logger.info('New user created from Telegram', { 
-      userId: telegramUser.id, 
-      username: telegramUser.username 
+    logger.info('New user created from Telegram', {
+      userId: telegramUser.id,
+      username: telegramUser.username,
     });
 
     return telegramUser.id;
@@ -205,10 +202,7 @@ async function ensureUserExists(telegramUser: TelegramUser): Promise<number> {
 // COMMAND HANDLERS
 // ============================================
 
-async function handleStartCommand(
-  chatId: number,
-  user: TelegramUser
-): Promise<void> {
+async function handleStartCommand(chatId: number, user: TelegramUser): Promise<void> {
   await ensureUserExists(user);
 
   const webAppUrl = process.env.WEBAPP_URL || 'https://neuro-guardian.vercel.app';
@@ -280,29 +274,22 @@ async function handleHelpCommand(chatId: number): Promise<void> {
 async function handleSettingsCommand(chatId: number): Promise<void> {
   const webAppUrl = process.env.WEBAPP_URL || 'https://neuro-guardian.vercel.app';
 
-  await sendTelegramMessage(
-    chatId,
-    '⚙️ Для настройки API ключей откройте приложение:',
-    {
-      parseMode: 'HTML',
-      replyMarkup: {
-        inline_keyboard: [
-          [
-            {
-              text: '⚙️ Открыть настройки',
-              web_app: { url: `${webAppUrl}?page=settings` },
-            },
-          ],
+  await sendTelegramMessage(chatId, '⚙️ Для настройки API ключей откройте приложение:', {
+    parseMode: 'HTML',
+    replyMarkup: {
+      inline_keyboard: [
+        [
+          {
+            text: '⚙️ Открыть настройки',
+            web_app: { url: `${webAppUrl}?page=settings` },
+          },
         ],
-      },
-    }
-  );
+      ],
+    },
+  });
 }
 
-async function handleStatusCommand(
-  chatId: number,
-  userId: number
-): Promise<void> {
+async function handleStatusCommand(chatId: number, userId: number): Promise<void> {
   try {
     const result = await sql`
       SELECT 
@@ -349,11 +336,7 @@ ${!isActive ? '\n💡 Оформите подписку для продолже�
 // MESSAGE HANDLER (VIKTOR AI)
 // ============================================
 
-async function handleUserMessage(
-  chatId: number,
-  userId: number,
-  text: string
-): Promise<void> {
+async function handleUserMessage(chatId: number, userId: number, text: string): Promise<void> {
   // Show typing indicator
   await sendTypingAction(chatId);
 
@@ -371,7 +354,7 @@ async function handleUserMessage(
       // Add links if present
       if (result.links && result.links.length > 0) {
         response += '\n\n🔗 <b>Ссылки:</b>\n';
-        result.links.forEach((link) => {
+        result.links.forEach(link => {
           response += `• <a href="${link.url}">${link.title}</a>\n`;
         });
       }
@@ -379,7 +362,7 @@ async function handleUserMessage(
       // Add actions if present
       if (result.actions && result.actions.length > 0) {
         response += '\n\n⚡ <b>Выполненные действия:</b>\n';
-        result.actions.forEach((action) => {
+        result.actions.forEach(action => {
           response += `• ${action.summary}\n`;
         });
       }
@@ -414,7 +397,7 @@ async function handleCallbackQuery(query: TelegramCallbackQuery): Promise<void> 
   await answerCallbackQuery(query.id); // Acknowledge immediately
 
   // --- TWO-STEP CONFIRMATION ---
-  
+
   // Step 1: User clicked "Применить" → Show confirmation
   if (data.startsWith('confirm:apply_price:')) {
     // Format: confirm:apply_price:marketplace:externalId:price
@@ -424,17 +407,21 @@ async function handleCallbackQuery(query: TelegramCallbackQuery): Promise<void> 
       const externalId = parts[2];
       const price = parts[3];
 
-      await sendTelegramMessage(chatId, 
+      await sendTelegramMessage(
+        chatId,
         `⚠️ *Подтвердите изменение цены*\n\n` +
-        `📦 Артикул: \`${externalId}\`\n` +
-        `💰 Новая цена: *${price}₽*\n\n` +
-        `Вы уверены?`,
+          `📦 Артикул: \`${externalId}\`\n` +
+          `💰 Новая цена: *${price}₽*\n\n` +
+          `Вы уверены?`,
         {
           parseMode: 'Markdown',
           replyMarkup: {
             inline_keyboard: [
               [
-                { text: '✅ Да, применить', callback_data: `apply_price:${marketplace}:${externalId}:${price}` },
+                {
+                  text: '✅ Да, применить',
+                  callback_data: `apply_price:${marketplace}:${externalId}:${price}`,
+                },
                 { text: '❌ Отмена', callback_data: `cancel_action` },
               ],
             ],
@@ -460,27 +447,30 @@ async function handleCallbackQuery(query: TelegramCallbackQuery): Promise<void> 
 
       // Delegate to Viktor AI
       const command = `Установи цену ${price} для товара с артикулом ${externalId} на ${marketplace}`;
-      
+
       try {
         const result = await orchestrateV4(command, { userId, marketplace: 'all' });
-        
+
         if (result.success) {
-           await sendTelegramMessage(chatId, 
-             `✅ *Цена обновлена!*\n\n` +
-             `📦 Артикул: \`${externalId}\`\n` +
-             `💰 Новая цена: *${price}₽*\n\n` +
-             `${result.message}`, 
-             { parseMode: 'Markdown' }
-           );
+          await sendTelegramMessage(
+            chatId,
+            `✅ *Цена обновлена!*\n\n` +
+              `📦 Артикул: \`${externalId}\`\n` +
+              `💰 Новая цена: *${price}₽*\n\n` +
+              `${result.message}`,
+            { parseMode: 'Markdown' }
+          );
         } else {
-           await sendTelegramMessage(chatId, 
-             `❌ *Ошибка обновления цены*\n\n${result.message}`, 
-             { parseMode: 'Markdown' }
-           );
+          await sendTelegramMessage(chatId, `❌ *Ошибка обновления цены*\n\n${result.message}`, {
+            parseMode: 'Markdown',
+          });
         }
       } catch (e) {
-         logger.error('Failed to apply price via callback', e);
-         await sendTelegramMessage(chatId, `❌ Системная ошибка при обновлении цены. Попробуйте позже.`);
+        logger.error('Failed to apply price via callback', e);
+        await sendTelegramMessage(
+          chatId,
+          `❌ Системная ошибка при обновлении цены. Попробуйте позже.`
+        );
       }
     }
     return;
@@ -489,10 +479,11 @@ async function handleCallbackQuery(query: TelegramCallbackQuery): Promise<void> 
   // --- IGNORE ALERT ---
   if (data.startsWith('ignore_alert:')) {
     const externalId = data.split(':')[1];
-    await sendTelegramMessage(chatId, 
+    await sendTelegramMessage(
+      chatId,
       `👌 Уведомление проигнорировано.\n\n` +
-      `Товар \`${externalId}\` останется с текущей ценой.\n` +
-      `Sentinel продолжит мониторинг.`,
+        `Товар \`${externalId}\` останется с текущей ценой.\n` +
+        `Sentinel продолжит мониторинг.`,
       { parseMode: 'Markdown' }
     );
     return;
@@ -507,16 +498,24 @@ async function handleCallbackQuery(query: TelegramCallbackQuery): Promise<void> 
   // --- CHECK PROTECTION ---
   if (data.startsWith('check_protection:')) {
     const externalId = data.split(':')[1];
-    
-    await sendTelegramMessage(chatId, 
+
+    await sendTelegramMessage(
+      chatId,
       `🛡️ *Настройка защиты*\n\n` +
-      `Откройте приложение для настройки правил защиты товара \`${externalId}\`.`,
+        `Откройте приложение для настройки правил защиты товара \`${externalId}\`.`,
       {
         parseMode: 'Markdown',
         replyMarkup: {
-          inline_keyboard: [[
-            { text: '⚙️ Открыть настройки', web_app: { url: `${process.env.WEBAPP_URL || 'https://neuro-guardian.vercel.app'}?page=products` } },
-          ]],
+          inline_keyboard: [
+            [
+              {
+                text: '⚙️ Открыть настройки',
+                web_app: {
+                  url: `${process.env.WEBAPP_URL || 'https://neuro-guardian.vercel.app'}?page=products`,
+                },
+              },
+            ],
+          ],
         },
       }
     );
@@ -536,8 +535,26 @@ async function handleCallbackQuery(query: TelegramCallbackQuery): Promise<void> 
       await handleStatusCommand(chatId, query.from.id);
       break;
     case 'buy_subscription':
-       await sendTelegramMessage(chatId, '💳 Оплата подписки скоро будет доступна. Сейчас у вас действует пробный период.');
-       break;
+      await sendTelegramMessage(
+        chatId,
+        '💳 *Оформление подписки*\n\n' + 'Нажмите кнопку ниже, чтобы выбрать тариф и оплатить.',
+        {
+          parseMode: 'Markdown',
+          replyMarkup: {
+            inline_keyboard: [
+              [
+                {
+                  text: '💎 Выбрать тариф',
+                  web_app: {
+                    url: `${process.env.WEBAPP_URL || 'https://neuro-guardian.vercel.app'}?page=subscription`,
+                  },
+                },
+              ],
+            ],
+          },
+        }
+      );
+      break;
     default:
       // Unknown callback
       break;
@@ -560,7 +577,7 @@ export async function handleTelegramWebhook(
   try {
     const update: TelegramUpdate = req.body;
 
-    logger.info('Telegram webhook received', { 
+    logger.info('Telegram webhook received', {
       updateId: update.update_id,
       hasMessage: !!update.message,
       hasCallback: !!update.callback_query,
@@ -585,7 +602,7 @@ export async function handleTelegramWebhook(
       // Check for commands
       if (text.startsWith('/')) {
         const command = text.split(' ')[0].toLowerCase();
-        
+
         switch (command) {
           case '/start':
             await handleStartCommand(chatId, user);
@@ -627,21 +644,18 @@ export async function setTelegramWebhook(webhookUrl: string): Promise<{
 }> {
   try {
     const token = getBotToken();
-    const response = await fetch(
-      `${TELEGRAM_API}${token}/setWebhook`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          url: webhookUrl,
-          allowed_updates: ['message', 'callback_query'],
-          drop_pending_updates: true,
-        }),
-      }
-    );
+    const response = await fetch(`${TELEGRAM_API}${token}/setWebhook`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url: webhookUrl,
+        allowed_updates: ['message', 'callback_query'],
+        drop_pending_updates: true,
+      }),
+    });
 
     const data = await response.json();
-    
+
     if (data.ok) {
       logger.info('Telegram webhook set successfully', { url: webhookUrl });
       return { success: true };

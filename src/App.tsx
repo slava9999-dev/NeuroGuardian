@@ -23,6 +23,9 @@ const LegalPage = lazy(() => import('./pages/LegalPage').then(m => ({ default: m
 const OpsPanelPage = lazy(() =>
   import('./pages/OpsPanelPage').then(m => ({ default: m.OpsPanelPage }))
 );
+const SubscriptionPage = lazy(() =>
+  import('./pages/SubscriptionPage').then(m => ({ default: m.SubscriptionPage }))
+);
 
 // Loading screen with agent branding
 function LoadingScreen() {
@@ -108,7 +111,7 @@ const DEV_USER: User = {
 };
 
 // Pages enum - Agent is first!
-type Page = 'agent' | 'products' | 'settings' | 'info' | 'ops';
+type Page = 'agent' | 'products' | 'settings' | 'info' | 'ops' | 'subscription';
 
 function App() {
   const setUser = useAppStore(state => state.setUser);
@@ -117,7 +120,17 @@ function App() {
 
   const [isInitialized, setIsInitialized] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState<Page>('agent'); // Agent is default!
+  const [currentPage, setCurrentPage] = useState<Page>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const pageParam = params.get('page') as Page;
+    if (
+      pageParam &&
+      ['agent', 'products', 'settings', 'info', 'ops', 'subscription'].includes(pageParam)
+    ) {
+      return pageParam;
+    }
+    return 'agent';
+  });
 
   const initPerformed = useRef(false);
 
@@ -250,7 +263,9 @@ function App() {
           <SettingsPage onBack={goToAgent} onNavigate={p => (p === 'ops' ? goToOps() : null)} />
         )}
         {currentPage === 'info' && <LegalPage onBack={goToAgent} />}
+        {currentPage === 'info' && <LegalPage onBack={goToAgent} />}
         {currentPage === 'ops' && <OpsPanelPage onBack={goToAgent} />}
+        {currentPage === 'subscription' && <SubscriptionPage onBack={goToSettings} />}
       </Suspense>
 
       {/* Bottom Tab Bar - Simplified */}
