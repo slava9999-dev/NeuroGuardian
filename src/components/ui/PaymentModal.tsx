@@ -196,8 +196,14 @@ export function PaymentModal({
     setFallbackUrl(null);
 
     try {
+      // FIX: Map legacy plan IDs to new API
+      const isYearly = selectedPlanId === 'yearly';
+      const tier = isYearly ? 'pro' : selectedPlanId || 'pro';
+      const billingPeriod = isYearly ? 'yearly' : 'monthly';
+
       const result = await paymentApi.createPayment({
-        planId: selectedPlanId,
+        tier,
+        billingPeriod,
         savePaymentMethod: true,
       });
 

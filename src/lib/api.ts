@@ -267,18 +267,22 @@ export const paymentApi = {
   },
 
   createPayment: async (params: {
-    planId: string;
+    tier: string;
     billingPeriod?: 'monthly' | 'yearly';
     email?: string;
+    savePaymentMethod?: boolean;
+    promoCode?: string;
   }): Promise<CreatePaymentResult> => {
     const initData = getInitData();
 
     const response = await api.post('', {
       action: 'create-payment',
       initData,
-      tier: params.planId, // Backend expects 'tier'
+      tier: params.tier,
       billing_period: params.billingPeriod || 'monthly',
       email: params.email,
+      savePaymentMethod: params.savePaymentMethod ?? true,
+      promoCode: params.promoCode,
     });
 
     // Map backend response to frontend expected format
