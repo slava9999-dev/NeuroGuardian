@@ -16,6 +16,9 @@ export type AlertUrgency = 'low' | 'medium' | 'high' | 'critical';
 export type AlertType =
   | 'price_protection'
   | 'sentinel_alert'
+  | 'margin_warning' // NEW: Low margin alert
+  | 'stock_warning' // NEW: Low stock alert
+  | 'competitor_alert' // NEW: Competitor price drop
   | 'system_error'
   | 'sync_completed'
   | 'daily_report'
@@ -342,6 +345,67 @@ function formatAlert(alert: Alert, smartMessage?: string | null): string {
       alert.message || 'Буду следить за вашим магазином на WB и Ozon.',
       ``,
       `🛡️ Защита цен • 📊 Аналитика • ⚠️ Уведомления`,
+    ].join('\n');
+  }
+
+  // === NEW PROACTIVE ALERTS ===
+
+  // Margin warning - low margin alert
+  if (alert.type === 'margin_warning' && alert.product) {
+    const margin = (alert.data?.margin as number) || 0;
+    const profit = (alert.data?.profit as number) || 0;
+    return [
+      `💸 *Виктор ИИ — Внимание к марже!*`,
+      ``,
+      `${emoji} *Низкая маржинальность*`,
+      ``,
+      `📦 *${escapeMarkdown(alert.product.name)}*`,
+      `🏷️ Артикул: \`${alert.product.externalId}\``,
+      ``,
+      `📊 Маржа: *${margin.toFixed(1)}%*`,
+      `💰 Прибыль: *${profit}₽* за шт.`,
+      ``,
+      `💡 ${alert.message || 'Рекомендую пересмотреть цену или себестоимость'}`,
+    ].join('\n');
+  }
+
+  // Stock warning - low stock alert
+  if (alert.type === 'stock_warning' && alert.product) {
+    const stock = (alert.data?.stock as number) || 0;
+    const daysLeft = (alert.data?.daysLeft as number) || 0;
+    return [
+      `📦 *Виктор ИИ — Остатки заканчиваются!*`,
+      ``,
+      `${emoji} *Скоро закончится товар*`,
+      ``,
+      `📦 *${escapeMarkdown(alert.product.name)}*`,
+      `🏷️ Артикул: \`${alert.product.externalId}\``,
+      ``,
+      `📊 Остаток: *${stock} шт.*`,
+      `⏰ Хватит на: *~${daysLeft} дн.*`,
+      ``,
+      `💡 ${alert.message || 'Закажите товар на склад, чтобы не потерять продажи!'}`,
+    ].join('\n');
+  }
+
+  // Competitor alert - competitor price drop
+  if (alert.type === 'competitor_alert' && alert.product) {
+    const competitorPrice = (alert.data?.competitorPrice as number) || 0;
+    const yourPrice = (alert.data?.yourPrice as number) || 0;
+    const diff = yourPrice - competitorPrice;
+    return [
+      `🔍 *Виктор ИИ — Конкурент снизил цену!*`,
+      ``,
+      `${emoji} *Изменение у конкурента*`,
+      ``,
+      `📦 *${escapeMarkdown(alert.product.name)}*`,
+      `🏷️ Ваш артикул: \`${alert.product.externalId}\``,
+      ``,
+      `💰 Ваша цена: *${yourPrice}₽*`,
+      `👤 Конкурент: *${competitorPrice}₽*`,
+      diff > 0 ? `📉 Разница: *${diff}₽* дороже` : `📈 Разница: *${Math.abs(diff)}₽* дешевле`,
+      ``,
+      `💡 ${alert.message || 'Проверьте, нужно ли скорректировать цену'}`,
     ].join('\n');
   }
 
