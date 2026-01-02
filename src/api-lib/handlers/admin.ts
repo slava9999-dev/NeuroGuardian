@@ -209,6 +209,104 @@ export async function handleRunMigration(
       console.log('✅ Migration 014 complete');
     }
 
+    if (migrationId === '017' || migrationId === 'all') {
+      // Migration 017: Subscriptions System
+      console.log('🔄 Applying migration 017: subscriptions system...');
+
+      // Create subscriptions table
+      await sql`
+        CREATE TABLE IF NOT EXISTS subscriptions (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          status VARCHAR(20) NOT NULL DEFAULT 'trial',
+          tier VARCHAR(20) NOT NULL DEFAULT 'free',
+          trial_started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          trial_ends_at TIMESTAMP WITH TIME ZONE DEFAULT (NOW() + INTERVAL '7 days'),
+          current_period_start TIMESTAMP WITH TIME ZONE,
+          current_period_end TIMESTAMP WITH TIME ZONE,
+          next_billing_date TIMESTAMP WITH TIME ZONE,
+          payment_method VARCHAR(50),
+          last_payment_at TIMESTAMP WITH TIME ZONE,
+          last_payment_amount DECIMAL(10, 2),
+          max_products INTEGER DEFAULT 50,
+          max_accounts INTEGER DEFAULT 1,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          cancelled_at TIMESTAMP WITH TIME ZONE,
+          cancellation_reason TEXT,
+          CONSTRAINT valid_status CHECK (status IN ('trial', 'active', 'past_due', 'cancelled', 'expired')),
+          CONSTRAINT valid_tier CHECK (tier IN ('free', 'basic', 'pro', 'business')),
+          CONSTRAINT one_subscription_per_user UNIQUE (user_id)
+        )
+      `;
+      results.push('Table subscriptions created');
+
+      // Create indexes
+      await sql`CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON subscriptions(status)`;
+      await sql`CREATE INDEX IF NOT EXISTS idx_subscriptions_tier ON subscriptions(tier)`;
+      results.push('Subscriptions indexes created');
+
+      // Create payments table
+      await sql`
+        CREATE TABLE IF NOT EXISTS payments (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          subscription_id INTEGER REFERENCES subscriptions(id) ON DELETE SET NULL,
+          payment_id VARCHAR(255) UNIQUE NOT NULL,
+          amount DECIMAL(10, 2) NOT NULL,
+          currency VARCHAR(3) DEFAULT 'RUB',
+          status VARCHAR(20) NOT NULL DEFAULT 'pending',
+          provider VARCHAR(50) NOT NULL,
+          provider_data JSONB,
+          description TEXT,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          paid_at TIMESTAMP WITH TIME ZONE,
+          CONSTRAINT valid_payment_status CHECK (status IN ('pending', 'succeeded', 'failed', 'cancelled', 'refunded'))
+        )
+      `;
+      results.push('Table payments created');
+
+      // Create payments indexes
+      await sql`CREATE INDEX IF NOT EXISTS idx_payments_user_id ON payments(user_id)`;
+      await sql`CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status)`;
+      await sql`CREATE INDEX IF NOT EXISTS idx_payments_payment_id ON payments(payment_id)`;
+      results.push('Payments indexes created');
+
+      // Create subscription_tiers table
+      await sql`
+        CREATE TABLE IF NOT EXISTS subscription_tiers (
+          tier VARCHAR(20) PRIMARY KEY,
+          name_ru VARCHAR(100) NOT NULL,
+          name_en VARCHAR(100) NOT NULL,
+          price_monthly DECIMAL(10, 2) NOT NULL,
+          price_yearly DECIMAL(10, 2),
+          max_products INTEGER NOT NULL,
+          max_accounts INTEGER NOT NULL,
+          features JSONB NOT NULL DEFAULT '[]',
+          display_order INTEGER NOT NULL DEFAULT 0,
+          is_popular BOOLEAN DEFAULT FALSE,
+          is_active BOOLEAN DEFAULT TRUE,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        )
+      `;
+      results.push('Table subscription_tiers created');
+
+      // Insert default tiers
+      await sql`
+        INSERT INTO subscription_tiers (tier, name_ru, name_en, price_monthly, price_yearly, max_products, max_accounts, features, display_order, is_popular) VALUES
+        ('free', 'Бесплатный', 'Free', 0, 0, 10, 1, '["Базовый AI ассистент", "Мониторинг до 10 товаров", "1 магазин"]'::jsonb, 1, false),
+        ('basic', 'Базовый', 'Basic', 999, 9990, 50, 1, '["Полный AI ассистент Viktor", "Защита цен 24/7", "Мониторинг до 50 товаров", "1 магазин", "Умные уведомления", "ABC анализ"]'::jsonb, 2, true),
+        ('pro', 'Профессиональный', 'Pro', 2999, 29990, 500, 3, '["Всё из Базового", "До 500 товаров", "3 магазина", "Приоритетная поддержка", "Расширенная аналитика", "Прогнозы продаж"]'::jsonb, 3, false),
+        ('business', 'Бизнес', 'Business', 9999, 99990, 999999, 10, '["Всё из Профессионального", "Безлимит товаров", "До 10 магазинов", "Персональный менеджер", "API доступ", "Кастомные интеграции"]'::jsonb, 4, false)
+        ON CONFLICT (tier) DO NOTHING
+      `;
+      results.push('Default tiers inserted');
+
+      console.log('✅ Migration 017 complete');
+    }
+
     return res.json({
       success: true,
       migration: migrationId,
@@ -573,7 +671,7 @@ export async function handleAdminTestTelegram(
   }
 
   const userId = Number(req.query.userId || req.body?.userId);
-  
+
   if (!userId) {
     return res.status(400).json({ error: 'userId required' });
   }
@@ -589,19 +687,19 @@ export async function handleAdminTestTelegram(
         name: 'Тестовый Товар 123',
         marketplace: 'WB',
         externalId: '12345678',
-        userId
+        userId,
       },
       analysis: {
         currentPrice: 1000,
         recommendedPrice: 900,
         reason: 'Конкурент снизил цену на 15%',
-        action: 'Снизить цену'
-      }
+        action: 'Снизить цену',
+      },
     });
 
     return res.json({
       success,
-      message: 'Smart Alert sent via sendAlertToUser'
+      message: 'Smart Alert sent via sendAlertToUser',
     });
   } catch (e) {
     const errorMessage = e instanceof Error ? e.message : 'Unknown error';
