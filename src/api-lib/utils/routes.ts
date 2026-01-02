@@ -12,6 +12,13 @@ export const ROUTE_GROUPS = {
   auth: ['auth', 'settings', 'plans'],
   products: ['products', 'sync-products', 'batch-set-stop-loss'],
   payments: ['create-payment', 'payment-webhook'],
+  subscriptions: [
+    'subscription',
+    'subscription-tiers',
+    'upgrade-subscription',
+    'cancel-subscription',
+    'check-limits',
+  ],
   sentinel: [
     'check-prices',
     'sentinel-logs',
@@ -60,6 +67,7 @@ export const AVAILABLE_ACTIONS = [
   ...ROUTE_GROUPS.auth,
   ...ROUTE_GROUPS.products,
   ...ROUTE_GROUPS.payments,
+  ...ROUTE_GROUPS.subscriptions,
   ...ROUTE_GROUPS.sentinel,
   ...ROUTE_GROUPS.agent,
   ...ROUTE_GROUPS.chat,

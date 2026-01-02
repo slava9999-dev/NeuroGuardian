@@ -57,6 +57,15 @@ import {
 // Payment handlers
 import { handleCreatePayment, handlePaymentWebhook } from '../src/api-lib/handlers/payments.js';
 
+// Subscription handlers
+import {
+  handleGetSubscription,
+  handleUpgradeSubscription,
+  handleCancelSubscription,
+  handleGetTiers,
+  handleCheckLimits,
+} from '../src/api-lib/handlers/subscription.js';
+
 // Sentinel handlers
 import {
   handleCheckPrices,
@@ -268,7 +277,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!auth.success || auth.context.authMethod !== 'admin') {
           return sendAuthError(res, 'Admin access required', 403);
         }
-        const webhookUrl = req.body?.url || `https://neuro-guardian.vercel.app/api?action=telegram-webhook`;
+        const webhookUrl =
+          req.body?.url || `https://neuro-guardian.vercel.app/api?action=telegram-webhook`;
         const result = await setTelegramWebhook(webhookUrl);
         return res.status(result.success ? 200 : 500).json(result);
       }
@@ -328,6 +338,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         return handleSyncProducts(req, res, auth.context.userId);
       }
+
+      // ========== SUBSCRIPTION ENDPOINTS ==========
+      case 'subscription':
+      case 'upgrade-subscription':
+      case 'cancel-subscription':
+      case 'check-limits': {
+        const auth = await extractAnyAuthAsync(req);
+        if (auth.success === false) {
+          return sendAuthError(res, auth.error, auth.statusCode);
+        }
+
+        const subscriptionHandlers: Record<
+          string,
+          (req: VercelRequest, res: VercelResponse, userId: number) => Promise<void>
+        > = {
+          subscription: handleGetSubscription,
+          'upgrade-subscription': handleUpgradeSubscription,
+          'cancel-subscription': handleCancelSubscription,
+          'check-limits': handleCheckLimits,
+        };
+        return subscriptionHandlers[action](req, res, auth.context.userId);
+      }
+
+      case 'subscription-tiers':
+        return handleGetTiers(req, res);
 
       // ========== SENTINEL ENDPOINTS ==========
       case 'check-prices':
