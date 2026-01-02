@@ -483,7 +483,7 @@ async function handleCallbackQuery(query: TelegramCallbackQuery): Promise<void> 
       chatId,
       `👌 Уведомление проигнорировано.\n\n` +
         `Товар \`${externalId}\` останется с текущей ценой.\n` +
-        `Sentinel продолжит мониторинг.`,
+        `Виктор ИИ продолжит мониторинг.`,
       { parseMode: 'Markdown' }
     );
     return;
