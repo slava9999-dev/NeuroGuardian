@@ -82,7 +82,7 @@ export function SubscriptionPage({ onBack }: SubscriptionPageProps) {
     setLoading(true);
     setError(null);
     try {
-      const result = await paymentApi.createPayment({ planId: tierId });
+      const result = await paymentApi.createPayment({ tier: tierId });
       if (result.confirmationUrl) {
         // Redirect to YooKassa
         window.location.href = result.confirmationUrl;
