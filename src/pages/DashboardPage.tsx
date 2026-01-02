@@ -66,7 +66,7 @@ export function DashboardPage() {
       {/* System Status Section */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatusCard
-          title="Sentinel 2.0"
+          title="🛡️ Защита цен"
           value={sentinelStatus?.is_active ? '🛡️ Активен' : '⏸️ Пауза'}
           subtitle={`Посл. проверка: ${formatTime(sentinelStatus?.last_check)}`}
           highlight={!sentinelStatus?.is_active}

@@ -132,7 +132,7 @@ export function LogHistory({ isOpen, onClose }: LogHistoryProps) {
                   </div>
                   <div>
                     <h2 className="text-xl font-bold text-white">История защиты</h2>
-                    <p className="text-sm text-stone-400">Срабатывания Sentinel</p>
+                    <p className="text-sm text-stone-400">Защита цен</p>
                   </div>
                 </div>
                 <button
@@ -224,7 +224,7 @@ export function LogHistory({ isOpen, onClose }: LogHistoryProps) {
                   <span className="text-4xl mb-4 block">🛡️</span>
                   <p className="text-stone-400 font-medium">Пока нет срабатываний</p>
                   <p className="text-stone-500 text-sm mt-2">
-                    Sentinel отслеживает цены ваших товаров
+                    Виктор ИИ отслеживает цены ваших товаров
                   </p>
                 </div>
               ) : (

@@ -126,7 +126,7 @@ export function LegalPage({ onBack }: LegalPageProps) {
                 <span className="text-violet-500">✓</span> 🧠 AI-агент с голосовым управлением
               </li>
               <li className="flex gap-3 text-sm text-stone-300">
-                <span className="text-violet-500">✓</span> 🛡️ SENTINEL — защита от акций 24/7
+                <span className="text-violet-500">✓</span> 🛡️ Виктор ИИ — защита цен 24/7
               </li>
               <li className="flex gap-3 text-sm text-stone-300">
                 <span className="text-violet-500">✓</span> 📊 Продажи и выручка в реальном времени
