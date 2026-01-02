@@ -1,7 +1,7 @@
 // ============================================
 // NeuroGUARDIAN — Competitor Monitor Service
 // Real-time price fetching from external marketplaces
-// Version: 1.0.0 | Date: December 2024
+// Version: 1.1.0 | Date: 2026-01-03
 // ============================================
 
 interface CompetitorData {
@@ -10,6 +10,46 @@ interface CompetitorData {
   basicPrice: number; // Цена до скидок (для аналитики)
   available: boolean; // Есть ли в наличии
   stock: number; // Остаток (приблизительно)
+}
+
+/**
+ * Извлекает nm_id из URL Wildberries
+ * Примеры:
+ * - https://www.wildberries.ru/catalog/123456789/detail.aspx → 123456789
+ * - https://wildberries.ru/catalog/123456789 → 123456789
+ * - wildberries.ru/catalog/123456789/detail.aspx?targetUrl=... → 123456789
+ */
+export function extractNmIdFromUrl(input: string | number): number | null {
+  // If already a number, return it
+  if (typeof input === 'number') return input;
+
+  // If it's a pure number string
+  const numericOnly = input.replace(/\D/g, '');
+  if (/^\d{6,12}$/.test(input.trim())) {
+    return parseInt(input.trim());
+  }
+
+  // Try to extract from WB URL patterns
+  const wbPatterns = [
+    /wildberries\.ru\/catalog\/(\d+)/i,
+    /wb\.ru\/catalog\/(\d+)/i,
+    /wbx\.ru\/(\d+)/i,
+    /card\.wb\.ru\/.*nm=(\d+)/i,
+  ];
+
+  for (const pattern of wbPatterns) {
+    const match = input.match(pattern);
+    if (match && match[1]) {
+      return parseInt(match[1]);
+    }
+  }
+
+  // Last resort: find any sequence of 6-12 digits (likely nm_id)
+  if (numericOnly.length >= 6 && numericOnly.length <= 12) {
+    return parseInt(numericOnly);
+  }
+
+  return null;
 }
 
 /**

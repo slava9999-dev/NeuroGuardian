@@ -223,13 +223,14 @@ async function generateSmartMessage(alert: Alert): Promise<string | null> {
     return null;
   }
 
-  const systemPrompt = `Ты — Виктор, опытный AI-ассистент для управления бизнесом на WB и Ozon.
-Твоя задача: написать короткое, профессиональное и "живое" уведомление.
-Стиль: деловой, партнерский, иногда с легким юмором или мотивацией, если это уместно (например, приветствие или успех).
-Обязательно делай акцент на выгоде пользователя и ПРИБЫЛИ.
+  const systemPrompt = `Ты — Виктор, ИИ-управляющий магазинами на WB и Ozon.
+Твоя задача: написать короткое уведомление для продавца.
+Стиль: заботливый, понятный, без сложных терминов. Как сообщение от умного помощника.
+Всегда с конкретикой: название товара, цифры, что делать.
 Формат: Telegram Markdown.
-Ограничение: до 400 символов.
-Не используй вводные фразы ("Вот уведомление:", "Согласно данным..."). Сразу к сути.`;
+Ограничение: до 350 символов.
+Не используй слова: API, Sentinel, unit-economics, margin, webhook.
+Сразу к сути, без вводных фраз.`;
 
   const context = [
     `Тип: ${alert.type}`,
@@ -273,10 +274,10 @@ function formatAlert(alert: Alert, smartMessage?: string | null): string {
 
   // If we have a smart message, use it with a proper header
   if (smartMessage) {
-    let header = `🛡️ *SENTINEL — Уведомление*`;
-    if (alert.type === 'welcome') header = `👋 *Добро пожаловать в NeuroGUARDIAN!*`;
-    if (alert.type === 'subscription_expired') header = `💎 *Внимание: Подписка истекла*`;
-    if (alert.type === 'price_protection') header = `🛡️ *SENTINEL — Автоматический мониторинг*`;
+    let header = `🤖 *Виктор ИИ*`;
+    if (alert.type === 'welcome') header = `👋 *Виктор ИИ — Ваш управляющий*`;
+    if (alert.type === 'subscription_expired') header = `💎 *Виктор ИИ: Подписка истекла*`;
+    if (alert.type === 'price_protection') header = `🛡️ *Виктор ИИ — Защита цен*`;
 
     const body = [header, ``, smartMessage];
 
@@ -303,40 +304,44 @@ function formatAlert(alert: Alert, smartMessage?: string | null): string {
     const priceDiffPercent = Math.round((priceDiff / alert.analysis.currentPrice) * 100);
 
     return [
-      `🛡️ *SENTINEL — Автоматический мониторинг*`,
+      `🛡️ *Виктор ИИ — Защита цен*`,
       ``,
-      `${emoji} *Обнаружен демпинг конкурента!*`,
+      `${emoji} *Обнаружил проблему с ценой!*`,
       ``,
-      `📦 *Товар:* ${escapeMarkdown(alert.product.name)}`,
-      `🔢 *Артикул:* \`${alert.product.externalId}\``,
-      `${mpEmoji} *Маркетплейс:* ${alert.product.marketplace.toUpperCase()}`,
+      `📦 *${escapeMarkdown(alert.product.name)}*`,
+      `${mpEmoji} ${alert.product.marketplace.toUpperCase()} • Артикул: \`${alert.product.externalId}\``,
       ``,
-      `💰 Ваша цена: *${alert.analysis.currentPrice}₽*`,
-      `📉 Рекомендация: *${alert.analysis.recommendedPrice}₽* (${priceDiffPercent > 0 ? '-' : '+'}${Math.abs(priceDiffPercent)}%)`,
+      `Сейчас: *${alert.analysis.currentPrice}₽*`,
+      `Нужно: *${alert.analysis.recommendedPrice}₽*`,
+      priceDiffPercent > 0 ? `❌ Вы теряете ~${priceDiffPercent}% прибыли` : ``,
       ``,
-      `💡 *Причина:* ${escapeMarkdown(alert.analysis.reason)}`,
-    ].join('\n');
+      `💡 ${escapeMarkdown(alert.analysis.reason)}`,
+    ]
+      .filter(Boolean)
+      .join('\n');
   }
 
   // Sentinel alert - general
   if (alert.type === 'sentinel_alert' && alert.product) {
+    const mpEmoji = alert.product.marketplace.toUpperCase() === 'WB' ? '🟣' : '🔵';
     return [
-      `🛡️ *SENTINEL — Уведомление*`,
+      `🤖 *Виктор ИИ*`,
       ``,
-      `${emoji} ${escapeMarkdown(alert.product.name)}`,
-      `🔢 Артикул: \`${alert.product.externalId}\``,
-      `📍 ${alert.product.marketplace.toUpperCase()}`,
+      `${emoji} *${escapeMarkdown(alert.product.name)}*`,
+      `${mpEmoji} ${alert.product.marketplace.toUpperCase()} • \`${alert.product.externalId}\``,
       ``,
-      alert.message || 'Обнаружена нежелательная акция',
+      alert.message || 'Обнаружил изменение цены. Проверьте товар.',
     ].join('\n');
   }
 
   // Welcome message
   if (alert.type === 'welcome') {
     return [
-      `👋 *Добро пожаловать в NeuroGUARDIAN!*`,
+      `👋 *Привет! Я Виктор — ваш ИИ-управляющий*`,
       ``,
-      alert.message || 'AI-ассистент готов к работе.',
+      alert.message || 'Буду следить за вашим магазином на WB и Ozon.',
+      ``,
+      `🛡️ Защита цен • 📊 Аналитика • ⚠️ Уведомления`,
     ].join('\n');
   }
 
@@ -448,28 +453,42 @@ export async function sendAlert(alert: Alert): Promise<boolean> {
 }
 
 /**
- * Send hourly report to admin
+ * Send hourly report to admin — ONLY if there are issues
+ * Silent when everything is OK (no spam!)
  */
 export async function sendHourlyReport(report: HourlyReport): Promise<boolean> {
   const adminChatId = getAdminChatId();
   if (!adminChatId) return false;
 
   const hasErrors = report.errors && report.errors.length > 0;
-  const emoji = hasErrors ? '⚠️' : '📊';
+  const hasAlerts = report.alertsSent > 0;
 
-  const message = [
-    `${emoji} *Hourly Report*`,
-    ``,
-    `⏰ ${new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })}`,
-    ``,
-    `📦 Products synced: ${report.productsSynced}`,
-    `✅ Price checks: ${report.priceChecks}`,
-    `✏️ Auto-updates: ${report.autoUpdates}`,
-    `⚠️ Alerts sent: ${report.alertsSent}`,
-    ``,
-    hasErrors ? `❌ Errors: ${report.errors!.length}` : `✅ No errors`,
-  ].join('\n');
+  // 🔇 SILENT MODE: Don't spam if everything is OK
+  if (!hasErrors && !hasAlerts) {
+    console.log('📊 Hourly check: всё в порядке, уведомление не отправляем');
+    return true; // Success but no message
+  }
 
+  // Only send if there's something important
+  const lines: string[] = [`🤖 *Виктор ИИ — Проверка*`, ``];
+
+  if (hasAlerts) {
+    lines.push(`⚠️ За последний час: ${report.alertsSent} важных событий`);
+    lines.push(`Проверено товаров: ${report.priceChecks}`);
+  }
+
+  if (hasErrors) {
+    lines.push(``);
+    lines.push(`❌ Ошибок: ${report.errors!.length}`);
+    lines.push(`Возможно проблема с доступом к маркетплейсу`);
+  }
+
+  if (report.autoUpdates > 0) {
+    lines.push(``);
+    lines.push(`✅ Автоматически исправлено: ${report.autoUpdates} цен`);
+  }
+
+  const message = lines.join('\n');
   const success = await sendTelegramMessage(adminChatId, message);
 
   await logOpsEvent({

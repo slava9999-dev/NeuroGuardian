@@ -16,7 +16,7 @@ import {
   type ToolResult,
   type ToolName,
 } from './schemas-v4.js';
-import { buildPlannerPrompt, buildAnswererPrompt } from './prompts/system-v4.js';
+import { buildPlannerPrompt, buildAnswererPrompt } from './prompts/system-v5.js';
 import {
   executeGetProducts,
   executeGetSalesStats,

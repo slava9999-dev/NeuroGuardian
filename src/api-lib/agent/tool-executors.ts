@@ -1488,6 +1488,7 @@ export async function executeGetSystemLogs(userId: number, rawArgs: unknown): Pr
 /**
  * GET_COMPETITOR_PRICE — Get real-time price of a competitor product
  * Uses public WB API to fetch competitor data without needing their API key
+ * Now supports URLs — automatically extracts nm_id from Wildberries URLs
  */
 export async function executeGetCompetitorPrice(
   _userId: number,
@@ -1499,27 +1500,37 @@ export async function executeGetCompetitorPrice(
   if (isValidationError(validation)) return { success: false, error: validation.error };
   const args = validation.data;
 
-  console.log(`🔍 executeGetCompetitorPrice: nm_id=${args.nm_id}, marketplace=${args.marketplace}`);
-
-  // Import competitor monitor service
-  const { fetchWbCompetitorData, fetchOzonCompetitorData } =
+  // Import competitor monitor service with URL extraction
+  const { fetchWbCompetitorData, fetchOzonCompetitorData, extractNmIdFromUrl } =
     await import('../services/competitor-monitor.js');
+
+  // Extract nm_id from URL or use as-is
+  const nmId = extractNmIdFromUrl(args.nm_id);
+
+  if (!nmId) {
+    return {
+      success: false,
+      error: `Не удалось определить артикул товара. Передайте ссылку на товар (например: https://www.wildberries.ru/catalog/123456789/detail.aspx) или артикул (123456789).`,
+    };
+  }
+
+  console.log(`🔍 executeGetCompetitorPrice: nm_id=${nmId}, marketplace=${args.marketplace}`);
 
   try {
     if (args.marketplace === 'Ozon') {
-      const data = await fetchOzonCompetitorData(args.nm_id);
+      const data = await fetchOzonCompetitorData(String(nmId));
       if (!data) {
         return {
           success: false,
           error:
-            'Ozon competitor monitoring requires specialized scraping service. Use search_web for Ozon competitor research.',
+            'К сожалению, цены Ozon пока нельзя проверить напрямую. Попробуйте поиск: search_web с запросом "название товара site:ozon.ru".',
         };
       }
       return {
         success: true,
         data: {
           marketplace: 'Ozon',
-          product_id: args.nm_id,
+          product_id: nmId,
           price: data.price,
           available: data.available,
           stock: data.stock,
@@ -1528,12 +1539,12 @@ export async function executeGetCompetitorPrice(
     }
 
     // Wildberries - uses public API
-    const data = await fetchWbCompetitorData(args.nm_id);
+    const data = await fetchWbCompetitorData(nmId);
 
     if (!data) {
       return {
         success: false,
-        error: `Товар ${args.nm_id} не найден на Wildberries. Проверьте правильность артикула.`,
+        error: `Товар с артикулом ${nmId} не найден на Wildberries. Проверьте правильность ссылки или артикула.`,
       };
     }
 
