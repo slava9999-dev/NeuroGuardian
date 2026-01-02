@@ -43,6 +43,7 @@ import {
   GetLowMarginProductsArgsSchema,
 } from './validators.js';
 import type { DBProduct } from '../lib/types.js';
+import type { WbStatisticsSale } from '../lib/marketplace-types.js';
 
 // Unified product matching
 import { filterProducts } from '../utils/product-matcher.js';
@@ -224,10 +225,13 @@ export async function executeGetSalesStats(userId: number, rawArgs: unknown): Pr
     if (keys.wb && (!args.marketplace || args.marketplace === 'WB' || args.marketplace === 'all')) {
       try {
         const wbOrders = await fetchWbOrders(keys.wb, from);
-        const filtered = wbOrders.filter((s: any) => {
-          const saleDate = new Date(s.date);
-          return saleDate >= from && saleDate <= to;
-        });
+        const filtered = wbOrders.filter(
+          (s: WbStatisticsSale): s is WbStatisticsSale & { date: string } => {
+            if (!s.date) return false;
+            const saleDate = new Date(s.date);
+            return saleDate >= from && saleDate <= to;
+          }
+        );
 
         for (const sale of filtered) {
           if (sale.saleID && !sale.saleID.startsWith('R')) {
@@ -488,7 +492,8 @@ export async function executeGetWarehouseStocks(
 
       for (const item of items) {
         const totalStock =
-          item.stocks?.reduce((sum: number, s: any) => sum + (s.present || 0), 0) || 0;
+          item.stocks?.reduce((sum: number, s: { present: number }) => sum + (s.present || 0), 0) ||
+          0;
 
         if (!args.low_stock_only || totalStock < 10) {
           stocks.push({
@@ -568,7 +573,9 @@ export async function executeCalculateUnitEconomics(
   // getCommissionRate() returns category-specific rates from unit-economics.ts
 
   // Count products with real cost data
-  const productsWithCost = targetProducts.filter((p: any) => p.cost_price && p.cost_price > 0);
+  const productsWithCost = targetProducts.filter(
+    (p: DBProduct) => p.cost_price && p.cost_price > 0
+  );
   const costDataCoverage = Math.round((productsWithCost.length / targetProducts.length) * 100);
 
   const calculations = await Promise.all(
@@ -1209,7 +1216,13 @@ export async function executeUpdatePrices(userId: number, rawArgs: unknown): Pro
   const args = validation.data;
 
   try {
-    const products = await getProductsByUserId(userId, (args as any).account_id);
+    const argsWithAccount = args as {
+      account_id?: number;
+      marketplace?: string;
+      products?: any[];
+      change_value?: number;
+    };
+    const products = await getProductsByUserId(userId, argsWithAccount.account_id);
     const updates: Array<{
       product_id: string;
       nm_id?: number;
@@ -1217,6 +1230,8 @@ export async function executeUpdatePrices(userId: number, rawArgs: unknown): Pro
       marketplace: 'WB' | 'Ozon';
       currentPrice: number;
       newPrice: number;
+      minPrice: number;
+      belowMinPrice: boolean;
     }> = [];
 
     // Case 1: Specific products from array
@@ -1234,7 +1249,7 @@ export async function executeUpdatePrices(userId: number, rawArgs: unknown): Pro
             newPrice: item.new_price,
             minPrice: p.min_price,
             belowMinPrice: p.min_price > 0 && item.new_price < p.min_price,
-          } as any);
+          });
         }
       }
     }
@@ -1255,7 +1270,7 @@ export async function executeUpdatePrices(userId: number, rawArgs: unknown): Pro
           newPrice,
           minPrice: p.min_price,
           belowMinPrice: p.min_price > 0 && newPrice < p.min_price,
-        } as any);
+        });
       }
     }
 
@@ -1268,7 +1283,7 @@ export async function executeUpdatePrices(userId: number, rawArgs: unknown): Pro
       data: {
         price_updates: updates,
         marketplace: args.marketplace,
-        account_id: (args as any).account_id,
+        account_id: argsWithAccount.account_id,
       },
     };
   } catch (error) {
@@ -1285,7 +1300,8 @@ export async function executeUpdateStocks(userId: number, rawArgs: unknown): Pro
   const args = validation.data;
 
   try {
-    const products = await getProductsByUserId(userId, (args as any).account_id);
+    const argsWithAccount = args as { account_id?: number; marketplace?: string; products: any[] };
+    const products = await getProductsByUserId(userId, argsWithAccount.account_id);
     const stockUpdates: Array<{
       product_id: string;
       sku?: string;
@@ -1321,7 +1337,7 @@ export async function executeUpdateStocks(userId: number, rawArgs: unknown): Pro
       data: {
         stock_updates: stockUpdates,
         marketplace: args.marketplace,
-        account_id: (args as any).account_id,
+        account_id: argsWithAccount.account_id,
       },
     };
   } catch (error) {
@@ -1432,7 +1448,8 @@ export async function executeGetSystemLogs(userId: number, rawArgs: unknown): Pr
   const user = await getUserById(userId);
   const adminId = process.env.ADMIN_TELEGRAM_ID;
   const isAdmin =
-    (user as any)?.role === 'admin' || (adminId && String(userId) === String(adminId));
+    (user && 'role' in user && user.role === 'admin') ||
+    (adminId && String(userId) === String(adminId));
 
   if (!isAdmin) {
     return { success: false, error: '⛔ Access Denied: Admin rights required for system logs.' };
@@ -1451,7 +1468,9 @@ export async function executeGetSystemLogs(userId: number, rawArgs: unknown): Pr
         logs: logs.map(l => ({
           timestamp: l.created_at,
           type: l.event_type,
-          severity: (l.payload as any)?.urgency || 'info',
+          severity: (l.payload && typeof l.payload === 'object' && 'urgency' in l.payload
+            ? l.payload.urgency
+            : 'info') as string,
           entity: l.product_id
             ? `product:${l.product_id}`
             : l.user_id

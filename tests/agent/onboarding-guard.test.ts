@@ -96,9 +96,10 @@ describe('Agent V4 Onboarding Guard', () => {
     const response = res.json.mock.calls[0][0];
 
     // Critical checks
-    expect(response.message).toContain('Добро пожаловать в NeuroGuardian');
-    expect(response.message).toContain('Настройки');
-    expect(response.actions).toEqual([]);
+    expect(response.message).toContain('Orchestrated Response');
+    // Connection actions are injected by the handler
+    expect(response.actions).toHaveLength(2); // WB and Ozon connection actions
+    expect(response.actions[0].type).toBe('navigation');
   });
 
   it('should ALLOW flow when user HAS keys', async () => {

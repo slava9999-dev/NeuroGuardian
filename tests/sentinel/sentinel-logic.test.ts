@@ -22,6 +22,8 @@ vi.mock('../../src/api-lib/services/marketplace.js', () => ({
   setWbZeroStock: vi.fn(),
   setWbDefensePrice: vi.fn(),
   fetchOzonCurrentPrices: vi.fn(),
+  updateWbPrices: vi.fn(),
+  updateOzonPrices: vi.fn(),
 }));
 
 vi.mock('../../src/api-lib/services/database.js', () => ({
@@ -32,8 +34,17 @@ vi.mock('../../src/api-lib/services/database.js', () => ({
   updateProductMinPrice: vi.fn(),
 }));
 
+vi.mock('../../src/api-lib/middleware/auth.js', () => ({
+  verifyAdminAccessAsync: vi.fn().mockResolvedValue(true),
+  extractAnyAuthAsync: vi.fn().mockResolvedValue({
+    success: true,
+    context: { userId: 1, authMethod: 'cron' },
+  }),
+}));
+
 vi.mock('../../src/api-lib/services/notifications.js', () => ({
   sendTelegramNotification: vi.fn(),
+  sendAlert: vi.fn(),
   notificationService: {
     sendAlert: vi.fn(),
   },
@@ -121,6 +132,9 @@ describe('Sentinel Protection Logic', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default SQL response to avoid crashes on unmocked calls (like price_rules)
+    vi.mocked(sql).mockResolvedValue({ rows: [] } as any);
+
     process.env.CRON_SECRET = 'super-secret';
     process.env.ADMIN_API_KEY = 'admin-key';
     process.env.TELEGRAM_BOT_TOKEN = 'bot-token';
@@ -170,6 +184,14 @@ describe('Sentinel Protection Logic', () => {
     await handleCheckPrices(req, res);
 
     // 6. Assertions
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: true,
+        scanned: 1,
+        triggered: 1,
+      })
+    );
+
     expect(dbService.setOzonDefensePrice).toHaveBeenCalledWith(
       'ozon-client',
       'ozon-key',
@@ -177,9 +199,11 @@ describe('Sentinel Protection Logic', () => {
     );
 
     // Should update current_price in DB
-    const updateCall = vi
-      .mocked(sql)
-      .mock.calls.find(c => c[0][0].includes('UPDATE products SET current_price'));
+    const updateCall = vi.mocked(sql).mock.calls.find(c => {
+      const queryStr = Array.isArray(c[0]) ? c[0].join('') : String(c[0]);
+      return queryStr.includes('UPDATE products') && queryStr.includes('current_price');
+    });
+
     expect(updateCall).toBeDefined();
 
     // Should log the trigger (via database.js mock)

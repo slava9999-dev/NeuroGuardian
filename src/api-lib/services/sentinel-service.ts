@@ -97,6 +97,7 @@ export class SentinelService {
    * Process a single user's products
    */
   public async processUser(user: DBUser, summary: SentinelRunResult): Promise<void> {
+    console.warn(`[DEBUG] processUser called for user ${user.id}`);
     const keys = await getMarketplaceKeys(user.id);
     if (!keys.wb && !keys.ozon) return;
 
@@ -142,6 +143,9 @@ export class SentinelService {
         const ozonKeys = keys.ozon;
 
         const priceMap = await fetchOzonCurrentPrices(ozonKeys.clientId, ozonKeys.apiKey, ozonIds);
+        console.error(
+          `[DEBUG] Ozon Prices fetched: size=${priceMap.size}, keys=[${Array.from(priceMap.keys())}]`
+        );
         await this.handleMarketplaceThreats(
           user,
           ozonProducts,
@@ -167,13 +171,16 @@ export class SentinelService {
     summary: SentinelRunResult,
     rulesMap: Map<string, PriceRule>
   ): Promise<void> {
+    console.warn(`[DEBUG] handleMarketplaceThreats for ${products.length} products`);
     for (const product of products) {
       const key =
         marketplace === 'WB' ? product.nm_id : parseInt(product.product_id.replace('ozon-', ''));
 
       if (!key) continue;
 
+      console.error(`[DEBUG] Loop: product=${product.product_id} key=${key}`);
       const livePrice = priceMap.get(key);
+      console.error(`[DEBUG] Loop: livePrice=${livePrice} (type=${typeof livePrice})`);
       if (livePrice === undefined) continue;
 
       // 1. SMART REPRICING (PriceShield)
@@ -289,6 +296,7 @@ export class SentinelService {
       }
 
       // Update current_price in DB for observability
+      console.warn(`[DEBUG] Updating DB for product ${product.id} price ${livePrice}`);
       await sql`
         UPDATE products SET current_price = ${livePrice}, updated_at = NOW() 
         WHERE id = ${product.id}
