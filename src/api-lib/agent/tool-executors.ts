@@ -1487,20 +1487,18 @@ export async function executeGetSystemLogs(userId: number, rawArgs: unknown): Pr
 
 /**
  * GET_COMPETITOR_PRICE — Get real-time price of a competitor product
- * Uses public WB API to fetch competitor data without needing their API key
- * Now supports URLs — automatically extracts nm_id from Wildberries URLs
+ * UPDATED 2026-01: WB public API (card.wb.ru) is now blocked
+ * Falls back to web search via Serper API
  */
 export async function executeGetCompetitorPrice(
   _userId: number,
   rawArgs: unknown
 ): Promise<ToolResult> {
-  // Import validator if not already at top
   const { GetCompetitorPriceArgsSchema } = await import('./validators.js');
   const validation = validateToolArgs(GetCompetitorPriceArgsSchema, rawArgs);
   if (isValidationError(validation)) return { success: false, error: validation.error };
   const args = validation.data;
 
-  // Import competitor monitor service with URL extraction
   const { fetchWbCompetitorData, fetchOzonCompetitorData, extractNmIdFromUrl } =
     await import('../services/competitor-monitor.js');
 
@@ -1510,22 +1508,16 @@ export async function executeGetCompetitorPrice(
   if (!nmId) {
     return {
       success: false,
-      error: `Не удалось определить артикул товара. Передайте ссылку на товар (например: https://www.wildberries.ru/catalog/123456789/detail.aspx) или артикул (123456789).`,
+      error: `Не удалось определить артикул. Передайте ссылку (https://www.wildberries.ru/catalog/123456789/detail.aspx) или артикул (123456789).`,
     };
   }
 
-  console.log(`🔍 executeGetCompetitorPrice: nm_id=${nmId}, marketplace=${args.marketplace}`);
+  console.log(`🔍 get_competitor_price: nm_id=${nmId}, marketplace=${args.marketplace}`);
 
-  try {
-    if (args.marketplace === 'Ozon') {
-      const data = await fetchOzonCompetitorData(String(nmId));
-      if (!data) {
-        return {
-          success: false,
-          error:
-            'К сожалению, цены Ozon пока нельзя проверить напрямую. Попробуйте поиск: search_web с запросом "название товара site:ozon.ru".',
-        };
-      }
+  // ===== OZON =====
+  if (args.marketplace === 'Ozon') {
+    const data = await fetchOzonCompetitorData(String(nmId));
+    if (data) {
       return {
         success: true,
         data: {
@@ -1537,51 +1529,147 @@ export async function executeGetCompetitorPrice(
         },
       };
     }
+    // Fallback: suggest search
+    return {
+      success: true,
+      data: {
+        marketplace: 'Ozon',
+        product_id: nmId,
+        error: 'Прямой доступ к ценам Ozon недоступен',
+        suggestion: 'Используйте search_web для поиска: "site:ozon.ru [артикул или название]"',
+        productUrl: `https://www.ozon.ru/product/${nmId}`,
+      },
+    };
+  }
 
-    // Wildberries - uses public API
+  // ===== WILDBERRIES =====
+  try {
+    // Try direct API first (may be blocked)
     const data = await fetchWbCompetitorData(nmId);
 
-    if (!data) {
+    if (data) {
+      const discount =
+        data.basicPrice > data.price
+          ? Math.round(((data.basicPrice - data.price) / data.basicPrice) * 100)
+          : 0;
+
       return {
-        success: false,
-        error: `Товар с артикулом ${nmId} не найден на Wildberries. Проверьте правильность ссылки или артикула.`,
+        success: true,
+        data: {
+          marketplace: 'WB',
+          nm_id: data.nmId,
+          price: data.price,
+          basicPrice: data.basicPrice,
+          discount: discount > 0 ? `${discount}%` : null,
+          available: data.available,
+          stock: data.stock,
+          stockStatus:
+            data.stock > 50
+              ? '🟢 Много'
+              : data.stock > 10
+                ? '🟡 Средне'
+                : data.stock > 0
+                  ? '🔴 Мало'
+                  : '⚫ Нет',
+          url: `https://www.wildberries.ru/catalog/${data.nmId}/detail.aspx`,
+        },
       };
     }
+  } catch (error) {
+    console.warn('WB API failed, falling back to search:', error);
+  }
 
-    // Calculate discount
-    const discount =
-      data.basicPrice > data.price
-        ? Math.round(((data.basicPrice - data.price) / data.basicPrice) * 100)
-        : 0;
+  // ===== FALLBACK: Web Search =====
+  console.log('📡 WB API unavailable, using web search fallback...');
 
+  const { getSecret } = await import('../lib/secrets-helper.js');
+  const serperKey = await getSecret('serper_api_key', 'web_search');
+
+  if (!serperKey) {
     return {
       success: true,
       data: {
         marketplace: 'WB',
-        nm_id: data.nmId,
-        price: data.price,
-        basicPrice: data.basicPrice,
-        discount: discount > 0 ? `${discount}%` : null,
-        available: data.available,
-        stock: data.stock,
-        stockStatus:
-          data.stock > 50
-            ? '🟢 Много'
-            : data.stock > 10
-              ? '🟡 Средне'
-              : data.stock > 0
-                ? '🔴 Мало'
-                : '⚫ Нет',
-        url: `https://www.wildberries.ru/catalog/${data.nmId}/detail.aspx`,
+        nm_id: nmId,
+        error: 'Прямой API недоступен, интернет-поиск не настроен',
+        productUrl: `https://www.wildberries.ru/catalog/${nmId}/detail.aspx`,
+        suggestion: 'Откройте ссылку вручную для просмотра цены',
       },
     };
-  } catch (error) {
-    console.error('Competitor price fetch error:', error);
-    return {
-      success: false,
-      error: `Ошибка получения данных конкурента: ${error instanceof Error ? error.message : String(error)}`,
-    };
   }
+
+  try {
+    const searchQuery = `wildberries ${nmId} цена`;
+    const response = await fetch('https://google.serper.dev/search', {
+      method: 'POST',
+      headers: {
+        'X-API-KEY': serperKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        q: searchQuery,
+        gl: 'ru',
+        hl: 'ru',
+        num: 3,
+      }),
+    });
+
+    if (response.ok) {
+      interface SerperResult {
+        title?: string;
+        link?: string;
+        snippet?: string;
+      }
+      const searchData = (await response.json()) as { organic?: SerperResult[] };
+
+      // Try to extract price from search results
+      const wbResult = searchData.organic?.find((r: SerperResult) =>
+        r.link?.includes('wildberries.ru')
+      );
+
+      // Extract price from snippet if possible (pattern: "1 234 ₽" or "от 999 руб")
+      let extractedPrice: number | null = null;
+      if (wbResult?.snippet) {
+        const priceMatch = wbResult.snippet.match(/(\d[\d\s]*)\s*[₽руб]/i);
+        if (priceMatch) {
+          extractedPrice = parseInt(priceMatch[1].replace(/\s/g, ''));
+        }
+      }
+
+      return {
+        success: true,
+        data: {
+          marketplace: 'WB',
+          nm_id: nmId,
+          source: 'web_search',
+          price: extractedPrice,
+          priceNote: extractedPrice
+            ? 'Цена получена из поиска Google (может быть неточной)'
+            : 'Цена не найдена в результатах поиска',
+          productUrl: `https://www.wildberries.ru/catalog/${nmId}/detail.aspx`,
+          searchResults: searchData.organic?.slice(0, 2).map((r: SerperResult) => ({
+            title: r.title,
+            link: r.link,
+            snippet: r.snippet?.substring(0, 150),
+          })),
+        },
+      };
+    }
+  } catch (searchError) {
+    console.error('Search fallback also failed:', searchError);
+  }
+
+  // Last resort: just return the product URL
+  return {
+    success: true,
+    data: {
+      marketplace: 'WB',
+      nm_id: nmId,
+      error: 'Не удалось получить цену автоматически',
+      productUrl: `https://www.wildberries.ru/catalog/${nmId}/detail.aspx`,
+      suggestion: 'Откройте ссылку для просмотра актуальной цены',
+    },
+  };
 }
 
 /**
