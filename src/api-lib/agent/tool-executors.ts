@@ -17,6 +17,7 @@ import {
   fetchOzonStocksV3,
   getSystemEvents,
 } from '../services/index.js';
+import { getUserReviews } from '../services/reviews-service.js';
 
 import { getSecurityAgent } from '@neuroguardian/security-agent';
 
@@ -1601,5 +1602,44 @@ export async function executeGetCompetitorPrice(
       success: false,
       error: `Ошибка получения данных конкурента: ${error instanceof Error ? error.message : String(error)}`,
     };
+  }
+}
+
+/**
+ * GET_REVIEWS — List product reviews from WB/Ozon
+ */
+export async function executeGetReviews(userId: number, rawArgs: unknown): Promise<ToolResult> {
+  const { GetReviewsArgsSchema } = await import('./validators.js');
+  const validation = validateToolArgs(GetReviewsArgsSchema, rawArgs);
+  if (isValidationError(validation)) return { success: false, error: validation.error };
+  const args = validation.data;
+
+  try {
+    const reviews = await getUserReviews(userId, args);
+
+    if (reviews.length === 0) {
+      return {
+        success: true,
+        data: { message: 'Отзывов не найдено за последнее время.', reviews: [] },
+      };
+    }
+
+    return {
+      success: true,
+      data: {
+        total: reviews.length,
+        reviews: reviews.slice(0, args.limit).map(r => ({
+          marketplace: r.marketplace,
+          rating: r.rating,
+          text: r.text.substring(0, 200) + (r.text.length > 200 ? '...' : ''),
+          author: r.author_name,
+          date: new Date(r.created_at).toLocaleDateString(),
+          status: r.status,
+          product: r.product_title || r.product_id,
+        })),
+      },
+    };
+  } catch (error) {
+    return { success: false, error: String(error) };
   }
 }

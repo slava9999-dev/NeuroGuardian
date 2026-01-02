@@ -89,6 +89,19 @@ export const GetSystemLogsArgsSchema = z.object({
   entity_type: z.string().optional(),
 });
 
+export const GetReviewsArgsSchema = z.object({
+  limit: z.number().int().min(1).max(50).optional().default(10),
+  is_replied: z.boolean().optional(),
+  marketplace: z.enum(['WB', 'Ozon']).optional(),
+});
+
+export const GenerateReviewReplyArgsSchema = z.object({
+  review_id: z.string().min(1, 'Review ID is required'),
+  marketplace: z.enum(['WB', 'Ozon']),
+  tone: z.enum(['polite', 'friendly', 'official']).optional().default('polite'),
+  text: z.string().optional(), // If provided, use this text
+});
+
 // === WRITE TOOLS (REQUIRE CONFIRMATION) ===
 
 export const SetStopLossArgsSchema = z.object({

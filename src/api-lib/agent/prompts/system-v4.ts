@@ -41,6 +41,9 @@ export const PLANNER_PROMPT_V4 = `Ты — AI-ассистент для упра
 - get_competitor_price: Слежка за ценой конкурента (парсинг). { "marketplace": "WB"|"Ozon", "nm_id": "...", "url": "..." }
 - get_marketplace_info: Справка по комиссиям и тарифам МП. { "marketplace": "WB"|"Ozon" }
 
+### ⭐ Отзывы
+- get_reviews: Просмотр отзывов покупателей. { "limit": 10, "is_replied": false }
+
 ### ⚡ Действия (Требуют requires_confirmation: true)
 - update_prices: Изменение цены товара. { "updates": [{ "product_id": "...", "new_price": 1000 }] }
 - set_stop_loss: Установка минимальной цены (Stop-Loss). { "product_id": "...", "min_price": 800, "auto_adjust": true }

@@ -30,6 +30,7 @@ export const ToolNameEnum = z.enum([
   'set_stop_loss',
   'bulk_protect_products',
   'get_system_logs',
+  'get_reviews',
 ]);
 
 export type ToolName = z.infer<typeof ToolNameEnum>;
@@ -347,6 +348,7 @@ export const PLAN_JSON_SCHEMA = {
                 'set_stop_loss',
                 'bulk_protect_products',
                 'get_system_logs',
+                'get_reviews',
               ],
             },
             args: {
@@ -453,6 +455,10 @@ export const PLAN_JSON_SCHEMA = {
                 nm_id: {
                   type: 'string',
                   description: 'Артикул товара конкурента (nm_id для WB)',
+                },
+                is_replied: {
+                  type: 'boolean',
+                  description: 'Filter reviews by reply status',
                 },
                 entity_type: {
                   type: 'string',

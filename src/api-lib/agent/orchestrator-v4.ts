@@ -34,6 +34,7 @@ import {
   executeBulkProtectProducts,
   executeGetSystemLogs,
   executeGetCompetitorPrice,
+  executeGetReviews,
 } from './tool-executors.js';
 // ============================================
 // LLM PROVIDER CONFIG
@@ -615,6 +616,8 @@ async function executeTool(
         return await executeBulkProtectProducts(userId, args);
       case 'get_system_logs':
         return await executeGetSystemLogs(userId, args);
+      case 'get_reviews':
+        return await executeGetReviews(userId, args);
       default:
         return { success: false, error: `Unknown tool: ${toolName}` };
     }
