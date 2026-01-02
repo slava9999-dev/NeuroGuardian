@@ -31,6 +31,7 @@ export const ToolNameEnum = z.enum([
   'bulk_protect_products',
   'get_system_logs',
   'get_reviews',
+  'get_low_margin_products',
 ]);
 
 export type ToolName = z.infer<typeof ToolNameEnum>;
@@ -74,7 +75,13 @@ export const ResponseLinkSchema = z.object({
  * Action that requires user confirmation
  */
 export const ResponseActionSchema = z.object({
-  type: z.enum(['update_prices', 'set_stop_loss', 'bulk_protect_products', 'update_stocks']),
+  type: z.enum([
+    'update_prices',
+    'set_stop_loss',
+    'bulk_protect_products',
+    'update_stocks',
+    'navigation',
+  ]),
   summary: z.string().describe('Human-readable description'),
   details_json: z.string().describe('JSON-serialized action parameters'),
   affected_count: z.number().int().min(0).describe('Number of items affected'),
@@ -288,7 +295,13 @@ export const ANSWER_JSON_SCHEMA = {
           properties: {
             type: {
               type: 'string',
-              enum: ['update_prices', 'set_stop_loss', 'bulk_protect_products', 'update_stocks'],
+              enum: [
+                'update_prices',
+                'set_stop_loss',
+                'bulk_protect_products',
+                'update_stocks',
+                'navigation',
+              ],
             },
             summary: { type: 'string' },
             details_json: {
@@ -349,6 +362,7 @@ export const PLAN_JSON_SCHEMA = {
                 'bulk_protect_products',
                 'get_system_logs',
                 'get_reviews',
+                'get_low_margin_products',
               ],
             },
             args: {
@@ -425,11 +439,10 @@ export const PLAN_JSON_SCHEMA = {
                   enum: [
                     'commissions',
                     'logistics',
-                    'payments',
-                    'returns',
                     'promotions',
-                    'problems',
+                    'legal',
                     'tips',
+                    'problems',
                     'general',
                   ],
                   description: 'Info topic',
@@ -463,6 +476,10 @@ export const PLAN_JSON_SCHEMA = {
                 entity_type: {
                   type: 'string',
                   description: 'Entity type filter (e.g. user, product)',
+                },
+                threshold: {
+                  type: 'number',
+                  description: 'Margin threshold percentage (default 10)',
                 },
               },
               required: [], // All args are optional

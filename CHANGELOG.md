@@ -2,6 +2,18 @@
 
 All notable changes to NeuroGUARDIAN project.
 
+## [2.12.1] - 2026-01-02
+
+### 🤖 Agent Capabilities Expansion
+
+- **[NEW] Reviews Intelligence**: Agent can now fetch and analyze product reviews from WB/Ozon using `get_reviews` tool.
+- **[FIX] Planner Tool Awareness**: Fixed critical issue where Agent V4 was unaware of 80% of its tools. Now explicitly aware of all 16 tools including `search_web`, `get_competitor_price`, etc.
+- **[FIX] Payment API Types**: Resolved TypeScript conflict between `planId` (legacy) and `tier` (new) in payment creation logic.
+
+### 🧪 Testing
+
+- **[NEW] Tool Unit Tests**: Added tests for `get_reviews` tool validating input arguments and response formatting.
+
 ## [2.12.0] - 2025-12-28
 
 ### 🎯 Major features — Production Readiness & Marketplace Automation

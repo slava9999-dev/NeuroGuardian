@@ -19,7 +19,7 @@ import {
 } from '../services/index.js';
 import { getUserReviews } from '../services/reviews-service.js';
 
-import { getSecurityAgent } from '@neuroguardian/security-agent';
+import { getSecret } from '../lib/index.js';
 
 // Zod validation schemas
 import {
@@ -40,6 +40,7 @@ import {
   SetStopLossArgsSchema,
   BulkProtectProductsArgsSchema,
   GetSystemLogsArgsSchema,
+  GetLowMarginProductsArgsSchema,
 } from './validators.js';
 import type { DBProduct } from '../lib/types.js';
 
@@ -575,12 +576,20 @@ export async function executeCalculateUnitEconomics(
       const mp = (p.marketplace || 'WB') as 'WB' | 'Ozon';
 
       // Call the centralized service
-      const { calculateUnitEconomics } = await import('../services/unit-economics.js');
+      const { calculateUnitEconomics, estimateCostPrice } =
+        await import('../services/unit-economics.js');
 
-      // Use real cost_price if available in DB, then from args, then estimate (30%)
-      const costPrice = p.cost_price || args.cost_price || Math.round((p.current_price || 0) * 0.3);
-      const costSource =
-        (p.cost_price ?? 0) > 0 ? 'из БД' : args.cost_price ? 'указана вами' : '⚠️ оценка 30%';
+      // Use real cost_price if available in DB, then from args, then estimate based on category
+      let costPrice = p.cost_price || args.cost_price;
+      let costSource = '';
+
+      if (costPrice && costPrice > 0) {
+        costSource = p.cost_price ? 'из БД' : 'указана вами';
+      } else {
+        const estimate = estimateCostPrice(p.current_price || 0, p.category || undefined);
+        costPrice = estimate.costPrice;
+        costSource = `⚠️ оценка ${Math.round((costPrice / (p.current_price || 1)) * 100)}% (по категории)`;
+      }
 
       const result = calculateUnitEconomics({
         price: p.current_price || 0,
@@ -980,6 +989,8 @@ export async function executeGetStockForecast(
   };
 }
 
+import { MARKETPLACE_KNOWLEDGE } from '../data/marketplace-knowledge.js';
+
 /**
  * GET_MARKETPLACE_INFO — Reference information about marketplaces
  */
@@ -987,85 +998,34 @@ export function executeGetMarketplaceInfo(rawArgs: unknown): ToolResult {
   const validation = validateToolArgs(GetMarketplaceInfoArgsSchema, rawArgs);
   if (isValidationError(validation)) return { success: false, error: validation.error };
   const args = validation.data;
-  const info: Record<string, Record<string, string>> = {
-    commissions: {
-      WB: `📊 Комиссии Wildberries (декабрь 2024):
-• Базовая комиссия: 5-25% (зависит от категории)
-• Электроника: 5-10%
-• Одежда: 15-20%
-• Косметика: 12-18%
-• Логистика: ~50-100₽/товар (зависит от веса/габаритов)
-• Хранение: ~5₽/товар/сутки
-• СПП (Скидка Постоянного Покупателя): 3-25% за счёт продавца!`,
 
-      Ozon: `📊 Комиссии Ozon (декабрь 2024):
-• Базовая комиссия: 5-20% (зависит от категории)
-• Электроника: 5-8%
-• Одежда: 12-17%
-• Косметика: 10-15%
-• Логистика FBO: ~70-120₽/товар
-• Обработка: ~30₽/заказ
-• Эквайринг: 1.5% встроен в комиссию`,
-    },
-
-    promotions: {
-      WB: `🏷️ Акции Wildberries:
-• Автомитинги: WB сам снижает цену на 5-15%
-• Плановые акции: Черная пятница, 11.11, Новый год
-• Защита: Наш Stop-Loss автоматически повысит цену при падении ниже порога`,
-
-      Ozon: `🏷️ Акции Ozon:
-• Premium-скидки: для подписчиков Premium
-• Промокоды: система выдачи купонов
-• Распродажи: аналогично WB
-• Защита: Stop-Loss работает и на Ozon`,
-    },
-
-    problems: {
-      WB: `⚠️ Частые проблемы WB:
-• СПП съедает маржу (до 25%!)
-• Авто-участие в акциях без согласия
-• Задержки выплат
-• Решение: настроить Stop-Loss и мониторинг 24/7`,
-
-      Ozon: `⚠️ Частые проблемы Ozon:
-• Долгая модерация товаров
-• Сложная система штрафов
-• Комиссия на возвраты
-• Решение: правильно заполнять карточки, мониторить отзывы`,
-    },
-
-    tips: {
-      WB: `💡 Советы для WB:
-• Следи за СПП — главный убийца маржи!
-• Используй Stop-Loss на 15-20% ниже желаемой цены
-• Отслеживай остатки — 0 остаток = потеря позиций
-• Отвечай на отзывы — влияет на ранжирование`,
-
-      Ozon: `💡 Советы для Ozon:
-• Качественные фото = больше конверсия
-• Участвуй в Premium — больше продаж
-• Следи за рейтингом магазина
-• Быстро отвечай на вопросы покупателей`,
-    },
-
-    general: {
-      both: `📚 Общая информация:
-• WB: ~70% рынка маркетплейсов РФ
-• Ozon: ~20% рынка, быстро растёт
-• Рекомендуем продавать на обоих для диверсификации
-• Используйте NeuroGUARDIAN для автоматической защиты маржи!`,
-    },
-  };
-
+  const info = MARKETPLACE_KNOWLEDGE as Record<string, Record<string, string>>;
   const mpKey = args.marketplace || 'both';
   const topicInfo = info[args.topic];
 
   if (!topicInfo) {
-    return { success: false, error: `Тема "${args.topic}" не найдена` };
+    return {
+      success: false,
+      error: `Тема "${args.topic}" не найдена. Доступные: ${Object.keys(info).join(', ')}`,
+    };
   }
 
-  const content = topicInfo[mpKey] || topicInfo.WB || topicInfo.both || Object.values(topicInfo)[0];
+  // Support 'both' by merging or picking the right keys
+  let content = '';
+  if (mpKey === 'both') {
+    if (topicInfo.both) {
+      content = topicInfo.both;
+    } else {
+      content =
+        (topicInfo.WB ? `[WB]\n${topicInfo.WB}` : '') +
+        (topicInfo.Ozon ? `\n\n[Ozon]\n${topicInfo.Ozon}` : '');
+    }
+  } else {
+    content =
+      topicInfo[mpKey] ||
+      topicInfo.both ||
+      `Информация для ${mpKey} по теме ${args.topic} отсутствует.`;
+  }
 
   return {
     success: true,
@@ -1087,27 +1047,11 @@ export async function executeSearchWeb(_userId: number, rawArgs: unknown): Promi
 
   console.log(`🌐 executeSearchWeb: query="${args.query}" topic=${args.topic}`);
 
-  // Retrieve Serper.dev API key from Security Agent
-  const agent = getSecurityAgent();
-  if (!agent.isInitialized()) await agent.initialize();
-
-  let apiKey: string | undefined;
-  try {
-    apiKey = (
-      await agent.secrets.get({
-        userId: 'system',
-        key: 'serper_api_key',
-        purpose: 'web_search',
-        ttl: 300,
-      })
-    ).value;
-  } catch {
-    apiKey = process.env.SERPER_API_KEY;
-  }
+  // Retrieve Serper.dev API key via common helper (handles caching and ENV fallback)
+  const apiKey = await getSecret('serper_api_key', 'web_search');
 
   if (!apiKey) {
     console.warn('⚠️ Web Search: SERPER_API_KEY not found');
-
     return {
       success: false,
       error: 'Web search is disabled (API key missing). Please contact support.',
@@ -1288,7 +1232,9 @@ export async function executeUpdatePrices(userId: number, rawArgs: unknown): Pro
             marketplace: p.marketplace as 'WB' | 'Ozon',
             currentPrice: p.current_price,
             newPrice: item.new_price,
-          });
+            minPrice: p.min_price,
+            belowMinPrice: p.min_price > 0 && item.new_price < p.min_price,
+          } as any);
         }
       }
     }
@@ -1299,14 +1245,17 @@ export async function executeUpdatePrices(userId: number, rawArgs: unknown): Pro
 
       for (const p of filtered) {
         const diff = Math.round(p.current_price * (args.change_value / 100));
+        const newPrice = p.current_price + diff;
         updates.push({
           product_id: p.product_id,
           nm_id: p.nm_id || undefined,
           title: p.title,
           marketplace: p.marketplace as 'WB' | 'Ozon',
           currentPrice: p.current_price,
-          newPrice: p.current_price + diff,
-        });
+          newPrice,
+          minPrice: p.min_price,
+          belowMinPrice: p.min_price > 0 && newPrice < p.min_price,
+        } as any);
       }
     }
 
@@ -1637,6 +1586,87 @@ export async function executeGetReviews(userId: number, rawArgs: unknown): Promi
           status: r.status,
           product: r.product_title || r.product_id,
         })),
+      },
+    };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * GET_LOW_MARGIN_PRODUCTS — Identify products with profitability issues
+ */
+export async function executeGetLowMarginProducts(
+  userId: number,
+  rawArgs: unknown
+): Promise<ToolResult> {
+  const validation = validateToolArgs(GetLowMarginProductsArgsSchema, rawArgs);
+  if (isValidationError(validation)) return { success: false, error: validation.error };
+  const args = validation.data;
+
+  try {
+    // 1. Get products
+    const products = await getProductsByUserId(userId, args.account_id);
+    const marketplace = args.marketplace === 'all' ? undefined : args.marketplace;
+    const filtered = filterProducts(products, marketplace);
+
+    if (filtered.length === 0) {
+      return { success: true, data: { products: [], message: 'Товары не найдены' } };
+    }
+
+    // 2. Calculate economics for each and filter
+    const { calculateUnitEconomics, estimateCostPrice } =
+      await import('../services/unit-economics.js');
+    const lowMarginProducts = [];
+
+    for (const p of filtered) {
+      let costPrice = p.cost_price || 0;
+      let isEstimated = false;
+
+      if (costPrice <= 0) {
+        const estimate = estimateCostPrice(p.current_price, p.category || undefined);
+        costPrice = estimate.costPrice;
+        isEstimated = true;
+      }
+
+      const econ = calculateUnitEconomics({
+        price: p.current_price,
+        costPrice,
+        category: p.category || undefined,
+        marketplace: p.marketplace as 'WB' | 'Ozon',
+        useOzonCard: true,
+      });
+
+      if (econ.margin < args.threshold) {
+        lowMarginProducts.push({
+          id: p.product_id,
+          title: p.title,
+          marketplace: p.marketplace,
+          price: p.current_price,
+          cost_price: costPrice,
+          margin: econ.margin,
+          profit: econ.profit,
+          is_estimated: isEstimated,
+          status:
+            econ.margin < 0
+              ? '🔴 Убыток'
+              : isEstimated
+                ? '🟡 Проверьте себестоимость'
+                : '🟡 Низкая маржа',
+        });
+      }
+    }
+
+    // Sort by margin (worst first)
+    lowMarginProducts.sort((a, b) => a.margin - b.margin);
+
+    return {
+      success: true,
+      data: {
+        count: lowMarginProducts.length,
+        threshold: args.threshold,
+        products: lowMarginProducts.slice(0, 50),
+        note: `Анализ ${filtered.length} товаров. Найдено ${lowMarginProducts.length} проблемных позиций. Часть себестоимостей оценена автоматически по категории.`,
       },
     };
   } catch (error) {

@@ -5,6 +5,7 @@
 
 import { sql } from '@vercel/postgres';
 import { logOpsEvent } from './ops-logger.js';
+import { callLLMWithFallback } from '../agent/orchestrator-v4.js';
 
 // ============================================
 // TYPES
@@ -176,10 +177,8 @@ function getAlertButtons(alert: Alert): Record<string, unknown> | undefined {
       marketplace.toLowerCase() === 'wb'
         ? `https://www.wildberries.ru/catalog/${externalId}/detail.aspx`
         : `https://www.ozon.ru/product/${externalId}`;
-    
-    buttons.push([
-      { text: '🔗 Открыть товар на маркетплейсе', url: link },
-    ]);
+
+    buttons.push([{ text: '🔗 Открыть товар на маркетплейсе', url: link }]);
   }
 
   // Sentinel Alerts
@@ -195,10 +194,10 @@ function getAlertButtons(alert: Alert): Record<string, unknown> | undefined {
       },
     ]);
   }
-  
+
   // Subscription Alerts
   if (alert.type === 'subscription_expired') {
-     buttons.push([
+    buttons.push([
       {
         text: '💎 Продлить подписку',
         callback_data: 'buy_subscription',
@@ -209,15 +208,100 @@ function getAlertButtons(alert: Alert): Record<string, unknown> | undefined {
   return buttons.length > 0 ? { inline_keyboard: buttons } : undefined;
 }
 
-function formatAlert(alert: Alert): string {
+/**
+ * Generate a smart, contextual message using LLM
+ */
+async function generateSmartMessage(alert: Alert): Promise<string | null> {
+  // Only for relevant alert types
+  const smartTypes: AlertType[] = [
+    'price_protection',
+    'sentinel_alert',
+    'subscription_expired',
+    'welcome',
+  ];
+  if (!smartTypes.includes(alert.type)) {
+    return null;
+  }
+
+  const systemPrompt = `Ты — Виктор, опытный AI-ассистент для управления бизнесом на WB и Ozon.
+Твоя задача: написать короткое, профессиональное и "живое" уведомление.
+Стиль: деловой, партнерский, иногда с легким юмором или мотивацией, если это уместно (например, приветствие или успех).
+Обязательно делай акцент на выгоде пользователя и ПРИБЫЛИ.
+Формат: Telegram Markdown.
+Ограничение: до 400 символов.
+Не используй вводные фразы ("Вот уведомление:", "Согласно данным..."). Сразу к сути.`;
+
+  const context = [
+    `Тип: ${alert.type}`,
+    `Товар: ${alert.product?.name || 'Н/Д'}`,
+    `Маркетплейс: ${alert.product?.marketplace || 'Н/Д'}`,
+    `Анализ: ${alert.analysis ? JSON.stringify(alert.analysis) : alert.message || 'анализ не предоставлен'}`,
+    `Доп. текст: ${alert.message || ''}`,
+  ].join('\n');
+
+  const userPrompt = `На основе этих данных напиши уведомление для селлера.
+Если это демпинг — объясни опасность для маржи.
+Если это приветствие — вдохнови на успешные продажи и укажи на важность настройки.
+Если это подписка — напомни, что без защиты Sentinel бизнес уязвим.
+Данные:\n${context}`;
+
+  try {
+    const response = await callLLMWithFallback(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      {
+        temperature: 0.7,
+        maxTokens: 500,
+        preferredModel: 'llama-3.3-70b-versatile',
+      }
+    );
+
+    return response.content;
+  } catch (error) {
+    console.warn(
+      '[Notifications] Smart message generation failed, falling back to template',
+      error
+    );
+    return null;
+  }
+}
+
+function formatAlert(alert: Alert, smartMessage?: string | null): string {
   const emoji = URGENCY_EMOJI[alert.urgency];
+
+  // If we have a smart message, use it with a proper header
+  if (smartMessage) {
+    let header = `🛡️ *SENTINEL — Уведомление*`;
+    if (alert.type === 'welcome') header = `👋 *Добро пожаловать в NeuroGUARDIAN!*`;
+    if (alert.type === 'subscription_expired') header = `💎 *Внимание: Подписка истекла*`;
+    if (alert.type === 'price_protection') header = `🛡️ *SENTINEL — Автоматический мониторинг*`;
+
+    const body = [header, ``, smartMessage];
+
+    // Append product info if available
+    if (alert.product) {
+      body.push(``);
+      body.push(`📦 *${escapeMarkdown(alert.product.name)}* (\`${alert.product.externalId}\`)`);
+      if (alert.analysis) {
+        body.push(
+          `💰 Цена: *${alert.analysis.currentPrice}₽* → *${alert.analysis.recommendedPrice}₽*`
+        );
+      }
+    }
+
+    return body.join('\n');
+  }
+
+  // FALLBACK TEMPLATES (if LLM fails or type not supported for smart generation)
 
   // Price protection alert - ENHANCED UX
   if (alert.type === 'price_protection' && alert.analysis && alert.product) {
     const mpEmoji = alert.product.marketplace.toUpperCase() === 'WB' ? '🟣' : '🔵';
     const priceDiff = alert.analysis.currentPrice - alert.analysis.recommendedPrice;
     const priceDiffPercent = Math.round((priceDiff / alert.analysis.currentPrice) * 100);
-    
+
     return [
       `🛡️ *SENTINEL — Автоматический мониторинг*`,
       ``,
@@ -247,6 +331,15 @@ function formatAlert(alert: Alert): string {
     ].join('\n');
   }
 
+  // Welcome message
+  if (alert.type === 'welcome') {
+    return [
+      `👋 *Добро пожаловать в NeuroGUARDIAN!*`,
+      ``,
+      alert.message || 'AI-ассистент готов к работе.',
+    ].join('\n');
+  }
+
   // System error
   if (alert.type === 'system_error') {
     return [
@@ -271,11 +364,12 @@ export async function sendAlertToAdmin(alert: Alert): Promise<boolean> {
   const adminChatId = getAdminChatId();
   if (!adminChatId) return false;
 
-  const message = formatAlert(alert);
+  const smartMsg = await generateSmartMessage(alert);
+  const message = formatAlert(alert, smartMsg);
   const replyMarkup = getAlertButtons(alert);
-  
+
   const success = await sendTelegramMessage(adminChatId, message, {
-    replyMarkup: replyMarkup as Record<string, unknown>
+    replyMarkup: replyMarkup as Record<string, unknown>,
   });
 
   // Log notification
@@ -312,11 +406,12 @@ export async function sendAlertToUser(userId: number, alert: Alert): Promise<boo
     });
   }
 
-  const message = formatAlert(alert);
+  const smartMsg = await generateSmartMessage(alert);
+  const message = formatAlert(alert, smartMsg);
   const replyMarkup = getAlertButtons(alert);
 
   const success = await sendTelegramMessage(chatId, message, {
-    replyMarkup: replyMarkup as Record<string, unknown>
+    replyMarkup: replyMarkup as Record<string, unknown>,
   });
 
   // Log notification

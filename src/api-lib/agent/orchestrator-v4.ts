@@ -35,6 +35,7 @@ import {
   executeGetSystemLogs,
   executeGetCompetitorPrice,
   executeGetReviews,
+  executeGetLowMarginProducts,
 } from './tool-executors.js';
 // ============================================
 // LLM PROVIDER CONFIG
@@ -106,7 +107,7 @@ async function getAvailableProviders(): Promise<LLMProvider[]> {
 /**
  * Call LLM with retry and fallback logic
  */
-async function callLLMWithFallback(
+export async function callLLMWithFallback(
   messages: Array<{ role: string; content: string }>,
   options: {
     temperature?: number;
@@ -182,7 +183,10 @@ async function callLLMWithFallback(
           throw new Error(`${provider.name} API error: ${response.status} - ${errorText}`);
         }
 
-        const data = (await response.json()) as any;
+        const data = (await response.json()) as {
+          choices: Array<{ message: { content: string } }>;
+          usage?: { total_tokens: number };
+        };
         const content = data.choices[0]?.message?.content;
         const tokensUsed = data.usage?.total_tokens || 0;
 
@@ -233,6 +237,7 @@ export interface UserContext {
   marketplace?: 'WB' | 'Ozon' | 'all';
   wbApiKey?: string;
   ozonApiKey?: string;
+  onboardingMode?: boolean;
 }
 
 export interface OrchestratorV4Result {
@@ -368,25 +373,36 @@ async function executePlanSteps(
   plan: Plan,
   context: UserContext
 ): Promise<{ toolResults: ToolResult[]; toolsCalled: string[] }> {
-  const toolResults: ToolResult[] = [];
-  const toolsCalled: string[] = [];
+  logger.info('V4 Phase 2: Executing tools in parallel', { count: plan.tools.length });
 
-  for (const plannedTool of plan.tools) {
-    logger.debug('Executing tool', { tool: plannedTool.tool });
-    const result = await executeTool(plannedTool.tool, plannedTool.args, context.userId);
+  const executionPromises = plan.tools.map(async plannedTool => {
+    try {
+      logger.debug(`Starting tool: ${plannedTool.tool}`);
+      const result = await executeTool(plannedTool.tool, plannedTool.args, context.userId);
 
-    // Extract URLs from result for link validation
-    const urls = extractUrlsFromResult(result);
+      // Extract URLs from result for link validation
+      const urls = extractUrlsFromResult(result);
 
-    toolResults.push({
-      tool: plannedTool.tool,
-      success: result.success,
-      data: result.data,
-      error: result.error,
-      urls,
-    });
-    toolsCalled.push(plannedTool.tool);
-  }
+      return {
+        tool: plannedTool.tool,
+        success: result.success,
+        data: result.data,
+        error: result.error,
+        urls,
+      };
+    } catch (error) {
+      logger.error(`Fatal tool execution error: ${plannedTool.tool}`, error);
+      return {
+        tool: plannedTool.tool,
+        success: false,
+        error: String(error),
+        urls: [],
+      };
+    }
+  });
+
+  const toolResults = await Promise.all(executionPromises);
+  const toolsCalled = plan.tools.map(t => t.tool);
 
   return { toolResults, toolsCalled };
 }
@@ -525,6 +541,7 @@ async function callPlanner(
   const systemPrompt = buildPlannerPrompt({
     marketplace: context.marketplace,
     productsCount: 0, // Could be fetched
+    onboardingMode: context.onboardingMode,
   });
 
   const messages = [
@@ -618,6 +635,8 @@ async function executeTool(
         return await executeGetSystemLogs(userId, args);
       case 'get_reviews':
         return await executeGetReviews(userId, args);
+      case 'get_low_margin_products':
+        return await executeGetLowMarginProducts(userId, args);
       default:
         return { success: false, error: `Unknown tool: ${toolName}` };
     }
@@ -670,10 +689,10 @@ function extractUrlsFromResult(result: { success: boolean; data?: unknown }): st
 async function callAnswerer(
   originalMessage: string,
   toolResults: ToolResult[],
-  _context: UserContext,
+  context: UserContext,
   conversationHistory?: Array<{ role: string; content: string }>
 ): Promise<{ success: boolean; answer?: Answer; error?: string; tokensUsed: number }> {
-  const systemPrompt = buildAnswererPrompt();
+  const systemPrompt = buildAnswererPrompt(context.onboardingMode);
 
   // Build context message with tool results
   const toolResultsSummary = toolResults.map(tr => ({

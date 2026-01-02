@@ -57,16 +57,7 @@ export const GetWarehouseStocksArgsSchema = z.object({
 
 export const GetMarketplaceInfoArgsSchema = z.object({
   marketplace: z.enum(['WB', 'Ozon', 'both']).optional().default('both'),
-  topic: z.enum([
-    'commissions',
-    'logistics',
-    'payments',
-    'returns',
-    'promotions',
-    'problems',
-    'tips',
-    'general',
-  ]),
+  topic: z.enum(['commissions', 'logistics', 'promotions', 'legal', 'tips', 'problems', 'general']),
 });
 
 export const SearchWebArgsSchema = z.object({
@@ -93,6 +84,12 @@ export const GetReviewsArgsSchema = z.object({
   limit: z.number().int().min(1).max(50).optional().default(10),
   is_replied: z.boolean().optional(),
   marketplace: z.enum(['WB', 'Ozon']).optional(),
+});
+
+export const GetLowMarginProductsArgsSchema = z.object({
+  threshold: z.number().min(-100).max(100).optional().default(10), // Alert if margin < threshold
+  marketplace: z.enum(['WB', 'Ozon', 'all']).optional().default('all'),
+  account_id: z.number().optional(),
 });
 
 export const GenerateReviewReplyArgsSchema = z.object({
@@ -222,6 +219,7 @@ export type UpdatePricesArgs = z.infer<typeof UpdatePricesArgsSchema>;
 export type UpdateStocksArgs = z.infer<typeof UpdateStocksArgsSchema>;
 export type GetMarketplaceAccountsArgs = z.infer<typeof GetMarketplaceAccountsArgsSchema>;
 export type GetSystemLogsArgs = z.infer<typeof GetSystemLogsArgsSchema>;
+export type GetLowMarginProductsArgs = z.infer<typeof GetLowMarginProductsArgsSchema>;
 
 // Confirmation details types
 export type PriceChangeItem = z.infer<typeof PriceChangeItemSchema>;

@@ -1,4 +1,4 @@
-# NeuroGUARDIAN v3.0: Viktor Margin - AI Price Guardian
+# NeuroGUARDIAN v3.0: Виктор - AI Price Guardian
 
 ## Production-Ready Technical Specification
 
@@ -38,7 +38,7 @@ Transform NeuroGUARDIAN into a **proactive AI agent** that protects seller margi
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                    NEUROGUARDIAN v3.0                           │
-│                  "Viktor Margin" AI Agent                       │
+│                  "Виктор" AI Agent                       │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  ┌──────────────────────────────────────────────────────────┐  │

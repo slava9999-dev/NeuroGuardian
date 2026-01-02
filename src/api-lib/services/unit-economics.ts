@@ -1,6 +1,6 @@
 // ============================================
 // NeuroGUARDIAN — Unit Economics Service
-// Viktor Margin v3.0: Complete Cost Breakdown
+// Viktor v3.0: Complete Cost Breakdown
 // Version: 3.0.0 | Date: 2025-12-29
 // ============================================
 
@@ -47,7 +47,7 @@ export const WB_COMMISSIONS: Record<string, number> = {
   Спорт: 0.18, // Was 0.13
 
   // Default (after October 2025 increases, can be up to 34.5%)
-  default: 0.2, // Was 0.14
+  default: 0.22, // Was 0.2
 };
 
 /**
@@ -133,14 +133,14 @@ export const OZON_CARD_RATE = OZON_CARD_CONFIG.discountPercent;
  */
 export const LOGISTICS_COSTS = {
   WB: {
-    fbo: 35, // Average for 0.001-1L (23-46₽ range)
-    fbs: 50, // Updated from 45₽
-    express: 120, // Express delivery
+    fbo: 38, // 2025 Base: 38₽ first liter
+    fbs: 55, // 2025 Base: 55₽
+    express: 150,
   },
   Ozon: {
-    fbo: 46, // Updated from 55₽ (June 2025)
-    fbs: 80, // CRITICAL: Updated from 40₽ (June 2025) - doubled!
-    express: 100,
+    fbo: 50, // 2025 Base updated
+    fbs: 90, // CRITICAL: Douglas doubled!
+    express: 120,
   },
 };
 
@@ -303,9 +303,15 @@ export function calculateUnitEconomics(input: UnitEconomicsInput): UnitEconomics
   const logisticsCosts = LOGISTICS_COSTS[marketplace];
   let logistics = logisticsCosts[fulfillmentType] || logisticsCosts.fbo;
 
-  // WB variable logistics
-  if (marketplace === 'WB' && input.volumeLiters && input.volumeLiters > 1) {
-    logistics += (input.volumeLiters - 1) * 7;
+  if (marketplace === 'Ozon') {
+    // 2025 Formula: 2% (sale) + 5.5% (last mile) + processing (fixed)
+    // We use price-based logistics for Ozon as it scales with value
+    const variableLogistics = Math.round(price * 0.075);
+    const fixedProcessing = 45;
+    logistics = variableLogistics + fixedProcessing;
+  } else if (marketplace === 'WB' && input.volumeLiters && input.volumeLiters > 1) {
+    // WB variable logistics (2025 formula: 38 + 9.5 per extra liter)
+    logistics += (input.volumeLiters - 1) * 9.5;
   }
 
   // Storage
@@ -489,9 +495,29 @@ export function calculateUnitEconomics(input: UnitEconomicsInput): UnitEconomics
  * Estimate cost price if not provided (30% of selling price)
  * Returns estimated value and a warning flag
  */
-export function estimateCostPrice(price: number): { costPrice: number; isEstimated: boolean } {
+/**
+ * Estimate cost price if not provided based on industry averages
+ * Returns estimated value and a warning flag
+ */
+export function estimateCostPrice(
+  price: number,
+  category?: string
+): { costPrice: number; isEstimated: boolean } {
+  let factor = 0.4; // Default: 40% of selling price (decent margin)
+
+  if (category) {
+    const cat = category.toLowerCase();
+    if (cat.includes('электроника') || cat.includes('смартфон') || cat.includes('компьютер')) {
+      factor = 0.75; // Electronics: thin margins, high cost (75%)
+    } else if (cat.includes('одежда') || cat.includes('обувь') || cat.includes('аксессуар')) {
+      factor = 0.25; // Fashion: high margins, low cost (25%)
+    } else if (cat.includes('продукты') || cat.includes('еда')) {
+      factor = 0.6; // Food: medium-high cost
+    }
+  }
+
   return {
-    costPrice: Math.round(price * 0.3),
+    costPrice: Math.round(price * factor),
     isEstimated: true,
   };
 }

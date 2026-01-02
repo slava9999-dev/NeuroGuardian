@@ -19,7 +19,7 @@ import {
 } from './marketplace.js';
 import { scanProductThreats, ThreatType, type Threat } from './threat-detector.js'; // Threat renamed from ProductThreat if it was mismatch
 import { logSentinelAction } from './database.js';
-import { sendTelegramNotification } from './notifications.js';
+import { sendAlert } from './notifications.js';
 import { priceShield, type PriceRule } from './price-shield.js';
 import { getCompetitorPrice } from './competitor-monitor.js';
 import type { DBUser, DBProduct } from '../lib/types.js';
@@ -382,14 +382,20 @@ export class SentinelService {
     threat: Threat,
     marketplace: string
   ): Promise<void> {
-    const message =
-      `⚠️ <b>Угроза прибыли!</b>\n\n` +
-      `📦 ${product.title}\n` +
-      `${marketplace === 'WB' ? '🟣' : '🔵'} ${marketplace}\n\n` +
-      `🔍 ${threat.message}\n` +
-      `💰 Текущая цена: ${(threat.data as { livePrice?: number })?.livePrice || product.current_price}₽`;
-
-    await sendTelegramNotification(user.id, message);
+    await sendAlert({
+      type: 'sentinel_alert',
+      urgency: threat.severity as any,
+      product: {
+        name: product.title,
+        marketplace: marketplace,
+        externalId: product.nm_id ? String(product.nm_id) : product.product_id,
+        userId: user.id,
+      },
+      message: threat.message,
+      data: {
+        livePrice: (threat.data as { livePrice?: number })?.livePrice || product.current_price,
+      },
+    });
   }
 
   private async notifyDefenseSuccess(
@@ -400,20 +406,22 @@ export class SentinelService {
     mode: string,
     marketplace: string
   ): Promise<void> {
-    const emoji = marketplace === 'WB' ? '🟣' : '🔵';
-    const actionText =
-      mode === 'zero_stock' ? 'Обнулены остатки' : `Цена возвращена к ${minPrice}₽`;
-
-    const message =
-      `🛡️ <b>Sentinel: Защита сработала!</b>\n\n` +
-      `📦 ${product.title}\n` +
-      `${emoji} ${marketplace}\n\n` +
-      `🚨 Обнаружена цена: ${livePrice}₽\n` +
-      `🔒 Лимит (Stop-Loss): ${minPrice}₽\n` +
-      `⚔️ <b>Действие: ${actionText}</b>\n\n` +
-      `✅ Товар защищён от убытков.`;
-
-    await sendTelegramNotification(user.id, message);
+    await sendAlert({
+      type: 'price_protection',
+      urgency: 'high',
+      product: {
+        name: product.title,
+        marketplace: marketplace,
+        externalId: product.nm_id ? String(product.nm_id) : product.product_id,
+        userId: user.id,
+      },
+      analysis: {
+        currentPrice: livePrice,
+        recommendedPrice: minPrice,
+        reason: `Защита сработала: ${mode === 'zero_stock' ? 'обнуление остатков' : 'возврат цены'}`,
+        action: mode,
+      },
+    });
   }
 }
 

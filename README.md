@@ -1,4 +1,4 @@
-# 🛡️ NeuroGUARDIAN | Viktor Margin v3.0
+# 🛡️ NeuroGUARDIAN | Виктор v3.0
 
 [![Version](https://img.shields.io/badge/version-3.0.0-blue.svg)](CHANGELOG_v3.0.md)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue.svg)](https://www.typescriptlang.org/)
@@ -6,9 +6,9 @@
 [![Vercel](https://img.shields.io/badge/Deployed-Vercel-black.svg)](https://vercel.com/)
 [![License](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
 
-> **Viktor Margin — Ваш AI-эксперт по защите прибыли на Wildberries и Ozon**
+> **Виктор — Ваш AI-эксперт по защите прибыли на Wildberries и Ozon**
 
-## 🔥 NEW in v3.0.0 — Viktor Margin Edition:
+## 🔥 NEW in v3.0.0 — Viktor Edition:
 
 ### 💰 **Полная защита маржи:**
 
@@ -17,7 +17,7 @@
 - **Return Rate Monitoring:** Контроль возвратов (критично при >25%)
 - **Complete Unit Economics:** Полный расчёт всех затрат с конкретными цифрами
 
-### 🤖 **Viktor Margin AI Agent:**
+### 🤖 **Виктор — AI Агент:**
 
 - **Проактивные предупреждения:** "Скидка Ozon Card съедает 50₽ с каждого заказа!"
 - **Годовой impact:** "При 1000 заказов вы теряете 50,000₽ маржи"
@@ -30,13 +30,13 @@
 - **Hourly Economics Check:** Автоматическое обнаружение угроз маржи
 - **Telegram Alerts:** Детальные breakdown с конкретными цифрами
 
-📚 **Документация:** [START_HERE](START_HERE.md) | [CHANGELOG v3.0](CHANGELOG_v3.0.md) | [Unit Economics](docs/UNIT_ECONOMICS.md) | [Viktor Margin Guide](docs/VIKTOR_MARGIN_GUIDE.md) | [n8n Workflows](n8n-workflows/README.md)
+📚 **Документация:** [START_HERE](START_HERE.md) | [CHANGELOG v3.0](CHANGELOG_v3.0.md) | [Unit Economics](docs/UNIT_ECONOMICS.md) | [Viktor Guide](docs/VICTOR_SPEC_v3.0.md) | [n8n Workflows](n8n-workflows/README.md)
 
 ---
 
 ## ✨ Возможности
 
-### 🛡️ Viktor Margin — AI-эксперт по защите маржи
+### 🛡️ Виктор — AI-эксперт по защите маржи
 
 **Ваш личный эксперт, который:**
 
@@ -85,7 +85,7 @@
 
 ### 🚨 Критические ловушки маркетплейсов
 
-**Viktor Margin знает и предупреждает:**
+**Виктор знает и предупреждает:**
 
 1. **Ozon Card (КРИТИЧНО!):**
    - Скидка 5% оплачивается ПРОДАВЦОМ
@@ -104,7 +104,7 @@
    - Логистика возврата = за ваш счёт
    - **Автоматический расчёт в Unit Economics**
 
-### 🤖 AI-агент с персоной Viktor Margin
+### 🤖 AI-агент с персоной Виктор
 
 Управляйте магазином через чат:
 

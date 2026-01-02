@@ -13,7 +13,7 @@
 | 2   | `get_sales_stats`          | ✅ Работает         | Статистика продаж с трендами | WB/Ozon API      |
 | 3   | `get_orders`               | ✅ Работает         | История заказов              | WB/Ozon API      |
 | 4   | `get_warehouse_stocks`     | ✅ Работает         | Остатки на складах           | WB/Ozon API      |
-| 5   | `calculate_unit_economics` | ✅ Работает         | Расчёт маржинальности        | Калькулятор      |
+| 5   | `calculate_unit_economics` | ✅ Работает         | Расчёт Викторальности        | Калькулятор      |
 | 6   | `get_abc_analysis`         | ✅ Работает         | ABC анализ товаров           | PostgreSQL + API |
 | 7   | `get_stock_forecast`       | ✅ Работает         | Прогноз остатков             | Алгоритм         |
 | 8   | `get_marketplace_info`     | ✅ Работает         | Справка о маркетплейсах      | Статичные данные |

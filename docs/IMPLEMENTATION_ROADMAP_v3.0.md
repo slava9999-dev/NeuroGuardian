@@ -1,6 +1,6 @@
-# 🚀 VIKTOR MARGIN v3.0: IMPLEMENTATION ROADMAP
+# 🚀 Виктор v3.0: IMPLEMENTATION ROADMAP
 
-**Project:** NeuroGUARDIAN → Viktor Margin  
+**Project:** NeuroGUARDIAN → Виктор  
 **Date:** 2025-12-29  
 **Status:** READY TO START  
 **Estimated Time:** 4 weeks (80 hours)
@@ -23,7 +23,7 @@
 
 1. **Ozon Card Discount** - NOT accounted for in unit economics
 2. **Complete Cost Breakdown** - Missing storage, returns, packaging
-3. **Viktor Margin Persona** - Generic AI agent, no personality
+3. **Виктор Persona** - Generic AI agent, no personality
 4. **Onboarding Flow** - No guided setup for new users
 5. **Automated Price Adjustment** - Detection exists, but no auto-fix
 6. **Comprehensive Threat Detection** - Ad-hoc checks, not systematic
@@ -226,7 +226,7 @@ Create comprehensive tests:
 
 ---
 
-#### Task 1.6: Add Viktor Margin Persona (4 hours)
+#### Task 1.6: Add Виктор Persona (4 hours)
 
 **Priority:** P0-CRITICAL  
 **Impact:** Brand differentiation, user trust
@@ -237,7 +237,7 @@ Create comprehensive tests:
 const VIKTOR_MARGIN_SYSTEM_PROMPT = `
 # ИДЕНТИЧНОСТЬ
 
-Ты — Виктор Маржин, цифровой эксперт по маркетплейсам Wildberries и Ozon. 
+Ты — Виктор Виктор, цифровой эксперт по маркетплейсам Wildberries и Ozon. 
 Твоя миссия — защищать прибыль селлера от всех скрытых комиссий, штрафов и ловушек маркетплейсов.
 
 Ты не просто отвечаешь на вопросы — ты проактивно анализируешь ситуацию и предупреждаешь о рисках ДО того, как они станут проблемой.
@@ -316,7 +316,7 @@ const VIKTOR_MARGIN_SYSTEM_PROMPT = `
 
 ```typescript
 const WELCOME_MESSAGE = `
-👋 Привет! Я Виктор Маржин — ваш AI-помощник для защиты цен на маркетплейсах.
+👋 Привет! Я Виктор Виктор — ваш AI-помощник для защиты цен на маркетплейсах.
 
 Я помогу вам:
 • 🔗 Подключить магазины Wildberries и Ozon
@@ -343,7 +343,7 @@ const WELCOME_MESSAGE = `
 
 Update:
 
-- `README.md` - Add Viktor Margin branding
+- `README.md` - Add Виктор branding
 - `CHANGELOG.md` - Document v3.0 changes
 - Create `docs/UNIT_ECONOMICS.md` - Complete cost breakdown explanation
 
@@ -522,7 +522,7 @@ Performance testing and optimization.
 
 ### Step 1: Review Specifications
 
-1. Read `VICTOR_MARGIN_SPEC_v3.0.md`
+1. Read `VICTOR_SPEC_v3.0.md`
 2. Read `CRITICAL_ANALYSIS_v3.0.md`
 3. Understand current codebase state
 
@@ -542,7 +542,7 @@ npm run dev
 ### Step 3: Start with Quick Wins
 
 1. Task 1.1: Add Ozon Card discount (2 hours)
-2. Task 1.6: Add Viktor Margin persona (4 hours)
+2. Task 1.6: Add Виктор persona (4 hours)
 3. Deploy and test
 
 ### Step 4: Follow Phase 1
@@ -557,7 +557,7 @@ Complete all Phase 1 tasks in order.
 
 - [ ] Ozon Card discount implemented and tested
 - [ ] Complete cost breakdown (storage, returns, packaging)
-- [ ] Viktor Margin persona active
+- [ ] Виктор persona active
 - [ ] All unit economics tests passing
 - [ ] Documentation updated
 
@@ -614,7 +614,7 @@ Complete all Phase 1 tasks in order.
 
 For questions or issues:
 
-1. Check `VICTOR_MARGIN_SPEC_v3.0.md`
+1. Check `VICTOR_SPEC_v3.0.md`
 2. Check `CRITICAL_ANALYSIS_v3.0.md`
 3. Review existing code in `src/api-lib/services/`
 4. Ask the team

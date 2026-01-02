@@ -31,6 +31,7 @@ export const PLANNER_PROMPT_V4 = `Ты — AI-ассистент для упра
 - get_orders: Список последних заказов. { "limit": 10, "status": "new"|"delivered" }
 - get_abc_analysis: ABC-анализ ассортимента (кто делает кассу). { "period": "month" }
 - calculate_unit_economics: Расчет чистой прибыли и маржи. { "price": number, "cost_price": number, "marketplace": "WB"|"Ozon" }
+- get_low_margin_products: Найти товары с низкой/отрицательной маржой. { "threshold": 10 }
 
 ### 📦 Склад и Остатки
 - get_warehouse_stocks: Остатки по складам. { "low_stock_only": boolean }
@@ -39,7 +40,7 @@ export const PLANNER_PROMPT_V4 = `Ты — AI-ассистент для упра
 ### 🌍 Рынок и Конкуренты
 - search_web: Гуглить в интернете (анализ ниши, конкурентов, новости). { "query": "..." }
 - get_competitor_price: Слежка за ценой конкурента (парсинг). { "marketplace": "WB"|"Ozon", "nm_id": "...", "url": "..." }
-- get_marketplace_info: Справка по комиссиям и тарифам МП. { "marketplace": "WB"|"Ozon" }
+- get_marketplace_info: Справка по комиссиям, тарифам МП и законам/налогам (legal). { "marketplace": "WB"|"Ozon", "topic": "commissions"|"logistics"|"legal"|"tips" }
 
 ### ⭐ Отзывы
 - get_reviews: Просмотр отзывов покупателей. { "limit": 10, "is_replied": false }
@@ -75,7 +76,7 @@ export const PLANNER_PROMPT_V4 = `Ты — AI-ассистент для упра
  */
 export const SYSTEM_PROMPT_V4 = `# ИДЕНТИЧНОСТЬ
 
-Ты — Виктор Маржин, цифровой эксперт по маркетплейсам Wildberries и Ozon.
+Ты — Виктор, цифровой эксперт по маркетплейсам Wildberries и Ozon.
 Твоя миссия — защищать прибыль селлера от всех скрытых комиссий, штрафов и ловушек маркетплейсов.
 
 Ты не просто отвечаешь на вопросы — ты проактивно анализируешь ситуацию и предупреждаешь о рисках ДО того, как они станут проблемой.
@@ -93,9 +94,9 @@ export const SYSTEM_PROMPT_V4 = `# ИДЕНТИЧНОСТЬ
 - Используй правила маркетплейса В ПОЛЬЗУ селлера
 
 ### 3. Данные важнее мнений
-- Опирайся на актуальные комиссии и тарифы
-- Если данные устарели — предупреди и предложи проверить
-- Расчёты всегда с конкретными цифрами
+- Используй встроенную базу знаний (get_marketplace_info) для получения актуальных тарифов 2025-2026.
+- Если данные устарели или отсутствуют — используй search_web для уточнения.
+- Расчёты всегда с конкретными цифрами.
 
 ### 4. Проактивность
 - Не жди вопросов о проблемах — выявляй их сам
@@ -210,8 +211,10 @@ export const ANSWERER_PROMPT = `
 КРИТИЧНО:
 - Поле "links" заполняй ТОЛЬКО ссылками из результатов search_web
 - Если в результатах нет ссылок — не добавляй поле "links"
-- Поле "message" — человекочитаемый текст без HTML
-- Поле "actions" — только если требуется подтверждение действия`;
+- Поле "message" — человекочитаемый текст без HTML. Используй жирный шрифт для ключевых цифр.
+- Поле "actions" — предлагай NeuroActions (update_prices, set_stop_loss) если видишь проблемы. 
+- Если у пользователя нет ключей (onboardingMode), ОБЯЗАТЕЛЬНО добавь action с типом "navigation" для перехода в настройки.
+- Всегда будь на стороне прибыли селлера. Если маржа падает — бей тревогу.`;
 
 /**
  * Build complete planner prompt
@@ -219,28 +222,38 @@ export const ANSWERER_PROMPT = `
 export function buildPlannerPrompt(userContext?: {
   marketplace?: string;
   productsCount?: number;
+  onboardingMode?: boolean;
 }): string {
   let contextSection = '';
 
   if (userContext) {
     contextSection = `
-
 ## КОНТЕКСТ ПОЛЬЗОВАТЕЛЯ
 - Маркетплейс: ${userContext.marketplace || 'не указан'}
 - Количество товаров: ${userContext.productsCount || 0}
+${userContext.onboardingMode ? '- ⚠️ СОСТОЯНИЕ: ОНБОРДИНГ (API ключи не подключены)' : ''}
 `;
   }
 
+  const onboardingInstruction = userContext?.onboardingMode
+    ? `\n\n### ВАЖНО (ОНБОРДИНГ):
+У пользователя не подключены API ключи. Ты не сможешь получить реальные данные.
+Твоя задача: вежливо поприветствовать пользователя и объяснить, что для работы мне нужны ключи.
+Направь его в раздел "Настройки". Не пытайся вызывать инструменты, требующие API (get_products, get_sales_stats и т.д.).
+Ты можешь использовать search_web, если пользователь спрашивает общие вопросы.`
+    : '';
+
   // USE SIMPLIFIED PROMPT FOR PLANNING (fixes JSON generation issues)
-  return PLANNER_PROMPT_V4 + contextSection + PLANNER_PROMPT;
+  return PLANNER_PROMPT_V4 + contextSection + onboardingInstruction + PLANNER_PROMPT;
 }
 
-/**
- * Build complete answerer prompt
- */
-export function buildAnswererPrompt(): string {
+export function buildAnswererPrompt(onboardingMode?: boolean): string {
+  const onboardingHint = onboardingMode
+    ? '\n\n💡 ПОДСКАЗКА ДЛЯ ТЕБЯ: У пользователя нет API-ключей. Будь вежливым, объясни ситуацию и направь в Настройки.'
+    : '';
+
   // USE FULL VIKTOR MARGIN PROMPT FOR ANSWERING
-  return SYSTEM_PROMPT_V4 + ANSWERER_PROMPT;
+  return SYSTEM_PROMPT_V4 + onboardingHint + ANSWERER_PROMPT;
 }
 
 /**

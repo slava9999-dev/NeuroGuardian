@@ -189,42 +189,35 @@ export async function handleAgentV4(
 
   // 8. API Key Guard (Onboarding)
   const hasKeys = context.wbApiKey || context.ozonApiKey;
-  const isHelpIntent = /^(привет|помощь|что ты умеешь|старт|start|help|здравствуйте)/i.test(
-    message.trim()
-  );
 
-  if (!hasKeys && !isHelpIntent && !isAdmin) {
-    return res.json({
-      success: true,
-      message: `👋 **Добро пожаловать в NeuroGuardian!**
-
-Я вижу, что вы здесь впервые (или у вас не настроены интеграции).
-Без доступа к API Wildberries или Ozon я как "сапожник без сапог" — многое умею, но ничего не могу показать на ваших данных.
-
-👉 **Что делать:**
-1. Перейдите в раздел ⚙️ **Настройки** (Settings)
-2. Добавьте API-ключ (Статистика для WB или ClientID+Key для Ozon)
-3. Возвращайтесь сюда, и мы займемся прибылью!
-
-_Если вам нужна помощь с ключами, напишите "Помощь"._`,
-      actions: [],
-      data: {},
-      links: [],
-      metadata: {
-        totalTime: 0,
-        planningTime: 0,
-        executionTime: 0,
-        answeringTime: 0,
-        tokensUsed: 0,
-        toolsCalled: [],
-        productsCount: 0,
-        protectedCount: 0,
-      },
-    });
+  if (!hasKeys && !isAdmin) {
+    context.onboardingMode = true;
   }
 
   // 9. Execute V4 Orchestrator (Two-Phase Pipeline)
   const result = await orchestrateV4(message, context, conversationHistory);
+
+  // 10. Enhance onboarding UX: Inject connection actions if missing
+  if (context.onboardingMode && result.success) {
+    if (!result.actions) result.actions = [];
+
+    if (!context.wbApiKey) {
+      result.actions.push({
+        type: 'navigation',
+        summary: '🚀 Подключить Wildberries',
+        details: { action: 'connect_marketplace', marketplace: 'WB', page: '/settings' },
+        affected_count: 0,
+      });
+    }
+    if (!context.ozonApiKey) {
+      result.actions.push({
+        type: 'navigation',
+        summary: '🚀 Подключить Ozon',
+        details: { action: 'connect_marketplace', marketplace: 'Ozon', page: '/settings' },
+        affected_count: 0,
+      });
+    }
+  }
 
   // 9. Save conversation history and pending actions
   if (kv) {

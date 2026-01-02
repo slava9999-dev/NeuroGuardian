@@ -49,7 +49,7 @@
 
 ### Что это:
 
-**NeuroGUARDIAN (Viktor Margin)** — AI-ассистент для управления ценами на маркетплейсах Wildberries и Ozon.
+**NeuroGUARDIAN (Виктор)** — AI-ассистент для управления ценами на маркетплейсах Wildberries и Ozon.
 
 ### Главная ценность:
 
