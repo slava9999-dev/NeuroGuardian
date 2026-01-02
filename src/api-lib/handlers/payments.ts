@@ -6,16 +6,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql } from '@vercel/postgres';
 
-// Import from modular library
-import { SUBSCRIPTION_PLANS, type PlanId } from '../lib/index.js';
-import {
-  createYookassaPayment,
-  activateSubscription,
-  updateTransactionStatus,
-  getUserById,
-} from '../services/index.js';
+// Import subscription service
+import { SubscriptionService } from '../services/subscription-service.js';
 import { sendTelegramNotification } from '../services/notifications.js';
-import { getSecurityAgent } from '@neuroguardian/security-agent';
 
 /**
  * Handle create-payment action
@@ -25,94 +18,84 @@ export async function handleCreatePayment(
   res: VercelResponse,
   userId: number
 ): Promise<VercelResponse> {
-  const { planId } = req.body || {};
+  try {
+    const { tier, billing_period = 'monthly', return_url } = req.body || {};
 
-  if (!planId || !['basic', 'pro', 'yearly'].includes(planId)) {
-    return res.status(400).json({ error: 'Invalid plan' });
-  }
-
-  const plan = SUBSCRIPTION_PLANS[planId as PlanId];
-  if (!plan) {
-    return res.status(400).json({ error: 'Plan not found' });
-  }
-
-  // Get user email if exists
-  await getUserById(userId);
-
-  // PRODUCTION: YooKassa must be configured
-  // PRODUCTION: YooKassa must be configured
-  const agent = getSecurityAgent();
-  if (!agent.isInitialized()) await agent.initialize();
-
-  const SHOP_ID =
-    (
-      await agent.secrets.get({
-        userId: 'system',
-        key: 'yookassa_shop_id',
-        purpose: 'payment_handler_check',
-        ttl: 300,
-      })
-    ).value ||
-    process.env.YOOKASSA_SHOP_ID ||
-    '';
-
-  const SECRET_KEY =
-    (
-      await agent.secrets.get({
-        userId: 'system',
-        key: 'yookassa_secret_key',
-        purpose: 'payment_handler_check',
-        ttl: 300,
-      })
-    ).value ||
-    process.env.YOOKASSA_SECRET_KEY ||
-    '';
-  const IS_PRODUCTION =
-    process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
-
-  if (!SHOP_ID || !SECRET_KEY) {
-    // In development, allow test mode
-    if (!IS_PRODUCTION) {
-      console.log('🧪 DEV MODE: Activating subscription without payment');
-      await activateSubscription(userId, planId === 'yearly' ? 'pro' : planId, plan.durationDays);
-      return res.json({
-        success: true,
-        testMode: true,
-        message: `Тестовый режим: подписка ${plan.name} активирована на ${plan.durationDays} дней`,
-        plan: {
-          id: planId,
-          name: plan.name,
-          price: plan.price,
-          durationDays: plan.durationDays,
-        },
+    // Validate tier
+    if (!tier || !['basic', 'pro', 'business'].includes(tier)) {
+      return res.status(400).json({
+        error: 'Invalid tier',
+        message: 'Tier must be one of: basic, pro, business',
       });
     }
 
-    // In production, payment system must be configured
-    console.error('❌ PRODUCTION: YooKassa not configured!');
-    return res.status(503).json({
-      error: 'Платёжная система временно недоступна. Попробуйте позже.',
-      code: 'PAYMENT_SYSTEM_UNAVAILABLE',
+    // Validate billing period
+    if (!['monthly', 'yearly'].includes(billing_period)) {
+      return res.status(400).json({
+        error: 'Invalid billing period',
+        message: 'Billing period must be monthly or yearly',
+      });
+    }
+
+    // Check if YooKassa is configured
+    const shopId = process.env.YOOKASSA_SHOP_ID;
+    const secretKey = process.env.YOOKASSA_SECRET_KEY;
+    const isProduction =
+      process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
+
+    if (!shopId || !secretKey) {
+      // In development, allow test mode
+      if (!isProduction) {
+        console.log('🧪 DEV MODE: Creating test payment');
+        return res.json({
+          success: true,
+          testMode: true,
+          payment_id: `test_${Date.now()}`,
+          payment_url: `https://neuro-guardian.vercel.app/subscription/success?test=true`,
+          amount: tier === 'basic' ? 999 : tier === 'pro' ? 2999 : 9999,
+          currency: 'RUB',
+          message: 'Тестовый режим: платёж создан',
+        });
+      }
+
+      return res.status(503).json({
+        error: 'Payment system unavailable',
+        message: 'Платёжная система временно недоступна',
+      });
+    }
+
+    // Create payment via YooKassa
+    const { getYooKassaService } = await import('../services/yookassa-service.js');
+    const yookassa = getYooKassaService();
+
+    const payment = await yookassa.createPayment({
+      tier,
+      billing_period,
+      return_url,
+      userId,
+    });
+
+    // Record payment in database
+    await sql`
+      INSERT INTO payments (
+        user_id, payment_id, amount, currency, status, provider, description
+      ) VALUES (
+        ${userId}, ${payment.payment_id}, ${payment.amount}, ${payment.currency},
+        'pending', 'yookassa', ${`Подписка ${tier} - ${billing_period}`}
+      )
+    `;
+
+    return res.json({
+      success: true,
+      ...payment,
+    });
+  } catch (error) {
+    console.error('Failed to create payment:', error);
+    return res.status(500).json({
+      error: 'Payment creation failed',
+      message: error instanceof Error ? error.message : 'Unknown error',
     });
   }
-
-  const returnUrl =
-    process.env.WEBAPP_URL ||
-    `https://${process.env.VERCEL_URL}` ||
-    'https://neuro-guardian.vercel.app';
-
-  const result = await createYookassaPayment(
-    userId,
-    planId as PlanId,
-    `${returnUrl}?payment_complete=true`,
-    undefined // No email in current user schema
-  );
-
-  if (!result.success) {
-    return res.status(500).json({ error: result.error || 'Payment creation failed' });
-  }
-
-  return res.json(result);
 }
 
 /**
@@ -172,61 +155,60 @@ export async function handlePaymentWebhook(
   const payment = event.object;
   const metadata = payment.metadata || {};
   const userId = parseInt(metadata.user_id, 10);
-  const planId = metadata.plan_id;
-  const referrerId = metadata.referrer_id ? parseInt(metadata.referrer_id, 10) : null;
+  const tier = metadata.tier;
+  const billingPeriod = metadata.billing_period || 'monthly';
 
-  console.log(`💳 Payment webhook: status=${payment.status}, userId=${userId}, plan=${planId}`);
+  console.log(`💳 Payment webhook: status=${payment.status}, userId=${userId}, tier=${tier}`);
 
-  if (payment.status === 'succeeded' && userId && planId) {
-    const plan = SUBSCRIPTION_PLANS[planId as PlanId];
-    if (plan) {
-      const actualPlan = planId === 'yearly' ? 'pro' : planId;
+  if (payment.status === 'succeeded' && userId && tier) {
+    try {
+      // Upgrade subscription to paid tier
+      await SubscriptionService.upgrade(userId, tier, billingPeriod);
 
-      // CHECK REFERRAL ELIGIBILITY *BEFORE* UPDATING TRANSACTION
-      // Because isFirstPayment checks for existing 'succeeded' transactions
-      let isFirst = false;
-      if (referrerId) {
-        const { isFirstPayment } = await import('../services/index.js');
-        isFirst = await isFirstPayment(userId);
-      }
+      // Record payment
+      await SubscriptionService.recordPayment(
+        userId,
+        payment.id,
+        parseFloat(payment.amount.value),
+        'yookassa'
+      );
 
-      // Activate subscription
-      await activateSubscription(userId, actualPlan, plan.durationDays);
-
-      // Update transaction status
-      if (metadata.transaction_id) {
-        await updateTransactionStatus(metadata.transaction_id, 'succeeded', payment.id);
-      } else {
-        await sql`
-          UPDATE transactions SET status = 'succeeded', yookassa_payment_id = ${payment.id}, paid_at = CURRENT_TIMESTAMP
-          WHERE user_id = ${userId} AND status = 'pending'
-          ORDER BY created_at DESC LIMIT 1
-        `;
-      }
-
-      // Apply referral bonus if eligible
-      if (referrerId && isFirst) {
-        const { applyReferralBonus } = await import('../services/index.js');
-        await applyReferralBonus(referrerId, 500); // Standard 500 RUB bonus
-        console.log(`🎁 Referral bonus applied to user ${referrerId}`);
-      }
+      // Update payment status in database
+      await sql`
+        UPDATE payments 
+        SET status = 'succeeded', paid_at = NOW(), updated_at = NOW()
+        WHERE payment_id = ${payment.id}
+      `;
 
       // Send success notification
+      const tierNames: Record<string, string> = {
+        basic: 'Базовый',
+        pro: 'Профессиональный',
+        business: 'Бизнес',
+      };
+
       await sendTelegramNotification(
         userId,
         `✅ <b>Оплата успешна!</b>\n\n` +
-          `Подписка <b>${plan.name}</b> активирована.\n` +
-          `📅 Срок действия: ${plan.durationDays} дней\n\n` +
+          `Подписка <b>${tierNames[tier] || tier}</b> активирована.\n` +
+          `📅 Период: ${billingPeriod === 'yearly' ? 'год' : 'месяц'}\n\n` +
           `🛡️ Защита ваших товаров уже работает!`
       );
 
-      console.log(`✅ Subscription activated for user ${userId}: ${actualPlan}`);
+      console.log(`✅ Subscription activated for user ${userId}: ${tier}`);
       return res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to process payment webhook:', error);
+      return res.status(500).json({ error: 'Failed to process payment' });
     }
   } else if (payment.status === 'canceled' && userId) {
-    if (metadata.transaction_id) {
-      await updateTransactionStatus(metadata.transaction_id, 'canceled');
-    }
+    // Update payment status
+    await sql`
+      UPDATE payments 
+      SET status = 'cancelled', updated_at = NOW()
+      WHERE payment_id = ${payment.id}
+    `;
+
     console.log(`❌ Payment canceled for user ${userId}`);
     return res.json({ success: true });
   }
