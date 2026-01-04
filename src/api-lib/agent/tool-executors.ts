@@ -1126,6 +1126,45 @@ export async function executeSearchWeb(_userId: number, rawArgs: unknown): Promi
         snippet: r.snippet || '',
       })) || [];
 
+    // HELPER: Extract Marketplace IDs from search results automatically
+    // This helps the AI agent to easily pick up competitor products without hallucinating IDs
+    const extracted_products: Array<{
+      source: 'WB' | 'Ozon';
+      id: string;
+      link: string;
+      title: string;
+    }> = [];
+
+    for (const res of results) {
+      if (!res.link) continue;
+
+      // Try WB
+      const wbMatch = res.link.match(/wildberries\.ru\/catalog\/(\d+)/i);
+      if (wbMatch && wbMatch[1]) {
+        extracted_products.push({
+          source: 'WB',
+          id: wbMatch[1],
+          link: res.link,
+          title: res.title || 'WB Product',
+        });
+        continue;
+      }
+
+      // Try Ozon (format: /product/name-id/ or /product/id/)
+      // Ozon IDs are typically at the end of path, before slash or query
+      const ozonMatch =
+        res.link.match(/ozon\.ru\/product\/.*?[-/](\d{8,12})/i) ||
+        res.link.match(/ozon\.ru\/product\/(\d{8,12})/i);
+      if (ozonMatch && ozonMatch[1]) {
+        extracted_products.push({
+          source: 'Ozon',
+          id: ozonMatch[1],
+          link: res.link,
+          title: res.title || 'Ozon Product',
+        });
+      }
+    }
+
     // Try to get a direct answer or featured snippet if available
     const answer =
       data.answerBox?.answer ||
@@ -1158,6 +1197,7 @@ export async function executeSearchWeb(_userId: number, rawArgs: unknown): Promi
         answer, // AI agent can use this as a summary
         knowledgeGraph, // Rich info about companies/products
         results,
+        extracted_products, // <--- NEW: Ready-to-use product IDs for get_competitor_price
         relatedQuestions, // Common follow-up questions
       },
     };
