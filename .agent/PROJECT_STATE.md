@@ -1,6 +1,6 @@
 # 📊 Project State — NeuroGUARDIAN
 
-# Updated: 2026-01-03T15:00:00+03:00
+# Updated: 2026-01-04T17:10:00+03:00
 
 # This file tracks current progress and is updated at end of each session
 
@@ -9,7 +9,7 @@
 ## 🎯 Current Phase: MONETIZATION LAUNCH (Phase 11) 🟢 READY FOR TESTING
 
 **Last Session:** 2026-01-04 (Session 25)
-**Focus:** 🛡️ Критический Аудит + Исправление Security Issues
+**Focus:** 🛡️ Критический Аудит + Security Fixes + Bug Fix
 
 **📋 Ключевые документы:**
 
@@ -18,21 +18,32 @@
 - `docs/LAUNCH_CHECKLIST.md` — Интерактивный чеклист
 - `docs/ARCHITECTURE_EXPLAINED.md` — Архитектура системы
 
-**✅ ИСПРАВЛЕНО (2026-01-04):**
-
-1. ✅ **YooKassa Webhook Security** — API verification добавлена
-2. ✅ **Daily Report CRON** — Эндпоинт зарегистрирован
-3. ✅ **Secrets cleanup** — Удалены `\r\n` из env
-4. ✅ **Debug logs** — Заменены на logger.debug()
-5. ✅ **Price sync** — Constants обновлены
-
 **🎯 СЛЕДУЮЩИЙ ШАГ:**
 
 - ⏳ Тестовый платёж через YooKassa
+- ⏳ Проверить что Sentinel уведомления приходят после фикса
 
 ---
 
 ## ✅ Recently Completed
+
+### Session 2026-01-04 (Session 25 - Critical Audit & Security Hardening) 🛡️
+
+**Критический аудит проекта:**
+
+- [x] Провели полный security audit — обнаружили 5 критических проблем
+- [x] **YooKassa Webhook Security**: Добавлена проверка платежа через API перед активацией подписки
+- [x] **Daily Report CRON**: Зарегистрирован `send-daily-report` action в API router
+- [x] **Secrets cleanup**: Удалены `\r\n` из .env.production
+- [x] **Debug logs**: Заменены console.warn на logger.debug() в sentinel-service
+- [x] **Price sync**: Обновлены цены в constants.ts (basic=999, pro=2999)
+- [x] **CRITICAL BUG FIX**: `getUserChatId()` возвращала `id` вместо `telegram_id` — уведомления не доходили!
+
+**Commits (3):**
+
+- `security(payments): add API verification for YooKassa webhooks + fix critical issues`
+- `docs: update project status to READY FOR TESTING after security fixes`
+- `fix(notifications): use telegram_id instead of id for Telegram messages`
 
 ### Session 2026-01-03 (Session 24 - YooKassa Production Integration) 🚀
 
