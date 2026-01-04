@@ -691,18 +691,41 @@ export async function handleAdminTestTelegram(
       urgency: 'high',
     });
 
+    // 3. RAW TEST (Bypass service, hit API directly to see error)
+    let rawResult = null;
+    let rawError = null;
+    try {
+      if (botToken && adminChatId) {
+        // Use native fetch (Node 18+)
+        const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+        const resp = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: adminChatId,
+            text: '🔍 Raw Test from Vercel',
+          }),
+        });
+        rawResult = await resp.json();
+      }
+    } catch (e) {
+      rawError = e instanceof Error ? e.message : String(e);
+    }
+
     return res.json({
       success,
       env: envStatus,
       message: success ? 'Message sent successfully' : 'Failed to send message',
-      timestamp: new Date().toISOString(),
+      rawTelegramResponse: rawResult,
+      rawFetchError: rawError,
+      timestamp: new Date().toLocaleString(),
     });
   } catch (error) {
-    console.error('[Debug] Test telegram failed:', error);
+    console.error('Test failed:', error);
     return res.status(500).json({
       success: false,
       env: envStatus,
-      error: error instanceof Error ? error.message : String(error),
+      error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 }
