@@ -482,29 +482,60 @@ function formatAlert(alert: Alert, smartMessage?: string | null): string {
  */
 export async function sendAlertToAdmin(alert: Alert): Promise<boolean> {
   const adminChatId = getAdminChatId();
-  if (!adminChatId) return false;
+  console.log(
+    `[Notification] Sending Admin Alert: Type=${alert.type}, ID=${adminChatId ? 'OK' : 'MISSING'}`
+  );
 
-  const smartMsg = await generateSmartMessage(alert);
-  const message = formatAlert(alert, smartMsg);
-  const replyMarkup = getAlertButtons(alert);
+  if (!adminChatId) {
+    console.warn('[Notification] FAILED: Admin Chat ID not configured');
+    return false;
+  }
 
-  const success = await sendTelegramMessage(adminChatId, message, {
-    replyMarkup: replyMarkup as Record<string, unknown>,
-  });
+  try {
+    let message: string;
 
-  // Log notification
-  await logOpsEvent({
-    eventType: 'notification_sent',
-    eventSource: 'system',
-    payload: {
-      alertType: alert.type,
-      urgency: alert.urgency,
-      success,
-      recipient: 'admin',
-    },
-  });
+    // SPECIAL CASE: Sentinel Reports (already pre-formatted)
+    // If it's a sentinel_alert without a specific product, use the raw message
+    if (alert.type === 'sentinel_alert' && !alert.product && alert.message) {
+      message = alert.message;
+    } else {
+      // Standard flow
+      let smartMsg = null;
+      try {
+        // Try getting smart message (skip for simple status updates)
+        smartMsg = await generateSmartMessage(alert);
+      } catch (e) {
+        console.warn('[Notification] Smart message generation failed, falling back to template', e);
+      }
+      message = formatAlert(alert, smartMsg);
+    }
 
-  return success;
+    const replyMarkup = getAlertButtons(alert);
+
+    console.log(`[Notification] Sending to Telegram... (Length: ${message.length})`);
+    const success = await sendTelegramMessage(adminChatId, message, {
+      replyMarkup: replyMarkup as Record<string, unknown>,
+    });
+
+    console.log(`[Notification] Send Result: ${success ? 'SUCCESS' : 'FAILED'}`);
+
+    // Log notification
+    await logOpsEvent({
+      eventType: 'notification_sent',
+      eventSource: 'system',
+      payload: {
+        alertType: alert.type,
+        urgency: alert.urgency,
+        success,
+        recipient: 'admin',
+      },
+    });
+
+    return success;
+  } catch (error) {
+    console.error('[Notification] CRITICAL ERROR sending admin alert:', error);
+    return false;
+  }
 }
 
 /**
