@@ -125,8 +125,15 @@ async function sendTelegramMessage(
  */
 async function getUserChatId(userId: number): Promise<string | null> {
   try {
-    const result = await sql`SELECT id FROM users WHERE id = ${userId}`;
-    return result.rows[0]?.id?.toString() || null;
+    // IMPORTANT: Select telegram_id, not id!
+    // telegram_id is the actual Telegram chat ID for sending messages
+    const result = await sql`SELECT telegram_id FROM users WHERE id = ${userId}`;
+    const telegramId = result.rows[0]?.telegram_id;
+    if (!telegramId) {
+      console.warn(`[Notifications] User ${userId} has no telegram_id set`);
+      return null;
+    }
+    return telegramId.toString();
   } catch (error) {
     console.error('Failed to get user chat ID:', error);
     return null;
