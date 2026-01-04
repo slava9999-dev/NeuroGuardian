@@ -6,24 +6,24 @@
 
 ---
 
-## 🎯 Current Phase: MONETIZATION LAUNCH (Phase 11) 🟢 PRODUCTION READY
+## 🎯 Current Phase: MONETIZATION LAUNCH (Phase 11) 🔴 NOT PRODUCTION READY
 
-**Last Session:** 2026-01-03 (Session 24)
-**Focus:** 🚀 YooKassa Integration & Production Deployment
+**Last Session:** 2026-01-04 (Session 25)
+**Focus:** 🔍 Критический Аудит — обнаружены блокирующие проблемы
 
 **📋 Ключевые документы:**
 
+- `docs/CRITICAL_AUDIT_2026-01-04.md` — ⚠️ **ЧИТАЙ ПЕРВЫМ**
 - `docs/MONETIZATION_ROADMAP.md` — Полный путеводитель
-- `docs/LAUNCH_CHECKLIST.md` — Интерактивный чеклист (85% готово!)
-- `docs/AUTOMATION_AUDIT.md` — Аудит автоматизации
+- `docs/LAUNCH_CHECKLIST.md` — Интерактивный чеклист
 - `docs/ARCHITECTURE_EXPLAINED.md` — Архитектура системы
 
-**🟢 БОЕВОЙ СТАТУС:**
+**🔴 КРИТИЧЕСКИЕ БЛОКЕРЫ (до первого платежа):**
 
-1. ✅ YooKassa интегрирована и ключи в Vercel production
-2. ✅ GROQ_API_KEY настроен в Vercel production
-3. ✅ Telegram Webhook работает
-4. ⏳ Тестовый платёж (следующий шаг)
+1. ❌ **YooKassa webhook signature НЕ проверяется** (возвращает `return true`)
+2. ❌ **CRON endpoint `/api/cron/send-daily-report` не зарегистрирован** в router
+3. ⚠️ `.env.production` содержит `\r\n` в ключах
+4. ⏳ Тестовый платёж (НЕЛЬЗЯ до исправления п.1)
 
 ---
 

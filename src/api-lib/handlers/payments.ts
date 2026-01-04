@@ -152,16 +152,73 @@ export async function handlePaymentWebhook(
   const event = req.body;
   if (!event?.object?.id) return res.status(400).json({ error: 'Invalid payload' });
 
-  const payment = event.object;
+  const webhookPayment = event.object;
+  const paymentId = webhookPayment.id;
+
+  console.log(`💳 Payment webhook received: id=${paymentId}, status=${webhookPayment.status}`);
+
+  // ============================================
+  // 🔐 SECURITY: Verify payment via YooKassa API
+  // Never trust webhook data alone - always verify!
+  // ============================================
+
+  let verifiedPayment;
+  try {
+    const { getYooKassaService } = await import('../services/yookassa-service.js');
+    const yookassa = getYooKassaService();
+
+    // Fetch REAL payment status from YooKassa API
+    verifiedPayment = await yookassa.getPayment(paymentId);
+
+    console.log(`🔐 API Verification: id=${paymentId}, verified_status=${verifiedPayment.status}`);
+
+    // Compare webhook status with API status
+    if (webhookPayment.status !== verifiedPayment.status) {
+      console.error(`🚨 SECURITY ALERT: Webhook status mismatch!`, {
+        webhookStatus: webhookPayment.status,
+        apiStatus: verifiedPayment.status,
+        paymentId,
+        clientIP,
+      });
+      // Use verified status, not webhook status
+    }
+  } catch (verifyError) {
+    console.error(`❌ Payment verification failed for ${paymentId}:`, verifyError);
+    // In production, reject unverifiable webhooks
+    if (IS_PRODUCTION) {
+      return res.status(500).json({
+        error: 'Payment verification failed',
+        message: 'Could not verify payment with YooKassa API',
+      });
+    }
+    // In dev, fall back to webhook data with warning
+    console.warn('⚠️ DEV MODE: Using unverified webhook data');
+    verifiedPayment = webhookPayment;
+  }
+
+  // Use VERIFIED payment data
+  const payment = verifiedPayment;
   const metadata = payment.metadata || {};
   const userId = parseInt(metadata.user_id, 10);
   const tier = metadata.tier;
   const billingPeriod = metadata.billing_period || 'monthly';
 
-  console.log(`💳 Payment webhook: status=${payment.status}, userId=${userId}, tier=${tier}`);
+  console.log(
+    `💳 Processing verified payment: status=${payment.status}, userId=${userId}, tier=${tier}`
+  );
 
   if (payment.status === 'succeeded' && userId && tier) {
     try {
+      // Check if already processed (idempotency)
+      const existingPayment = await sql`
+        SELECT status FROM payments WHERE payment_id = ${paymentId}
+      `;
+
+      if (existingPayment.rows[0]?.status === 'succeeded') {
+        console.log(`⏭️ Payment ${paymentId} already processed, skipping`);
+        return res.json({ success: true, message: 'Already processed' });
+      }
+
       // Upgrade subscription to paid tier
       await SubscriptionService.upgrade(userId, tier, billingPeriod);
 

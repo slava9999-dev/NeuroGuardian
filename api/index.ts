@@ -10,6 +10,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import {
   extractTelegramAuth,
   extractAnyAuthAsync,
+  verifyAdminAccessAsync,
   sendAuthError,
   sendMethodNotAllowed,
 } from '../src/api-lib/middleware/auth.js';
@@ -485,6 +486,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       case 'send-reminders':
         return handleSendReminders(req, res);
+
+      case 'send-daily-report': {
+        // Verify cron/admin access
+        const isAdmin = await verifyAdminAccessAsync(req);
+        if (!isAdmin) {
+          return sendAuthError(res, 'Cron/Admin access required for daily report', 403);
+        }
+        // Import and call daily report handler
+        const { default: handleDailyReport } = await import('./cron/send-daily-report.js');
+        return handleDailyReport(req, res);
+      }
 
       case 'referral':
         return handleReferral(req, res);

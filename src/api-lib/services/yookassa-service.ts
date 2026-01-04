@@ -135,12 +135,25 @@ export class YooKassaService {
   }
 
   /**
-   * Verify webhook signature
+   * Verify webhook authenticity
+   *
+   * IMPORTANT: YooKassa does NOT use cryptographic signatures for webhooks.
+   * Their security model relies on:
+   * 1. IP address whitelist (implemented in payments.ts)
+   * 2. API verification - ALWAYS verify payment status via API before processing
+   *
+   * @see https://yookassa.ru/developers/using-api/webhooks
+   * @deprecated Use API verification in handlePaymentWebhook instead
    */
   verifyWebhookSignature(_body: string, _signature: string): boolean {
-    // TODO: Implement signature verification
-    // For now, return true (will implement after getting webhook secret)
-    return true;
+    // YooKassa does not send signatures in webhooks
+    // Security is enforced via:
+    // 1. IP whitelist in handlePaymentWebhook
+    // 2. API verification via getPayment() before processing
+    console.warn(
+      '⚠️ verifyWebhookSignature called but YooKassa uses IP + API verification, not signatures'
+    );
+    return true; // Always true - actual verification happens via getPayment() API call
   }
 
   /**
