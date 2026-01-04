@@ -19,7 +19,7 @@ import {
 } from './marketplace.js';
 import { scanProductThreats, ThreatType, type Threat } from './threat-detector.js'; // Threat renamed from ProductThreat if it was mismatch
 import { logSentinelAction } from './database.js';
-import { sendAlert } from './notifications.js';
+import { sendAlert, notificationService } from './notifications.js';
 import { priceShield, type PriceRule } from './price-shield.js';
 import { getCompetitorPrice } from './competitor-monitor.js';
 import { logger } from '../lib/index.js';
@@ -30,6 +30,9 @@ export interface SentinelRunResult {
   threatsDetected: number;
   actionsTaken: number;
   errors: string[];
+  // Extended stats for reporting
+  productsScanned?: { wb: number; ozon: number };
+  defenseDetails?: Array<{ product: string; action: string; marketplace: string }>;
 }
 
 export class SentinelService {
@@ -42,6 +45,8 @@ export class SentinelService {
       threatsDetected: 0,
       actionsTaken: 0,
       errors: [],
+      productsScanned: { wb: 0, ozon: 0 },
+      defenseDetails: [],
     };
 
     try {
@@ -67,6 +72,9 @@ export class SentinelService {
           result.errors.push(errorMsg);
         }
       }
+
+      // 3. Send summary notification to admin
+      await this.sendCycleSummary(result);
     } catch (err) {
       result.errors.push(`Critical cycle error: ${err}`);
     }
@@ -120,6 +128,10 @@ export class SentinelService {
       const wbProducts = products.filter(p => p.marketplace === 'WB');
       const nmIds = wbProducts.map(p => p.nm_id).filter((id): id is number => id !== null);
       if (nmIds.length > 0) {
+        // Track products scanned
+        if (summary.productsScanned) {
+          summary.productsScanned.wb += wbProducts.length;
+        }
         const { priceMap } = await fetchWbPrices(keys.wb, nmIds);
         await this.handleMarketplaceThreats(
           user,
@@ -140,6 +152,10 @@ export class SentinelService {
         .map(p => parseInt(p.product_id.replace('ozon-', '')))
         .filter(Boolean);
       if (ozonIds.length > 0 && keys.ozon) {
+        // Track products scanned
+        if (summary.productsScanned) {
+          summary.productsScanned.ozon += ozonProducts.length;
+        }
         // TS check for keys.ozon being truthy inside block
         const ozonKeys = keys.ozon;
 
@@ -430,6 +446,80 @@ export class SentinelService {
         reason: `Защита сработала: ${mode === 'zero_stock' ? 'обнуление остатков' : 'возврат цены'}`,
         action: mode,
       },
+    });
+  }
+
+  /**
+   * Send cycle summary notification to admin
+   * Only sends if there were threats, actions, or errors
+   */
+  private async sendCycleSummary(result: SentinelRunResult): Promise<void> {
+    // Silent mode if everything is OK and no actions taken
+    if (result.threatsDetected === 0 && result.actionsTaken === 0 && result.errors.length === 0) {
+      logger.debug('[Sentinel] Cycle complete, all OK - no notification sent (silent mode)');
+      return;
+    }
+
+    const now = new Date();
+    const time = now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    const date = now.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+
+    const wbCount = result.productsScanned?.wb || 0;
+    const ozonCount = result.productsScanned?.ozon || 0;
+    const totalProducts = wbCount + ozonCount;
+
+    let statusEmoji = '✅';
+    let statusText = 'Мониторинг завершён';
+
+    if (result.errors.length > 0) {
+      statusEmoji = '⚠️';
+      statusText = 'Есть ошибки';
+    } else if (result.actionsTaken > 0) {
+      statusEmoji = '🛡️';
+      statusText = 'Защита сработала';
+    } else if (result.threatsDetected > 0) {
+      statusEmoji = '👁️';
+      statusText = 'Обнаружены угрозы';
+    }
+
+    const lines = [
+      `🛡️ *СТОРОЖ — Отчёт*`,
+      ``,
+      `${statusEmoji} *${statusText}*`,
+      `📅 ${date} в ${time}`,
+      ``,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      `👥 Пользователей: ${result.usersProcessed}`,
+      totalProducts > 0 ? `📦 Товаров проверено: ${totalProducts}` : null,
+      wbCount > 0 ? `   🟣 WB: ${wbCount}` : null,
+      ozonCount > 0 ? `   🔵 Ozon: ${ozonCount}` : null,
+      `━━━━━━━━━━━━━━━━━━━━`,
+    ];
+
+    if (result.threatsDetected > 0) {
+      lines.push(`⚠️ Угроз обнаружено: *${result.threatsDetected}*`);
+    }
+
+    if (result.actionsTaken > 0) {
+      lines.push(`⚔️ Действий выполнено: *${result.actionsTaken}*`);
+    }
+
+    if (result.errors.length > 0) {
+      lines.push(`❌ Ошибок: *${result.errors.length}*`);
+      // Show first error
+      lines.push(`   _${result.errors[0].substring(0, 50)}..._`);
+    }
+
+    if (result.threatsDetected === 0 && result.actionsTaken === 0 && result.errors.length === 0) {
+      lines.push(`✅ Всё в порядке!`);
+    }
+
+    const message = lines.filter(Boolean).join('\n');
+
+    await notificationService.sendAlertToAdmin({
+      type: 'sentinel_alert',
+      urgency: result.errors.length > 0 ? 'high' : 'low',
+      message,
     });
   }
 }

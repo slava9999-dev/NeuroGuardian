@@ -307,28 +307,72 @@ function formatAlert(alert: Alert, smartMessage?: string | null): string {
 
   // FALLBACK TEMPLATES (if LLM fails or type not supported for smart generation)
 
-  // Price protection alert - ENHANCED UX
+  // Price protection alert - СТОРОЖ FORMAT (3 SCENARIOS)
   if (alert.type === 'price_protection' && alert.analysis && alert.product) {
     const mpEmoji = alert.product.marketplace.toUpperCase() === 'WB' ? '🟣' : '🔵';
-    const priceDiff = alert.analysis.currentPrice - alert.analysis.recommendedPrice;
-    const priceDiffPercent = Math.round((priceDiff / alert.analysis.currentPrice) * 100);
+    const currentPrice = alert.analysis.currentPrice;
+    const minPrice = alert.analysis.recommendedPrice;
+    const wasBelow = currentPrice < minPrice;
+    const difference = Math.abs(minPrice - currentPrice);
+
+    // Короткое название (макс 60 символов)
+    const shortTitle =
+      alert.product.name.length > 60
+        ? alert.product.name.substring(0, 57) + '...'
+        : alert.product.name;
+
+    const now = new Date();
+    const time = now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+
+    let headerEmoji = '';
+    let headerText = '';
+    let priceBlock = '';
+    let resultBlock = '';
+    let tipText = '';
+
+    if (wasBelow) {
+      // СЦЕНАРИЙ 1: Реальная атака — цена была НИЖЕ минимума
+      headerEmoji = '🚨';
+      headerText = 'ЦЕНУ СНИЗИЛИ — МЫ ВЕРНУЛИ';
+      priceBlock = [
+        `💸 *Было:* ~${currentPrice}₽~ (на ${difference}₽ ниже)`,
+        `✅ *Стало:* ${minPrice}₽`,
+      ].join('\n');
+      resultBlock = `💰 *Защитили:* ${difference}₽`;
+      tipText = 'Проверьте конкурентов';
+    } else if (difference === 0) {
+      // СЦЕНАРИЙ 2: Превентивная защита — цена РАВНА минимуму
+      headerEmoji = '✅';
+      headerText = 'ЗАЩИТА СРАБОТАЛА';
+      priceBlock = [`💰 *Цена:* ${minPrice}₽`, `🔒 *Статус:* Зафиксирована на минимуме`].join('\n');
+      resultBlock = `🛡️ *Результат:* Цена не упадёт ниже`;
+      tipText = 'Всё под контролем';
+    } else {
+      // СЦЕНАРИЙ 3: Цена приближалась к минимуму
+      headerEmoji = '⚠️';
+      headerText = 'ЦЕНА ПРИБЛИЖАЛАСЬ К МИНИМУМУ';
+      priceBlock = [`📊 *Было:* ${currentPrice}₽`, `🔒 *Защитили на:* ${minPrice}₽`].join('\n');
+      resultBlock = `🛡️ *Результат:* Снижение остановлено`;
+      tipText = 'Превентивная защита';
+    }
 
     return [
-      `🛡️ *Виктор ИИ — Защита цен*`,
+      `🛡️ *СТОРОЖ*`,
       ``,
-      `${emoji} *Обнаружил проблему с ценой!*`,
+      `${headerEmoji} *${headerText}*`,
       ``,
-      `📦 *${escapeMarkdown(alert.product.name)}*`,
-      `${mpEmoji} ${alert.product.marketplace.toUpperCase()} • Артикул: \`${alert.product.externalId}\``,
+      `${mpEmoji} ${alert.product.marketplace.toUpperCase()} • ${time}`,
+      `📦 ${escapeMarkdown(shortTitle)}`,
       ``,
-      `Сейчас: *${alert.analysis.currentPrice}₽*`,
-      `Нужно: *${alert.analysis.recommendedPrice}₽*`,
-      priceDiffPercent > 0 ? `❌ Вы теряете ~${priceDiffPercent}% прибыли` : ``,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      priceBlock,
       ``,
-      `💡 ${escapeMarkdown(alert.analysis.reason)}`,
-    ]
-      .filter(Boolean)
-      .join('\n');
+      `⚔️ *Действие:* ${escapeMarkdown(alert.analysis.action)}`,
+      resultBlock,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      ``,
+      `✅ *Товар защищён!* 💡 _${tipText}_`,
+    ].join('\n');
   }
 
   // Sentinel alert - general
