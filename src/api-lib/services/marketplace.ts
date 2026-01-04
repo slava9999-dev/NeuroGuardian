@@ -19,9 +19,7 @@ import type {
   WbStockItem,
   WbUploadTaskResponse,
   OzonProductListItem,
-  OzonPriceInfo,
   OzonAnalyticsRow,
-  OzonPrice,
   OzonWarehouse,
   OzonOrder,
   WbStatisticsStock,
@@ -108,8 +106,16 @@ export async function getMarketplaceKeys(
   if (user.api_key_ozon) {
     const decrypted = decryptApiKey(user.api_key_ozon);
     if (decrypted) {
-      const [clientId, apiKey] = decrypted.split(':');
-      if (clientId && apiKey) result.ozon = { clientId, apiKey };
+      // 1. Check if it's modern format "CLIENT_ID:API_KEY"
+      if (decrypted.includes(':')) {
+        const [clientId, apiKey] = decrypted.split(':');
+        if (clientId && apiKey) result.ozon = { clientId, apiKey };
+      }
+      // 2. Fallback to separate ozon_client_id column if present
+      else if (user.ozon_client_id) {
+        const clientId = decryptApiKey(user.ozon_client_id);
+        if (clientId) result.ozon = { clientId, apiKey: decrypted };
+      }
     }
   }
 
@@ -325,7 +331,6 @@ export async function fetchWbPrices(
 
   try {
     // Step 1: Try Prices API first
-    console.log(`📡 WB Prices API: bulk fetch for ${nmIds.length} products`);
 
     const url = new URL('https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter');
     url.searchParams.set('limit', '1000');
@@ -340,23 +345,15 @@ export async function fetchWbPrices(
       const data = (await response.json()) as { data: { listGoods: WbGoodsItem[] } };
       const goods = data.data?.listGoods || [];
 
-      console.log(`📦 WB Prices API: received ${goods.length} goods`);
-
-      const requestedNmIds = new Set(nmIds);
+      // CRITICAL FIX: Ensure all IDs are numbers (Postgres/JSON type mismatch)
+      const requestedNmIds = new Set(nmIds.map(id => Number(id)));
 
       for (const good of goods) {
-        if (nmIds.length === 0 || requestedNmIds.has(good.nmID)) {
+        const goodNmId = Number(good.nmID);
+        if (nmIds.length === 0 || requestedNmIds.has(goodNmId)) {
           const price = extractWbPrice(good);
           if (price > 0) {
-            priceMap.set(good.nmID, price);
-          } else {
-            // Debug: log first item with zero price to understand structure
-            if (priceMap.size === 0 && goods.length > 0) {
-              console.log(
-                `🔍 WB DEBUG: First good with zero price:`,
-                JSON.stringify(good).substring(0, 500)
-              );
-            }
+            priceMap.set(goodNmId, price);
           }
         }
       }
@@ -367,8 +364,6 @@ export async function fetchWbPrices(
     // Step 2: Statistics API fallback for missing prices
     const missing = nmIds.filter(id => !priceMap.has(id));
     if (missing.length > 0) {
-      console.log(`📡 WB: ${missing.length} products missing prices, trying Statistics API...`);
-
       const today = new Date();
       const dateFrom = new Date(today);
       dateFrom.setDate(today.getDate() - 30); // Last 30 days
@@ -409,7 +404,6 @@ export async function fetchWbPrices(
     }
 
     // Log final results
-    const foundCount = priceMap.size;
     const stillMissing = nmIds.filter(id => !priceMap.has(id));
 
     if (stillMissing.length > 0) {
@@ -420,7 +414,6 @@ export async function fetchWbPrices(
       }
     }
 
-    console.log(`💰 WB: Extracted ${foundCount}/${nmIds.length} prices total`);
     return { priceMap };
   } catch (e) {
     const error = e instanceof Error ? e.message : 'Unknown error';
@@ -432,25 +425,26 @@ export async function fetchWbPrices(
 /**
  * Extract price from WB goods item
  * Priority: discountedPrice > clubDiscountedPrice > salePrice > price
+ * WB API v2 December 2024 Update: Prices can be in sizes[0] or direct.
  */
 function extractWbPrice(good: WbGoodsItem): number {
+  // Try sizes first (most accurate for v2)
   const size = good.sizes?.[0];
   let price = 0;
 
   if (size) {
-    // WB API 2024: prices are in RUBLES (not kopecks!)
-    price =
-      size.discountedPrice ||
-      size.clubDiscountedPrice ||
-      size.salePrice ||
-      size.price ||
-      good.price ||
-      0;
+    // Priority for final price to customer
+    price = size.discountedPrice || size.clubDiscountedPrice || size.salePrice || size.price || 0;
+  }
 
-    // Safety check: if price looks like kopecks (very high value), convert
-    if (price > 100000) {
-      price = Math.round(price / 100);
-    }
+  // Fallback to top-level price if size price is missing
+  if (price === 0) {
+    price = (good as any).price || (good as any).discountedPrice || 0;
+  }
+
+  // Safety check: if price looks like kopecks (very high value), convert
+  if (price > 500000) {
+    price = Math.round(price / 100);
   }
 
   return Math.round(price);
@@ -496,19 +490,11 @@ export async function updateWbPrices(
   const batchedUpdates = validUpdates.slice(0, 1000);
 
   try {
-    // CRITICAL FIX: nmID (not nmId) + discount: 0
-    const payload = {
-      data: batchedUpdates.map(u => ({
-        nmID: u.nmId, // WB API requires uppercase ID
-        price: u.price,
-        discount: 0, // Required for proper execution
-      })),
-    };
-
-    console.log(
-      `📤 WB Price Update: ${batchedUpdates.length} items, payload sample:`,
-      JSON.stringify(payload.data.slice(0, 2))
-    );
+    // WB API v2 2025: Simple format - just nmID and price
+    const payload = batchedUpdates.map(u => ({
+      nmID: Number(u.nmId),
+      price: Math.round(u.price),
+    }));
 
     const response = await fetchWithRetry(
       'https://discounts-prices-api.wildberries.ru/api/v2/upload/task',
@@ -518,7 +504,7 @@ export async function updateWbPrices(
           Authorization: apiKey,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ data: payload }),
       }
     );
 
@@ -941,12 +927,17 @@ export async function fetchOzonCurrentPrices(
 
   if (productIds.length === 0) return priceMap;
 
-  try {
-    console.log(`📡 Ozon Prices API: Fetching for ${productIds.length} products`);
+  // Sanitize and deduplicate IDs
+  const validIds = Array.from(new Set(productIds.filter(id => typeof id === 'number' && id > 0)));
 
-    // Use v4/product/info/prices - current working version (Dec 2024)
-    // v1 is deprecated and returns 404
-    const response = await fetchWithRetry('https://api-seller.ozon.ru/v4/product/info/prices', {
+  if (validIds.length === 0) {
+    console.warn('⚠️ Ozon: No valid numeric product IDs to fetch');
+    return priceMap;
+  }
+
+  try {
+    // Final attempt: v2/product/info/list is the most stable across all account types
+    const response = await fetchWithRetry('https://api-seller.ozon.ru/v2/product/info/list', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -954,27 +945,17 @@ export async function fetchOzonCurrentPrices(
         'Api-Key': apiKey,
       },
       body: JSON.stringify({
-        filter: {
-          product_id: productIds,
-        },
-        limit: productIds.length,
+        product_id: validIds.map(Number), // Must be numbers for v2
       }),
     });
 
-    console.log(`📡 Ozon Prices API: status=${response.status}`);
-
     if (response.ok) {
-      const data = (await response.json()) as {
-        result: { items: OzonPriceInfo[] };
-        items?: OzonPriceInfo[];
-      };
+      const data = (await response.json()) as any;
       const items = data.result?.items || data.items || [];
 
-      console.log(`📦 Ozon Prices API: received ${items.length} items`);
-
       for (const p of items) {
-        // v4 response structure: price object with price.price and price.marketing_price
-        const priceObj = p.price || ({} as OzonPrice);
+        // v2 price structure: marketing_price is often inside 'price' object or top level
+        const priceObj = p.price || p;
         const actualPrice = parseFloat(priceObj.marketing_price || priceObj.price || '0');
 
         if (p.product_id && actualPrice > 0) {

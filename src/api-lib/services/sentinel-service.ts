@@ -106,33 +106,41 @@ export class SentinelService {
    * Process a single user's products
    */
   public async processUser(user: DBUser, summary: SentinelRunResult): Promise<void> {
-    logger.debug(`[Sentinel] processUser called for user ${user.id}`);
     const keys = await getMarketplaceKeys(user.id);
     if (!keys.wb && !keys.ozon) return;
 
     // Get monitored products
+
     const productsRes = await sql`
       SELECT * FROM products 
       WHERE user_id = ${user.id} 
       AND (is_monitored = true OR min_price > 0)
     `;
     const products = productsRes.rows as DBProduct[];
+
     if (products.length === 0) return;
 
     // Get Active Price Rules (Smart Repricing)
     const rules = await priceShield.getRulesForUser(user.id);
-    const rulesMap = new Map(rules.map(r => [r.product_id, r]));
+    const rulesMap = new Map<string, PriceRule>();
+    for (const rule of rules) {
+      rulesMap.set(rule.product_id, rule);
+    }
 
     // --- WB Sub-cycle ---
     if (keys.wb) {
       const wbProducts = products.filter(p => p.marketplace === 'WB');
       const nmIds = wbProducts.map(p => p.nm_id).filter((id): id is number => id !== null);
       if (nmIds.length > 0) {
-        // Track products scanned
         if (summary.productsScanned) {
           summary.productsScanned.wb += wbProducts.length;
         }
-        const { priceMap } = await fetchWbPrices(keys.wb, nmIds);
+        const { priceMap, error } = await fetchWbPrices(keys.wb, nmIds);
+
+        if (error) {
+          summary.errors.push(`WB API Error (User ${user.id}): ${error}`);
+        }
+
         await this.handleMarketplaceThreats(
           user,
           wbProducts,
@@ -159,14 +167,29 @@ export class SentinelService {
         // TS check for keys.ozon being truthy inside block
         const ozonKeys = keys.ozon;
 
-        const priceMap = await fetchOzonCurrentPrices(ozonKeys.clientId, ozonKeys.apiKey, ozonIds);
+        let ozonPriceMap = new Map<number, number>();
+        let ozonError: string | undefined;
+
+        try {
+          const result = await fetchOzonCurrentPrices(ozonKeys.clientId, ozonKeys.apiKey, ozonIds);
+          // fetchOzonCurrentPrices returns Map<number, number> directly based on its signature
+          ozonPriceMap = result;
+        } catch (err) {
+          ozonError = err instanceof Error ? err.message : String(err);
+        }
+
+        if (ozonError) {
+          summary.errors.push(`Ozon API Error (User ${user.id}): ${ozonError}`);
+        }
+
         logger.debug(
-          `[Sentinel] Ozon Prices fetched: size=${priceMap.size}, keys=[${Array.from(priceMap.keys())}]`
+          `[Sentinel] Ozon Prices fetched: size=${ozonPriceMap.size}, keys=[${Array.from(ozonPriceMap.keys())}]`
         );
+
         await this.handleMarketplaceThreats(
           user,
           ozonProducts,
-          priceMap,
+          ozonPriceMap,
           'Ozon',
           ozonKeys,
           summary,
@@ -191,14 +214,16 @@ export class SentinelService {
     logger.debug(`[Sentinel] handleMarketplaceThreats for ${products.length} products`);
     for (const product of products) {
       const key =
-        marketplace === 'WB' ? product.nm_id : parseInt(product.product_id.replace('ozon-', ''));
-
-      if (!key) continue;
-
-      logger.debug(`[Sentinel] Loop: product=${product.product_id} key=${key}`);
+        marketplace === 'WB'
+          ? Number(product.nm_id)
+          : Number(product.product_id.replace('ozon-', ''));
       const livePrice = priceMap.get(key);
-      logger.debug(`[Sentinel] Loop: livePrice=${livePrice} (type=${typeof livePrice})`);
-      if (livePrice === undefined) continue;
+
+      logger.debug(
+        `[Sentinel] Loop: product=${product.product_id} key=${key} livePrice=${livePrice} (type=${typeof livePrice})`
+      );
+
+      if (!livePrice) continue;
 
       // 1. SMART REPRICING (PriceShield)
       // Check if we have active rules for this product
@@ -459,7 +484,7 @@ export class SentinelService {
 
   /**
    * Send cycle summary notification to admin
-   * БОЕВОЙ РЕЖИМ: Отправляет ВСЕГДА после каждого цикла
+   * БОЕВОЙ РЕЖИМ: Отчет на основе РЕАЛЬНЫХ данных текущего цикла
    */
   private async sendCycleSummary(result: SentinelRunResult): Promise<void> {
     const now = new Date();
@@ -475,32 +500,11 @@ export class SentinelService {
       timeZone: 'Europe/Moscow',
     });
 
-    // 1. ПОЛУЧАЕМ РЕАЛЬНЫЕ ДАННЫЕ ИЗ БАЗЫ (Global Truth)
-    let totalSellers = 0;
-    let totalProducts = 0;
-    let wbProducts = 0;
-    let ozonProducts = 0;
-
-    try {
-      // Считаем сколько ВСЕГО товаров на защите прямо сейчас
-      const stats = await sql`
-        SELECT 
-          (SELECT COUNT(*) FROM users WHERE subscription_active = true OR protection_enabled = true) as total_sellers,
-          (SELECT COUNT(*) FROM products WHERE is_monitored = true) as total_products,
-          (SELECT COUNT(*) FROM products WHERE is_monitored = true AND marketplace = 'WB') as wb_products,
-          (SELECT COUNT(*) FROM products WHERE is_monitored = true AND marketplace = 'OZON') as ozon_products
-      `;
-
-      if (stats.rows.length > 0) {
-        totalSellers = parseInt(stats.rows[0].total_sellers || '0');
-        totalProducts = parseInt(stats.rows[0].total_products || '0'); // Твои 33 товара будут здесь
-        wbProducts = parseInt(stats.rows[0].wb_products || '0');
-        ozonProducts = parseInt(stats.rows[0].ozon_products || '0');
-      }
-    } catch (e) {
-      console.warn('DB Stats failed, using cycle stats:', e);
-      totalProducts = (result.productsScanned?.wb || 0) + (result.productsScanned?.ozon || 0);
-    }
+    // 1. СТАТИСТИКА ИЗ ТЕКУЩЕГО ЦИКЛА (Real Truth)
+    const usersProcessed = result.usersProcessed || 0;
+    const wbScanned = result.productsScanned?.wb || 0;
+    const ozonScanned = result.productsScanned?.ozon || 0;
+    const totalScanned = wbScanned + ozonScanned;
 
     // 2. ОПРЕДЕЛЯЕМ СТАТУС (Боевой режим)
     let statusEmoji = '🟢';
@@ -508,13 +512,19 @@ export class SentinelService {
 
     if (result.errors.length > 0) {
       statusEmoji = '🔴';
-      statusText = 'Требует внимания';
+      statusText = 'Есть критические ошибки';
     } else if (result.actionsTaken > 0) {
-      statusEmoji = '🛡️';
-      statusText = 'Активная защита срабатывала';
+      statusEmoji = '⚔️';
+      statusText = 'Активная защита сработала';
     } else if (result.threatsDetected > 0) {
       statusEmoji = '🟡';
-      statusText = 'Есть предупреждения';
+      statusText = 'Зафиксированы угрозы';
+    } else if (totalScanned === 0 && usersProcessed > 0) {
+      statusEmoji = '⚪';
+      statusText = 'Нет данных для проверки';
+    } else if (usersProcessed === 0) {
+      statusEmoji = '💤';
+      statusText = 'Нет активных защит';
     }
 
     // 3. ФОРМИРУЕМ ОТЧЁТ (Элитный стиль)
@@ -524,35 +534,43 @@ export class SentinelService {
       ``,
       `${statusEmoji} *${statusText}*`,
       ``,
-      `📊 *Текущий масштаб:*`,
-      `👥 Магазинов на защите: ${totalSellers}`,
+      `📊 *Результаты проверки:*`,
+      `👥 Обработано пользователей: ${usersProcessed}`,
     ];
 
-    if (totalProducts > 0) {
-      lines.push(`📦 Товаров под контролем: ${totalProducts}`);
-      if (wbProducts > 0) lines.push(`   ├ 🟣 Wildberries: ${wbProducts}`);
-      if (ozonProducts > 0) lines.push(`   └ 🔵 Ozon: ${ozonProducts}`);
-    } else {
-      lines.push(`📦 Товаров: 0 (Ожидание синхронизации)`);
+    if (totalScanned > 0) {
+      lines.push(`📦 Товаров проверено: ${totalScanned}`);
+      if (wbScanned > 0) lines.push(`   ├ 🟣 Wildberries: ${wbScanned}`);
+      if (ozonScanned > 0) lines.push(`   └ 🔵 Ozon: ${ozonScanned}`);
+    } else if (usersProcessed > 0) {
+      lines.push(`📦 Товаров: 0 (Проверьте мониторинг у пользователей)`);
     }
 
     lines.push(``);
 
-    // Секция инцидентов (только если были)
+    // Секция инцидентов / Угроз
     if (result.threatsDetected > 0 || result.actionsTaken > 0 || result.errors.length > 0) {
-      lines.push(`📝 *События за последние 30 мин:*`);
-      if (result.threatsDetected > 0)
-        lines.push(`⚠️ Угроз зафиксировано: ${result.threatsDetected}`);
+      lines.push(`📝 *События за цикл:*`);
+      if (result.threatsDetected > 0) lines.push(`⚠️ Угроз обнаружено: ${result.threatsDetected}`);
       if (result.actionsTaken > 0) lines.push(`⚔️ Отражено атак: ${result.actionsTaken}`);
+
+      if (result.errors.length > 0) {
+        lines.push(`❌ Ошибок зафиксировано: ${result.errors.length}`);
+        // Показываем первую ошибку для диагностики
+        const firstError = result.errors[0].split(':').slice(0, 2).join(':');
+        lines.push(`_Err: ${firstError.substring(0, 50)}..._`);
+      }
     }
 
-    // Defense details if any
+    // Defense details (конкретика)
     if (result.defenseDetails && result.defenseDetails.length > 0) {
       lines.push(``);
-      lines.push(`🛡️ *Защита сработала на:*`);
+      lines.push(`🛡️ *Живая защита:*`);
       for (const detail of result.defenseDetails.slice(0, 3)) {
         const mpEmoji = detail.marketplace === 'WB' ? '🟣' : '🔵';
-        lines.push(`${mpEmoji} ${detail.product.substring(0, 30)}...`);
+        lines.push(
+          `${mpEmoji} ${detail.product.substring(0, 25)}... (${detail.action === 'zero_stock' ? 'склад 0' : 'цена'})`
+        );
       }
       if (result.defenseDetails.length > 3) {
         lines.push(`_...и ещё ${result.defenseDetails.length - 3} товаров_`);
@@ -565,7 +583,7 @@ export class SentinelService {
 
     const message = lines.filter(Boolean).join('\n');
 
-    // Send to admin
+    // Отправляем админу
     await notificationService.sendAlertToAdmin({
       type: 'sentinel_alert',
       urgency: result.errors.length > 0 ? 'high' : result.actionsTaken > 0 ? 'medium' : 'low',
@@ -573,7 +591,7 @@ export class SentinelService {
     });
 
     logger.debug(
-      `[Sentinel] Cycle summary sent: ${totalProducts} products, ${result.threatsDetected} threats`
+      `[Sentinel] Real-time cycle summary sent: ${totalScanned} products scanned for ${usersProcessed} users`
     );
   }
 }
