@@ -393,6 +393,14 @@ export class SentinelService {
     });
 
     if (success) {
+      // Track defense for summary
+      if (summary.defenseDetails) {
+        summary.defenseDetails.push({
+          product: product.title,
+          action: defenseMode,
+          marketplace,
+        });
+      }
       // Notify User
       await this.notifyDefenseSuccess(user, product, livePrice, minPrice, defenseMode, marketplace);
     } else {
@@ -451,76 +459,120 @@ export class SentinelService {
 
   /**
    * Send cycle summary notification to admin
-   * Only sends if there were threats, actions, or errors
+   * БОЕВОЙ РЕЖИМ: Отправляет ВСЕГДА после каждого цикла
    */
   private async sendCycleSummary(result: SentinelRunResult): Promise<void> {
-    // Silent mode if everything is OK and no actions taken
-    if (result.threatsDetected === 0 && result.actionsTaken === 0 && result.errors.length === 0) {
-      logger.debug('[Sentinel] Cycle complete, all OK - no notification sent (silent mode)');
-      return;
-    }
-
     const now = new Date();
     const time = now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-    const date = now.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+    const date = now.toLocaleDateString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
 
     const wbCount = result.productsScanned?.wb || 0;
     const ozonCount = result.productsScanned?.ozon || 0;
     const totalProducts = wbCount + ozonCount;
 
+    // Determine status
     let statusEmoji = '✅';
-    let statusText = 'Мониторинг завершён';
+    let statusText = 'Всё под контролем';
 
     if (result.errors.length > 0) {
-      statusEmoji = '⚠️';
-      statusText = 'Есть ошибки';
+      statusEmoji = '🔴';
+      statusText = 'Требует внимания';
     } else if (result.actionsTaken > 0) {
       statusEmoji = '🛡️';
       statusText = 'Защита сработала';
     } else if (result.threatsDetected > 0) {
-      statusEmoji = '👁️';
+      statusEmoji = '⚠️';
       statusText = 'Обнаружены угрозы';
     }
 
     const lines = [
-      `🛡️ *СТОРОЖ — Отчёт*`,
+      `🛡️ *СТОРОЖ — Мониторинг*`,
       ``,
       `${statusEmoji} *${statusText}*`,
-      `📅 ${date} в ${time}`,
+      `⏰ ${date}, ${time}`,
       ``,
-      `━━━━━━━━━━━━━━━━━━━━`,
-      `👥 Пользователей: ${result.usersProcessed}`,
-      totalProducts > 0 ? `📦 Товаров проверено: ${totalProducts}` : null,
-      wbCount > 0 ? `   🟣 WB: ${wbCount}` : null,
-      ozonCount > 0 ? `   🔵 Ozon: ${ozonCount}` : null,
       `━━━━━━━━━━━━━━━━━━━━`,
     ];
 
+    // Products section
+    if (totalProducts > 0) {
+      lines.push(`📦 *Товары проверены:*`);
+      if (wbCount > 0) lines.push(`   🟣 WB: ${wbCount} шт`);
+      if (ozonCount > 0) lines.push(`   🔵 Ozon: ${ozonCount} шт`);
+    } else {
+      lines.push(`📦 Товаров: 0 (нет настроенных API)`);
+    }
+
+    lines.push(``);
+
+    // Stats section
+    lines.push(`📊 *Результат проверки:*`);
+
     if (result.threatsDetected > 0) {
-      lines.push(`⚠️ Угроз обнаружено: *${result.threatsDetected}*`);
+      lines.push(`   ⚠️ Угроз: ${result.threatsDetected}`);
     }
 
     if (result.actionsTaken > 0) {
-      lines.push(`⚔️ Действий выполнено: *${result.actionsTaken}*`);
+      lines.push(`   ⚔️ Действий: ${result.actionsTaken}`);
     }
 
     if (result.errors.length > 0) {
-      lines.push(`❌ Ошибок: *${result.errors.length}*`);
-      // Show first error
-      lines.push(`   _${result.errors[0].substring(0, 50)}..._`);
+      lines.push(`   ❌ Ошибок: ${result.errors.length}`);
     }
 
     if (result.threatsDetected === 0 && result.actionsTaken === 0 && result.errors.length === 0) {
-      lines.push(`✅ Всё в порядке!`);
+      lines.push(`   ✅ Угроз не обнаружено`);
+      lines.push(`   💰 Цены в норме`);
     }
+
+    lines.push(`━━━━━━━━━━━━━━━━━━━━`);
+
+    // Users section
+    lines.push(``);
+    lines.push(`👥 Магазинов: ${result.usersProcessed}`);
+
+    // Error details if any
+    if (result.errors.length > 0) {
+      lines.push(``);
+      lines.push(`❗ *Подробности ошибки:*`);
+      lines.push(
+        `_${result.errors[0].substring(0, 80)}${result.errors[0].length > 80 ? '...' : ''}_`
+      );
+    }
+
+    // Defense details if any
+    if (result.defenseDetails && result.defenseDetails.length > 0) {
+      lines.push(``);
+      lines.push(`🛡️ *Защита сработала на:*`);
+      for (const detail of result.defenseDetails.slice(0, 3)) {
+        const mpEmoji = detail.marketplace === 'WB' ? '🟣' : '🔵';
+        lines.push(`${mpEmoji} ${detail.product.substring(0, 30)}...`);
+      }
+      if (result.defenseDetails.length > 3) {
+        lines.push(`_...и ещё ${result.defenseDetails.length - 3} товаров_`);
+      }
+    }
+
+    // Footer
+    lines.push(``);
+    lines.push(`💡 _Следующая проверка через 30 мин_`);
 
     const message = lines.filter(Boolean).join('\n');
 
+    // Send to admin
     await notificationService.sendAlertToAdmin({
       type: 'sentinel_alert',
-      urgency: result.errors.length > 0 ? 'high' : 'low',
+      urgency: result.errors.length > 0 ? 'high' : result.actionsTaken > 0 ? 'medium' : 'low',
       message,
     });
+
+    logger.debug(
+      `[Sentinel] Cycle summary sent: ${totalProducts} products, ${result.threatsDetected} threats`
+    );
   }
 }
 
