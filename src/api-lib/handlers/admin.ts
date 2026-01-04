@@ -9,7 +9,6 @@ import { sql } from '@vercel/postgres';
 import { getUserById, initializeDatabase } from '../services/index.js';
 import { getSecret } from '../lib/index.js';
 import { verifyAdminAccessAsync } from '../middleware/auth.js';
-import { sendAlertToUser } from '../services/notifications.js';
 
 /**
  * Helper to get Telegram secrets
@@ -663,47 +662,47 @@ export async function handleAdminSetDefenseMode(
  * Handle admin-test-telegram action
  */
 export async function handleAdminTestTelegram(
-  req: VercelRequest,
+  _req: VercelRequest,
   res: VercelResponse
 ): Promise<VercelResponse> {
-  if (!(await validateAdminAccess(req))) {
-    return res.status(403).json({ error: 'Admin access required' });
-  }
+  const { notificationService } = await import('../services/notifications.js');
 
-  const userId = Number(req.query.userId || req.body?.userId);
+  const adminChatId = process.env.ADMIN_CHAT_ID;
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
 
-  if (!userId) {
-    return res.status(400).json({ error: 'userId required' });
-  }
+  // 1. Env Diagnostic
+  const envStatus = {
+    ADMIN_CHAT_ID: adminChatId
+      ? `${adminChatId.substring(0, 4)}... (Length: ${adminChatId.length})`
+      : 'MISSING',
+    TELEGRAM_BOT_TOKEN: botToken ? 'PRESENT' : 'MISSING',
+  };
 
   try {
-    // FORCE CACHE DEPLOY BUST 2026-01-01-16-20
-    // Send a real-like Price Protection Alert
-    const success = await sendAlertToUser(userId, {
-      type: 'price_protection',
+    // 2. Test Sentinel Alert Path
+    const testMessage = `🛡️ *СТОРОЖ — Диагностика*\n\n✅ Тестовое сообщение (sentinel_alert)\n⏰ ${new Date().toLocaleTimeString()}\n\nЕсли вы видите это — путь "sendAlertToAdmin" исправен.`;
+
+    console.log('[Debug] Sending diagnostic alert...', envStatus);
+
+    const success = await notificationService.sendAlertToAdmin({
+      type: 'sentinel_alert',
+      message: testMessage,
       urgency: 'high',
-      message: 'Тестовое уведомление о демпинге',
-      product: {
-        name: 'Тестовый Товар 123',
-        marketplace: 'WB',
-        externalId: '12345678',
-        userId,
-      },
-      analysis: {
-        currentPrice: 1000,
-        recommendedPrice: 900,
-        reason: 'Конкурент снизил цену на 15%',
-        action: 'Снизить цену',
-      },
     });
 
     return res.json({
       success,
-      message: 'Smart Alert sent via sendAlertToUser',
+      env: envStatus,
+      message: success ? 'Message sent successfully' : 'Failed to send message',
+      timestamp: new Date().toISOString(),
     });
-  } catch (e) {
-    const errorMessage = e instanceof Error ? e.message : 'Unknown error';
-    return res.status(500).json({ error: 'Alert Error', details: errorMessage });
+  } catch (error) {
+    console.error('[Debug] Test telegram failed:', error);
+    return res.status(500).json({
+      success: false,
+      env: envStatus,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 }
 
