@@ -666,11 +666,12 @@ export async function handleAdminTestTelegram(
   res: VercelResponse
 ): Promise<VercelResponse> {
   const { notificationService } = await import('../services/notifications.js');
+  const { getSecret } = await import('../lib/secrets-helper.js');
 
-  const adminChatId = process.env.ADMIN_CHAT_ID;
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  const adminChatId = await getSecret('admin_chat_id');
+  const botToken = await getSecret('telegram_bot_token');
 
-  // 1. Env Diagnostic
+  // 1. Diagnostic Data
   const envStatus = {
     ADMIN_CHAT_ID: adminChatId
       ? `${adminChatId.substring(0, 4)}... (Length: ${adminChatId.length})`

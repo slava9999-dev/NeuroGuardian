@@ -6,6 +6,7 @@
 import { sql } from '@vercel/postgres';
 import { logOpsEvent } from './ops-logger.js';
 import { callLLMWithFallback } from '../agent/orchestrator-v4.js';
+import { getSecret } from '../lib/secrets-helper.js';
 
 // ============================================
 // TYPES
@@ -67,10 +68,10 @@ function getBotToken(): string {
   return token;
 }
 
-function getAdminChatId(): string {
-  const chatId = process.env.ADMIN_CHAT_ID;
+async function getAdminChatId(): Promise<string> {
+  const chatId = await getSecret('admin_chat_id', 'notification_delivery');
   if (!chatId) {
-    console.warn('ADMIN_CHAT_ID not configured, notifications will be skipped');
+    console.warn('ADMIN_CHAT_ID not configured (DB or ENV), notifications will be skipped');
     return '';
   }
   return chatId;
@@ -481,7 +482,7 @@ function formatAlert(alert: Alert, smartMessage?: string | null): string {
  * Send alert to admin
  */
 export async function sendAlertToAdmin(alert: Alert): Promise<boolean> {
-  const adminChatId = getAdminChatId();
+  const adminChatId = await getAdminChatId();
   console.log(
     `[Notification] Sending Admin Alert: Type=${alert.type}, ID=${adminChatId ? 'OK' : 'MISSING'}`
   );
@@ -603,7 +604,7 @@ export async function sendAlert(alert: Alert): Promise<boolean> {
  * Silent when everything is OK (no spam!)
  */
 export async function sendHourlyReport(report: HourlyReport): Promise<boolean> {
-  const adminChatId = getAdminChatId();
+  const adminChatId = await getAdminChatId();
   if (!adminChatId) return false;
 
   const hasErrors = report.errors && report.errors.length > 0;
@@ -660,7 +661,7 @@ export async function sendDailyReport(stats: {
   totalErrors: number;
   topProducts?: Array<{ name: string; changes: number }>;
 }): Promise<boolean> {
-  const adminChatId = getAdminChatId();
+  const adminChatId = await getAdminChatId();
   if (!adminChatId) return false;
 
   const message = [

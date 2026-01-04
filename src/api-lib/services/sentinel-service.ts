@@ -490,43 +490,34 @@ export class SentinelService {
     }
 
     const lines = [
-      `🛡️ *СТОРОЖ — Мониторинг*`,
+      `🛡️ *СТОРОЖ — Отчёт*`,
       ``,
       `${statusEmoji} *${statusText}*`,
-      `⏰ ${date}, ${time}`,
+      `⏰ ${time} | 📅 ${date}`,
       ``,
-      `━━━━━━━━━━━━━━━━━━━━`,
+      `👥 Клиентов: ${result.usersProcessed}`,
     ];
 
-    // Products section
+    // Products section compact
     if (totalProducts > 0) {
-      lines.push(`📦 *Товары проверены:*`);
-      if (wbCount > 0) lines.push(`   🟣 WB: ${wbCount} шт`);
-      if (ozonCount > 0) lines.push(`   🔵 Ozon: ${ozonCount} шт`);
+      const parts = [];
+      if (wbCount > 0) parts.push(`🟣 ${wbCount}`);
+      if (ozonCount > 0) parts.push(`🔵 ${ozonCount}`);
+      lines.push(`📦 Товаров: ${totalProducts} (${parts.join(' | ')})`);
     } else {
-      lines.push(`📦 Товаров: 0 (нет настроенных API)`);
+      lines.push(`📦 Товаров: 0`);
     }
 
     lines.push(``);
 
     // Stats section
-    lines.push(`📊 *Результат проверки:*`);
-
-    if (result.threatsDetected > 0) {
-      lines.push(`   ⚠️ Угроз: ${result.threatsDetected}`);
-    }
-
-    if (result.actionsTaken > 0) {
-      lines.push(`   ⚔️ Действий: ${result.actionsTaken}`);
-    }
-
-    if (result.errors.length > 0) {
-      lines.push(`   ❌ Ошибок: ${result.errors.length}`);
-    }
-
-    if (result.threatsDetected === 0 && result.actionsTaken === 0 && result.errors.length === 0) {
-      lines.push(`   ✅ Угроз не обнаружено`);
-      lines.push(`   💰 Цены в норме`);
+    if (result.threatsDetected > 0 || result.actionsTaken > 0 || result.errors.length > 0) {
+      lines.push(`📊 *Сводка:*`);
+      if (result.threatsDetected > 0) lines.push(`⚠️ Угроз: ${result.threatsDetected}`);
+      if (result.actionsTaken > 0) lines.push(`⚔️ Действий: ${result.actionsTaken}`);
+      if (result.errors.length > 0) lines.push(`❌ Ошибок: ${result.errors.length}`);
+    } else {
+      lines.push(`✅ Угроз нет • 💰 Цены в норме`);
     }
 
     lines.push(`━━━━━━━━━━━━━━━━━━━━`);

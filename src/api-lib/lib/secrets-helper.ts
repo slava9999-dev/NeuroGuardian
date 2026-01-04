@@ -4,6 +4,7 @@
 // ============================================
 
 import { getSecurityAgent } from '@neuroguardian/security-agent';
+import { sql } from '@vercel/postgres';
 
 // In-memory cache for performance
 const secretsCache = new Map<string, { value: string; expiresAt: number }>();
@@ -11,7 +12,7 @@ const CACHE_TTL_MS = 60 * 1000; // 1 minute
 
 /**
  * Get a secret from Security Agent with local caching
- * Falls back to process.env in development/test
+ * Falls back to DB and then process.env
  */
 export async function getSecret(
   key: string,
@@ -23,36 +24,43 @@ export async function getSecret(
     return cached.value;
   }
 
+  // 1. Try Security Agent (Vault)
   const agent = getSecurityAgent();
-  if (!agent.isInitialized()) {
+  if (agent.isInitialized()) {
     try {
-      await agent.initialize();
-    } catch (initError) {
-      console.warn(`[SecretsHelper] Failed to initialize Security Agent: ${initError}`);
-      // Fall back to process.env
-      return getEnvFallback(key);
+      const response = await agent.secrets.get({
+        userId: 'system',
+        key: key,
+        purpose: purpose,
+        ttl: 60,
+      });
+
+      if (response && response.value) {
+        secretsCache.set(key, {
+          value: response.value,
+          expiresAt: Date.now() + CACHE_TTL_MS,
+        });
+        return response.value;
+      }
+    } catch (agentError) {
+      console.warn(`[SecretsHelper] Vault retrieval failed for ${key}:`, agentError);
     }
   }
 
+  // 2. Try Database (system_settings)
   try {
-    const response = await agent.secrets.get({
-      userId: 'system',
-      key: key,
-      purpose: purpose,
-      ttl: 60, // 1 minute lease
-    });
-
-    // Cache the value
-    secretsCache.set(key, {
-      value: response.value,
-      expiresAt: Date.now() + CACHE_TTL_MS,
-    });
-
-    return response.value;
-  } catch (error) {
-    console.warn(`[SecretsHelper] Vault retrieval failed for ${key}, using env fallback:`, error);
-    return getEnvFallback(key);
+    const dbResult = await sql`SELECT value FROM system_settings WHERE key = ${key}`;
+    if (dbResult.rows && dbResult.rows.length > 0) {
+      const value = dbResult.rows[0].value;
+      secretsCache.set(key, { value, expiresAt: Date.now() + CACHE_TTL_MS });
+      return value;
+    }
+  } catch (dbError) {
+    // console.warn failed to read from system_settings
   }
+
+  // 3. Last fallback: Environment Variables
+  return getEnvFallback(key);
 }
 
 /**
@@ -83,6 +91,7 @@ function getEnvFallback(key: string): string | undefined {
     kv_rest_api_token: 'KV_REST_API_TOKEN',
     yookassa_shop_id: 'YOOKASSA_SHOP_ID',
     yookassa_secret_key: 'YOOKASSA_SECRET_KEY',
+    admin_chat_id: 'ADMIN_CHAT_ID',
   };
 
   const envVar = envMap[key] || key.toUpperCase();
