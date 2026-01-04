@@ -463,76 +463,87 @@ export class SentinelService {
    */
   private async sendCycleSummary(result: SentinelRunResult): Promise<void> {
     const now = new Date();
-    const time = now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    const time = now.toLocaleTimeString('ru-RU', {
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Europe/Moscow',
+    });
     const date = now.toLocaleDateString('ru-RU', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
+      timeZone: 'Europe/Moscow',
     });
 
-    const wbCount = result.productsScanned?.wb || 0;
-    const ozonCount = result.productsScanned?.ozon || 0;
-    const totalProducts = wbCount + ozonCount;
+    // 1. ПОЛУЧАЕМ РЕАЛЬНЫЕ ДАННЫЕ ИЗ БАЗЫ (Global Truth)
+    let totalSellers = 0;
+    let totalProducts = 0;
+    let wbProducts = 0;
+    let ozonProducts = 0;
 
-    // Determine status
-    let statusEmoji = '✅';
-    let statusText = 'Всё под контролем';
+    try {
+      // Считаем сколько ВСЕГО товаров на защите прямо сейчас
+      const stats = await sql`
+        SELECT 
+          (SELECT COUNT(*) FROM users WHERE subscription_active = true OR protection_enabled = true) as total_sellers,
+          (SELECT COUNT(*) FROM products WHERE is_monitored = true) as total_products,
+          (SELECT COUNT(*) FROM products WHERE is_monitored = true AND marketplace = 'WB') as wb_products,
+          (SELECT COUNT(*) FROM products WHERE is_monitored = true AND marketplace = 'OZON') as ozon_products
+      `;
+
+      if (stats.rows.length > 0) {
+        totalSellers = parseInt(stats.rows[0].total_sellers || '0');
+        totalProducts = parseInt(stats.rows[0].total_products || '0'); // Твои 33 товара будут здесь
+        wbProducts = parseInt(stats.rows[0].wb_products || '0');
+        ozonProducts = parseInt(stats.rows[0].ozon_products || '0');
+      }
+    } catch (e) {
+      console.warn('DB Stats failed, using cycle stats:', e);
+      totalProducts = (result.productsScanned?.wb || 0) + (result.productsScanned?.ozon || 0);
+    }
+
+    // 2. ОПРЕДЕЛЯЕМ СТАТУС (Боевой режим)
+    let statusEmoji = '🟢';
+    let statusText = 'Система работает штатно';
 
     if (result.errors.length > 0) {
       statusEmoji = '🔴';
       statusText = 'Требует внимания';
     } else if (result.actionsTaken > 0) {
       statusEmoji = '🛡️';
-      statusText = 'Защита сработала';
+      statusText = 'Активная защита срабатывала';
     } else if (result.threatsDetected > 0) {
-      statusEmoji = '⚠️';
-      statusText = 'Обнаружены угрозы';
+      statusEmoji = '🟡';
+      statusText = 'Есть предупреждения';
     }
 
+    // 3. ФОРМИРУЕМ ОТЧЁТ (Элитный стиль)
     const lines = [
-      `🛡️ *СТОРОЖ — Отчёт*`,
+      `🎩 *Отчёт от управляющего*`,
+      `📅 ${date} | ⏰ ${time} (МСК)`,
       ``,
       `${statusEmoji} *${statusText}*`,
-      `⏰ ${time} | 📅 ${date}`,
       ``,
-      `👥 Клиентов: ${result.usersProcessed}`,
+      `📊 *Текущий масштаб:*`,
+      `👥 Магазинов на защите: ${totalSellers}`,
     ];
 
-    // Products section compact
     if (totalProducts > 0) {
-      const parts = [];
-      if (wbCount > 0) parts.push(`🟣 ${wbCount}`);
-      if (ozonCount > 0) parts.push(`🔵 ${ozonCount}`);
-      lines.push(`📦 Товаров: ${totalProducts} (${parts.join(' | ')})`);
+      lines.push(`📦 Товаров под контролем: ${totalProducts}`);
+      if (wbProducts > 0) lines.push(`   ├ 🟣 Wildberries: ${wbProducts}`);
+      if (ozonProducts > 0) lines.push(`   └ 🔵 Ozon: ${ozonProducts}`);
     } else {
-      lines.push(`📦 Товаров: 0`);
+      lines.push(`📦 Товаров: 0 (Ожидание синхронизации)`);
     }
 
     lines.push(``);
 
-    // Stats section
+    // Секция инцидентов (только если были)
     if (result.threatsDetected > 0 || result.actionsTaken > 0 || result.errors.length > 0) {
-      lines.push(`📊 *Сводка:*`);
-      if (result.threatsDetected > 0) lines.push(`⚠️ Угроз: ${result.threatsDetected}`);
-      if (result.actionsTaken > 0) lines.push(`⚔️ Действий: ${result.actionsTaken}`);
-      if (result.errors.length > 0) lines.push(`❌ Ошибок: ${result.errors.length}`);
-    } else {
-      lines.push(`✅ Угроз нет • 💰 Цены в норме`);
-    }
-
-    lines.push(`━━━━━━━━━━━━━━━━━━━━`);
-
-    // Users section
-    lines.push(``);
-    lines.push(`👥 Магазинов: ${result.usersProcessed}`);
-
-    // Error details if any
-    if (result.errors.length > 0) {
-      lines.push(``);
-      lines.push(`❗ *Подробности ошибки:*`);
-      lines.push(
-        `_${result.errors[0].substring(0, 80)}${result.errors[0].length > 80 ? '...' : ''}_`
-      );
+      lines.push(`📝 *События за последние 30 мин:*`);
+      if (result.threatsDetected > 0)
+        lines.push(`⚠️ Угроз зафиксировано: ${result.threatsDetected}`);
+      if (result.actionsTaken > 0) lines.push(`⚔️ Отражено атак: ${result.actionsTaken}`);
     }
 
     // Defense details if any
