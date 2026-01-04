@@ -234,10 +234,13 @@ export async function callLLMWithFallback(
 
 export interface UserContext {
   userId: number;
+  userName?: string; // Имя пользователя из Telegram
   marketplace?: 'WB' | 'Ozon' | 'all';
   wbApiKey?: string;
   ozonApiKey?: string;
   onboardingMode?: boolean;
+  isFirstContact?: boolean; // Первое сообщение пользователя
+  productsCount?: number; // Количество синхронизированных товаров
 }
 
 export interface OrchestratorV4Result {
@@ -286,9 +289,9 @@ export async function orchestrateV4(
 
   // Check for simple intents that don't need tools
   console.log('[Orchestrator V4] Checking for simple intent...');
-  const simpleResponse = await handleSimpleIntent(message);
+  const simpleResponse = await handleSimpleIntent(message, context);
   if (simpleResponse) {
-    console.log('[Orchestrator V4] Simple intent matched, returning quick response');
+    console.log('[Orchestrator V4] Simple intent matched, returning personalized response');
     return createSimpleResult(simpleResponse, startTime);
   }
   console.log('[Orchestrator V4] No simple intent match, proceeding to planning phase');
@@ -540,8 +543,11 @@ async function callPlanner(
 ): Promise<{ success: boolean; plan?: Plan; error?: string; tokensUsed: number }> {
   const systemPrompt = buildPlannerPrompt({
     marketplace: context.marketplace,
-    productsCount: 0, // Could be fetched
+    productsCount: context.productsCount || 0,
     onboardingMode: context.onboardingMode,
+    userName: context.userName,
+    isFirstContact: context.isFirstContact,
+    hasSyncedProducts: (context.productsCount || 0) > 0,
   });
 
   const messages = [
@@ -809,35 +815,85 @@ ${JSON.stringify(toolResultsSummary, null, 2)}
 }
 
 // ============================================
-// SIMPLE INTENT HANDLER
+// SIMPLE INTENT HANDLER (with personalization)
 // ============================================
 
-const SIMPLE_INTENTS: Record<string, string> = {
-  привет: 'Привет! 👋 Я — AI-ассистент для управления ценами на маркетплейсах. Чем могу помочь?',
-  здравствуй: 'Здравствуйте! 👋 Готов помочь с анализом продаж и управлением ценами.',
-  спасибо: 'Пожалуйста! Если возникнут вопросы — обращайтесь. 😊',
-  пока: 'До свидания! Удачных продаж! 🚀',
-  помощь:
-    'Я могу помочь с:\n\n📊 **Аналитика** — статистика продаж, ABC-анализ\n💰 **Цены** — изменение цен, защита от демпинга\n📦 **Остатки** — прогноз, складские остатки\n🔍 **Конкуренты** — поиск и анализ\n\nПросто напишите, что вас интересует!',
-};
+import { generateWelcomeMessage } from './prompts/system-v5.js';
 
-async function handleSimpleIntent(message: string): Promise<string | null> {
+/**
+ * Обрабатывает простые намерения с персонализацией
+ * @param message - сообщение пользователя
+ * @param context - контекст с именем и статусом
+ */
+async function handleSimpleIntent(message: string, context?: UserContext): Promise<string | null> {
   const normalized = message.toLowerCase().trim();
+  const userName = context?.userName || 'друг';
+  const hasKeys = !context?.onboardingMode;
+  const productsCount = context?.productsCount || 0;
 
-  // Only match if message is short (simple greeting) - max 25 chars
-  // This prevents matching "привет давай выровняем цены..." as simple intent
-  if (normalized.length > 25) {
+  // Только матчим короткие сообщения (простые приветствия) — макс 30 символов
+  if (normalized.length > 30) {
     return null;
   }
 
-  for (const [trigger, response] of Object.entries(SIMPLE_INTENTS)) {
+  // Приветствия — персонализированный ответ с вступлением в роль
+  const greetings = [
+    'привет',
+    'здравствуй',
+    'здравствуйте',
+    'хай',
+    'hi',
+    'hello',
+    'добрый день',
+    'доброе утро',
+    'добрый вечер',
+  ];
+
+  for (const greeting of greetings) {
     if (
-      normalized === trigger ||
-      normalized.startsWith(trigger + '!') ||
-      normalized === trigger + '.'
+      normalized === greeting ||
+      normalized.startsWith(greeting + '!') ||
+      normalized.startsWith(greeting + ',') ||
+      normalized.startsWith(greeting + ' ')
     ) {
-      return response;
+      // Первый контакт или повторный — всегда вступаем в роль
+      return generateWelcomeMessage(userName, hasKeys, productsCount);
     }
+  }
+
+  // "Что ты умеешь" / "расскажи о себе"
+  const aboutPhrases = [
+    'что ты умеешь',
+    'что умеешь',
+    'расскажи о себе',
+    'кто ты',
+    'помощь',
+    'помоги',
+  ];
+
+  for (const phrase of aboutPhrases) {
+    if (normalized.includes(phrase)) {
+      return `${userName}, я — Виктор, ваш управляющий магазином на WB и Ozon! 🎯
+
+**Мои обязанности:**
+📊 Анализирую продажи и ABC-разбивку товаров
+💰 Считаю реальную прибыль с учётом ВСЕХ комиссий  
+🛡️ Защищаю цены от принудительных скидок
+⚠️ Предупреждаю когда товар заканчивается
+🔍 Мониторю конкурентов и даю рекомендации
+
+${hasKeys ? 'Скажите что проверить — я приступлю!' : 'Но сначала нужно подключить доступ к магазину.'}`;
+    }
+  }
+
+  // Благодарность
+  if (normalized.includes('спасибо') || normalized.includes('благодарю')) {
+    return `Всегда пожалуйста, ${userName}! 😊 Есть ещё вопросы — обращайтесь, я на связи 24/7.`;
+  }
+
+  // Прощание
+  if (normalized === 'пока' || normalized === 'до свидания' || normalized.startsWith('пока ')) {
+    return `До свидания, ${userName}! Удачных продаж! 🚀 Я продолжаю следить за магазином.`;
   }
 
   return null;

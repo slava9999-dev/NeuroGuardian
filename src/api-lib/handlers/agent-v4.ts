@@ -180,11 +180,20 @@ export async function handleAgentV4(
   console.log(`🚀 V4 Agent Request from User ${userId}: "${message.substring(0, 50)}..."`);
 
   // 7. Build context for V4 Orchestrator
+  // Определяем первый контакт по пустой истории
+  const isFirstContact = conversationHistory.length === 0;
+
+  // Получаем имя пользователя (first_name из Telegram)
+  const userName = user?.first_name || req.body?.firstName || 'друг';
+
   const context: UserContext = {
     userId,
+    userName,
     marketplace: 'all',
     wbApiKey: user?.api_key_wb ? decryptApiKey(user.api_key_wb) : undefined,
     ozonApiKey: user?.api_key_ozon ? decryptApiKey(user.api_key_ozon) : undefined,
+    isFirstContact,
+    productsCount: products.length,
   };
 
   // 8. API Key Guard (Onboarding)
