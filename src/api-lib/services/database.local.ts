@@ -39,12 +39,29 @@ export const sql = async (
     (acc: string, str: string, i: number) => acc + str + (i < values.length ? `$${i + 1}` : ''),
     ''
   );
-  const client = await pool.connect();
-  try {
-    return await client.query(text, values);
-  } finally {
-    client.release();
+
+  let retries = 3;
+  while (retries > 0) {
+    let client;
+    try {
+      client = await pool.connect();
+      return await client.query(text, values);
+    } catch (error: any) {
+      retries--;
+      if (retries === 0) throw error;
+
+      const isTransient = error.code === 'ECONNRESET' || error.message?.includes('fetch failed');
+      if (isTransient) {
+        console.warn(`⚠️ DB Transient error, retrying... (${retries} left)`);
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } else {
+        throw error;
+      }
+    } finally {
+      if (client) client.release();
+    }
   }
+  throw new Error('Retries exceeded');
 };
 
 export { pool };

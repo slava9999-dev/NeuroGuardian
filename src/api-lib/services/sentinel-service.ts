@@ -4,7 +4,7 @@
 // Version: 2.1.0 | Date: December 2024
 // ============================================
 
-import { sql } from '@vercel/postgres';
+import { sql } from './database.js';
 import {
   getMarketplaceKeys,
   fetchWbPrices,
@@ -66,6 +66,8 @@ export class SentinelService {
       for (const user of users) {
         try {
           await this.processUser(user, result);
+          // Small delay between users to prevent DB connection reset (ECONNRESET)
+          await new Promise(resolve => setTimeout(resolve, 1000));
         } catch (err) {
           const errorMsg = `Error processing user ${user.id}: ${err instanceof Error ? err.message : String(err)}`;
           console.error(errorMsg);
@@ -127,7 +129,9 @@ export class SentinelService {
       rulesMap.set(rule.product_id, rule);
     }
 
-    // --- WB Sub-cycle ---
+    // --- WB Sub-cycle --- (TEMPORARILY DISABLED - focus on Ozon first)
+    // TODO: Re-enable once Ozon is stable
+    /*
     if (keys.wb) {
       const wbProducts = products.filter(p => p.marketplace === 'WB');
       const nmIds = wbProducts.map(p => p.nm_id).filter((id): id is number => id !== null);
@@ -152,6 +156,7 @@ export class SentinelService {
         );
       }
     }
+    */
 
     // --- Ozon Sub-cycle ---
     if (keys.ozon) {
@@ -176,6 +181,21 @@ export class SentinelService {
           ozonPriceMap = result;
         } catch (err) {
           ozonError = err instanceof Error ? err.message : String(err);
+        }
+
+        // WORKAROUND: If API failed or returned empty, use DB prices
+        // Per commit 9b55371: Ozon Prices API returns 404, use current_price from DB
+        if (ozonPriceMap.size === 0) {
+          console.log(`⚠️ Ozon API returned no prices, using DB prices as fallback`);
+          for (const product of ozonProducts) {
+            if (product.current_price && product.current_price > 0) {
+              const ozonId = parseInt(product.product_id.replace('ozon-', ''));
+              if (ozonId) {
+                ozonPriceMap.set(ozonId, product.current_price);
+              }
+            }
+          }
+          console.log(`💾 Using ${ozonPriceMap.size} prices from DB for Ozon`);
         }
 
         if (ozonError) {

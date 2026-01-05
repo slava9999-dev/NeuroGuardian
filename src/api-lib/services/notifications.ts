@@ -3,7 +3,7 @@
 // Telegram notifications for alerts and reports
 // ============================================
 
-import { sql } from '@vercel/postgres';
+import { sql } from './database.js';
 import { logOpsEvent } from './ops-logger.js';
 import { callLLMWithFallback } from '../agent/orchestrator-v4.js';
 import { getSecret } from '../lib/secrets-helper.js';
@@ -124,21 +124,36 @@ async function sendTelegramMessage(
 /**
  * Get user's Telegram chat ID from database
  */
+const chatIdCache = new Map<number, string>();
+
 async function getUserChatId(userId: number): Promise<string | null> {
-  try {
-    // IMPORTANT: Select telegram_id, not id!
-    // telegram_id is the actual Telegram chat ID for sending messages
-    const result = await sql`SELECT telegram_id FROM users WHERE id = ${userId}`;
-    const telegramId = result.rows[0]?.telegram_id;
-    if (!telegramId) {
-      console.warn(`[Notifications] User ${userId} has no telegram_id set`);
-      return null;
+  // Check cache first
+  const cached = chatIdCache.get(userId);
+  if (cached) return cached;
+
+  let retries = 3;
+  while (retries > 0) {
+    try {
+      const result = await sql`SELECT telegram_id FROM users WHERE id = ${userId}`;
+      const telegramId = result.rows[0]?.telegram_id;
+      if (!telegramId) {
+        console.warn(`[Notifications] User ${userId} has no telegram_id set`);
+        return null;
+      }
+      const tidString = telegramId.toString();
+      chatIdCache.set(userId, tidString);
+      return tidString;
+    } catch (error) {
+      retries--;
+      if (retries === 0) {
+        console.error('Failed to get user chat ID after 3 retries:', error);
+        return null;
+      }
+      console.warn(`⚠️ Retrying DB chat ID fetch for ${userId}... (${retries} left)`);
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
-    return telegramId.toString();
-  } catch (error) {
-    console.error('Failed to get user chat ID:', error);
-    return null;
   }
+  return null;
 }
 
 // ============================================
@@ -221,8 +236,13 @@ function getAlertButtons(alert: Alert): Record<string, unknown> | undefined {
 
 /**
  * Generate a smart, contextual message using LLM
+ * TEMPORARILY DISABLED - Local LLM not running, use templates instead
  */
 async function generateSmartMessage(alert: Alert): Promise<string | null> {
+  // TEMP: Skip LLM call to avoid timeouts when local LLM is not running
+  // Re-enable when Groq or other cloud LLM is configured
+  return null;
+
   // Only for relevant alert types
   const smartTypes: AlertType[] = [
     'price_protection',

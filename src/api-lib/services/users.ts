@@ -1,4 +1,4 @@
-import { sql } from '@vercel/postgres';
+import { sql } from './database.js';
 import type { DBUser } from '../lib/types.js';
 
 export interface MarketplaceAccount {

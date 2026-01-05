@@ -1,13 +1,24 @@
+// Force production mode for this script
+process.env.NODE_ENV = 'production';
+
+// Load environment variables immediately
 import * as dotenv from 'dotenv';
 dotenv.config({ path: '.env.production' });
 
-import { sentinelService } from '../src/api-lib/services/sentinel-service.js';
+// Verify critical env vars
+if (!process.env.POSTGRES_URL && !process.env.DATABASE_URL) {
+  console.error('❌ Error: POSTGRES_URL or DATABASE_URL not found in .env.production');
+  process.exit(1);
+}
 
 async function runCycle() {
   console.log('🛡️ Запуск боевого цикла Sentinel...');
   console.log(`⏰ Время: ${new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })}`);
 
   try {
+    // Dynamic import ensures modules allow database.ts to see the updated process.env
+    const { sentinelService } = await import('../src/api-lib/services/sentinel-service.js');
+
     const result = await sentinelService.runCycle();
 
     console.log('\n✅ Цикл завершен успешно!');

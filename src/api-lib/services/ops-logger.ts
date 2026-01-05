@@ -3,7 +3,7 @@
 // Enhanced logging for ops_events and ops_audit tables
 // ============================================
 
-import { sql } from '@vercel/postgres';
+import { sql } from './database.js';
 
 // ============================================
 // TYPES
@@ -71,6 +71,9 @@ export interface OpsEvent {
   actionTaken?: string;
   marketplace?: 'wildberries' | 'ozon';
   externalId?: string;
+  severity?: 'INFO' | 'WARN' | 'ERROR' | 'CRITICAL';
+  entityType?: string;
+  entityId?: string;
 }
 
 export interface AuditEntry {
@@ -95,8 +98,16 @@ export interface AuditEntry {
 
 /**
  * Log an operational event to ops_events table
+ * TEMPORARILY DISABLED - NeonDbError ECONNRESET issues
  */
 export async function logOpsEvent(event: OpsEvent): Promise<number | null> {
+  // TEMP: Skip DB logging to avoid ECONNRESET errors
+  // Just log to console for now
+  console.log(
+    `[OpsLog] ${event.eventType}: ${event.eventSource} - ${JSON.stringify(event.payload || {}).substring(0, 100)}`
+  );
+  return null;
+
   try {
     const userId = event.userId ?? null;
     const productId = event.productId ?? null;
@@ -107,16 +118,21 @@ export async function logOpsEvent(event: OpsEvent): Promise<number | null> {
     const actionTaken = event.actionTaken ?? null;
     const marketplace = event.marketplace ?? null;
     const externalId = event.externalId ?? null;
+    const severity = event.severity ?? 'INFO';
+    const entityType = event.entityType ?? null;
+    const entityId = event.entityId ?? null;
 
     const result = await sql`
       INSERT INTO ops_events (
         event_type, event_source, user_id, product_id,
         payload, old_price, new_price, competitor_price,
-        action_taken, marketplace, external_id
+        action_taken, marketplace, external_id, severity,
+        entity_type, entity_id
       ) VALUES (
         ${event.eventType}, ${event.eventSource}, ${userId}, ${productId},
         ${payload}, ${oldPrice}, ${newPrice}, ${competitorPrice},
-        ${actionTaken}, ${marketplace}, ${externalId}
+        ${actionTaken}, ${marketplace}, ${externalId}, ${severity},
+        ${entityType}, ${entityId}
       )
       RETURNING id
     `;

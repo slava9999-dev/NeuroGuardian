@@ -24,8 +24,18 @@ async function diagnose() {
 
   const activeKeys =
     await sql`SELECT user_id, marketplace, length(wb_token) as wb_len, length(ozon_api_key) as ozon_len FROM marketplace_accounts`;
-  console.log('\n🔑 КЛЮЧИ API:');
+  console.log('\n🔑 КЛЮЧИ API (Marketplace Accounts):');
   console.table(activeKeys.rows);
+
+  const legacyKeys = await sql`
+    SELECT id, username, 
+      CASE WHEN api_key_wb IS NOT NULL THEN 'Yes' ELSE 'No' END as has_wb,
+      CASE WHEN api_key_ozon IS NOT NULL THEN 'Yes' ELSE 'No' END as has_ozon
+    FROM users
+    WHERE api_key_wb IS NOT NULL OR api_key_ozon IS NOT NULL
+  `;
+  console.log('\n🔑 КЛЮЧИ API (Legacy Users Table):');
+  console.table(legacyKeys.rows);
 }
 
 diagnose().catch(console.error);

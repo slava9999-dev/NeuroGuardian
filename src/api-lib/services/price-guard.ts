@@ -5,7 +5,7 @@
 // TZ v2.0 Production Compliant
 // ============================================
 
-import { sql } from '@vercel/postgres';
+import { sql } from './database.js';
 
 export interface PriceSecurityCheck {
   productId: string;

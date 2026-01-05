@@ -8,13 +8,15 @@
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let sql: any;
 
-if (process.env.NODE_ENV === 'production' && !process.env.LOCAL_DEV) {
+if (process.env.VERCEL) {
   const { sql: vercelSql } = await import('@vercel/postgres');
   sql = vercelSql;
 } else {
   const { sql: localSql } = await import('./database.local.js');
   sql = localSql;
 }
+
+export { sql };
 
 import { logger } from '../lib/index.js';
 import type { DBProduct, PendingPriceUpdate } from '../lib/types.js';
