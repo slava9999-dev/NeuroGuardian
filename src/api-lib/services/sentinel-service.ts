@@ -7,7 +7,7 @@
 import { sql } from './database.js';
 import {
   getMarketplaceKeys,
-  fetchWbPrices,
+  // fetchWbPrices, // TEMP: WB disabled
   fetchOzonCurrentPrices,
   setWbDefensePrice,
   setOzonDefensePrice,

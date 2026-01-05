@@ -26,7 +26,7 @@ import type {
   WbStatisticsSale,
   OzonStockV3Response,
 } from '../lib/marketplace-types.js';
-import { logger } from '../lib/index.js';
+// import { logger } from '../lib/index.js'; // TEMP: Unused while using console.log
 
 // ============================================
 // TYPES
