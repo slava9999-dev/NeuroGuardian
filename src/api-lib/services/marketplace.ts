@@ -944,40 +944,57 @@ export async function fetchOzonCurrentPrices(
   }
 
   try {
-    console.log(`📡 Ozon Prices API: Fetching for ${validIds.length} products`);
+    console.log(`📡 Ozon Prices API v5: Fetching for ${validIds.length} products`);
+    console.log(`📡 Ozon IDs sample: [${validIds.slice(0, 3).join(', ')}...]`);
 
-    // EXACT working format from commit 9b55371
-    const response = await fetchWithRetry('https://api-seller.ozon.ru/v1/product/info/prices', {
+    // v5 API endpoint (v1-v4 deprecated since Feb 2025)
+    // Reference: https://api-seller.ozon.ru/v5/product/info/prices
+    const requestBody = {
+      filter: {
+        product_id: validIds,
+        visibility: 'ALL',
+      },
+      cursor: '',
+      limit: Math.min(validIds.length, 1000),
+    };
+
+    console.log(`📡 Ozon Request body:`, JSON.stringify(requestBody).substring(0, 200));
+
+    const response = await fetchWithRetry('https://api-seller.ozon.ru/v5/product/info/prices', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Client-Id': clientId,
         'Api-Key': apiKey,
       },
-      body: JSON.stringify({
-        product_id: validIds, // Just array of numbers, no filter wrapper
-      }),
+      body: JSON.stringify(requestBody),
     });
 
-    console.log(`📡 Ozon Prices API: status=${response.status}`);
+    console.log(`📡 Ozon Prices API v5: status=${response.status}`);
 
     if (response.ok) {
       const data = (await response.json()) as any;
-      const items = data.result?.items || data.items || [];
+      console.log(`📡 Ozon Raw response keys:`, Object.keys(data));
+      const items = data.result?.items || [];
 
-      console.log(`📦 Ozon Prices API: received ${items.length} items`);
+      console.log(`📦 Ozon Prices API v5: received ${items.length} items`);
 
       for (const p of items) {
-        // v1 response: price is directly on item (marketing_price, price)
-        const actualPrice = parseFloat(p.marketing_price || p.price || '0');
+        // v5 response: price is in p.price.price (string)
+        // Note: marketing_price was deprecated 12 Nov 2025
+        const priceObj = p.price || {};
+        const actualPrice = parseFloat(priceObj.price || '0');
 
         if (p.product_id && actualPrice > 0) {
           priceMap.set(p.product_id, Math.round(actualPrice));
         } else {
-          console.warn(`⚠️ Ozon: No price for product ${p.product_id}, data:`, JSON.stringify(p));
+          console.warn(
+            `⚠️ Ozon: No price for product ${p.product_id}, price obj:`,
+            JSON.stringify(priceObj)
+          );
         }
       }
-      console.log(`💰 Ozon Prices API: Fetched ${priceMap.size}/${items.length} valid prices`);
+      console.log(`💰 Ozon Prices API v5: Fetched ${priceMap.size}/${items.length} valid prices`);
     } else {
       const errorText = await response.text();
       console.error(`❌ Ozon Prices API error: ${response.status}`, errorText);

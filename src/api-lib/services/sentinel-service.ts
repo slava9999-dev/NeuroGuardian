@@ -335,7 +335,8 @@ export class SentinelService {
             stopLossThreat.type
           );
         } else if (erosionThreat && user.protection_enabled) {
-          // Trigger Defense for Erosion if critical
+          // Only notify for CRITICAL erosion threats (real negative margin)
+          // Don't spam users with medium/high severity estimated warnings
           if (erosionThreat.severity === 'critical') {
             await this.notifyThreat(user, product, erosionThreat, marketplace);
 
@@ -351,9 +352,8 @@ export class SentinelService {
               threat_type: erosionThreat.type,
               success: true,
             });
-          } else {
-            await this.notifyThreat(user, product, erosionThreat, marketplace);
           }
+          // For non-critical threats, just log but DON'T notify (no spam)
         }
       }
 

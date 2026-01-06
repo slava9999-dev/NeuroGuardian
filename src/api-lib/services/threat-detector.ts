@@ -62,28 +62,14 @@ export function scanProductThreats(
     const estimate = estimateCostPrice(livePrice, product.category || undefined);
     analyzedCostPrice = estimate.costPrice;
     isEstimated = true;
-
-    threats.push({
-      type: ThreatType.MARGIN_BELOW_ZERO,
-      severity: 'low',
-      productId: product.product_id,
-      nmId: product.nm_id,
-      message: `Ценообразование рассчитано по оценке (40-75%). Укажите реальную себестоимость для точности!`,
-      data: { estimatedPrice: analyzedCostPrice },
-    });
+    // NOTE: This is NOT a threat, just an informational flag.
+    // Don't spam users with "укажите себестоимость" messages.
+    // The isEstimated flag is used in subsequent calculations.
   }
 
-  // Also check if min_price is missing but monitoring is on
-  if (product.is_monitored && (!product.min_price || product.min_price <= 0)) {
-    threats.push({
-      type: ThreatType.DB_PRICE_MISMATCH,
-      severity: 'medium',
-      productId: product.product_id,
-      nmId: product.nm_id,
-      message: `Включен мониторинг, но не указана минимальная цена (Stop-Loss). Защита не сработает!`,
-      data: {},
-    });
-  }
+  // NOTE: Missing min_price is a configuration issue, not a threat.
+  // Don't spam users with setup reminders every 30 minutes.
+  // They'll see this in the dashboard/product list.
 
   const economics = calculateUnitEconomics({
     price: livePrice,
@@ -94,36 +80,40 @@ export function scanProductThreats(
   });
 
   // Map Economics Warnings to Threats
-  for (const warning of economics.warnings) {
-    let threatType: ThreatType = ThreatType.MARGIN_BELOW_ZERO;
-    let severity: 'low' | 'medium' | 'high' | 'critical' = 'medium';
+  // BUT: Skip if cost_price is estimated - these warnings are meaningless noise
+  if (!isEstimated) {
+    for (const warning of economics.warnings) {
+      let threatType: ThreatType = ThreatType.MARGIN_BELOW_ZERO;
+      let severity: 'low' | 'medium' | 'high' | 'critical' = 'medium';
 
-    if (warning.code === 'NEGATIVE_PROFIT') {
-      threatType = ThreatType.MARGIN_BELOW_ZERO;
-      severity = 'critical';
-    } else if (warning.code === 'OZON_CARD_IMPACT') {
-      threatType = ThreatType.OZON_CARD_EROSION;
-      severity = 'high';
+      if (warning.code === 'NEGATIVE_PROFIT') {
+        threatType = ThreatType.MARGIN_BELOW_ZERO;
+        severity = 'critical';
+      } else if (warning.code === 'OZON_CARD_IMPACT') {
+        threatType = ThreatType.OZON_CARD_EROSION;
+        severity = 'high';
+      }
+
+      threats.push({
+        type: threatType,
+        severity,
+        productId: product.product_id,
+        nmId: product.nm_id,
+        message: warning.message,
+        data: { ...economics, warningDetails: warning },
+      });
     }
-
-    threats.push({
-      type: threatType,
-      severity,
-      productId: product.product_id,
-      nmId: product.nm_id,
-      message: warning.message + (isEstimated ? ' (ОЦЕНОЧНО)' : ''),
-      data: { ...economics, warningDetails: warning, isEstimated },
-    });
   }
 
-  // Additional low-margin check (if not already negative)
-  if (economics.profit > 0 && economics.margin < 10) {
+  // Skip low-margin warnings on ESTIMATED costs - they're just noise
+  // Only alert if we have REAL cost_price set by user
+  if (!isEstimated && economics.profit > 0 && economics.margin < 10) {
     threats.push({
       type: ThreatType.MARGIN_BELOW_ZERO,
       severity: 'high',
       productId: product.product_id,
       nmId: product.nm_id,
-      message: `Низкая маржинальность (${economics.margin}%)${isEstimated ? ' (ОЦЕНОЧНО)' : ''}.`,
+      message: `Низкая маржинальность (${economics.margin}%)`,
       data: economics,
     });
   }
