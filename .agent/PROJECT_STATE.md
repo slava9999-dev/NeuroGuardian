@@ -1,31 +1,53 @@
 # 📊 Project State — NeuroGUARDIAN
 
-# Updated: 2026-01-04T17:10:00+03:00
+# Updated: 2026-01-06T20:37:00+03:00
 
 # This file tracks current progress and is updated at end of each session
 
 ---
 
-## 🎯 Current Phase: MONETIZATION LAUNCH (Phase 11) 🟢 READY FOR TESTING
+## 🎯 Current Phase: MONETIZATION LAUNCH (Phase 11) 🟢 PRODUCTION
 
-**Last Session:** 2026-01-04 (Session 25)
-**Focus:** 🛡️ Критический Аудит + Security Fixes + Bug Fix
+**Last Session:** 2026-01-06 (Session 26)
+**Focus:** 🚨 Sentinel Spam Fix — Удаление ложных угроз
 
 **📋 Ключевые документы:**
 
 - `docs/CRITICAL_AUDIT_2026-01-04.md` — Полный отчёт аудита
 - `docs/MONETIZATION_ROADMAP.md` — Путеводитель монетизации
 - `docs/LAUNCH_CHECKLIST.md` — Интерактивный чеклист
-- `docs/ARCHITECTURE_EXPLAINED.md` — Архитектура системы
+- `docs/TZ-OZON-API-RESEARCH.md` — Исследование Ozon API v5
 
 **🎯 СЛЕДУЮЩИЙ ШАГ:**
 
-- ⏳ Тестовый платёж через YooKassa
-- ⏳ Проверить что Sentinel уведомления приходят после фикса
+- ✅ Sentinel больше не спамит
+- ⏳ Проверить работу после деплоя
+- ⏳ Включить WB мониторинг когда настроят FBS
 
 ---
 
 ## ✅ Recently Completed
+
+### Session 2026-01-06 (Session 26 - Sentinel Spam Fix) 🚨
+
+**Критическое исправление спама:**
+
+- [x] **SPAM FIX**: Убрано 145+ ложных "угроз" каждые 30 минут
+- [x] Удалено "Укажите себестоимость" из списка угроз (это информация, не угроза)
+- [x] Удалено "Stop-Loss не настроен" из спама (это конфигурация)
+- [x] Economics warnings только для РЕАЛЬНОЙ себестоимости, не оценочной
+- [x] Уведомления только для CRITICAL угроз (Stop-Loss violation)
+- [x] Обновлен Ozon API на v5 эндпоинт (v1-v4 deprecated)
+
+**Commits:**
+
+- `fix(sentinel): remove spam notifications - only alert on real threats`
+
+**Файлы изменены:**
+
+- `src/api-lib/services/threat-detector.ts` — логика определения угроз
+- `src/api-lib/services/sentinel-service.ts` — логика уведомлений
+- `src/api-lib/services/marketplace.ts` — Ozon v5 API
 
 ### Session 2026-01-04 (Session 25 - Critical Audit & Security Hardening) 🛡️
 
