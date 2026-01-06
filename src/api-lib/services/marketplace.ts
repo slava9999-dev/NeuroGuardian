@@ -945,95 +945,89 @@ export async function fetchOzonCurrentPrices(
 
   try {
     console.log(`📡 Ozon Prices API v5: Fetching for ${validIds.length} products`);
-    console.log(`📡 Ozon IDs sample: [${validIds.slice(0, 3).join(', ')}...]`);
 
-    // v5 API endpoint (v1-v4 deprecated since Feb 2025)
-    // Reference: https://api-seller.ozon.ru/v5/product/info/prices
-    const requestBody = {
-      filter: {
-        product_id: validIds,
-        visibility: 'ALL',
-      },
-      cursor: '',
-      limit: Math.min(validIds.length, 1000),
-    };
+    // ⚠️ CRITICAL FIX: Ozon API v5 does NOT support product_id filter!
+    // We must load ALL products and filter locally
+    // Reference: Tested 2026-01-06 - filter returns empty result
 
-    console.log(`📡 Ozon Request body:`, JSON.stringify(requestBody).substring(0, 200));
+    // Convert validIds to Set for O(1) lookup
+    const requestedIds = new Set(validIds);
 
-    const response = await fetchWithRetry('https://api-seller.ozon.ru/v5/product/info/prices', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Client-Id': clientId,
-        'Api-Key': apiKey,
-      },
-      body: JSON.stringify(requestBody),
-    });
+    // Load ALL prices (pagination support for large catalogs)
+    let cursor = '';
+    let totalFetched = 0;
+    const MAX_PAGES = 10; // Safety limit
+    let pageCount = 0;
 
-    console.log(`📡 Ozon Prices API v5: status=${response.status}`);
+    while (pageCount < MAX_PAGES) {
+      pageCount++;
 
-    if (response.ok) {
-      const data = (await response.json()) as any;
-      console.log(`📡 Ozon Raw response keys:`, Object.keys(data));
-      const items = data.result?.items || [];
+      const requestBody = {
+        filter: {
+          visibility: 'ALL',
+        },
+        cursor,
+        limit: 1000, // Max allowed by Ozon
+      };
 
-      console.log(`📦 Ozon Prices API v5: received ${items.length} items`);
+      const response = await fetchWithRetry('https://api-seller.ozon.ru/v5/product/info/prices', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Client-Id': clientId,
+          'Api-Key': apiKey,
+        },
+        body: JSON.stringify(requestBody),
+      });
 
-      for (const p of items) {
-        // v5 response: price is in p.price.price (string)
-        // Note: marketing_price was deprecated 12 Nov 2025
-        const priceObj = p.price || {};
-        const actualPrice = parseFloat(priceObj.price || '0');
-
-        if (p.product_id && actualPrice > 0) {
-          priceMap.set(p.product_id, Math.round(actualPrice));
-        } else {
-          console.warn(
-            `⚠️ Ozon: No price for product ${p.product_id}, price obj:`,
-            JSON.stringify(priceObj)
-          );
-        }
+      if (!response.ok) {
+        console.error(`❌ Ozon Prices API v5 error: ${response.status}`);
+        break;
       }
-      console.log(`💰 Ozon Prices API v5: Fetched ${priceMap.size}/${items.length} valid prices`);
-    } else {
-      const errorText = await response.text();
-      console.error(`❌ Ozon Prices API error: ${response.status}`, errorText);
 
-      // Fallback to v3/product/info/list if v4 fails
-      console.log('🔄 Trying fallback to v3/product/info/list...');
-      const fallbackResponse = await fetchWithRetry(
-        'https://api-seller.ozon.ru/v3/product/info/list',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Client-Id': clientId,
-            'Api-Key': apiKey,
-          },
-          body: JSON.stringify({
-            product_id: validIds,
-          }),
-        }
-      );
+      const data = (await response.json()) as any;
+      const items = data.items || data.result?.items || [];
+      totalFetched += items.length;
 
-      if (fallbackResponse.ok) {
-        const fallbackData = (await fallbackResponse.json()) as any;
-        const fallbackItems = fallbackData.result?.items || fallbackData.items || [];
+      // Extract prices for requested products
+      for (const p of items) {
+        const pid = Number(p.product_id);
+        if (requestedIds.has(pid)) {
+          const priceObj = p.price || {};
+          // Use 'price' field (actual selling price after discounts)
+          const actualPrice = parseFloat(priceObj.price || priceObj.marketing_seller_price || '0');
 
-        for (const p of fallbackItems) {
-          const priceData = p.price || p;
-          const actualPrice = parseFloat(
-            priceData.marketing_price || priceData.price || priceData.min_price || '0'
-          );
-          const pid = p.product_id || p.id;
-          if (pid && actualPrice > 0) {
-            priceMap.set(Number(pid), Math.round(actualPrice));
+          if (actualPrice > 0) {
+            priceMap.set(pid, Math.round(actualPrice));
           }
         }
-        console.log(
-          `💰 Ozon Prices (v3 fallback): Fetched ${priceMap.size}/${validIds.length} prices`
-        );
       }
+
+      // Check if we got all requested IDs
+      if (priceMap.size >= validIds.length) {
+        console.log(`✅ Ozon: Found all ${priceMap.size} requested prices`);
+        break;
+      }
+
+      // Check for next page
+      const nextCursor = data.cursor || '';
+      if (!nextCursor || nextCursor === cursor || items.length < 1000) {
+        // No more pages
+        break;
+      }
+      cursor = nextCursor;
+    }
+
+    console.log(
+      `💰 Ozon Prices API v5: Fetched ${priceMap.size}/${validIds.length} prices (scanned ${totalFetched} total)`
+    );
+
+    // Log missing IDs for debugging
+    const missing = validIds.filter(id => !priceMap.has(id));
+    if (missing.length > 0 && missing.length <= 5) {
+      console.warn(`⚠️ Ozon: Missing prices for IDs: ${missing.join(', ')}`);
+    } else if (missing.length > 5) {
+      console.warn(`⚠️ Ozon: Missing prices for ${missing.length} products`);
     }
   } catch (e) {
     console.warn('⚠️ Failed to fetch Ozon prices:', e);
