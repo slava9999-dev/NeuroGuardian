@@ -1,4 +1,4 @@
-# 📋 ТЗ: Исследование Ozon Seller API для NeuroGUARDIAN
+# 📋 __ТЗ: Исследование Ozon Seller API для NeuroGUARDIAN
 
 ## 🎯 Цель
 
@@ -117,3 +117,4 @@ POST https://api-seller.ozon.ru/v?/...
 **Приоритет**: HIGH
 **Статус**: OPEN
 ```
+__
