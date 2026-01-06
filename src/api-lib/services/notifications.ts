@@ -396,17 +396,50 @@ function formatAlert(alert: Alert, smartMessage?: string | null): string {
     ].join('\n');
   }
 
-  // Sentinel alert - general
+  // Sentinel alert - УЛУЧШЕННЫЙ ФОРМАТ
   if (alert.type === 'sentinel_alert' && alert.product) {
     const mpEmoji = alert.product.marketplace.toUpperCase() === 'WB' ? '🟣' : '🔵';
-    return [
-      `🤖 *Виктор ИИ*`,
+    const now = new Date();
+    const time = now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+
+    // Короткое название товара
+    const shortTitle =
+      alert.product.name.length > 50
+        ? alert.product.name.substring(0, 47) + '...'
+        : alert.product.name;
+
+    const lines = [
+      `⚠️ *СТОРОЖ — Обнаружена угроза*`,
       ``,
-      `${emoji} *${escapeMarkdown(alert.product.name)}*`,
-      `${mpEmoji} ${alert.product.marketplace.toUpperCase()} • \`${alert.product.externalId}\``,
+      `${mpEmoji} ${alert.product.marketplace.toUpperCase()} • ${time}`,
+      `📦 ${escapeMarkdown(shortTitle)}`,
       ``,
-      alert.message || 'Обнаружил изменение цены. Проверьте товар.',
-    ].join('\n');
+      `━━━━━━━━━━━━━━━━━━━━`,
+    ];
+
+    // Добавляем информацию о цене если есть
+    if (alert.data?.livePrice) {
+      const livePrice = alert.data.livePrice as number;
+      lines.push(`💰 *Текущая цена:* ${livePrice}₽`);
+
+      // Если есть min_price в данных
+      if (alert.data?.minPrice) {
+        const minPrice = alert.data.minPrice as number;
+        const diff = minPrice - livePrice;
+        if (diff > 0) {
+          lines.push(`🔻 *Ниже минимума на:* ${diff}₽`);
+        }
+      }
+      lines.push(``);
+    }
+
+    // Сообщение об угрозе
+    lines.push(alert.message || '⚠️ Обнаружено изменение цены');
+    lines.push(`━━━━━━━━━━━━━━━━━━━━`);
+    lines.push(``);
+    lines.push(`💡 _Проверьте товар и настройки защиты_`);
+
+    return lines.join('\n');
   }
 
   // Welcome message

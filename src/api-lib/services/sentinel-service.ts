@@ -882,59 +882,77 @@ export class SentinelService {
       statusText = 'Нет активных защит';
     }
 
-    // 3. ФОРМИРУЕМ ОТЧЁТ (Элитный стиль)
+    // 3. ФОРМИРУЕМ ОТЧЁТ (Улучшенный формат)
     const lines = [
-      `🎩 *Отчёт от управляющего*`,
-      `📅 ${date} | ⏰ ${time} (МСК)`,
+      `🎩 *ОТЧЁТ ОТ УПРАВЛЯЮЩЕГО*`,
+      `📅 ${date} • ⏰ ${time}`,
       ``,
       `${statusEmoji} *${statusText}*`,
       ``,
+      `━━━━━━━━━━━━━━━━━━━━`,
       `📊 *Результаты проверки:*`,
-      `👥 Обработано пользователей: ${usersProcessed}`,
     ];
 
+    // Пользователи и товары
+    lines.push(`👥 Магазинов: ${usersProcessed}`);
+
     if (totalScanned > 0) {
-      lines.push(`📦 Товаров проверено: ${totalScanned}`);
-      if (wbScanned > 0) lines.push(`   ├ 🟣 Wildberries: ${wbScanned}`);
-      if (ozonScanned > 0) lines.push(`   └ 🔵 Ozon: ${ozonScanned}`);
+      lines.push(`📦 Товаров: ${totalScanned}`);
+      if (ozonScanned > 0) lines.push(`   � Ozon: ${ozonScanned}`);
+      if (wbScanned > 0) lines.push(`   � WB: ${wbScanned}`);
     } else if (usersProcessed > 0) {
-      lines.push(`📦 Товаров: 0 (Проверьте мониторинг у пользователей)`);
+      lines.push(`📦 Товаров: 0`);
+      lines.push(`   _⚠️ Проверьте настройки мониторинга_`);
     }
 
-    lines.push(``);
-
-    // Секция инцидентов / Угроз
+    // Секция событий
     if (result.threatsDetected > 0 || result.actionsTaken > 0 || result.errors.length > 0) {
-      lines.push(`📝 *События за цикл:*`);
-      if (result.threatsDetected > 0) lines.push(`⚠️ Угроз обнаружено: ${result.threatsDetected}`);
-      if (result.actionsTaken > 0) lines.push(`⚔️ Отражено атак: ${result.actionsTaken}`);
+      lines.push(``);
+      lines.push(`━━━━━━━━━━━━━━━━━━━━`);
+      lines.push(`📝 *События:*`);
+
+      if (result.actionsTaken > 0) {
+        const plural =
+          result.actionsTaken === 1 ? 'атака' : result.actionsTaken < 5 ? 'атаки' : 'атак';
+        lines.push(`⚔️ Отражено: ${result.actionsTaken} ${plural}`);
+      }
+
+      if (result.threatsDetected > 0) {
+        const plural =
+          result.threatsDetected === 1 ? 'угроза' : result.threatsDetected < 5 ? 'угрозы' : 'угроз';
+        lines.push(`⚠️ Обнаружено: ${result.threatsDetected} ${plural}`);
+      }
 
       if (result.errors.length > 0) {
-        lines.push(`❌ Ошибок зафиксировано: ${result.errors.length}`);
+        lines.push(`❌ Ошибок: ${result.errors.length}`);
         // Показываем первую ошибку для диагностики
         const firstError = result.errors[0].split(':').slice(0, 2).join(':');
-        lines.push(`_Err: ${firstError.substring(0, 50)}..._`);
+        lines.push(`   _${firstError.substring(0, 45)}..._`);
       }
     }
 
-    // Defense details (конкретика)
+    // Defense details (конкретика по защите)
     if (result.defenseDetails && result.defenseDetails.length > 0) {
       lines.push(``);
-      lines.push(`🛡️ *Живая защита:*`);
-      for (const detail of result.defenseDetails.slice(0, 3)) {
+      lines.push(`━━━━━━━━━━━━━━━━━━━━`);
+      lines.push(`🛡️ *Защищённые товары:*`);
+      for (const detail of result.defenseDetails.slice(0, 5)) {
         const mpEmoji = detail.marketplace === 'WB' ? '🟣' : '🔵';
-        lines.push(
-          `${mpEmoji} ${detail.product.substring(0, 25)}... (${detail.action === 'zero_stock' ? 'склад 0' : 'цена'})`
-        );
+        const actionText = detail.action === 'zero_stock' ? '📦 Остаток→0' : '💰 Цена↑';
+        const productName =
+          detail.product.length > 30 ? detail.product.substring(0, 27) + '...' : detail.product;
+        lines.push(`${mpEmoji} ${productName}`);
+        lines.push(`   ${actionText}`);
       }
-      if (result.defenseDetails.length > 3) {
-        lines.push(`_...и ещё ${result.defenseDetails.length - 3} товаров_`);
+      if (result.defenseDetails.length > 5) {
+        lines.push(`   _...и ещё ${result.defenseDetails.length - 5} товаров_`);
       }
     }
 
     // Footer
+    lines.push(`━━━━━━━━━━━━━━━━━━━━`);
     lines.push(``);
-    lines.push(`💡 _Следующая проверка через 30 мин_`);
+    lines.push(`💡 _Следующая проверка через 30 минут_`);
 
     const message = lines.filter(Boolean).join('\n');
 
