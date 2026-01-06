@@ -35,6 +35,23 @@ export interface SentinelRunResult {
   defenseDetails?: Array<{ product: string; action: string; marketplace: string }>;
 }
 
+// Per-user results for individual reports
+export interface UserCycleResult {
+  userId: number;
+  telegramId: number;
+  firstName?: string;
+  productsScanned: { wb: number; ozon: number };
+  threatsDetected: number;
+  actionsTaken: number;
+  defenseDetails: Array<{
+    product: string;
+    action: string;
+    marketplace: string;
+    savedAmount: number;
+  }>;
+  errors: string[];
+}
+
 export class SentinelService {
   /**
    * Run a full cycle for all users
@@ -49,6 +66,9 @@ export class SentinelService {
       defenseDetails: [],
     };
 
+    // Track per-user results for individual reports
+    const userResults: UserCycleResult[] = [];
+
     try {
       // 1. Get all active users with protection enabled
       const usersRes = await sql`
@@ -62,20 +82,39 @@ export class SentinelService {
 
       console.log(`🛡️ Sentinel Cycle: Processing ${users.length} users...`);
 
-      // 2. Process users sequentially or in small batches to avoid API rate limits
+      // 2. Process users sequentially with individual tracking
       for (const user of users) {
+        // Create per-user result tracker
+        const userResult: UserCycleResult = {
+          userId: user.id,
+          telegramId: user.id, // In DBUser, id IS the Telegram user ID
+          firstName: user.first_name || undefined,
+          productsScanned: { wb: 0, ozon: 0 },
+          threatsDetected: 0,
+          actionsTaken: 0,
+          defenseDetails: [],
+          errors: [],
+        };
+
         try {
-          await this.processUser(user, result);
-          // Small delay between users to prevent DB connection reset (ECONNRESET)
+          await this.processUserWithTracking(user, result, userResult);
+
+          // Send PERSONAL report to this user
+          await this.sendUserReport(user, userResult);
+
+          // Small delay between users to prevent DB connection reset
           await new Promise(resolve => setTimeout(resolve, 1000));
         } catch (err) {
           const errorMsg = `Error processing user ${user.id}: ${err instanceof Error ? err.message : String(err)}`;
           console.error(errorMsg);
           result.errors.push(errorMsg);
+          userResult.errors.push(errorMsg);
         }
+
+        userResults.push(userResult);
       }
 
-      // 3. Send summary notification to admin
+      // 3. Send admin summary (aggregated across all users)
       await this.sendCycleSummary(result);
     } catch (err) {
       result.errors.push(`Critical cycle error: ${err}`);
@@ -217,6 +256,302 @@ export class SentinelService {
         );
       }
     }
+  }
+
+  /**
+   * Process a single user with per-user tracking
+   * Wraps processUser but also tracks individual stats for personal reports
+   */
+  private async processUserWithTracking(
+    user: DBUser,
+    globalSummary: SentinelRunResult,
+    userResult: UserCycleResult
+  ): Promise<void> {
+    const keys = await getMarketplaceKeys(user.id);
+    if (!keys.wb && !keys.ozon) return;
+
+    // Get monitored products
+    const productsRes = await sql`
+      SELECT * FROM products 
+      WHERE user_id = ${user.id} 
+      AND (is_monitored = true OR min_price > 0)
+    `;
+    const products = productsRes.rows as DBProduct[];
+
+    if (products.length === 0) return;
+
+    // Get Active Price Rules
+    const rules = await priceShield.getRulesForUser(user.id);
+    const rulesMap = new Map<string, PriceRule>();
+    for (const rule of rules) {
+      rulesMap.set(rule.product_id, rule);
+    }
+
+    // --- Ozon Sub-cycle ---
+    if (keys.ozon) {
+      const ozonProducts = products.filter(p => p.marketplace === 'Ozon');
+      const ozonIds = ozonProducts
+        .map(p => parseInt(p.product_id.replace('ozon-', '')))
+        .filter(Boolean);
+
+      if (ozonIds.length > 0) {
+        // Track per-user stats
+        userResult.productsScanned.ozon = ozonProducts.length;
+        if (globalSummary.productsScanned) {
+          globalSummary.productsScanned.ozon += ozonProducts.length;
+        }
+
+        const ozonKeys = keys.ozon;
+        let ozonPriceMap = new Map<number, number>();
+
+        try {
+          ozonPriceMap = await fetchOzonCurrentPrices(ozonKeys.clientId, ozonKeys.apiKey, ozonIds);
+        } catch (err) {
+          const errorMsg = err instanceof Error ? err.message : String(err);
+          userResult.errors.push(`Ozon API: ${errorMsg}`);
+          globalSummary.errors.push(`Ozon API Error (User ${user.id}): ${errorMsg}`);
+        }
+
+        // Fallback to DB prices if API failed
+        if (ozonPriceMap.size === 0) {
+          for (const product of ozonProducts) {
+            if (product.current_price && product.current_price > 0) {
+              const ozonId = parseInt(product.product_id.replace('ozon-', ''));
+              if (ozonId) ozonPriceMap.set(ozonId, product.current_price);
+            }
+          }
+        }
+
+        await this.handleMarketplaceThreatsWithTracking(
+          user,
+          ozonProducts,
+          ozonPriceMap,
+          'Ozon',
+          ozonKeys,
+          globalSummary,
+          userResult,
+          rulesMap
+        );
+      }
+    }
+
+    // --- WB Sub-cycle (when enabled) ---
+    // TODO: Add WB support with same pattern
+  }
+
+  /**
+   * Handle threats with per-user tracking
+   */
+  private async handleMarketplaceThreatsWithTracking(
+    user: DBUser,
+    products: DBProduct[],
+    priceMap: Map<number, number>,
+    marketplace: 'WB' | 'Ozon',
+    keys: string | NonNullable<MarketplaceApiKeys['ozon']>,
+    globalSummary: SentinelRunResult,
+    userResult: UserCycleResult,
+    _rulesMap: Map<string, PriceRule>
+  ): Promise<void> {
+    for (const product of products) {
+      const key =
+        marketplace === 'WB'
+          ? Number(product.nm_id)
+          : Number(product.product_id.replace('ozon-', ''));
+      const livePrice = priceMap.get(key);
+
+      if (!livePrice) continue;
+
+      // Scan for threats
+      const scan = scanProductThreats(product, livePrice, marketplace);
+
+      if (scan.hasThreats) {
+        globalSummary.threatsDetected += scan.threats.length;
+        userResult.threatsDetected += scan.threats.length;
+
+        const stopLossThreat = scan.threats.find(t => t.type === ThreatType.COMPETITOR_PRICE_DROP);
+
+        if (stopLossThreat && user.protection_enabled) {
+          // Execute defense and track
+          const defenseResult = await this.executeDefenseWithTracking(
+            user,
+            product,
+            livePrice,
+            marketplace,
+            keys,
+            globalSummary,
+            userResult,
+            stopLossThreat.type
+          );
+
+          if (defenseResult.success) {
+            userResult.defenseDetails.push({
+              product: product.title,
+              action: user.defense_mode || 'price_correction',
+              marketplace,
+              savedAmount: defenseResult.savedAmount,
+            });
+          }
+        }
+      }
+
+      // Update price in DB
+      await sql`
+        UPDATE products SET current_price = ${livePrice}, updated_at = NOW() 
+        WHERE id = ${product.id}
+      `;
+    }
+  }
+
+  /**
+   * Execute defense with per-user tracking
+   */
+  private async executeDefenseWithTracking(
+    user: DBUser,
+    product: DBProduct,
+    livePrice: number,
+    marketplace: 'WB' | 'Ozon',
+    keys: string | NonNullable<MarketplaceApiKeys['ozon']>,
+    globalSummary: SentinelRunResult,
+    userResult: UserCycleResult,
+    threatType: string
+  ): Promise<{ success: boolean; savedAmount: number }> {
+    const defenseMode = user.defense_mode || 'price_correction';
+    const minPrice = product.min_price;
+    let success = false;
+    let errorMsg = '';
+
+    if (marketplace === 'Ozon' && typeof keys !== 'string') {
+      const ozonId = parseInt(product.product_id.replace('ozon-', ''));
+      const offerId = product.offer_id || product.product_id;
+
+      if (defenseMode === 'zero_stock') {
+        const res = await setOzonZeroStock(keys.clientId, keys.apiKey, [
+          { productId: ozonId, offerId },
+        ]);
+        success = res.success;
+        errorMsg = res.error || '';
+      } else {
+        const res = await setOzonDefensePrice(keys.clientId, keys.apiKey, [
+          { productId: ozonId, offerId, price: minPrice },
+        ]);
+        success = res.success;
+        errorMsg = res.error || '';
+      }
+    }
+
+    const savedAmount = Math.max(0, minPrice - livePrice);
+
+    // Log action
+    await logSentinelAction({
+      user_id: user.id,
+      product_id: product.product_id,
+      product_title: product.title,
+      detected_price: livePrice,
+      min_price: minPrice,
+      defense_action: defenseMode,
+      saved_amount: savedAmount,
+      marketplace,
+      threat_type: threatType,
+      success,
+    });
+
+    if (success) {
+      globalSummary.actionsTaken++;
+      userResult.actionsTaken++;
+
+      // Track defense in global summary
+      if (globalSummary.defenseDetails) {
+        globalSummary.defenseDetails.push({
+          product: product.title,
+          action: defenseMode,
+          marketplace,
+        });
+      }
+
+      // Notify user about successful defense
+      await this.notifyDefenseSuccess(user, product, livePrice, minPrice, defenseMode, marketplace);
+    } else {
+      const errText = `Defense failed for ${product.product_id}: ${errorMsg}`;
+      globalSummary.errors.push(errText);
+      userResult.errors.push(errText);
+    }
+
+    return { success, savedAmount };
+  }
+
+  /**
+   * Send personal report to individual user
+   */
+  private async sendUserReport(user: DBUser, userResult: UserCycleResult): Promise<void> {
+    // Skip if no products scanned (user has no monitored products)
+    const totalScanned = userResult.productsScanned.wb + userResult.productsScanned.ozon;
+    if (totalScanned === 0) return;
+
+    const now = new Date();
+    const time = now.toLocaleTimeString('ru-RU', {
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Europe/Moscow',
+    });
+
+    // Determine status
+    let statusEmoji = '🟢';
+    let statusText = 'Всё в порядке';
+
+    if (userResult.errors.length > 0) {
+      statusEmoji = '🔴';
+      statusText = 'Есть ошибки';
+    } else if (userResult.actionsTaken > 0) {
+      statusEmoji = '⚔️';
+      statusText = 'Защита сработала!';
+    } else if (userResult.threatsDetected > 0) {
+      statusEmoji = '🟡';
+      statusText = 'Обнаружены угрозы';
+    }
+
+    const lines = [
+      `🛡️ *Отчёт по вашему магазину*`,
+      `⏰ ${time} (МСК)`,
+      ``,
+      `${statusEmoji} *${statusText}*`,
+      ``,
+      `📦 Проверено товаров: ${totalScanned}`,
+    ];
+
+    if (userResult.threatsDetected > 0) {
+      lines.push(`⚠️ Угроз: ${userResult.threatsDetected}`);
+    }
+
+    if (userResult.actionsTaken > 0) {
+      lines.push(`⚔️ Отражено атак: ${userResult.actionsTaken}`);
+
+      // Add defense details
+      if (userResult.defenseDetails.length > 0) {
+        lines.push(``);
+        lines.push(`🛡️ *Защита:*`);
+        for (const detail of userResult.defenseDetails.slice(0, 3)) {
+          const action = detail.action === 'zero_stock' ? 'остаток→0' : 'цена↑';
+          const saved = detail.savedAmount > 0 ? ` (+${detail.savedAmount}₽)` : '';
+          lines.push(`• ${detail.product.substring(0, 25)}... ${action}${saved}`);
+        }
+        if (userResult.defenseDetails.length > 3) {
+          lines.push(`_...и ещё ${userResult.defenseDetails.length - 3}_`);
+        }
+      }
+    }
+
+    if (userResult.errors.length > 0) {
+      lines.push(``);
+      lines.push(`❌ Ошибок: ${userResult.errors.length}`);
+    }
+
+    lines.push(``);
+    lines.push(`_Следующая проверка через 30 мин_`);
+
+    const message = lines.join('\n');
+
+    // Send to THIS user specifically
+    await notificationService.sendTelegramNotification(user.id, message);
   }
 
   /**
