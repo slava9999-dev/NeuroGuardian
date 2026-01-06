@@ -142,10 +142,13 @@ export async function fetchWbStocks(apiKey: string, nmIds: number[]): Promise<Ma
   try {
     // Step 1: Try FBS warehouses first
     console.log(`🔍 WB FBS: Fetching warehouses...`);
-    const warehousesRes = await fetch('https://marketplace-api.wildberries.ru/api/v3/warehouses', {
-      method: 'GET',
-      headers: { Authorization: apiKey },
-    });
+    const warehousesRes = await fetchWithRetry(
+      'https://marketplace-api.wildberries.ru/api/v3/warehouses',
+      {
+        method: 'GET',
+        headers: { Authorization: apiKey },
+      }
+    );
 
     console.log(`📡 WB Warehouses API: status=${warehousesRes.status}`);
 
@@ -169,7 +172,7 @@ export async function fetchWbStocks(apiKey: string, nmIds: number[]): Promise<Ma
             console.log(
               `🔍 WB: Fetching stocks for warehouse ${wh.id} (${wh.name || 'unnamed'})...`
             );
-            const stocksRes = await fetch(
+            const stocksRes = await fetchWithRetry(
               `https://marketplace-api.wildberries.ru/api/v3/stocks/${wh.id}`,
               {
                 method: 'POST',
@@ -228,7 +231,7 @@ export async function fetchWbStocks(apiKey: string, nmIds: number[]): Promise<Ma
     const dateFrom = new Date(today);
     dateFrom.setDate(today.getDate() - 1); // Yesterday
 
-    const fboRes = await fetch(
+    const fboRes = await fetchWithRetry(
       `https://statistics-api.wildberries.ru/api/v1/supplier/stocks?dateFrom=${dateFrom.toISOString().split('T')[0]}`,
       {
         method: 'GET',
@@ -276,7 +279,7 @@ export async function fetchWbStocks(apiKey: string, nmIds: number[]): Promise<Ma
  */
 export async function fetchWbProducts(apiKey: string, limit = 100): Promise<MarketplaceProduct[]> {
   // Step 1: Get product cards from Content API
-  const cardsResponse = await fetch(
+  const cardsResponse = await fetchWithRetry(
     'https://content-api.wildberries.ru/content/v2/get/cards/list',
     {
       method: 'POST',
@@ -337,7 +340,7 @@ export async function fetchWbPrices(
     url.searchParams.set('limit', '1000');
     url.searchParams.set('offset', '0');
 
-    const response = await fetch(url.toString(), {
+    const response = await fetchWithRetry(url.toString(), {
       method: 'GET',
       headers: { Authorization: apiKey },
     });
@@ -624,7 +627,7 @@ export async function fetchOzonProducts(
   limit = 100
 ): Promise<MarketplaceProduct[]> {
   // Step 1: Get product list
-  const listResponse = await fetch('https://api-seller.ozon.ru/v3/product/list', {
+  const listResponse = await fetchWithRetry('https://api-seller.ozon.ru/v3/product/list', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -647,7 +650,7 @@ export async function fetchOzonProducts(
 
   // Step 2: Get product details
   const productIds = items.map(item => item.product_id);
-  const detailResponse = await fetch('https://api-seller.ozon.ru/v3/product/info/list', {
+  const detailResponse = await fetchWithRetry('https://api-seller.ozon.ru/v3/product/info/list', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

@@ -7,7 +7,7 @@
 import { sql } from './database.js';
 import {
   getMarketplaceKeys,
-  // fetchWbPrices, // TEMP: WB disabled
+  fetchWbPrices,
   fetchOzonCurrentPrices,
   setWbDefensePrice,
   setOzonDefensePrice,
@@ -97,7 +97,11 @@ export class SentinelService {
         };
 
         try {
+          console.log(`🛡️ Sentinel: Processing user ${user.id}...`);
           await this.processUserWithTracking(user, result, userResult);
+          console.log(
+            `✅ Sentinel: User ${user.id} processed. Actions: ${userResult.actionsTaken}, Errors: ${userResult.errors.length}`
+          );
 
           // Send PERSONAL report to this user
           await this.sendUserReport(user, userResult);
@@ -168,9 +172,7 @@ export class SentinelService {
       rulesMap.set(rule.product_id, rule);
     }
 
-    // --- WB Sub-cycle --- (TEMPORARILY DISABLED - focus on Ozon first)
-    // TODO: Re-enable once Ozon is stable
-    /*
+    // --- WB Sub-cycle ---
     if (keys.wb) {
       const wbProducts = products.filter(p => p.marketplace === 'WB');
       const nmIds = wbProducts.map(p => p.nm_id).filter((id): id is number => id !== null);
@@ -195,7 +197,6 @@ export class SentinelService {
         );
       }
     }
-    */
 
     // --- Ozon Sub-cycle ---
     if (keys.ozon) {
@@ -335,8 +336,44 @@ export class SentinelService {
       }
     }
 
-    // --- WB Sub-cycle (when enabled) ---
-    // TODO: Add WB support with same pattern
+    // --- WB Sub-cycle ---
+    if (keys.wb) {
+      const wbProducts = products.filter(p => p.marketplace === 'WB');
+      const nmIds = wbProducts.map(p => p.nm_id).filter((id): id is number => id !== null);
+
+      if (nmIds.length > 0) {
+        userResult.productsScanned.wb = wbProducts.length;
+        if (globalSummary.productsScanned) {
+          globalSummary.productsScanned.wb += wbProducts.length;
+        }
+
+        let wbPriceMap = new Map<number, number>();
+
+        try {
+          const result = await fetchWbPrices(keys.wb, nmIds);
+          wbPriceMap = result.priceMap;
+          if (result.error) {
+            userResult.errors.push(`WB API warning: ${result.error}`);
+            // Don't clutter global summary with warnings unless critical
+          }
+        } catch (err) {
+          const errorMsg = err instanceof Error ? err.message : String(err);
+          userResult.errors.push(`WB API: ${errorMsg}`);
+          globalSummary.errors.push(`WB API Error (User ${user.id}): ${errorMsg}`);
+        }
+
+        await this.handleMarketplaceThreatsWithTracking(
+          user,
+          wbProducts,
+          wbPriceMap,
+          'WB',
+          keys.wb,
+          globalSummary,
+          userResult,
+          rulesMap
+        );
+      }
+    }
   }
 
   /**
@@ -549,6 +586,7 @@ export class SentinelService {
     lines.push(`_Следующая проверка через 30 мин_`);
 
     const message = lines.join('\n');
+    console.log(`📡 Sentinel: Sending report to user ${user.id} (Scanned: ${totalScanned})`);
 
     // Send to THIS user specifically
     await notificationService.sendTelegramNotification(user.id, message);
