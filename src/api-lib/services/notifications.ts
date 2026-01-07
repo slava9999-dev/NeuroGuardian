@@ -377,6 +377,8 @@ function formatAlert(alert: Alert, smartMessage?: string | null): string {
       tipText = 'Превентивная защита';
     }
 
+    const actionLabel = alert.analysis.action === 'zero_stock' ? 'Остаток → 0' : 'Возврат цены';
+
     return [
       `🛡️ *СТОРОЖ*`,
       ``,
@@ -388,7 +390,7 @@ function formatAlert(alert: Alert, smartMessage?: string | null): string {
       `━━━━━━━━━━━━━━━━━━━━`,
       priceBlock,
       ``,
-      `⚔️ *Действие:* ${escapeMarkdown(alert.analysis.action)}`,
+      `⚔️ *Действие:* ${actionLabel}`,
       resultBlock,
       `━━━━━━━━━━━━━━━━━━━━`,
       ``,
