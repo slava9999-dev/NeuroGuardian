@@ -434,9 +434,10 @@ export class SentinelService {
       // Update price in DB
       // If defense succeeded, update to min_price (the new price we set)
       // Otherwise, update to livePrice (current market price)
-      const newPrice = userResult.defenseDetails.some(d => d.product === product.title)
-        ? product.min_price
-        : livePrice;
+      const defenseSucceeded = userResult.defenseDetails.some(
+        d => d.product === product.title && d.marketplace === marketplace
+      );
+      const newPrice = defenseSucceeded ? product.min_price : livePrice;
 
       await sql`
         UPDATE products SET current_price = ${newPrice}, updated_at = NOW() 
