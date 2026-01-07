@@ -952,8 +952,8 @@ export class SentinelService {
 
     if (totalScanned > 0) {
       lines.push(`📦 Товаров: ${totalScanned}`);
-      if (ozonScanned > 0) lines.push(`   � Ozon: ${ozonScanned}`);
-      if (wbScanned > 0) lines.push(`   � WB: ${wbScanned}`);
+      if (ozonScanned > 0) lines.push(`   🔵 Ozon: ${ozonScanned}`);
+      if (wbScanned > 0) lines.push(`   🟣 WB: ${wbScanned}`);
     } else if (usersProcessed > 0) {
       lines.push(`📦 Товаров: 0`);
       lines.push(`   _⚠️ Проверьте настройки мониторинга_`);
