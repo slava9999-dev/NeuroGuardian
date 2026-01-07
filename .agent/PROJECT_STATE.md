@@ -1,6 +1,6 @@
 # 📊 Project State — NeuroGUARDIAN
 
-# Updated: 2026-01-06T22:47:00+03:00
+# Updated: 2026-01-07T23:15:00+03:00
 
 # This file tracks current progress and is updated at end of each session
 
@@ -9,7 +9,7 @@
 ## 🎯 Current Phase: MONETIZATION LAUNCH (Phase 11) 🟢 PRODUCTION
 
 **Last Session:** 2026-01-06 (Session 27)
-**Focus:** 🛡️ Sentinel Complete Audit — Исправление Ozon API + Персональные отчёты
+**Focus:** 🕵️ Competitor Intelligence — Ozon Fallback & Link Precision
 
 **📋 Ключевые документы:**
 
@@ -29,6 +29,28 @@
 ---
 
 ## ✅ Recently Completed
+
+### Session 2026-01-07 (Session 28 - Competitor Core & Links Fix) 🕵️
+
+**Кардинальное улучшение анализа конкурентов (Ozon + Ссылки):**
+
+- [x] **CORE UPGRADE**: Ozon мониторинг активирован через Serper (Google) Fallback. Теперь Sentinel видит цены даже без API Ozon!
+- [x] **FIX**: Агент выдавал битые ссылки на категории. Внедрены `site:ozon.ru/product` и `inurl:detail` для снайперского поиска только карточек.
+- [x] **SECURITY**: "Предохранитель 500k" — Sentinel теперь запрещает менять цену, если `min_price` аномально высока (>5x текущей). Паника отменяется.
+- [x] **AGENT**: Агент проактивно использует новый поиск и fallbacks.
+- [x] **CLEANUP**: Удалено чувствительное логгирование ключей (Security Audit).
+
+**Commits:**
+
+- `feat(core): activate Ozon price tracking engine using Serper fallback`
+- `fix(agent): improve serper queries with 'inurl' filters`
+- `fix(sentinel): add panic prevention sanity check`
+
+**Файлы изменены:**
+
+- `src/api-lib/services/competitor-monitor.ts`
+- `src/api-lib/services/sentinel-service.ts`
+- `src/api-lib/agent/specialists/competitors.ts`
 
 ### Session 2026-01-06 (Session 27 - Sentinel Complete Audit) 🛡️
 
