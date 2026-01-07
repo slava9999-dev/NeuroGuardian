@@ -464,6 +464,17 @@ export class SentinelService {
     let success = false;
     let errorMsg = '';
 
+    // SANITY CHECK: Panic Prevention
+    // If min_price is absurdly higher than live price (e.g. > 5x and > 10k rub),
+    // assume min_price configuration error (e.g. kopecks issue) and ABORT defense.
+    if (minPrice > livePrice * 5 && minPrice > 10000) {
+      const msg = `⛔ Defense Aborted: min_price (${minPrice}) is suspiciously high vs live (${livePrice}). Check product settings!`;
+      console.error(msg);
+      globalSummary.errors.push(msg);
+      userResult.errors.push(msg);
+      return { success: false, savedAmount: 0 };
+    }
+
     if (marketplace === 'Ozon' && typeof keys !== 'string') {
       const ozonId = parseInt(product.product_id.replace('ozon-', ''));
       const offerId = product.offer_id || product.product_id;
