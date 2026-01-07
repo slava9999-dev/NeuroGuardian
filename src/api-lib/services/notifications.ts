@@ -180,25 +180,12 @@ function escapeMarkdown(text: string): string {
 function getAlertButtons(alert: Alert): Record<string, unknown> | undefined {
   const buttons: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
 
-  // Price Protection Actions - TWO-STEP CONFIRMATION
-  if (alert.type === 'price_protection' && alert.product && alert.analysis) {
-    const { recommendedPrice } = alert.analysis;
+  // Price Protection - action ALREADY executed by Sentinel, no confirmation needed
+  // Just show a link to view the product
+  if (alert.type === 'price_protection' && alert.product) {
     const { externalId, marketplace } = alert.product;
 
-    // Row 1: Confirm Apply + Ignore
-    buttons.push([
-      {
-        text: `✅ Применить ${recommendedPrice}₽`,
-        // confirm: prefix triggers confirmation dialog
-        callback_data: `confirm:apply_price:${marketplace}:${externalId}:${recommendedPrice}`,
-      },
-      {
-        text: `❌ Игнорировать`,
-        callback_data: `ignore_alert:${externalId}`,
-      },
-    ]);
-
-    // Row 2: View Product Link
+    // Only show link to product on marketplace
     const link =
       marketplace.toLowerCase() === 'wb'
         ? `https://www.wildberries.ru/catalog/${externalId}/detail.aspx`
@@ -637,20 +624,16 @@ export async function sendAlertToUser(userId: number, alert: Alert): Promise<boo
 }
 
 /**
- * Send alert - routes to admin for critical, user for others
+ * Send alert - routes to user if userId provided, otherwise to admin
+ * FIXED: Removed duplication (was sending to both admin AND user for high urgency)
  */
 export async function sendAlert(alert: Alert): Promise<boolean> {
-  // Critical alerts always go to admin
-  if (alert.urgency === 'critical' || alert.urgency === 'high') {
-    await sendAlertToAdmin(alert);
-  }
-
-  // Also send to user if applicable
+  // If alert has a specific user, send to that user only
   if (alert.product?.userId) {
     return await sendAlertToUser(alert.product.userId, alert);
   }
 
-  // Default to admin
+  // Otherwise send to admin (system-wide alerts)
   return await sendAlertToAdmin(alert);
 }
 
