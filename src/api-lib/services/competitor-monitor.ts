@@ -151,7 +151,7 @@ export async function fetchOzonCompetitorData(productId: string): Promise<Compet
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        q: `ozon ${productId} цена`,
+        q: `site:ozon.ru/product ${productId}`,
         gl: 'ru',
         hl: 'ru',
         num: 3,

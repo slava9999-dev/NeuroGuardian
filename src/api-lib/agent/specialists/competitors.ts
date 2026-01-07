@@ -1,7 +1,7 @@
 // ============================================
 // NeuroGUARDIAN — Competitors Specialist
 // Competitor research via web search
-// Version: 3.0.0 | Date: December 2024
+// Version: 3.1.0 | Date: December 2024
 // ============================================
 
 import { buildSpecialistPrompt } from '../prompts/base.js';
@@ -21,8 +21,10 @@ const COMPETITORS_RULES = `
 ## ⚠️ СТРАТЕГИЯ ПОИСКА:
 
 ### 1. Если нет ссылок на конкурентов:
-1. Вызови \`search_web\` с запросом \`товар site:ozon.ru\` или \`site:wildberries.ru\`.
-2. Из результатов возьми URL или артикул.
+1. Вызови \`search_web\` с умным фильтром поиска карточек:
+   - "товары Ozon": \`товар site:ozon.ru inurl:product\`
+   - "товары WB": \`товар site:wildberries.ru/catalog inurl:detail\`
+2. Из результатов возьми URL или артикул (из ссылки).
 3. СРАЗУ вызови \`get_competitor_price\` для этих артикулов.
 
 ### 2. Если есть ссылка/артикул:
@@ -32,11 +34,11 @@ const COMPETITORS_RULES = `
 
 ### 3. Формат запросов для поиска ссылок:
 \`\`\`
-Для Ozon:
-search_web({ query: "панно деревянное site:ozon.ru" })
+Для Ozon (строго карточки):
+search_web({ query: "панно деревянное site:ozon.ru inurl:product" })
 
-Для Wildberries:
-search_web({ query: "держатель для полотенец site:wildberries.ru" })
+Для Wildberries (строго карточки):
+search_web({ query: "держатель для полотенец site:wildberries.ru/catalog inurl:detail" })
 \`\`\`
 
 ## Формат ответа при поиске конкурентов:
@@ -106,6 +108,11 @@ export function buildCompetitorSearchQuery(
   productName: string,
   marketplace: 'WB' | 'Ozon'
 ): string {
-  const site = marketplace === 'Ozon' ? 'site:ozon.ru' : 'site:wildberries.ru';
-  return `${productName} ${site} цена купить`;
+  // Use 'inurl' filters to target exact product pages and skip categories/tags
+  const site =
+    marketplace === 'Ozon'
+      ? 'site:ozon.ru inurl:product'
+      : 'site:wildberries.ru/catalog inurl:detail';
+
+  return `${productName} ${site}`;
 }

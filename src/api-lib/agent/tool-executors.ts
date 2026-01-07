@@ -1606,7 +1606,7 @@ export async function executeGetCompetitorPrice(
             const match = currencyMatch || priceLabelMatch;
 
             if (match && match[1]) {
-              const raw = match[1].replace(/[\s,]/g, '');
+              const raw = match[1].replace(/[\s,.]/g, '');
               extractedPrice = Math.round(parseFloat(raw));
             }
           }
@@ -1706,7 +1706,7 @@ export async function executeGetCompetitorPrice(
   }
 
   try {
-    const searchQuery = `wildberries ${nmId} цена`;
+    const searchQuery = `site:wildberries.ru/catalog ${nmId} цена`;
     const response = await fetch('https://google.serper.dev/search', {
       method: 'POST',
       headers: {
@@ -1750,10 +1750,9 @@ export async function executeGetCompetitorPrice(
 
         if (match && match[1]) {
           // Cleanup: remove dots, commas, spaces to get pure number
-          // Handle "1.200" as 1200, but "1,200" is also 1200. "1200.50" -> 1200
-          const raw = match[1].replace(/[\s,]/g, '');
-          // If dot remains, it might be decimal or thousand separator.
-          // WB prices are usually integers, so Math.round
+          // Handle "1.200" or "1 200" or "1,200" as 1200
+          // RISK: "10.50" becomes 1050. But marketplaces mostly use integer RUB.
+          const raw = match[1].replace(/[\s,.]/g, '');
           extractedPrice = Math.round(parseFloat(raw));
         }
       }
