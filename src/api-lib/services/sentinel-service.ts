@@ -474,6 +474,22 @@ export class SentinelService {
         success = res.success;
         errorMsg = res.error || '';
       }
+    } else if (marketplace === 'WB' && typeof keys === 'string') {
+      // WB defense actions
+      const nmId = product.nm_id;
+
+      if (!nmId) {
+        errorMsg = 'Missing nm_id for WB product';
+      } else if (defenseMode === 'zero_stock') {
+        const res = await setWbZeroStock(keys, [String(nmId)]);
+        success = res.success;
+        errorMsg = res.error || '';
+      } else {
+        // price_correction mode
+        const res = await setWbDefensePrice(keys, [{ nmId, price: minPrice }]);
+        success = res.success;
+        errorMsg = res.error || '';
+      }
     }
 
     const savedAmount = Math.max(0, minPrice - livePrice);
