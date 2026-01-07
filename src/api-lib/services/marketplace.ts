@@ -1246,6 +1246,8 @@ export async function setWbDefensePrice(
       })),
     };
 
+    console.log(`📡 WB Defense Payload:`, JSON.stringify(payload));
+
     const response = await fetchWithRetry(
       'https://discounts-prices-api.wildberries.ru/api/v2/upload/task',
       {
@@ -1258,12 +1260,27 @@ export async function setWbDefensePrice(
       }
     );
 
+    const responseText = await response.text();
+    console.log(`📡 WB Defense Response (${response.status}):`, responseText);
+
     if (response.ok) {
+      // Parse JSON to check for errors inside response
+      try {
+        const json = JSON.parse(responseText);
+        // WB API may return 200 but with errors in the body
+        if (json.error || json.errorText) {
+          return { success: false, error: json.error || json.errorText };
+        }
+      } catch {
+        // If not JSON, that's fine
+      }
       console.log(`✅ WB: Set defense price for ${products.length} products`);
       return { success: true };
     } else {
-      const errorText = await response.text();
-      return { success: false, error: errorText };
+      return {
+        success: false,
+        error: `HTTP ${response.status}: ${responseText.substring(0, 200)}`,
+      };
     }
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : 'Unknown error' };
