@@ -495,11 +495,10 @@ export async function updateWbPrices(
 
   try {
     // WB API v2: Required fields are nmId, price, discount
-    // Per official docs: POST /api/v2/upload/task expects nmId, price, discount
+    // IMPORTANT: WB API expects prices in RUBLES (not kopecks!)
     const payload = batchedUpdates.map(u => ({
       nmId: Number(u.nmId),
-      // CRITICAL: WB API expects prices in kopecks, we store in rubles
-      price: Math.round(u.price * 100),
+      price: Math.round(u.price), // Price in RUBLES
       discount: 0, // Required field - 0 means no discount
     }));
 
@@ -1240,8 +1239,8 @@ export async function setWbDefensePrice(
     const payload = {
       data: products.map(p => ({
         nmId: Number(p.nmId), // WB API requires lowercase 'nmId'
-        // CRITICAL: WB API expects prices in kopecks, we store in rubles
-        price: Math.round(p.price * 100),
+        // WB API v2/upload/task expects prices in RUBLES (not kopecks!)
+        price: Math.round(p.price),
         discount: 0,
       })),
     };
