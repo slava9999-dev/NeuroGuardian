@@ -1569,7 +1569,74 @@ export async function executeGetCompetitorPrice(
         },
       };
     }
-    // Fallback: suggest search
+    // Fallback: Web Search for Ozon
+    console.log('📡 Ozon API unavailable, using web search fallback...');
+    const { getSecret } = await import('../lib/secrets-helper.js');
+    const serperKey = await getSecret('serper_api_key', 'web_search');
+
+    if (serperKey) {
+      try {
+        const searchQuery = `ozon ${nmId} цена`;
+        const response = await fetch('https://google.serper.dev/search', {
+          method: 'POST',
+          headers: {
+            'X-API-KEY': serperKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ q: searchQuery, gl: 'ru', hl: 'ru', num: 3 }),
+        });
+
+        if (response.ok) {
+          interface SerperResult {
+            title?: string;
+            link?: string;
+            snippet?: string;
+          }
+          const searchData = (await response.json()) as { organic?: SerperResult[] };
+          const ozonResult = searchData.organic?.find((r: SerperResult) =>
+            r.link?.includes('ozon.ru')
+          );
+
+          let extractedPrice: number | null = null;
+          if (ozonResult?.snippet || ozonResult?.title) {
+            const textToCheck = (ozonResult.title + ' ' + ozonResult.snippet).toLowerCase();
+            // Regex for price: 1 234 ₽, 1.234 руб
+            const currencyMatch = textToCheck.match(/(\d[\d\s.,]*)\s*(?:₽|руб|rur)/i);
+            const priceLabelMatch = textToCheck.match(/цена\s*:?\s*(\d[\d\s.,]*)/i);
+            const match = currencyMatch || priceLabelMatch;
+
+            if (match && match[1]) {
+              const raw = match[1].replace(/[\s,]/g, '');
+              extractedPrice = Math.round(parseFloat(raw));
+            }
+          }
+
+          if (extractedPrice || ozonResult) {
+            return {
+              success: true,
+              data: {
+                marketplace: 'Ozon',
+                product_id: nmId,
+                source: 'web_search',
+                price: extractedPrice,
+                priceNote: extractedPrice
+                  ? `Цена найдена в Google: ~${extractedPrice}₽`
+                  : 'Цена не найдена в сниппете (проверьте вручную)',
+                productUrl: `https://www.ozon.ru/product/${nmId}`,
+                searchResults: searchData.organic?.slice(0, 2).map((r: SerperResult) => ({
+                  title: r.title,
+                  link: r.link,
+                  snippet: r.snippet?.substring(0, 150),
+                })),
+              },
+            };
+          }
+        }
+      } catch (e) {
+        console.error('Ozon search fallback failed:', e);
+      }
+    }
+
     return {
       success: true,
       data: {
@@ -1667,12 +1734,27 @@ export async function executeGetCompetitorPrice(
         r.link?.includes('wildberries.ru')
       );
 
-      // Extract price from snippet if possible (pattern: "1 234 ₽" or "от 999 руб")
+      // Extract price from snippet with improved regex
+      // Matches: "1 234 ₽", "1.234 руб", "1234р", "цена 1234"
       let extractedPrice: number | null = null;
-      if (wbResult?.snippet) {
-        const priceMatch = wbResult.snippet.match(/(\d[\d\s]*)\s*[₽руб]/i);
-        if (priceMatch) {
-          extractedPrice = parseInt(priceMatch[1].replace(/\s/g, ''));
+      if (wbResult?.snippet || wbResult?.title) {
+        const textToCheck = (wbResult.title + ' ' + wbResult.snippet).toLowerCase();
+
+        // Pattern 1: Price with currency (most reliable)
+        const currencyMatch = textToCheck.match(/(\d[\d\s.,]*)\s*(?:₽|руб|rur)/i);
+
+        // Pattern 2: "Price: 1234"
+        const priceLabelMatch = textToCheck.match(/цена\s*:?\s*(\d[\d\s.,]*)/i);
+
+        const match = currencyMatch || priceLabelMatch;
+
+        if (match && match[1]) {
+          // Cleanup: remove dots, commas, spaces to get pure number
+          // Handle "1.200" as 1200, but "1,200" is also 1200. "1200.50" -> 1200
+          const raw = match[1].replace(/[\s,]/g, '');
+          // If dot remains, it might be decimal or thousand separator.
+          // WB prices are usually integers, so Math.round
+          extractedPrice = Math.round(parseFloat(raw));
         }
       }
 
@@ -1684,8 +1766,8 @@ export async function executeGetCompetitorPrice(
           source: 'web_search',
           price: extractedPrice,
           priceNote: extractedPrice
-            ? 'Цена получена из поиска Google (может быть неточной)'
-            : 'Цена не найдена в результатах поиска',
+            ? `Цена найдена в Google: ~${extractedPrice}₽`
+            : 'Цена не найдена в сниппете (проверьте вручную)',
           productUrl: `https://www.wildberries.ru/catalog/${nmId}/detail.aspx`,
           searchResults: searchData.organic?.slice(0, 2).map((r: SerperResult) => ({
             title: r.title,
