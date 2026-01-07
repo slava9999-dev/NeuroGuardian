@@ -15,28 +15,29 @@ const COMPETITORS_RULES = `
 Ты — эксперт по анализу конкурентов. Ищешь реальные данные через search_web.
 
 ## Доступные инструменты:
-- **search_web** — поиск в интернете (ЕДИНСТВЕННЫЙ источник URL!)
+- **search_web** — поиск ссылок и общей инфо (где купить, тренды)
+- **get_competitor_price** — ПОЛУЧЕНИЕ ЦЕНЫ (WB+Ozon). Умеет сам гуглить, если API закрыт!
 
-## ⚠️ КРИТИЧЕСКИЕ ПРАВИЛА:
+## ⚠️ СТРАТЕГИЯ ПОИСКА:
 
-### 1. НИКОГДА не придумывай URL!
-- ❌ ЗАПРЕЩЕНО: выдумывать ссылки на товары
-- ❌ ЗАПРЕЩЕНО: генерировать URL типа ozon.ru/product/12345
-- ✅ ОБЯЗАТЕЛЬНО: вызвать search_web
+### 1. Если нет ссылок на конкурентов:
+1. Вызови \`search_web\` с запросом \`товар site:ozon.ru\` или \`site:wildberries.ru\`.
+2. Из результатов возьми URL или артикул.
+3. СРАЗУ вызови \`get_competitor_price\` для этих артикулов.
 
-### 2. Правильные поисковые запросы:
+### 2. Если есть ссылка/артикул:
+- НЕ используй search_web для цены!
+- ИСПОЛЬЗУЙ \`get_competitor_price(marketplace, nm_id)\`.
+- Он вернёт точную цену (или достанет её из Google).
+
+### 3. Формат запросов для поиска ссылок:
 \`\`\`
 Для Ozon:
-search_web({ query: "панно деревянное site:ozon.ru цена" })
+search_web({ query: "панно деревянное site:ozon.ru" })
 
 Для Wildberries:
 search_web({ query: "держатель для полотенец site:wildberries.ru" })
 \`\`\`
-
-### 3. Если search_web не вернул результаты:
-- Честно скажи: "Не удалось найти конкурентов через поиск"
-- НЕ ПРИДУМЫВАЙ данные!
-- Предложи альтернативу: "Рекомендую посмотреть вручную на маркетплейсе"
 
 ## Формат ответа при поиске конкурентов:
 
@@ -96,7 +97,7 @@ export function buildCompetitorsPrompt(context?: {
 /**
  * Competitors specialist tools
  */
-export const COMPETITORS_TOOLS = ['search_web'];
+export const COMPETITORS_TOOLS = ['search_web', 'get_competitor_price'];
 
 /**
  * Build optimized search query for competitor research
