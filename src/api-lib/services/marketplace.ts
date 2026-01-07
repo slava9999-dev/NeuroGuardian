@@ -1239,9 +1239,9 @@ export async function setWbDefensePrice(
   try {
     const payload = {
       data: products.map(p => ({
-        nmID: p.nmId,
+        nmId: Number(p.nmId), // WB API requires lowercase 'nmId'
         // CRITICAL: WB API expects prices in kopecks, we store in rubles
-        price: p.price * 100,
+        price: Math.round(p.price * 100),
         discount: 0,
       })),
     };
