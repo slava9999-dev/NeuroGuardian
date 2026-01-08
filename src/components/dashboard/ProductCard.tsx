@@ -197,19 +197,21 @@ export function ProductCard({ product }: ProductCardProps) {
           </p>
           {/* Show estimated buyer price if different */}
           {product.estimatedBuyerPrice && product.estimatedBuyerPrice < product.currentPrice && (
-            <p className="text-xs text-stone-400 mt-0.5 flex items-center gap-1">
+            <p className="text-xs text-stone-400 mt-1 flex items-center gap-1">
               <span
-                className={`${product.marketplace === 'Ozon' ? 'text-blue-400' : 'text-purple-400'}`}
+                className={`${product.marketplace === 'Ozon' ? 'text-blue-400' : 'text-purple-400'} font-medium`}
                 title={
                   product.marketplace === 'Ozon'
-                    ? 'Примерная цена с учётом Ozon Card (−5% для 40% покупателей)'
-                    : 'Примерная цена с учётом кэшбэка WB Pay'
+                    ? 'Цена для покупателей с Ozon Card (скидка 5%)'
+                    : 'Цена с учётом кэшбэка WB Pay (~3%)'
                 }
               >
-                👁 ~{product.estimatedBuyerPrice.toLocaleString('ru-RU')} ₽
+                {product.marketplace === 'Ozon' ? '💳 с Ozon Card:' : '💳 с WB Pay:'}
               </span>
-              <span className="text-stone-500 text-[10px]">
-                {product.marketplace === 'Ozon' ? '(Ozon Card)' : '(WB Pay)'}
+              <span
+                className={`${product.marketplace === 'Ozon' ? 'text-blue-300' : 'text-purple-300'} font-bold`}
+              >
+                {product.estimatedBuyerPrice.toLocaleString('ru-RU')} ₽
               </span>
             </p>
           )}

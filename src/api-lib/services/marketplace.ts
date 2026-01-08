@@ -106,20 +106,23 @@ export const WB_DISCOUNT_CONFIG = {
 
 /**
  * Calculate estimated buyer price for Ozon
+ * Shows price that buyers WITH Ozon Card will see (5% discount)
+ * Note: This is the MINIMUM price visible, actual price may be lower with promotions
  * @param sellerPrice - Price set by seller
  * @param hasPromotion - True if product is in an active promotion
- * @returns Estimated price buyer sees
+ * @returns Estimated price buyer sees WITH Ozon Card
  */
 export function calculateOzonBuyerPrice(
   sellerPrice: number,
   hasPromotion = false
 ): { price: number; discountPercent: number } {
-  // Base discount: Ozon Card (5% for ~40% of buyers = 2% average)
-  let discountPercent = OZON_DISCOUNT_CONFIG.averageCardImpact;
+  // Use ACTUAL Ozon Card discount (5%), not average impact
+  // This shows what buyers WITH Ozon Card will see
+  let discountPercent = OZON_DISCOUNT_CONFIG.cardDiscount; // 5%
 
   // Add typical promo discount if in promotion
   if (hasPromotion) {
-    discountPercent += 5; // Conservative estimate
+    discountPercent += 5; // Conservative estimate for promotions
   }
 
   // Apply discount to seller price
