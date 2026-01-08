@@ -324,8 +324,9 @@ export class SentinelService {
         summary.threatsDetected += scan.threats.length;
         if (userResult) userResult.threatsDetected += scan.threats.length;
 
-        // DB_PRICE_MISMATCH = price dropped below min_price (stop-loss trigger)
-        const stopLossThreat = scan.threats.find(t => t.type === ThreatType.DB_PRICE_MISMATCH);
+        // COMPETITOR_PRICE_DROP = price dropped below min_price (stop-loss trigger)
+        // This is the threat type defined in threat-detector.ts for stop-loss violations
+        const stopLossThreat = scan.threats.find(t => t.type === ThreatType.COMPETITOR_PRICE_DROP);
         const erosionThreat = scan.threats.find(
           t => t.type === ThreatType.OZON_CARD_EROSION || t.type === ThreatType.MARGIN_BELOW_ZERO
         );
