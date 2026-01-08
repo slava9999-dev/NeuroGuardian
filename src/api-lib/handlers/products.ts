@@ -19,6 +19,8 @@ import {
   updateProductMinPrice,
   fetchWbStocks,
   saveProducts,
+  calculateOzonBuyerPrice,
+  calculateWbBuyerPrice,
 } from '../services/index.js';
 
 // fetchWithRetry moved to api-lib/lib/index.js
@@ -43,6 +45,8 @@ export async function handleProducts(
       title: sanitizeInput(String(p.title || '')),
       imageUrl: p.image_url,
       currentPrice: Number(p.current_price || 0),
+      estimatedBuyerPrice: Number(p.estimated_buyer_price || p.current_price || 0),
+      marketplaceDiscountPercent: Number(p.marketplace_discount_percent || 0),
       minPrice: Number(p.min_price || 0),
       stock: Number(p.current_stock || 0),
       marketplace: p.marketplace,
@@ -252,6 +256,10 @@ async function performSync(
             price = parseFloat(item.price || item.marketing_price || '0');
           }
 
+          const roundedPrice = Math.round(price);
+          // Calculate estimated buyer price (accounts for Ozon Card + typical discounts)
+          const { price: buyerPrice, discountPercent } = calculateOzonBuyerPrice(roundedPrice);
+
           return {
             product_id: `ozon-${item.id}`,
             title: item.name || 'Без названия',
@@ -261,7 +269,9 @@ async function performSync(
                 : item.primary_image?.[0]) ||
               item.images?.[0] ||
               null,
-            current_price: price,
+            current_price: roundedPrice,
+            estimated_buyer_price: buyerPrice,
+            marketplace_discount_percent: discountPercent,
             current_stock: totalStock,
             marketplace: 'Ozon',
             offer_id: item.offer_id || '', // CRITICAL: Save offer_id for price updates
@@ -361,12 +371,17 @@ async function performSync(
         }
       }
 
+      // Calculate estimated buyer price (accounts for WB Pay cashback)
+      const { price: buyerPrice, discountPercent } = calculateWbBuyerPrice(price);
+
       return {
         product_id: `wb-${card.nmID}`,
         nm_id: card.nmID,
         title: card.title || card.subjectName || 'Без названия',
         image_url: card.photos?.[0]?.big || card.photos?.[0]?.c246x328 || null,
         current_price: price,
+        estimated_buyer_price: buyerPrice,
+        marketplace_discount_percent: discountPercent,
         current_stock: stockMap.get(card.nmID) || 0,
         marketplace: 'WB',
         account_id: accountId,

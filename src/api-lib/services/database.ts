@@ -485,6 +485,10 @@ export async function migrateAddPendingColumns(): Promise<void> {
   // Ensure Unit Economics columns exist
   await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS cost_price INTEGER`;
   await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS category VARCHAR(255)`;
+
+  // Buyer price estimation columns (Jan 2026)
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS estimated_buyer_price INTEGER`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS marketplace_discount_percent DECIMAL(5,2)`;
 }
 
 export async function clearChatHistory(userId: number): Promise<void> {
@@ -499,15 +503,19 @@ export async function saveProducts(userId: number, products: Partial<DBProduct>[
     await sql`
       INSERT INTO products (
         user_id, product_id, nm_id, official_sku, offer_id, title, 
-        image_url, current_price, current_stock, marketplace, account_id, updated_at
+        image_url, current_price, estimated_buyer_price, marketplace_discount_percent,
+        current_stock, marketplace, account_id, updated_at
       )
       VALUES (
         ${userId}, ${p.product_id}, ${p.nm_id || null}, ${p.official_sku || null}, 
         ${p.offer_id || null}, ${p.title}, ${p.image_url}, ${p.current_price}, 
+        ${p.estimated_buyer_price || null}, ${p.marketplace_discount_percent || null},
         ${p.current_stock}, ${p.marketplace}, ${p.account_id || null}, NOW()
       )
       ON CONFLICT (user_id, product_id) DO UPDATE SET
         current_price = EXCLUDED.current_price,
+        estimated_buyer_price = EXCLUDED.estimated_buyer_price,
+        marketplace_discount_percent = EXCLUDED.marketplace_discount_percent,
         current_stock = EXCLUDED.current_stock,
         title = EXCLUDED.title,
         image_url = EXCLUDED.image_url,

@@ -144,6 +144,8 @@ export interface DBProduct {
   title: string; // VARCHAR(500) NOT NULL
   image_url: string | null; // TEXT
   current_price: number; // INTEGER NOT NULL
+  estimated_buyer_price: number | null; // INTEGER — estimated price buyer sees (Jan 2026)
+  marketplace_discount_percent: number | null; // DECIMAL(5,2) — total marketplace discount % (Jan 2026)
   min_price: number; // INTEGER DEFAULT 0
   current_stock: number; // INTEGER DEFAULT 0
   marketplace: 'WB' | 'Ozon'; // VARCHAR(10) NOT NULL

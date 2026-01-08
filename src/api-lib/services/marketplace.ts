@@ -37,7 +37,9 @@ export interface MarketplaceProduct {
   nm_id?: number;
   title: string;
   image_url: string | null;
-  current_price: number;
+  current_price: number; // Seller's price
+  estimated_buyer_price?: number; // Estimated price buyer sees (after discounts)
+  marketplace_discount_percent?: number; // Total estimated discount %
   current_stock: number;
   marketplace: 'WB' | 'Ozon';
 }
@@ -61,6 +63,87 @@ export interface MarketplaceSalesStats {
 export interface MarketplaceApiKeys {
   wb?: string;
   ozon?: { clientId: string; apiKey: string };
+}
+
+// ============================================
+// MARKETPLACE DISCOUNT ESTIMATION
+// ============================================
+// Since Ozon removed marketing_price from API (Nov 2025),
+// we need to estimate the buyer-facing price
+
+/**
+ * Ozon discount factors:
+ * - Ozon Card: 5% discount, ~40% adoption = ~2% average impact
+ * - Ozon Premium: additional discounts for subscribers
+ * - Promotional actions: can add 5-15% more
+ */
+export const OZON_DISCOUNT_CONFIG = {
+  /** Ozon Card discount percentage */
+  cardDiscount: 5,
+  /** Estimated adoption rate of Ozon Card holders */
+  cardAdoptionRate: 0.4,
+  /** Average Ozon Card impact on price = 5% * 40% = 2% */
+  averageCardImpact: 2,
+  /** Typical promotional discount range */
+  typicalPromoMin: 0,
+  typicalPromoMax: 10,
+  /** Default estimated total discount (conservative) */
+  defaultEstimatedDiscount: 5,
+};
+
+/**
+ * Wildberries discount factors:
+ * - WB Wallet cashback: ~2-5%
+ * - SPP (discount from price): varies
+ * - Promotional actions
+ */
+export const WB_DISCOUNT_CONFIG = {
+  /** WB Wallet typical cashback */
+  walletCashback: 3,
+  /** Default estimated total discount */
+  defaultEstimatedDiscount: 3,
+};
+
+/**
+ * Calculate estimated buyer price for Ozon
+ * @param sellerPrice - Price set by seller
+ * @param hasPromotion - True if product is in an active promotion
+ * @returns Estimated price buyer sees
+ */
+export function calculateOzonBuyerPrice(
+  sellerPrice: number,
+  hasPromotion = false
+): { price: number; discountPercent: number } {
+  // Base discount: Ozon Card (5% for ~40% of buyers = 2% average)
+  let discountPercent = OZON_DISCOUNT_CONFIG.averageCardImpact;
+
+  // Add typical promo discount if in promotion
+  if (hasPromotion) {
+    discountPercent += 5; // Conservative estimate
+  }
+
+  // Apply discount to seller price
+  const buyerPrice = Math.round(sellerPrice * (1 - discountPercent / 100));
+
+  return { price: buyerPrice, discountPercent };
+}
+
+/**
+ * Calculate estimated buyer price for Wildberries
+ */
+export function calculateWbBuyerPrice(
+  sellerPrice: number,
+  hasPromotion = false
+): { price: number; discountPercent: number } {
+  let discountPercent = WB_DISCOUNT_CONFIG.walletCashback;
+
+  if (hasPromotion) {
+    discountPercent += 3;
+  }
+
+  const buyerPrice = Math.round(sellerPrice * (1 - discountPercent / 100));
+
+  return { price: buyerPrice, discountPercent };
 }
 
 // ============================================
@@ -308,16 +391,23 @@ export async function fetchWbProducts(apiKey: string, limit = 100): Promise<Mark
   // Step 3: Fetch REAL stocks from Warehouse Stocks API
   const stockMap = await fetchWbStocks(apiKey, nmIds);
 
-  // Step 4: Map to unified format
-  return cards.map(card => ({
-    product_id: `wb-${card.nmID}`,
-    nm_id: card.nmID,
-    title: card.title || card.subjectName || 'Без названия',
-    image_url: card.photos?.[0]?.big || card.photos?.[0]?.c246x328 || null,
-    current_price: priceMap.get(card.nmID) || 0,
-    current_stock: stockMap.get(card.nmID) || 0,
-    marketplace: 'WB' as const,
-  }));
+  // Step 4: Map to unified format with estimated buyer price
+  return cards.map(card => {
+    const sellerPrice = priceMap.get(card.nmID) || 0;
+    const { price: buyerPrice, discountPercent } = calculateWbBuyerPrice(sellerPrice);
+
+    return {
+      product_id: `wb-${card.nmID}`,
+      nm_id: card.nmID,
+      title: card.title || card.subjectName || 'Без названия',
+      image_url: card.photos?.[0]?.big || card.photos?.[0]?.c246x328 || null,
+      current_price: sellerPrice,
+      estimated_buyer_price: buyerPrice,
+      marketplace_discount_percent: discountPercent,
+      current_stock: stockMap.get(card.nmID) || 0,
+      marketplace: 'WB' as const,
+    };
+  });
 }
 
 /**
@@ -670,7 +760,7 @@ export async function fetchOzonProducts(
   };
   const detailItems: OzonProductInfo[] = detailData.result?.items || detailData.items || [];
 
-  // Step 3: Map to unified format
+  // Step 3: Map to unified format with estimated buyer price
   return detailItems.map(item => {
     const stocks: OzonStockItem[] = item.stocks?.stocks || [];
     const totalStock = stocks.reduce((acc, s) => acc + (s.present || 0), 0);
@@ -682,6 +772,12 @@ export async function fetchOzonProducts(
       price = parseFloat(item.price || item.marketing_price || '0');
     }
 
+    const roundedPrice = Math.round(price);
+
+    // Calculate estimated buyer price (accounts for Ozon Card + typical discounts)
+    // Since Ozon removed marketing_price from API (Nov 2025), we estimate
+    const { price: buyerPrice, discountPercent } = calculateOzonBuyerPrice(roundedPrice);
+
     return {
       product_id: `ozon-${item.id}`,
       title: item.name || 'Без названия',
@@ -691,7 +787,9 @@ export async function fetchOzonProducts(
           : (item.primary_image as string[])?.[0]) ||
         item.images?.[0] ||
         null,
-      current_price: Math.round(price),
+      current_price: roundedPrice,
+      estimated_buyer_price: buyerPrice,
+      marketplace_discount_percent: discountPercent,
       current_stock: totalStock,
       marketplace: 'Ozon' as const,
     };

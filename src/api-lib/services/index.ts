@@ -97,6 +97,11 @@ export {
   getWbFbsWarehouses,
   updateOzonStockFbs,
   getOzonFbsWarehouses,
+  // Buyer price estimation (since Ozon removed marketing_price from API)
+  calculateOzonBuyerPrice,
+  calculateWbBuyerPrice,
+  OZON_DISCOUNT_CONFIG,
+  WB_DISCOUNT_CONFIG,
   type MarketplaceProduct,
   type MarketplacePriceUpdate,
   type MarketplaceSalesStats,

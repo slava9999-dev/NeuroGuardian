@@ -182,12 +182,37 @@ export function ProductCard({ product }: ProductCardProps) {
 
       {/* Price info */}
       <div className="grid grid-cols-2 gap-3 mb-3">
-        {/* Current price */}
+        {/* Current price with buyer estimate */}
         <div className="bg-stone-800/50 rounded-xl p-3">
-          <p className="text-xs text-stone-400 mb-1">Текущая цена</p>
+          <p className="text-xs text-stone-400 mb-1 flex items-center gap-1">
+            Ваша цена
+            {product.marketplaceDiscountPercent && product.marketplaceDiscountPercent > 0 && (
+              <span className="text-amber-400/70 ml-auto" title="Примерная скидка маркетплейса">
+                ↓{product.marketplaceDiscountPercent}%
+              </span>
+            )}
+          </p>
           <p className="text-lg font-bold text-white">
             {product.currentPrice.toLocaleString('ru-RU')} ₽
           </p>
+          {/* Show estimated buyer price if different */}
+          {product.estimatedBuyerPrice && product.estimatedBuyerPrice < product.currentPrice && (
+            <p className="text-xs text-stone-400 mt-0.5 flex items-center gap-1">
+              <span
+                className={`${product.marketplace === 'Ozon' ? 'text-blue-400' : 'text-purple-400'}`}
+                title={
+                  product.marketplace === 'Ozon'
+                    ? 'Примерная цена с учётом Ozon Card (−5% для 40% покупателей)'
+                    : 'Примерная цена с учётом кэшбэка WB Pay'
+                }
+              >
+                👁 ~{product.estimatedBuyerPrice.toLocaleString('ru-RU')} ₽
+              </span>
+              <span className="text-stone-500 text-[10px]">
+                {product.marketplace === 'Ozon' ? '(Ozon Card)' : '(WB Pay)'}
+              </span>
+            </p>
+          )}
         </div>
 
         {/* Min price (editable) */}

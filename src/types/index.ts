@@ -77,9 +77,14 @@ export interface Product {
   category?: string;
 
   // Pricing
-  currentPrice: number;
+  currentPrice: number; // Seller's set price
+  estimatedBuyerPrice?: number; // Price buyer sees (after marketplace discounts)
   minPrice: number; // Stop-Loss level (0 = disabled)
   originalPrice?: number; // Price before any drops
+
+  // Marketplace discounts info
+  marketplaceDiscountPercent?: number; // Total discount applied by marketplace
+  ozonCardDiscount?: boolean; // True if Ozon Card discount applies
 
   // Stock
   stock: number;
