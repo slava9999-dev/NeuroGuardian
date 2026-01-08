@@ -504,7 +504,7 @@ export async function handleBatchSetStopLoss(
  * This is used to fix prices on marketplaces after bugs
  */
 export async function handleApplyMinPrices(
-  req: VercelRequest,
+  _req: VercelRequest,
   res: VercelResponse,
   userId: number
 ): Promise<VercelResponse> {
@@ -512,9 +512,8 @@ export async function handleApplyMinPrices(
 
   try {
     // Import marketplace functions
-    const { getMarketplaceKeys, updateWbPrices, updateOzonPrices } = await import(
-      '../services/marketplace.js'
-    );
+    const { getMarketplaceKeys, updateWbPrices, updateOzonPrices } =
+      await import('../services/marketplace.js');
 
     // Get user's marketplace keys
     const keys = await getMarketplaceKeys(userId);
@@ -547,12 +546,10 @@ export async function handleApplyMinPrices(
 
     // Apply WB prices
     if (keys.wb) {
-      const wbProducts = products.filter(
-        (p) => p.marketplace === 'WB' && p.nm_id && p.min_price > 0
-      );
+      const wbProducts = products.filter(p => p.marketplace === 'WB' && p.nm_id && p.min_price > 0);
 
       if (wbProducts.length > 0) {
-        const updates = wbProducts.map((p) => ({
+        const updates = wbProducts.map(p => ({
           nmId: p.nm_id,
           price: p.min_price, // min_price is already in RUBLES
         }));
@@ -572,12 +569,10 @@ export async function handleApplyMinPrices(
 
     // Apply Ozon prices
     if (keys.ozon) {
-      const ozonProducts = products.filter(
-        (p) => p.marketplace === 'Ozon' && p.min_price > 0
-      );
+      const ozonProducts = products.filter(p => p.marketplace === 'Ozon' && p.min_price > 0);
 
       if (ozonProducts.length > 0) {
-        const updates = ozonProducts.map((p) => ({
+        const updates = ozonProducts.map(p => ({
           productId: parseInt(p.product_id.replace('ozon-', '')),
           price: p.min_price,
         }));
@@ -619,4 +614,3 @@ export async function handleApplyMinPrices(
     });
   }
 }
-
