@@ -1,6 +1,6 @@
 # 📊 Project State — NeuroGUARDIAN
 
-# Updated: 2026-01-08T16:15:00+03:00
+# Updated: 2026-01-08T22:20:00+03:00
 
 # This file tracks current progress and is updated at end of each session
 
@@ -8,8 +8,8 @@
 
 ## 🎯 Current Phase: MONETIZATION LAUNCH (Phase 11) 🟢 PRODUCTION
 
-**Last Session:** 2026-01-08 (Session 29)
-**Focus:** 🚨 CRITICAL FIX — WB Price Inflation Bug (500k RUB)
+**Last Session:** 2026-01-08 (Session 30)
+**Focus:** 🎓 PROACTIVE USER ONBOARDING — Agent UI Knowledge & Tutorial Integration
 
 **📋 Ключевые документы:**
 
@@ -20,14 +20,43 @@
 
 **🎯 СЛЕДУЮЩИЙ ШАГ:**
 
-- ✅ **CRITICAL FIX**: Исправлена ошибка с ценами на WB (500,000₽ вместо 5,000₽)
-- ✅ Цены синхронизированы в БД и на маркетплейсе
+- ✅ **PROACTIVE SUPPORT**: Агент знает весь интерфейс приложения
+- ✅ **TUTORIAL**: HelpModal интегрирован, кнопка помощи добавлена
+- ✅ **ONBOARDING**: Пошаговые инструкции API ключей в промпте
 - ⏳ Добавить колонку `cost_price` в БД для реальной экономики
 - ⏳ Включить WB мониторинг когда настроят FBS
 
 ---
 
 ## ✅ Recently Completed
+
+### Session 2026-01-08 (Session 30 - Proactive User Onboarding) 🎓
+
+**Критический аудит и улучшение проактивной поддержки:**
+
+- [x] **PLANNER PROMPT**: Добавлена секция СИНОНИМЫ (калькулятор, защита, себес, туториал)
+- [x] **ONBOARDING INSTRUCTIONS**: Пошаговые инструкции получения API ключей WB и Ozon в промпте
+- [x] **UI KNOWLEDGE**: Агент теперь знает все 5 страниц приложения и все ключевые кнопки
+- [x] **CALCULATOR TUTORIAL**: Добавлен пример ответа для калькулятора прибыли
+- [x] **PROTECTION SETUP**: Инструкция установки защиты через чат и интерфейс
+- [x] **POST-ONBOARDING**: Мини-обучение после успешного подключения магазина
+- [x] **HELP MODAL INTEGRATION**: HelpModal интегрирован в AgentPage с floating кнопкой
+- [x] **SHOW_TUTORIAL ACTION**: Добавлен action type для автоматического открытия туториала
+- [x] **SENTINEL FIX**: Исправлен тип угрозы COMPETITOR_PRICE_DROP для stop-loss
+
+**Commits (4):**
+
+- `feat(agent): comprehensive proactive support - add UI knowledge, step-by-step API key instructions, calculator guidance, tutorial integration`
+- `feat(agent): integrate HelpModal tutorial - add floating help button, handle show_tutorial action from agent`
+- `fix(sentinel): restore COMPETITOR_PRICE_DROP for stop-loss detection - aligns with threat-detector.ts`
+
+**Файлы изменены:**
+
+- `src/api-lib/agent/prompts/system-v5.ts` — полное расширение инструкций агента
+- `src/api-lib/agent/schemas-v4.ts` — добавлен action type show_tutorial
+- `src/lib/agentApi.ts` — обработка showTutorial в ответе
+- `src/pages/AgentPage.tsx` — интеграция HelpModal и floating кнопки
+- `src/api-lib/services/sentinel-service.ts` — исправление типа угрозы
 
 ### Session 2026-01-08 (Session 29 - Critical WB Price Fix) 🚨
 
