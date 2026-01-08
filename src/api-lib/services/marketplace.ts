@@ -545,8 +545,10 @@ function extractWbPrice(good: WbGoodsItem): number {
 
   // WB API v2 returns prices in KOPECKS
   // Convert to RUBLES for internal use
-  // We check > 10000 to ensure this is kopecks (100+ rubles minimum)
-  if (price > 10000) {
+  // We check > 100000 (1000 RUB) to ensure this is kopecks
+  // Example: 12000 RUB < 100000 -> No conversion (Correct)
+  // Example: 500000 kop (5000 RUB) > 100000 -> Convert / 100 (Correct)
+  if (price > 100000) {
     price = Math.round(price / 100);
     console.log(`📊 WB Price: nmId=${good.nmID}, converted ${price * 100} kopecks → ${price}₽`);
   } else if (price > 0) {
