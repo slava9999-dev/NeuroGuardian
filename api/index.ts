@@ -53,6 +53,7 @@ import {
   handleProducts,
   handleSyncProducts,
   handleBatchSetStopLoss,
+  handleApplyMinPrices,
 } from '../src/api-lib/handlers/products.js';
 
 // Payment handlers
@@ -311,6 +312,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'marketplace-accounts':
       case 'create-payment':
       case 'batch-set-stop-loss':
+      case 'apply-min-prices':
       case 'sentinel-logs': {
         const auth = await extractAnyAuthAsync(req);
         if (auth.success === false) {
@@ -326,6 +328,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           'marketplace-accounts': handleMarketplaceAccounts,
           'create-payment': handleCreatePayment,
           'batch-set-stop-loss': handleBatchSetStopLoss,
+          'apply-min-prices': handleApplyMinPrices,
           'sentinel-logs': handleSentinelLogs,
         };
         return handlers[action](req, res, auth.context.userId);

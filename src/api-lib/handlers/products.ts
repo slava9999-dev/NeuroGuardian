@@ -497,3 +497,126 @@ export async function handleBatchSetStopLoss(
     });
   }
 }
+
+/**
+ * Handle apply-min-prices action
+ * Applies min_price to WB/Ozon for all products that have min_price set
+ * This is used to fix prices on marketplaces after bugs
+ */
+export async function handleApplyMinPrices(
+  req: VercelRequest,
+  res: VercelResponse,
+  userId: number
+): Promise<VercelResponse> {
+  console.log(`🔧 Apply min_prices to marketplace for user ${userId}`);
+
+  try {
+    // Import marketplace functions
+    const { getMarketplaceKeys, updateWbPrices, updateOzonPrices } = await import(
+      '../services/marketplace.js'
+    );
+
+    // Get user's marketplace keys
+    const keys = await getMarketplaceKeys(userId);
+
+    if (!keys.wb && !keys.ozon) {
+      return res.status(400).json({ error: 'No marketplace keys configured' });
+    }
+
+    // Get products with min_price set
+    const productsRes = await sql`
+      SELECT product_id, title, nm_id, min_price, marketplace, offer_id
+      FROM products
+      WHERE user_id = ${userId}
+      AND min_price > 0
+    `;
+
+    const products = productsRes.rows;
+
+    if (products.length === 0) {
+      return res.json({
+        success: true,
+        message: 'Нет товаров с установленным min_price',
+        updated: 0,
+      });
+    }
+
+    let wbUpdated = 0;
+    let ozonUpdated = 0;
+    const errors: string[] = [];
+
+    // Apply WB prices
+    if (keys.wb) {
+      const wbProducts = products.filter(
+        (p) => p.marketplace === 'WB' && p.nm_id && p.min_price > 0
+      );
+
+      if (wbProducts.length > 0) {
+        const updates = wbProducts.map((p) => ({
+          nmId: p.nm_id,
+          price: p.min_price, // min_price is already in RUBLES
+        }));
+
+        console.log(`📡 Applying ${updates.length} WB prices:`, JSON.stringify(updates));
+
+        const result = await updateWbPrices(keys.wb, updates);
+
+        if (result.success) {
+          wbUpdated = result.count;
+          console.log(`✅ WB: Updated ${wbUpdated} prices`);
+        } else {
+          errors.push(`WB: ${result.error}`);
+        }
+      }
+    }
+
+    // Apply Ozon prices
+    if (keys.ozon) {
+      const ozonProducts = products.filter(
+        (p) => p.marketplace === 'Ozon' && p.min_price > 0
+      );
+
+      if (ozonProducts.length > 0) {
+        const updates = ozonProducts.map((p) => ({
+          productId: parseInt(p.product_id.replace('ozon-', '')),
+          price: p.min_price,
+        }));
+
+        const result = await updateOzonPrices(keys.ozon.clientId, keys.ozon.apiKey, updates);
+
+        if (result.success) {
+          ozonUpdated = result.count;
+          console.log(`✅ Ozon: Updated ${ozonUpdated} prices`);
+        } else {
+          errors.push(`Ozon: ${result.error}`);
+        }
+      }
+    }
+
+    // Update current_price in DB to min_price
+    await sql`
+      UPDATE products
+      SET current_price = min_price, updated_at = NOW()
+      WHERE user_id = ${userId}
+      AND min_price > 0
+    `;
+
+    const totalUpdated = wbUpdated + ozonUpdated;
+
+    return res.json({
+      success: errors.length === 0,
+      message: `Цены применены: WB=${wbUpdated}, Ozon=${ozonUpdated}`,
+      updated: totalUpdated,
+      wbUpdated,
+      ozonUpdated,
+      errors: errors.length > 0 ? errors : undefined,
+    });
+  } catch (error) {
+    console.error('Apply min_prices error:', error);
+    return res.status(500).json({
+      error: 'Failed to apply min_prices',
+      details: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+}
+
