@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAppStore, useChatStore, type ChatMessage } from '../stores';
 import { hapticFeedback, openExternalLink } from '../lib/telegram';
 import { agentApi, type AgentMessage, type AgentResponse } from '../lib/agentApi';
+import { HelpModal } from '../components/ui/HelpModal';
 import DOMPurify from 'dompurify';
 
 export function AgentPage() {
@@ -25,6 +26,7 @@ export function AgentPage() {
 
   const [inputValue, setInputValue] = useState('');
   const [isListening, setIsListening] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -185,6 +187,11 @@ export function AgentPage() {
         metadata: response.metadata,
       };
       addMessage(assistantMessage);
+
+      // Open tutorial modal if agent requested it
+      if (response.showTutorial) {
+        setShowTutorial(true);
+      }
 
       hapticFeedback('success');
     } catch (error) {
@@ -549,6 +556,32 @@ export function AgentPage() {
           )}
         </div>
       </div>
+
+      {/* Help/Tutorial Modal */}
+      <HelpModal isOpen={showTutorial} onClose={() => setShowTutorial(false)} />
+
+      {/* Floating Help Button */}
+      <button
+        onClick={() => {
+          hapticFeedback('light');
+          setShowTutorial(true);
+        }}
+        className="fixed bottom-28 right-4 z-40 w-12 h-12 rounded-full bg-violet-600 text-white shadow-lg flex items-center justify-center hover:bg-violet-500 transition-colors"
+        title="Помощь"
+      >
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <circle cx="12" cy="12" r="10" />
+          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+      </button>
     </div>
   );
 }

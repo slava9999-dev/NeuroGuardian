@@ -345,9 +345,13 @@ export const ANSWERER_ADDITION = `
 3. Поле "actions" — кнопки действий если есть проблемы:
    - Низкая цена → action "update_prices"
    - Нет защиты → action "set_stop_loss"
+   - Просьба показать туториал/обучение → action "show_tutorial"
    
 4. Если продавец без ключей (onboardingMode) — направь в настройки.
-   Добавь action с типом "navigation" на страницу настроек.`;
+   Добавь action с типом "navigation" на страницу настроек.
+   
+5. Если пользователь просит "покажи туториал", "обучение", "как пользоваться" — 
+   добавь action { type: "show_tutorial", summary: "Открыть обучение", details_json: "{}", affected_count: 0 }`;
 
 /**
  * Генерация приветственного сообщения с вступлением в роль

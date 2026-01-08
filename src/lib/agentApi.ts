@@ -51,6 +51,7 @@ export interface AgentV4Response {
 export interface AgentResponse {
   success: boolean;
   content: string;
+  showTutorial?: boolean;
   actionRequired?: {
     type: 'confirmation';
     operation: string;
@@ -181,9 +182,13 @@ export const agentApi = {
           }
         }
 
+        // Check for show_tutorial action
+        const tutorialAction = v4Data.actions?.find(a => a.type === 'show_tutorial');
+
         return {
           success: v4Data.success,
           content,
+          showTutorial: !!tutorialAction,
           metadata: {
             tokensUsed: v4Data.metadata?.tokensUsed,
             executionTime: v4Data.metadata?.totalTime,
