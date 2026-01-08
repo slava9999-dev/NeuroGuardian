@@ -166,6 +166,19 @@ export async function handleRunMigration(
       console.log('✅ Migration 008 complete');
     }
 
+    if (migrationId === '020' || migrationId === 'all') {
+      // Migration 020: Buyer price estimation columns (Jan 2026)
+      console.log('🔄 Applying migration 020: buyer price estimation...');
+
+      await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS estimated_buyer_price INTEGER`;
+      results.push('products.estimated_buyer_price added');
+
+      await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS marketplace_discount_percent DECIMAL(5,2)`;
+      results.push('products.marketplace_discount_percent added');
+
+      console.log('✅ Migration 020 complete');
+    }
+
     if (migrationId === '014' || migrationId === 'all') {
       // Migration 014: Price Rules
       console.log('🔄 Applying migration 014: price_rules table...');
