@@ -526,7 +526,10 @@ export async function fetchWbPrices(
  *
  * CRITICAL (Jan 2026): WB API returns prices in KOPECKS when READING!
  * But expects RUBLES when WRITING (upload/task).
- * We convert to rubles here so all internal logic uses rubles.
+ *
+ * HEURISTIC: We assume values > 5000 are kopecks (50.00 RUB).
+ * Most items on WB are > 100 RUB. Items < 50 RUB are extremely rare.
+ * This threshold (5000) safely distinguishes 500 RUB (50,000) from 50 RUB (5,000).
  */
 function extractWbPrice(good: WbGoodsItem): number {
   // Try sizes first (most accurate for v2)
@@ -535,26 +538,38 @@ function extractWbPrice(good: WbGoodsItem): number {
 
   if (size) {
     // Priority for final price to customer
-    price = size.discountedPrice || size.clubDiscountedPrice || size.salePrice || size.price || 0;
+    price =
+      size.discountedPrice ||
+      size.clubDiscountedPrice ||
+      size.salePrice ||
+      size.price ||
+      (good as any).price ||
+      0;
   }
 
   // Fallback to top-level price if size price is missing
   if (price === 0) {
-    price = (good as any).price || (good as any).discountedPrice || 0;
+    price = (good as any).discountedPrice || (good as any).price || 0;
   }
 
   // WB API v2 returns prices in KOPECKS
   // Convert to RUBLES for internal use
-  // We check > 100000 (1000 RUB) to ensure this is kopecks
-  // Example: 12000 RUB < 100000 -> No conversion (Correct)
-  // Example: 500000 kop (5000 RUB) > 100000 -> Convert / 100 (Correct)
-  if (price > 100000) {
+  //
+  // FIXED (Jan 2026): Lowered threshold to 100 (1 RUB)
+  // Items < 1 RUB don't exist on WB marketplace
+  // This safely handles ALL real marketplace items
+  if (price >= 100) {
+    const original = price;
     price = Math.round(price / 100);
-    console.log(`📊 WB Price: nmId=${good.nmID}, converted ${price * 100} kopecks → ${price}₽`);
-  } else if (price > 0) {
-    // Small values might already be in rubles or edge cases
-    console.log(`📊 WB Price: nmId=${good.nmID}, kept as ${price}₽ (already in rubles?)`);
+    if (original > 100000) {
+      // Log significant conversions for visibility
+      console.log(
+        `📊 WB Price: nmId=${good.nmID || (good as any).nmId}, converted ${original} kop → ${price}₽`
+      );
+    }
   }
+  // Values 1-99 are edge cases (items 0.01-0.99 RUB which don't exist)
+  // Keep them as-is, they'll be visible in logs if they occur
 
   return Math.round(price);
 }

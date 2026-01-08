@@ -16,6 +16,9 @@ import {
   fetchWbStocks,
   fetchOzonStocksV3,
   getSystemEvents,
+  updateProductCostPrice,
+  updateProductCategory,
+  updateProductMonitoring,
 } from '../services/index.js';
 import { getUserReviews } from '../services/reviews-service.js';
 
@@ -41,6 +44,7 @@ import {
   BulkProtectProductsArgsSchema,
   GetSystemLogsArgsSchema,
   GetLowMarginProductsArgsSchema,
+  UpdateProductSettingsArgsSchema,
 } from './validators.js';
 import type { DBProduct } from '../lib/types.js';
 import type { WbStatisticsSale } from '../lib/marketplace-types.js';
@@ -1259,7 +1263,7 @@ export async function executeUpdatePrices(userId: number, rawArgs: unknown): Pro
     const argsWithAccount = args as {
       account_id?: number;
       marketplace?: string;
-      products?: any[];
+      products?: Array<{ product_id: string; new_price: number }>;
       change_value?: number;
     };
     const products = await getProductsByUserId(userId, argsWithAccount.account_id);
@@ -1340,7 +1344,11 @@ export async function executeUpdateStocks(userId: number, rawArgs: unknown): Pro
   const args = validation.data;
 
   try {
-    const argsWithAccount = args as { account_id?: number; marketplace?: string; products: any[] };
+    const argsWithAccount = args as {
+      account_id?: number;
+      marketplace?: string;
+      products: Array<{ product_id: string; new_stock: number }>;
+    };
     const products = await getProductsByUserId(userId, argsWithAccount.account_id);
     const stockUpdates: Array<{
       product_id: string;
@@ -1378,6 +1386,66 @@ export async function executeUpdateStocks(userId: number, rawArgs: unknown): Pro
         stock_updates: stockUpdates,
         marketplace: args.marketplace,
         account_id: argsWithAccount.account_id,
+      },
+    };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
+ * UPDATE_PRODUCT_SETTINGS — Update cost_price, category, or min_price
+ * CRITICAL: This allows the agent to fix missing cost data that Sentinel relies on.
+ */
+export async function executeUpdateProductSettings(
+  userId: number,
+  rawArgs: unknown
+): Promise<ToolResult> {
+  const validation = validateToolArgs(UpdateProductSettingsArgsSchema, rawArgs);
+  if (isValidationError(validation)) return { success: false, error: validation.error };
+  const args = validation.data;
+
+  try {
+    const products = await getProductsByUserId(userId);
+    const filtered = filterProducts(products, undefined, args.product_id);
+
+    if (filtered.length === 0) {
+      return { success: false, error: `Товар "${args.product_id}" не найден` };
+    }
+
+    const p = filtered[0];
+    const changes: string[] = [];
+
+    if (args.cost_price !== undefined) {
+      await updateProductCostPrice(userId, p.product_id, args.cost_price);
+      changes.push(`себестоимость: ${args.cost_price}₽`);
+    }
+
+    if (args.category !== undefined) {
+      await updateProductCategory(userId, p.product_id, args.category);
+      changes.push(`категория: ${args.category}`);
+    }
+
+    if (args.min_price !== undefined || args.is_monitored !== undefined) {
+      const newMonitored =
+        args.is_monitored !== undefined ? args.is_monitored : (p.is_monitored ?? true);
+      const newMin = args.min_price !== undefined ? args.min_price : p.min_price;
+      await updateProductMonitoring(userId, p.product_id, newMonitored, newMin);
+      if (args.min_price !== undefined) changes.push(`мин. цена: ${args.min_price}₽`);
+      if (args.is_monitored !== undefined)
+        changes.push(`мониторинг: ${newMonitored ? 'ВКЛ' : 'ВЫКЛ'}`);
+    }
+
+    if (changes.length === 0) {
+      return { success: false, error: 'Нет данных для обновления' };
+    }
+
+    return {
+      success: true,
+      data: {
+        message: `Обновлены настройки для "${p.title}": ${changes.join(', ')}`,
+        product_id: p.product_id,
+        changes,
       },
     };
   } catch (error) {

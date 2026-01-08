@@ -103,6 +103,17 @@ export function scanProductThreats(
         data: { ...economics, warningDetails: warning },
       });
     }
+  } else if (economics.profit < 0) {
+    // NEW (Jan 2026): Alert even on ESTIMATED costs if it's a loss
+    // But mark it as 'high' instead of 'critical' to reflect estimation uncertainty
+    threats.push({
+      type: ThreatType.MARGIN_BELOW_ZERO,
+      severity: 'high',
+      productId: product.product_id,
+      nmId: product.nm_id,
+      message: `Потенциальный убыток (${economics.profit}₽) — проверьте себестоимость!`,
+      data: economics,
+    });
   }
 
   // Skip low-margin warnings on ESTIMATED costs - they're just noise

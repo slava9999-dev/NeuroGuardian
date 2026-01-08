@@ -36,6 +36,7 @@ import {
   executeGetCompetitorPrice,
   executeGetReviews,
   executeGetLowMarginProducts,
+  executeUpdateProductSettings,
 } from './tool-executors.js';
 // ============================================
 // LLM PROVIDER CONFIG
@@ -196,7 +197,9 @@ export async function callLLMWithFallback(
           const path = await import('path');
           const logMsg = `\n[${new Date().toISOString()}] ${provider.name} (${body.model})\nRequest: ${JSON.stringify(messages.slice(-1))}\nResponse: ${content}\n---\n`;
           fs.appendFileSync(path.join(process.cwd(), 'llm_debug.log'), logMsg);
-        } catch (e) {}
+        } catch {
+          // Ignore debug log write errors
+        }
 
         if (!content) {
           throw new Error('Empty response from LLM');
@@ -643,6 +646,8 @@ async function executeTool(
         return await executeGetReviews(userId, args);
       case 'get_low_margin_products':
         return await executeGetLowMarginProducts(userId, args);
+      case 'update_product_settings':
+        return await executeUpdateProductSettings(userId, args);
       default:
         return { success: false, error: `Unknown tool: ${toolName}` };
     }

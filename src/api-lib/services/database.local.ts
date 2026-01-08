@@ -7,9 +7,12 @@ import pkg from 'pg';
 const { Pool } = pkg;
 
 // Use POSTGRES_URL from .env
+const connectionString = process.env.POSTGRES_URL?.replace(/\r/g, '').trim();
+const isLocal = connectionString?.includes('localhost') || connectionString?.includes('127.0.0.1');
+
 const pool = new Pool({
-  connectionString: process.env.POSTGRES_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  connectionString,
+  ssl: isLocal ? false : { rejectUnauthorized: false },
   max: 20, // Support more concurrent requests
   idleTimeoutMillis: 30000, // Close idle clients after 30s
   connectionTimeoutMillis: 5000, // Fail fast if pool is full
@@ -46,11 +49,13 @@ export const sql = async (
     try {
       client = await pool.connect();
       return await client.query(text, values);
-    } catch (error: any) {
+    } catch (error: unknown) {
       retries--;
       if (retries === 0) throw error;
 
-      const isTransient = error.code === 'ECONNRESET' || error.message?.includes('fetch failed');
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const isTransient =
+        errorMessage.includes('ECONNRESET') || errorMessage.includes('fetch failed');
       if (isTransient) {
         console.warn(`⚠️ DB Transient error, retrying... (${retries} left)`);
         await new Promise(resolve => setTimeout(resolve, 500));

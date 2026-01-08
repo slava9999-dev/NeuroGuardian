@@ -1,47 +1,96 @@
-import * as dotenv from 'dotenv';
-dotenv.config({ path: '.env.production' });
-import { sql } from '@vercel/postgres';
+import pg from 'pg';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
 
-async function migrate() {
-  console.log('🏗️ Запуск миграции базы данных...');
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const rootPath = path.resolve(__dirname, '..');
+
+function loadEnvFile(filePath: string): void {
+  if (!fs.existsSync(filePath)) return;
+  const content = fs.readFileSync(filePath, 'utf8');
+  content.split('\n').forEach(line => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) return;
+    const match = trimmed.match(/^([^=]+)=(.*)$/);
+    if (match) {
+      const key = match[1].trim();
+      let value = match[2].trim();
+      value = value.replace(/^["']|["']$/g, '');
+      process.env[key] = value;
+    }
+  });
+}
+
+// Load environments
+loadEnvFile(path.join(rootPath, '.env.production'));
+loadEnvFile(path.join(rootPath, '.env.vercel'));
+loadEnvFile(path.join(rootPath, '.env.local'));
+loadEnvFile(path.join(rootPath, '.env'));
+
+const url = (
+  process.env.POSTGRES_URL_NON_POOLING ||
+  process.env.POSTGRES_URL ||
+  process.env.DATABASE_URL ||
+  ''
+)
+  .replace(/\r/g, '')
+  .trim();
+
+async function main() {
+  console.log('🚀 Direct Migration Start...');
+  if (!url) {
+    console.error('❌ No DB URL found');
+    process.exit(1);
+  }
+
+  const client = new pg.Client({
+    connectionString:
+      url.includes('neon.tech') && !url.includes('sslmode')
+        ? `${url}${url.includes('?') ? '&' : '?'}sslmode=require`
+        : url,
+    ssl: { rejectUnauthorized: false },
+  });
 
   try {
-    // 1. Добавляем колонку details в sentinel_logs
-    console.log('- Проверка таблицы sentinel_logs...');
-    await sql`
-      ALTER TABLE sentinel_logs 
-      ADD COLUMN IF NOT EXISTS details JSONB DEFAULT '{}';
-    `;
-    console.log('✅ Колонка details добавлена (или уже была).');
+    await client.connect();
+    console.log('✅ Connected. Applying schema changes...');
 
-    // 2. Создаем таблицу price_rules (если её нет)
-    console.log('- Проверка таблицы price_rules...');
-    await sql`
+    await client.query(`
+      ALTER TABLE products 
+      ADD COLUMN IF NOT EXISTS cost_price INTEGER DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS category TEXT,
+      ADD COLUMN IF NOT EXISTS estimated_buyer_price INTEGER DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS marketplace_discount_percent INTEGER DEFAULT 0
+    `);
+
+    console.log('✅ Columns added successfully.');
+
+    // Also ensure the price_rules table exists as it was mentioned in previous sessions as missing
+    await client.query(`
       CREATE TABLE IF NOT EXISTS price_rules (
         id SERIAL PRIMARY KEY,
-        user_id BIGINT NOT NULL,
-        product_id CHARACTER VARYING(255) NOT NULL,
-        min_price INTEGER NOT NULL,
-        max_price INTEGER NOT NULL,
-        target_margin DECIMAL(5,2) DEFAULT 10.00,
+        user_id INTEGER NOT NULL,
+        product_id TEXT NOT NULL,
+        min_price INTEGER DEFAULT 0,
+        max_price INTEGER DEFAULT 0,
+        auto_adjust BOOLEAN DEFAULT false,
         competitor_tracking BOOLEAN DEFAULT false,
         competitor_nmids TEXT,
-        price_match_strategy CHARACTER VARYING(50) DEFAULT 'none',
-        undercut_amount DECIMAL(10,2) DEFAULT 0,
-        undercut_type CHARACTER VARYING(20) DEFAULT 'absolute',
-        auto_adjust BOOLEAN DEFAULT false,
-        active BOOLEAN DEFAULT true,
-        created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
-      );
-    `;
-    console.log('✅ Таблица price_rules готова.');
-
-    console.log('\n✨ Миграция успешно завершена!');
-  } catch (err) {
-    console.error('\n❌ Ошибка при миграции:', err);
+        adjustment_type TEXT DEFAULT 'percent',
+        adjustment_value NUMERIC(10,2) DEFAULT 0,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, product_id)
+      )
+    `);
+    console.log('✅ Table price_rules verified.');
+  } catch (error) {
+    console.error('❌ Migration failed:', error);
     process.exit(1);
+  } finally {
+    await client.end();
   }
 }
 
-migrate().catch(console.error);
+main();

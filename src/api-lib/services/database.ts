@@ -339,9 +339,21 @@ export async function batchUpdateCostPrices(
   userId: number,
   updates: Array<{ productId: string; costPrice: number }>
 ): Promise<void> {
-  for (const u of updates) {
-    await sql`UPDATE products SET cost_price = ${u.costPrice}, updated_at = NOW() WHERE user_id = ${userId} AND product_id = ${u.productId}`;
+  for (const update of updates) {
+    await updateProductCostPrice(userId, update.productId, update.costPrice);
   }
+}
+
+export async function updateProductCategory(
+  userId: number,
+  productId: string,
+  category: string
+): Promise<void> {
+  await sql`
+    UPDATE products 
+    SET category = ${category}, updated_at = NOW() 
+    WHERE user_id = ${userId} AND product_id = ${productId}
+  `;
 }
 
 export async function updateProductPrice(
@@ -476,19 +488,36 @@ export async function batchConfirmPendingByTaskId(userId: number, taskId: string
 }
 
 export async function migrateAddPendingColumns(): Promise<void> {
-  // Already in initializeDatabase but for safe migration
+  // Add columns for pending price tracking
   await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS pending_price INTEGER`;
   await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS pending_task_id BIGINT`;
   await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS pending_status VARCHAR(50)`;
   await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS pending_since TIMESTAMP`;
 
-  // Ensure Unit Economics columns exist
-  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS cost_price INTEGER`;
+  // Add columns for Unit Economics and Marketplace stats
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS cost_price INTEGER DEFAULT 0`;
   await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS category VARCHAR(255)`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS estimated_buyer_price INTEGER DEFAULT 0`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS marketplace_discount_percent INTEGER DEFAULT 0`;
 
-  // Buyer price estimation columns (Jan 2026)
-  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS estimated_buyer_price INTEGER`;
-  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS marketplace_discount_percent DECIMAL(5,2)`;
+  // Ensure price_rules table exists for Smart Repricing
+  await sql`
+    CREATE TABLE IF NOT EXISTS price_rules (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      product_id TEXT NOT NULL,
+      min_price INTEGER DEFAULT 0,
+      max_price INTEGER DEFAULT 0,
+      auto_adjust BOOLEAN DEFAULT false,
+      competitor_tracking BOOLEAN DEFAULT false,
+      competitor_nmids TEXT,
+      adjustment_type TEXT DEFAULT 'percent',
+      adjustment_value NUMERIC(10,2) DEFAULT 0,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, product_id)
+    )
+  `;
 }
 
 export async function clearChatHistory(userId: number): Promise<void> {

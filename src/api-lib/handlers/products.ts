@@ -17,10 +17,7 @@ import {
   getUserById,
   getProductsByUserId,
   updateProductMinPrice,
-  fetchWbStocks,
-  saveProducts,
-  calculateOzonBuyerPrice,
-  calculateWbBuyerPrice,
+  type MarketplaceProduct,
 } from '../services/index.js';
 
 // fetchWithRetry moved to api-lib/lib/index.js
@@ -197,214 +194,44 @@ async function performSync(
   productLimit: number,
   accountId?: number
 ): Promise<{ savedCount: number; limitReached: boolean }> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let products: any[] = [];
+  // Import unified services
+  const { fetchWbProducts, fetchOzonProducts, saveProducts } = await import('../services/index.js');
 
-  if (mp === 'Ozon') {
-    // Ozon API v3 integration
-    const clientId = apiKey.split(':')[0];
-    const apiToken = apiKey.includes(':') ? apiKey.split(':')[1] : apiKey;
+  let products: MarketplaceProduct[] = [];
 
-    const listResponse = await fetch('https://api-seller.ozon.ru/v3/product/list', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Client-Id': clientId,
-        'Api-Key': apiToken,
-      },
-      body: JSON.stringify({ filter: {}, last_id: '', limit: 100 }),
-    });
-
-    if (!listResponse.ok) {
-      const errorText = await listResponse.text();
-      console.error(
-        `Ozon API error for account ${accountId || 'legacy'}: ${listResponse.status}`,
-        errorText
-      );
-      return { savedCount: 0, limitReached: false };
+  try {
+    if (mp === 'Ozon') {
+      const [clientId, apiToken] = apiKey.includes(':') ? apiKey.split(':') : [apiKey, apiKey];
+      products = await fetchOzonProducts(clientId, apiToken, 100);
+    } else if (mp === 'WB') {
+      products = await fetchWbProducts(apiKey, 100);
     }
 
-    const listData = (await listResponse.json()) as any;
-    const items = listData.result?.items || [];
+    // Assign account_id and filter by limit if needed
+    const productsToSave = products.map(p => ({
+      ...p,
+      account_id: accountId,
+    }));
 
-    if (items.length > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const productIds = items.map((item: any) => item.product_id);
-      const detailResponse = await fetch('https://api-seller.ozon.ru/v3/product/info/list', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Client-Id': clientId,
-          'Api-Key': apiToken,
-        },
-        body: JSON.stringify({ product_id: productIds }),
-      });
+    // Handle subscription limits
+    const limitedProducts = productsToSave.slice(0, productLimit);
+    const limitReached = productsToSave.length > productLimit;
 
-      if (detailResponse.ok) {
-        const detailData = (await detailResponse.json()) as any;
-        const detailItems = detailData.result?.items || detailData.items || [];
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        products = detailItems.map((item: any) => {
-          const totalStock =
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            item.stocks?.stocks?.reduce((acc: number, s: any) => acc + (s.present || 0), 0) || 0;
-          let price = 0;
-          if (typeof item.price === 'object' && item.price !== null) {
-            price = parseFloat(item.price.marketing_price || item.price.price || '0');
-          } else {
-            price = parseFloat(item.price || item.marketing_price || '0');
-          }
-
-          const roundedPrice = Math.round(price);
-          // Calculate estimated buyer price (accounts for Ozon Card + typical discounts)
-          const { price: buyerPrice, discountPercent } = calculateOzonBuyerPrice(roundedPrice);
-
-          return {
-            product_id: `ozon-${item.id}`,
-            title: item.name || 'Без названия',
-            image_url:
-              (typeof item.primary_image === 'string'
-                ? item.primary_image
-                : item.primary_image?.[0]) ||
-              item.images?.[0] ||
-              null,
-            current_price: roundedPrice,
-            estimated_buyer_price: buyerPrice,
-            marketplace_discount_percent: discountPercent,
-            current_stock: totalStock,
-            marketplace: 'Ozon',
-            offer_id: item.offer_id || '', // CRITICAL: Save offer_id for price updates
-            account_id: accountId,
-          };
-        });
-      }
-    }
-  } else if (mp === 'WB') {
-    // WB Content API v2
-    const wbResponse = await fetch('https://content-api.wildberries.ru/content/v2/get/cards/list', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: apiKey,
-      },
-      body: JSON.stringify({ settings: { cursor: { limit: 100 }, filter: { withPhoto: -1 } } }),
-    });
-
-    if (!wbResponse.ok) {
-      const errorBody = await wbResponse.text();
-      console.error(`❌ WB Content API error: ${wbResponse.status}`, errorBody);
-      return { savedCount: 0, limitReached: false };
+    if (limitedProducts.length > 0) {
+      await saveProducts(userId, limitedProducts);
     }
 
-    const wbData = (await wbResponse.json()) as any;
-    const cards = wbData.cards || [];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const nmIds = cards.map((card: any) => card.nmID);
-
-    // Fetch REAL prices from WB Prices API
-    const priceMap: Map<number, number> = new Map();
-    if (nmIds.length > 0) {
-      try {
-        // Based on marketplace.ts investigation: GET is correct.
-        const url = new URL('https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter');
-        url.searchParams.set('limit', '1000');
-        url.searchParams.set('offset', '0');
-
-        const pricesResponse = await fetch(url.toString(), {
-          method: 'GET',
-          headers: { Authorization: apiKey },
-        });
-
-        if (pricesResponse.ok) {
-          const pricesData = (await pricesResponse.json()) as any;
-          const goods = pricesData.data?.listGoods || [];
-
-          for (const good of goods) {
-            const size = good.sizes?.[0];
-            let price = 0;
-
-            if (size) {
-              // Priority: discountedPrice > clubDiscountedPrice > salePrice > price
-              price =
-                size.discountedPrice ||
-                size.clubDiscountedPrice ||
-                size.salePrice ||
-                size.price ||
-                good.price ||
-                0;
-
-              if (price > 100000) {
-                price = Math.round(price / 100);
-              }
-            }
-
-            if (price > 0) {
-              priceMap.set(good.nmID, Math.round(price));
-            }
-          }
-        }
-      } catch (_e) {
-        console.warn('Failed to fetch WB prices during sync:', _e);
-      }
-    }
-
-    // Fetch REAL stocks from Warehouse Stocks API
-    let stockMap = new Map<number, number>();
-    if (nmIds.length > 0) {
-      try {
-        stockMap = await fetchWbStocks(apiKey, nmIds);
-      } catch (e) {
-        console.warn('Failed to fetch WB stocks during sync:', e);
-      }
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    products = cards.map((card: any) => {
-      let price = priceMap.get(card.nmID) || 0;
-
-      // Content API fallback
-      if (price === 0 && card.sizes?.length > 0) {
-        const sizePrice = card.sizes[0]?.price || card.sizes[0]?.discountedPrice || 0;
-        if (sizePrice > 0) {
-          price = sizePrice > 100000 ? Math.round(sizePrice / 100) : sizePrice;
-        }
-      }
-
-      // Calculate estimated buyer price (accounts for WB Pay cashback)
-      const { price: buyerPrice, discountPercent } = calculateWbBuyerPrice(price);
-
-      return {
-        product_id: `wb-${card.nmID}`,
-        nm_id: card.nmID,
-        title: card.title || card.subjectName || 'Без названия',
-        image_url: card.photos?.[0]?.big || card.photos?.[0]?.c246x328 || null,
-        current_price: price,
-        estimated_buyer_price: buyerPrice,
-        marketplace_discount_percent: discountPercent,
-        current_stock: stockMap.get(card.nmID) || 0,
-        marketplace: 'WB',
-        account_id: accountId,
-      };
-    });
+    return {
+      savedCount: limitedProducts.length,
+      limitReached,
+    };
+  } catch (error) {
+    console.error(
+      `❌ [performSync] Error syncing ${mp} for account ${accountId || 'legacy'}:`,
+      error
+    );
+    return { savedCount: 0, limitReached: false };
   }
-
-  // Check limit across total products?
-  // The simplified version here just slices current batch.
-  // Ideally we should check total products in DB + new ones.
-  // productLimit is usually around 50-100 or 1000.
-  // For now, let's just limit the batch.
-
-  // NOTE: saveProducts does ON CONFLICT UPDATE, so existing products don't increase count towards limit if we were counting strict inserts.
-  // But 'limit' usually refers to max *active* products.
-  // Let's assume we proceed.
-
-  await saveProducts(userId, products);
-
-  return {
-    savedCount: products.length,
-    limitReached: products.length > productLimit,
-  };
 }
 
 /**

@@ -32,6 +32,7 @@ export const ToolNameEnum = z.enum([
   'get_system_logs',
   'get_reviews',
   'get_low_margin_products',
+  'update_product_settings',
 ]);
 
 export type ToolName = z.infer<typeof ToolNameEnum>;
@@ -363,6 +364,7 @@ export const PLAN_JSON_SCHEMA = {
                 'get_system_logs',
                 'get_reviews',
                 'get_low_margin_products',
+                'update_product_settings',
               ],
             },
             args: {

@@ -148,6 +148,14 @@ export const UpdateStocksArgsSchema = z.object({
   account_id: z.number().optional(),
 });
 
+export const UpdateProductSettingsArgsSchema = z.object({
+  product_id: z.string().min(1, 'Product ID is required'),
+  cost_price: z.number().int().min(0).optional(),
+  category: z.string().optional(),
+  min_price: z.number().int().min(0).optional(),
+  is_monitored: z.boolean().optional(),
+});
+
 // === CONFIRMATION DETAILS SCHEMAS (for handleConfirmation) ===
 
 /** Schema for validated price change item */
