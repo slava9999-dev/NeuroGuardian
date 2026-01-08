@@ -508,16 +508,26 @@ export async function migrateAddPendingColumns(): Promise<void> {
       product_id TEXT NOT NULL,
       min_price INTEGER DEFAULT 0,
       max_price INTEGER DEFAULT 0,
+      target_margin NUMERIC(5,2) DEFAULT 15,
       auto_adjust BOOLEAN DEFAULT false,
       competitor_tracking BOOLEAN DEFAULT false,
       competitor_nmids TEXT,
-      adjustment_type TEXT DEFAULT 'percent',
-      adjustment_value NUMERIC(10,2) DEFAULT 0,
+      price_match_strategy TEXT DEFAULT 'none',
+      undercut_amount NUMERIC(10,2) DEFAULT 5,
+      undercut_type TEXT DEFAULT 'percent',
+      active BOOLEAN DEFAULT true,
       created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
       UNIQUE(user_id, product_id)
     )
   `;
+
+  // Add missing columns if table already exists
+  await sql`ALTER TABLE price_rules ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT true`;
+  await sql`ALTER TABLE price_rules ADD COLUMN IF NOT EXISTS target_margin NUMERIC(5,2) DEFAULT 15`;
+  await sql`ALTER TABLE price_rules ADD COLUMN IF NOT EXISTS price_match_strategy TEXT DEFAULT 'none'`;
+  await sql`ALTER TABLE price_rules ADD COLUMN IF NOT EXISTS undercut_amount NUMERIC(10,2) DEFAULT 5`;
+  await sql`ALTER TABLE price_rules ADD COLUMN IF NOT EXISTS undercut_type TEXT DEFAULT 'percent'`;
 }
 
 export async function clearChatHistory(userId: number): Promise<void> {

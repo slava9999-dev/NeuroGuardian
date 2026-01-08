@@ -527,9 +527,8 @@ export async function fetchWbPrices(
  * CRITICAL (Jan 2026): WB API returns prices in KOPECKS when READING!
  * But expects RUBLES when WRITING (upload/task).
  *
- * HEURISTIC: We assume values > 5000 are kopecks (50.00 RUB).
- * Most items on WB are > 100 RUB. Items < 50 RUB are extremely rare.
- * This threshold (5000) safely distinguishes 500 RUB (50,000) from 50 RUB (5,000).
+ * FIXED: Threshold lowered to 100 (1 RUB) - items <1 RUB don't exist on WB.
+ * This safely handles ALL real marketplace items.
  */
 function extractWbPrice(good: WbGoodsItem): number {
   // Try sizes first (most accurate for v2)

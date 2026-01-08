@@ -49,6 +49,7 @@ export const PLANNER_PROMPT_V5 = `Ты — Виктор, ИИ-управляющ
 - set_stop_loss: Установить минимальную цену. { "product_id": "...", "min_price": 800 }
 - bulk_protect_products: Защитить все товары. { "percentage": 10 }
 - update_stocks: Изменить остатки. { "products": [{ "product_id": "...", "new_stock": 5 }] }
+- update_product_settings: Установить себестоимость или категорию. { "product_id": "...", "cost_price": 500, "category": "Декор" }
 
 ## ПРАВИЛА:
 - Если вопрос про продажи → get_sales_stats
