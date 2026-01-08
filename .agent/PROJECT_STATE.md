@@ -1,6 +1,6 @@
 # 📊 Project State — NeuroGUARDIAN
 
-# Updated: 2026-01-07T23:15:00+03:00
+# Updated: 2026-01-08T16:15:00+03:00
 
 # This file tracks current progress and is updated at end of each session
 
@@ -8,8 +8,8 @@
 
 ## 🎯 Current Phase: MONETIZATION LAUNCH (Phase 11) 🟢 PRODUCTION
 
-**Last Session:** 2026-01-06 (Session 27)
-**Focus:** 🕵️ Competitor Intelligence — Ozon Fallback & Link Precision
+**Last Session:** 2026-01-08 (Session 29)
+**Focus:** 🚨 CRITICAL FIX — WB Price Inflation Bug (500k RUB)
 
 **📋 Ключевые документы:**
 
@@ -20,15 +20,37 @@
 
 **🎯 СЛЕДУЮЩИЙ ШАГ:**
 
-- ✅ Sentinel полностью функционален (получение цен, защита, уведомления)
-- ✅ Персональные отчёты для каждого пользователя
-- ✅ Улучшенные форматы уведомлений
+- ✅ **CRITICAL FIX**: Исправлена ошибка с ценами на WB (500,000₽ вместо 5,000₽)
+- ✅ Цены синхронизированы в БД и на маркетплейсе
 - ⏳ Добавить колонку `cost_price` в БД для реальной экономики
 - ⏳ Включить WB мониторинг когда настроят FBS
 
 ---
 
 ## ✅ Recently Completed
+
+### Session 2026-01-08 (Session 29 - Critical WB Price Fix) 🚨
+
+**Исправление критической ошибки с ценами WB (500,000 руб):**
+
+- [x] **ROOT CAUSE**: WB API `list/goods/filter` возвращает цены в **КОПЕЙКАХ**, но `upload/task` (запись) ожидает **РУБЛИ**.
+- [x] **FIX**: Внедрен "Guard Rail" в `extractWbPrice`: конвертация делением на 100 происходит ТОЛЬКО если цена > 100,000 (1000 руб). Это защищает как дешевые, так и дорогие товары (до 100к руб).
+- [x] **RECOVERY**: Созданы скрипты для ручного исправления цен на WB (`apply-prices-to-wb.ts`). Цены восстановлены на проде.
+- [x] **FEATURE**: Добавлен endpoint `/api?action=apply-min-prices` для принудительного применения стоп-лоссов на маркетплейсы.
+- [x] **CLEANUP**: Полная очистка временных диагностических скриптов.
+
+**Commits:**
+
+- `fix(critical): raise WB kopecks threshold to 100,000`
+- `fix(chore): resolve TS unused variable error`
+- `feat: add apply-min-prices endpoint to fix WB prices`
+- `chore: cleanup temporary WB fix scripts`
+
+**Файлы изменены:**
+
+- `src/api-lib/services/marketplace.ts` — исправлена логика конвертации цен WB
+- `src/api-lib/handlers/products.ts` — добавлен endpoint `apply-min-prices`
+- `api/index.ts` — роутинг нового endpoint
 
 ### Session 2026-01-07 (Session 28 - Competitor Core & Links Fix) 🕵️
 
