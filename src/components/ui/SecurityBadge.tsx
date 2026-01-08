@@ -17,7 +17,15 @@ export function SecurityBadge({ compact = false }: { compact?: boolean }) {
         className="flex items-center gap-2 px-3 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl cursor-pointer"
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-emerald-400">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          className="text-emerald-400"
+        >
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
           <path d="m9 12 2 2 4-4" />
         </svg>
@@ -34,18 +42,26 @@ export function SecurityBadge({ compact = false }: { compact?: boolean }) {
     >
       <div className="flex items-start gap-4">
         {/* Shield Icon */}
-        <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-emerald-500/20 flex items-center justify-center">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-emerald-400">
+        <div className="shrink-0 w-14 h-14 rounded-2xl bg-emerald-500/20 flex items-center justify-center">
+          <svg
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            className="text-emerald-400"
+          >
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             <path d="m9 12 2 2 4-4" />
           </svg>
         </div>
-        
+
         <div className="flex-1">
           <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
             🔒 Ваши данные защищены
           </h3>
-          
+
           <div className="space-y-3">
             {/* Security features */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -147,7 +163,10 @@ export function SecurityBadge({ compact = false }: { compact?: boolean }) {
                 <div className="text-center pt-2">
                   <p className="text-stone-500 text-xs">
                     Хотите удалить все свои данные? Напишите нам:{' '}
-                    <a href="https://t.me/Vyacheslav_Neuro" className="text-amber-400 hover:text-amber-300">
+                    <a
+                      href="https://t.me/Vyacheslav_Neuro"
+                      className="text-amber-400 hover:text-amber-300"
+                    >
                       @Vyacheslav_Neuro
                     </a>
                   </p>

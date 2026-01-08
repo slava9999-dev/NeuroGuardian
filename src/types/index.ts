@@ -80,6 +80,8 @@ export interface Product {
   currentPrice: number; // Seller's set price
   estimatedBuyerPrice?: number; // Price buyer sees (after marketplace discounts)
   minPrice: number; // Stop-Loss level (0 = disabled)
+  costPrice?: number; // Unit economics basis
+  supplierSku?: string;
   originalPrice?: number; // Price before any drops
 
   // Marketplace discounts info

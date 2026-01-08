@@ -17,6 +17,7 @@ import {
   getUserById,
   getProductsByUserId,
   updateProductMinPrice,
+  updateProductCostPrice,
   type MarketplaceProduct,
 } from '../services/index.js';
 
@@ -45,6 +46,7 @@ export async function handleProducts(
       estimatedBuyerPrice: Number(p.estimated_buyer_price || p.current_price || 0),
       marketplaceDiscountPercent: Number(p.marketplace_discount_percent || 0),
       minPrice: Number(p.min_price || 0),
+      costPrice: Number(p.cost_price || 0),
       stock: Number(p.current_stock || 0),
       marketplace: p.marketplace,
       status: p.status,
@@ -54,13 +56,13 @@ export async function handleProducts(
     return res.json({ products: formatted, total: formatted.length });
   }
 
-  // POST: Update product min price
-  const { productId, minPrice } = req.body || {};
+  // POST: Update product prices (min price or cost price)
+  const { productId, minPrice, costPrice } = req.body || {};
 
-  if (!productId || typeof minPrice !== 'number') {
+  if (!productId || (minPrice === undefined && costPrice === undefined)) {
     return res.status(400).json({
       error: 'Invalid parameters',
-      received: { productId, minPrice },
+      received: { productId, minPrice, costPrice },
     });
   }
 
@@ -75,12 +77,25 @@ export async function handleProducts(
       return res.status(403).json({ error: 'Product not found or access denied' });
     }
 
-    await updateProductMinPrice(userId, productId, minPrice);
+    const updates: string[] = [];
+    const promises: Promise<void>[] = [];
+
+    if (minPrice !== undefined) {
+      promises.push(updateProductMinPrice(userId, productId, minPrice));
+      updates.push(`minPrice=${minPrice}`);
+    }
+
+    if (costPrice !== undefined) {
+      promises.push(updateProductCostPrice(userId, productId, costPrice));
+      updates.push(`costPrice=${costPrice}`);
+    }
+
+    await Promise.all(promises);
 
     console.log(
-      `✅ Stop-Loss updated (Modular): user=${userId}, product=${productId}, minPrice=${minPrice}`
+      `✅ Product updated (Modular): user=${userId}, product=${productId}, updates=[${updates.join(', ')}]`
     );
-    return res.json({ success: true, productId, minPrice });
+    return res.json({ success: true, productId, minPrice, costPrice });
   } catch (error) {
     console.error('Update product error:', error);
     return res.status(500).json({ error: 'Failed to update product' });

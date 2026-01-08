@@ -323,7 +323,7 @@ export function PaymentModal({
           ) : (
             <>
               {/* Header */}
-              <div className="flex-shrink-0 bg-stone-900 p-4 border-b border-stone-800 flex items-center justify-between z-10">
+              <div className="shrink-0 bg-stone-900 p-4 border-b border-stone-800 flex items-center justify-between z-10">
                 <h2 className="text-lg font-bold text-white">
                   {showWidget ? 'Оплата картой' : 'Оформление подписки'}
                 </h2>
@@ -438,7 +438,7 @@ export function PaymentModal({
 
               {/* Footer Actions */}
               {!showWidget && (
-                <div className="flex-shrink-0 p-4 bg-stone-900 border-t border-stone-800">
+                <div className="shrink-0 p-4 bg-stone-900 border-t border-stone-800">
                   <button
                     onClick={handlePayment}
                     disabled={!selectedPlanId || isProcessing}

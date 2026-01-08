@@ -180,7 +180,7 @@ export function PriceCalculator({
     <AnimatePresence mode="wait">
       <motion.div
         key="calculator-modal"
-        className="fixed inset-0 z-[9999] flex flex-col"
+        className="fixed inset-0 z-50 flex flex-col"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -197,7 +197,7 @@ export function PriceCalculator({
 
         {/* Fullscreen Modal Container */}
         <motion.div
-          className="relative flex flex-col w-full h-full max-h-[100dvh] bg-[#0c0c0e] z-10 overflow-hidden"
+          className="relative flex flex-col w-full h-full max-h-dvh bg-stone-900 z-10 overflow-hidden"
           initial={{ y: '100%' }}
           animate={{ y: 0 }}
           exit={{ y: '100%' }}
@@ -213,7 +213,7 @@ export function PriceCalculator({
           </div>
 
           {/* Header - Fixed */}
-          <div className="flex items-center justify-between px-5 py-4 border-b border-stone-800 bg-[#0c0c0e]/95 backdrop-blur-sm">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-stone-800 bg-stone-900/95 backdrop-blur-sm">
             <div className="flex-1">
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
                 🧮 Калькулятор цены
@@ -510,7 +510,7 @@ export function PriceCalculator({
                   )}
 
                   {/* Main Result */}
-                  <div className="bg-gradient-to-br from-amber-500/10 to-amber-600/5 border border-amber-500/30 rounded-xl p-4">
+                  <div className="bg-linear-to-br from-amber-500/10 to-amber-600/5 border border-amber-500/30 rounded-xl p-4">
                     <div className="text-sm text-amber-400/80 mb-1">Рекомендуемая цена:</div>
                     <div className="text-4xl font-bold text-white tracking-tight">
                       {calculationResult.price > 0
@@ -525,11 +525,11 @@ export function PriceCalculator({
           </div>
 
           {/* Footer - Fixed, safe area padding */}
-          <div className="px-5 py-4 border-t border-stone-800 bg-[#0c0c0e] pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <div className="px-5 py-4 border-t border-stone-800 bg-stone-900 pb-[max(1rem,env(safe-area-inset-bottom))]">
             <button
               onClick={handleApply}
               disabled={!costPrice || calculationResult.price <= 0}
-              className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 disabled:from-stone-700 disabled:to-stone-700 disabled:text-stone-500 disabled:cursor-not-allowed text-white rounded-xl py-4 font-bold text-lg transition-all shadow-lg shadow-emerald-900/30 active:scale-[0.98]"
+              className="w-full bg-linear-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 disabled:from-stone-700 disabled:to-stone-700 disabled:text-stone-500 disabled:cursor-not-allowed text-white rounded-xl py-4 font-bold text-lg transition-all shadow-lg shadow-emerald-900/30 active:scale-[0.98]"
             >
               {calculationResult.price > 0
                 ? `Применить ${calculationResult.price.toLocaleString()} ₽`

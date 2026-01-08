@@ -30,7 +30,7 @@ const SubscriptionPage = lazy(() =>
 // Loading screen with agent branding
 function LoadingScreen() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-stone-900 to-stone-800">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-linear-to-b from-stone-900 to-stone-800">
       <motion.div
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -44,7 +44,7 @@ function LoadingScreen() {
           }}
           transition={{ duration: 2, repeat: Infinity }}
         >
-          <div className="absolute inset-0 rounded-full bg-gradient-to-r from-violet-500 to-purple-500 blur-xl opacity-50" />
+          <div className="absolute inset-0 rounded-full bg-linear-to-r from-violet-500 to-purple-500 blur-xl opacity-50" />
           <img
             src="/agent-avatar.png"
             alt="NeuroAgent"
@@ -233,7 +233,7 @@ function App() {
   // Show auth error if not in Telegram
   if (authError) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-stone-900 to-stone-800 p-6">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-linear-to-b from-stone-900 to-stone-800 p-6">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}

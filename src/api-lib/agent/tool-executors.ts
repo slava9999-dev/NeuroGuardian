@@ -122,6 +122,7 @@ export async function executeGetProducts(userId: number, rawArgs: unknown): Prom
           title: p.title,
           price: p.current_price,
           min_price: p.min_price,
+          cost_price: p.cost_price || 0,
           marketplace: p.marketplace,
           status: p.status,
           protected: p.min_price > 0,

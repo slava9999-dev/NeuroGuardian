@@ -15,7 +15,7 @@ const connectionString =
 async function runMigrationFile(file) {
   const client = new Client({
     connectionString,
-    ssl: { rejectUnauthorized: false }
+    ssl: process.env.DB_NO_SSL === 'true' ? false : { rejectUnauthorized: false }
   });
 
   try {

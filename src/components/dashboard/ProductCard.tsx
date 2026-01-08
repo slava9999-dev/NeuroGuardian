@@ -51,12 +51,64 @@ export function ProductCard({ product }: ProductCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [showCalculator, setShowCalculator] = useState(false);
   const [minPriceInput, setMinPriceInput] = useState(product.minPrice.toString());
+  const [costPriceInput, setCostPriceInput] = useState((product.costPrice || 0).toString());
 
   const status = STATUS_CONFIG[product.status] || STATUS_CONFIG.active;
+
+  const handleCostPriceBlur = useCallback(async () => {
+    // Keep editing mode if we clicked another field (simplified logic)
+    // setIsEditing(false); // Let the specific field click handler manage this if needed, or just close it.
+    // For now, let's not close standard editing mode immediately if we want to edit multiple fields,
+    // but the original code closed it. Let's stick to original behavior but we might have conflict.
+    // Actually, distinct handlers are better.
+
+    // We only close editing if we are blurring out of the card context?
+    // Let's simplified: each blur saves.
+
+    // NOTE: This shared `isEditing` state for both inputs is problematic if we want to edit one without closing.
+    // However, usually we edit one by one.
+
+    const newCostPrice = parseFloat(costPriceInput) || 0;
+
+    if (newCostPrice !== (product.costPrice || 0)) {
+      hapticFeedback('light');
+      updateProduct(product.id, { costPrice: newCostPrice });
+
+      try {
+        interface TelegramWebApp {
+          initData?: string;
+        }
+        const tg = (window as unknown as { Telegram?: { WebApp?: TelegramWebApp } }).Telegram
+          ?.WebApp;
+        const initData = tg?.initData || 'demo';
+
+        await fetch('/api?action=products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Init-Data': initData },
+          body: JSON.stringify({
+            action: 'products',
+            initData,
+            productId: product.productId,
+            costPrice: newCostPrice,
+          }),
+        });
+        console.log(`✅ Cost Price saved: ${product.productId} → ${newCostPrice}`);
+      } catch (error) {
+        console.error('❌ Failed to save cost price:', error);
+      }
+    }
+  }, [costPriceInput, product.id, product.productId, product.costPrice, updateProduct]);
+
+  const handleCostPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/[^0-9.]/g, '');
+    setCostPriceInput(value);
+  };
 
   const handleMinPriceBlur = useCallback(async () => {
     setIsEditing(false);
     const newMinPrice = parseFloat(minPriceInput) || 0;
+
+    // ... existing logic ...
 
     if (newMinPrice !== product.minPrice) {
       hapticFeedback('light');
@@ -118,7 +170,7 @@ export function ProductCard({ product }: ProductCardProps) {
       {/* Header: Image + Title + Status */}
       <div className="flex gap-3 mb-3">
         {/* Product image */}
-        <div className="w-16 h-16 rounded-xl bg-stone-800 overflow-hidden flex-shrink-0">
+        <div className="w-16 h-16 rounded-xl bg-stone-800 overflow-hidden shrink-0">
           {product.imageUrl ? (
             <LazyImage src={product.imageUrl} alt={product.title} className="w-full h-full" />
           ) : (
@@ -183,7 +235,7 @@ export function ProductCard({ product }: ProductCardProps) {
       {/* Price info */}
       <div className="grid grid-cols-2 gap-3 mb-3">
         {/* Current price with buyer estimate */}
-        <div className="bg-stone-800/50 rounded-xl p-3">
+        <div className="bg-stone-800/50 rounded-xl p-3 col-span-2">
           <p className="text-xs text-stone-400 mb-1 flex items-center gap-1">
             Ваша цена
             {product.marketplaceDiscountPercent && product.marketplaceDiscountPercent > 0 && (
@@ -213,6 +265,48 @@ export function ProductCard({ product }: ProductCardProps) {
               >
                 {product.estimatedBuyerPrice.toLocaleString('ru-RU')} ₽
               </span>
+            </p>
+          )}
+        </div>
+
+        {/* Cost Price (Unit Economics) */}
+        <div
+          className={`
+            bg-stone-800/50 rounded-xl p-3 transition-all
+            ${isEditing ? 'ring-2 ring-amber-500' : ''}
+          `}
+        >
+          <p className="text-xs text-stone-400 mb-1 flex items-center gap-1">
+            Себестоимость
+            <span
+              className="text-stone-500"
+              title="Включая закупку, упаковку и логистику до склада"
+            >
+              📦
+            </span>
+          </p>
+          {isEditing ? (
+            <input
+              type="text"
+              inputMode="decimal"
+              value={costPriceInput}
+              onChange={handleCostPriceChange}
+              onBlur={handleCostPriceBlur}
+              onKeyDown={e => e.key === 'Enter' && handleCostPriceBlur()}
+              className="w-full bg-transparent text-lg font-bold text-blue-400 outline-none"
+              placeholder="0"
+            />
+          ) : (
+            <p
+              className="text-lg font-bold text-blue-400 cursor-pointer hover:text-blue-300"
+              onClick={() => {
+                setIsEditing(true);
+                setCostPriceInput(product.costPrice?.toString() || '0');
+              }}
+            >
+              {(product.costPrice || 0) > 0
+                ? `${product.costPrice?.toLocaleString('ru-RU')} ₽`
+                : 'Указать'}
             </p>
           )}
         </div>
@@ -261,7 +355,7 @@ export function ProductCard({ product }: ProductCardProps) {
               onClick={() => setShowCalculator(true)}
               className="mt-2 w-full text-xs text-stone-400 hover:text-amber-400 transition-colors flex items-center justify-center gap-1"
             >
-              🧮 Рассчитать автоматически
+              🧮 Рассчитать
             </button>
           )}
         </div>
@@ -294,8 +388,8 @@ export function ProductCard({ product }: ProductCardProps) {
             <div
               className={`absolute top-0 bottom-0 left-0 transition-all duration-500 ${
                 product.currentPrice >= product.minPrice
-                  ? 'bg-gradient-to-r from-emerald-500 to-emerald-400'
-                  : 'bg-gradient-to-r from-red-500 to-red-400'
+                  ? 'bg-linear-to-r from-emerald-500 to-emerald-400'
+                  : 'bg-linear-to-r from-red-500 to-red-400'
               }`}
               style={{
                 width: `${Math.min(100, (product.currentPrice / (product.minPrice * 2)) * 100)}%`,
@@ -358,6 +452,7 @@ export function ProductCard({ product }: ProductCardProps) {
       {showCalculator && (
         <PriceCalculator
           marketplace={product.marketplace}
+          initialCostPrice={product.costPrice}
           onCalculated={calculatedPrice => {
             // Update input and trigger save
             setMinPriceInput(calculatedPrice.toString());

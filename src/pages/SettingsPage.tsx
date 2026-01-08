@@ -175,7 +175,7 @@ export function SettingsPage({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-stone-900 to-stone-800 px-4 py-6 pb-24">
+    <div className="min-h-screen bg-linear-to-b from-stone-900 to-stone-800 px-4 py-6 pb-24">
       {/* Header */}
       <header className="flex items-center gap-4 mb-6">
         <button
@@ -207,7 +207,7 @@ export function SettingsPage({
       {user && (
         <section className="glass-panel p-4 mb-6">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center text-stone-900 font-bold text-xl">
+            <div className="w-14 h-14 rounded-full bg-linear-to-br from-amber-500 to-amber-600 flex items-center justify-center text-stone-900 font-bold text-xl">
               {user.firstName.charAt(0)}
             </div>
             <div>
@@ -543,7 +543,7 @@ export function SettingsPage({
           >
             <div
               className={`
-              w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0
+              w-10 h-10 rounded-xl flex items-center justify-center shrink-0
               ${defenseMode === 'zero_stock' ? 'bg-amber-500/20' : 'bg-stone-800'}
             `}
             >
@@ -578,7 +578,7 @@ export function SettingsPage({
           >
             <div
               className={`
-              w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0
+              w-10 h-10 rounded-xl flex items-center justify-center shrink-0
               ${defenseMode === 'price_correction' ? 'bg-amber-500/20' : 'bg-stone-800'}
             `}
             >
@@ -631,11 +631,22 @@ export function SettingsPage({
               max="30"
               step="1"
               value={user?.priceBufferPercent ?? 5}
-              onChange={async e => {
+              onChange={e => {
                 const value = Number(e.target.value);
                 if (user) {
                   setUser({ ...user, priceBufferPercent: value });
-                  await settingsApi.updateSettings({ priceBufferPercent: value });
+                }
+              }}
+              onMouseUp={async () => {
+                if (user) {
+                  await settingsApi.updateSettings({ priceBufferPercent: user.priceBufferPercent });
+                  hapticFeedback('light');
+                }
+              }}
+              onTouchEnd={async () => {
+                if (user) {
+                  await settingsApi.updateSettings({ priceBufferPercent: user.priceBufferPercent });
+                  hapticFeedback('light');
                 }
               }}
               className="w-full h-2 bg-stone-700 rounded-lg appearance-none cursor-pointer accent-amber-500"

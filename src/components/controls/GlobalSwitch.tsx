@@ -84,8 +84,8 @@ export function GlobalSwitch({ compact = false }: GlobalSwitchProps) {
           ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
           ${
             protectionEnabled
-              ? 'bg-gradient-to-r from-emerald-600 to-emerald-500'
-              : 'bg-gradient-to-r from-stone-700 to-stone-600'
+              ? 'bg-linear-to-r from-emerald-600 to-emerald-500'
+              : 'bg-linear-to-r from-stone-700 to-stone-600'
           }
         `}
       >

@@ -158,7 +158,7 @@ export function GuidePage({ onBack }: GuidePageProps) {
   const section = GUIDE_SECTIONS.find(s => s.id === activeSection);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-stone-900 to-stone-800">
+    <div className="min-h-screen bg-linear-to-b from-stone-900 to-stone-800">
       {/* Header */}
       <header className="sticky top-0 bg-stone-900/95 backdrop-blur-sm border-b border-stone-700 px-4 py-3 flex items-center gap-4 z-10">
         <button
@@ -237,9 +237,9 @@ export function GuidePage({ onBack }: GuidePageProps) {
                   <div className="flex items-start gap-3">
                     <div
                       className={`
-                      w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-bold
-                      ${item.warning ? 'bg-amber-500 text-stone-900' : 'bg-stone-700 text-white'}
-                    `}
+                        w-8 h-8 rounded-full flex items-center justify-center shrink-0 font-bold
+                        ${item.warning ? 'bg-amber-500 text-stone-900' : 'bg-stone-700 text-white'}
+                      `}
                     >
                       {item.step}
                     </div>

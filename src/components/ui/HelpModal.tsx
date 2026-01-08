@@ -157,7 +157,7 @@ export function HelpModal({ isOpen, onClose }: HelpModalProps) {
           {/* Progress bar */}
           <div className="h-1 bg-stone-800">
             <motion.div
-              className="h-full bg-gradient-to-r from-amber-500 to-amber-400"
+              className="h-full bg-linear-to-r from-amber-500 to-amber-400"
               initial={{ width: 0 }}
               animate={{ width: `${((currentStep + 1) / TUTORIAL_STEPS.length) * 100}%` }}
               transition={{ duration: 0.3 }}

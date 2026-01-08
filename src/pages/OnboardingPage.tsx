@@ -74,7 +74,7 @@ export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-stone-900 to-stone-800 px-6 py-12">
+    <div className="min-h-screen bg-linear-to-b from-stone-900 to-stone-800 px-6 py-12">
       <AnimatePresence mode="wait">
         {/* STEP: Welcome */}
         {step === 'welcome' && (
@@ -87,7 +87,7 @@ export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
           >
             {/* Logo */}
             <motion.div
-              className="w-24 h-24 mb-6 rounded-3xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center"
+              className="w-24 h-24 mb-6 rounded-3xl bg-linear-to-br from-amber-500 to-amber-600 flex items-center justify-center"
               animate={{
                 boxShadow: [
                   '0 0 20px rgba(245, 158, 11, 0.3)',

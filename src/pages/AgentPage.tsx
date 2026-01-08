@@ -279,9 +279,9 @@ export function AgentPage() {
   const hasMessages = messages.length > 0;
 
   return (
-    <div className="h-[100dvh] bg-stone-900 flex flex-col relative overflow-hidden">
+    <div className="h-dvh bg-stone-900 flex flex-col relative overflow-hidden">
       {/* Background Gradient */}
-      <div className="absolute inset-0 bg-gradient-to-b from-stone-900 via-stone-900 to-stone-800 pointer-events-none" />
+      <div className="absolute inset-0 bg-linear-to-b from-stone-900 via-stone-900 to-stone-800 pointer-events-none" />
 
       {/* Welcome Screen - Only shown when no messages */}
       <AnimatePresence>
@@ -334,7 +334,7 @@ export function AgentPage() {
             >
               <h1 className="text-2xl font-light text-white">
                 Привет,{' '}
-                <span className="font-semibold text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-fuchsia-400">
+                <span className="font-semibold text-transparent bg-clip-text bg-linear-to-r from-violet-400 to-fuchsia-400">
                   {firstName}
                 </span>
               </h1>
@@ -456,8 +456,8 @@ export function AgentPage() {
       )}
 
       {/* Input Area - Fixed at bottom, high contrast */}
-      <div className="p-4 pb-24 z-30 bg-gradient-to-t from-stone-900 via-stone-900/90 to-transparent">
-        <div className="max-w-xl mx-auto bg-stone-800 rounded-[2rem] border border-white/10 shadow-2xl p-1.5 flex items-end gap-2 ring-1 ring-white/5">
+      <div className="p-4 pb-24 z-30 bg-linear-to-t from-stone-900 via-stone-900/90 to-transparent">
+        <div className="max-w-xl mx-auto bg-stone-800 rounded-4xl border border-white/10 shadow-2xl p-1.5 flex items-end gap-2 ring-1 ring-white/5">
           <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} />
 
           {/* File Attachment Button */}
@@ -645,7 +645,7 @@ function MessageBubble({ message, onConfirm }: MessageBubbleProps) {
       >
         {/* Message content - improved mobile readability */}
         <div
-          className="text-[15px] leading-relaxed whitespace-pre-wrap font-sans break-words overflow-hidden"
+          className="text-[15px] leading-relaxed whitespace-pre-wrap font-sans wrap-break-word overflow-hidden"
           style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
           onClick={e => {
             // Intercept ALL link clicks to open in external browser
