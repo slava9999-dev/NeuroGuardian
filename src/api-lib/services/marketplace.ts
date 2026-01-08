@@ -524,8 +524,7 @@ export async function fetchWbPrices(
  * Priority: discountedPrice > clubDiscountedPrice > salePrice > price
  * WB API v2 December 2024 Update: Prices can be in sizes[0] or direct.
  *
- * CRITICAL FIX (Jan 2026): WB API returns prices in KOPECKS!
- * Must convert to rubles before using.
+ * NOTE: WB API format is unclear - adding logging for diagnosis
  */
 function extractWbPrice(good: WbGoodsItem): number {
   // Try sizes first (most accurate for v2)
@@ -542,14 +541,12 @@ function extractWbPrice(good: WbGoodsItem): number {
     price = (good as any).price || (good as any).discountedPrice || 0;
   }
 
-  // CRITICAL: WB API v2 returns prices in KOPECKS (not rubles!)
-  // Convert to rubles if price looks like kopecks
-  // Threshold: 50000 kopecks = 500 RUB (minimum reasonable product price)
-  // Previous bug: threshold was 500000, so 5000 RUB (500000 kopecks) was NOT converted!
-  if (price > 50000) {
-    price = Math.round(price / 100);
+  // Log for debugging (first 3 items only to avoid spam)
+  if (good.nmID && price > 0) {
+    console.log(`📊 WB Price Debug: nmId=${good.nmID}, raw_price=${price}`);
   }
 
+  // Return as-is - WB API v2 appears to return prices in RUBLES
   return Math.round(price);
 }
 
@@ -594,11 +591,11 @@ export async function updateWbPrices(
 
   try {
     // WB API v2: Required fields are nmId, price, discount
-    // CRITICAL FIX (Jan 2026): WB API expects prices in KOPECKS!
-    // Input is in RUBLES, multiply by 100
+    // NOTE: WB API v2/upload/task expects prices in RUBLES (confirmed)
+    // Do NOT multiply by 100!
     const payload = batchedUpdates.map(u => ({
       nmId: Number(u.nmId),
-      price: Math.round(u.price * 100), // Price in KOPECKS (rubles × 100)
+      price: Math.round(u.price), // Price in RUBLES
       discount: 0, // Required field - 0 means no discount
     }));
 
@@ -1347,9 +1344,8 @@ export async function setWbDefensePrice(
     const payload = {
       data: products.map(p => ({
         nmId: Number(p.nmId), // WB API requires lowercase 'nmId'
-        // CRITICAL FIX (Jan 2026): WB API v2/upload/task expects prices in KOPECKS!
-        // Input price is in RUBLES, must multiply by 100
-        price: Math.round(p.price * 100),
+        // WB API v2/upload/task expects prices in RUBLES
+        price: Math.round(p.price),
         discount: 0,
       })),
     };
