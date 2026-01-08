@@ -524,7 +524,9 @@ export async function fetchWbPrices(
  * Priority: discountedPrice > clubDiscountedPrice > salePrice > price
  * WB API v2 December 2024 Update: Prices can be in sizes[0] or direct.
  *
- * NOTE: WB API format is unclear - adding logging for diagnosis
+ * CRITICAL (Jan 2026): WB API returns prices in KOPECKS when READING!
+ * But expects RUBLES when WRITING (upload/task).
+ * We convert to rubles here so all internal logic uses rubles.
  */
 function extractWbPrice(good: WbGoodsItem): number {
   // Try sizes first (most accurate for v2)
@@ -541,12 +543,17 @@ function extractWbPrice(good: WbGoodsItem): number {
     price = (good as any).price || (good as any).discountedPrice || 0;
   }
 
-  // Log for debugging (first 3 items only to avoid spam)
-  if (good.nmID && price > 0) {
-    console.log(`📊 WB Price Debug: nmId=${good.nmID}, raw_price=${price}`);
+  // WB API v2 returns prices in KOPECKS
+  // Convert to RUBLES for internal use
+  // We check > 10000 to ensure this is kopecks (100+ rubles minimum)
+  if (price > 10000) {
+    price = Math.round(price / 100);
+    console.log(`📊 WB Price: nmId=${good.nmID}, converted ${price * 100} kopecks → ${price}₽`);
+  } else if (price > 0) {
+    // Small values might already be in rubles or edge cases
+    console.log(`📊 WB Price: nmId=${good.nmID}, kept as ${price}₽ (already in rubles?)`);
   }
 
-  // Return as-is - WB API v2 appears to return prices in RUBLES
   return Math.round(price);
 }
 
