@@ -551,25 +551,12 @@ function extractWbPrice(good: WbGoodsItem): number {
     price = (good as any).discountedPrice || (good as any).price || 0;
   }
 
-  // WB API v2 returns prices in KOPECKS
-  // Convert to RUBLES for internal use
-  //
-  // FIXED (Jan 2026): Lowered threshold to 100 (1 RUB)
-  // Items < 1 RUB don't exist on WB marketplace
-  // This safely handles ALL real marketplace items
-  if (price >= 100) {
-    const original = price;
-    price = Math.round(price / 100);
-    if (original > 100000) {
-      // Log significant conversions for visibility
-      console.log(
-        `📊 WB Price: nmId=${good.nmID || (good as any).nmId}, converted ${original} kop → ${price}₽`
-      );
-    }
-  }
-  // Values 1-99 are edge cases (items 0.01-0.99 RUB which don't exist)
-  // Keep them as-is, they'll be visible in logs if they occur
+  // WB API v2 usually returns prices in integers (RUB).
+  // Previously we thought it was kopecks and divided by 100.
+  // Tests show 13500 for a 13500 RUB item.
+  // Division by 100 turns 3000 RUB into 30 RUB, which is the bug reported by user.
 
+  // No conversion needed.
   return Math.round(price);
 }
 
