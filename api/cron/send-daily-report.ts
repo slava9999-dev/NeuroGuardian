@@ -9,7 +9,7 @@ import { sendAlertToUser } from '../../src/api-lib/services/notifications.js';
 import type { Alert } from '../../src/api-lib/services/notifications.js';
 
 /**
- * Daily Report - runs at 8:00 AM Moscow time
+ * Daily Report - runs at 8:00 AM Moscow time (05:00 UTC)
  * Sends personalized digest to each active seller
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -23,11 +23,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   console.log('📊 Starting daily report generation...');
 
   try {
-    // Get all active users with subscription
+    // Get all active users (subscription OR protection enabled)
     const users = await sql`
       SELECT u.id, u.telegram_id, u.first_name
       FROM users u
-      WHERE u.subscription_active = true
+      WHERE (u.subscription_active = true OR u.protection_enabled = true)
+        AND u.is_active = true
         AND u.telegram_id IS NOT NULL
     `;
 
@@ -41,46 +42,84 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           SELECT 
             COUNT(DISTINCT o.id) as orders_count,
             COALESCE(SUM(o.total_price), 0) as revenue,
-            (SELECT COUNT(*) FROM products WHERE user_id = ${user.id} AND current_stock < 10) as low_stock_count,
-            (SELECT COUNT(*) FROM sentinel_logs WHERE user_id = ${user.id} AND created_at > NOW() - INTERVAL '24 hours') as protection_actions
+            (SELECT COUNT(*) FROM products WHERE user_id = ${user.id}) as total_products,
+            (SELECT COUNT(*) FROM products WHERE user_id = ${user.id} AND current_stock < 10 AND current_stock > 0) as low_stock_count,
+            (SELECT COUNT(*) FROM products WHERE user_id = ${user.id} AND min_price > 0) as protected_count
           FROM orders o
           WHERE o.user_id = ${user.id}
             AND o.created_at > NOW() - INTERVAL '24 hours'
         `;
 
+        // Get Sentinel stats for past 24h
+        const sentinelStats = await sql`
+          SELECT 
+            COUNT(*) as total_checks,
+            COUNT(*) FILTER (WHERE success = true AND defense_action != 'notify') as defenses,
+            COALESCE(SUM(saved_amount), 0) as total_saved
+          FROM sentinel_logs 
+          WHERE user_id = ${user.id}
+            AND created_at > NOW() - INTERVAL '24 hours'
+        `;
+
         const data = stats.rows[0];
+        const sentinel = sentinelStats.rows[0];
+
         const ordersCount = parseInt(data.orders_count) || 0;
         const revenue = parseFloat(data.revenue) || 0;
+        const totalProducts = parseInt(data.total_products) || 0;
         const lowStockCount = parseInt(data.low_stock_count) || 0;
-        const protectionActions = parseInt(data.protection_actions) || 0;
+        const protectedCount = parseInt(data.protected_count) || 0;
+        const defenseActions = parseInt(sentinel.defenses) || 0;
+        const totalSaved = parseFloat(sentinel.total_saved) || 0;
 
-        // Build digest message
-        let message = `☀️ Доброе утро, ${user.first_name || 'владелец магазина'}!\n\n`;
+        // Build personalized digest message
+        let message = `☀️ *Доброе утро, ${user.first_name || 'владелец магазина'}!*\n\n`;
+
+        // === Yesterday's Results ===
         message += `📊 *Вчера:*\n`;
-        message += `├─ Заказов: *${ordersCount}*\n`;
-        message += `└─ Выручка: *${revenue.toLocaleString('ru-RU')}₽*\n`;
+        if (ordersCount > 0) {
+          message += `├─ 🛒 Заказов: *${ordersCount}*\n`;
+          message += `├─ 💰 Выручка: *${revenue.toLocaleString('ru-RU')}₽*\n`;
+        } else {
+          message += `├─ 🛒 Заказов не было\n`;
+        }
 
-        // Add problems section if any
+        // === Protection Status ===
+        message += `\n🛡️ *Защита Sentinel:*\n`;
+        message += `├─ 📦 Товаров: ${totalProducts} (защищено: ${protectedCount})\n`;
+
+        if (defenseActions > 0) {
+          message += `├─ ⚔️ Отражено атак: *${defenseActions}*\n`;
+          if (totalSaved > 0) {
+            message += `├─ 💵 Сохранено: *${totalSaved.toLocaleString('ru-RU')}₽*\n`;
+          }
+        } else {
+          message += `├─ ✅ Угроз не обнаружено\n`;
+        }
+        message += `└─ 🔄 Мониторинг: 24/7 активен\n`;
+
+        // === Warnings ===
         let hasProblems = false;
 
         if (lowStockCount > 0) {
           hasProblems = true;
-          message += `\n⚠️ *Требует внимания:*\n`;
-          message += `├─ Заканчивается: ${lowStockCount} товаров\n`;
+          message += `\n⚠️ *Внимание:*\n`;
+          message += `└─ 📉 Заканчивается: ${lowStockCount} товаров\n`;
         }
 
-        if (protectionActions > 0) {
-          if (!hasProblems) {
-            message += `\n📋 *Защита цен:*\n`;
+        if (protectedCount === 0 && totalProducts > 0) {
+          hasProblems = true;
+          message += `\n💡 *Рекомендация:*\n`;
+          message += `└─ Установите минимальные цены для защиты!\n`;
+        }
+
+        // === Closing ===
+        if (!hasProblems) {
+          if (ordersCount > 0) {
+            message += `\n✨ Отличный день! Так держать!`;
+          } else {
+            message += `\n💪 Sentinel на страже. Хорошего дня!`;
           }
-          message += `└─ Сработала ${protectionActions} раз\n`;
-        }
-
-        // Add positive closing
-        if (!hasProblems && ordersCount > 0) {
-          message += `\n✅ Всё хорошо! Продолжайте в том же духе!`;
-        } else if (!hasProblems) {
-          message += `\n💪 Новый день — новые возможности!`;
         }
 
         // Send as daily_report alert
