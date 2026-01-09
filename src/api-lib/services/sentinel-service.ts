@@ -507,23 +507,42 @@ export class SentinelService {
     });
   }
 
+  /**
+   * Send report to user ONLY if something happened (threats, actions, errors)
+   * Don't spam "everything is OK" every 30 minutes!
+   */
   private async sendUserReport(user: DBUser, userResult: UserCycleResult): Promise<void> {
     const totalScanned = userResult.productsScanned.wb + userResult.productsScanned.ozon;
     if (totalScanned === 0) return;
+
+    // 🔴 CRITICAL: Only notify if something happened!
+    // Don't spam users with "everything OK" every 30 minutes
+    const hasThreats = userResult.threatsDetected > 0;
+    const hasActions = userResult.actionsTaken > 0;
+    const hasErrors = userResult.errors.length > 0;
+
+    if (!hasThreats && !hasActions && !hasErrors) {
+      // Everything is fine - DON'T send anything!
+      // Users will receive daily digest instead
+      console.log(`✅ User ${user.id}: All OK, skipping notification (no spam)`);
+      return;
+    }
+
     const time = new Date().toLocaleTimeString('ru-RU', {
       hour: '2-digit',
       minute: '2-digit',
       timeZone: 'Europe/Moscow',
     });
+
     let statusEmoji = '🟢',
       statusText = 'Всё в порядке';
-    if (userResult.errors.length > 0) {
+    if (hasErrors) {
       statusEmoji = '🔴';
       statusText = 'Есть ошибки';
-    } else if (userResult.actionsTaken > 0) {
+    } else if (hasActions) {
       statusEmoji = '⚔️';
       statusText = 'Защита сработала!';
-    } else if (userResult.threatsDetected > 0) {
+    } else if (hasThreats) {
       statusEmoji = '🟡';
       statusText = 'Угрозы обнаружены';
     }
@@ -535,18 +554,34 @@ export class SentinelService {
       `${statusEmoji} *${statusText}*`,
       ``,
       `📦 Проверено: ${totalScanned}`,
-      userResult.threatsDetected > 0 ? `⚠️ Угроз: ${userResult.threatsDetected}` : '',
-      userResult.actionsTaken > 0 ? `⚔️ Защищено: ${userResult.actionsTaken}` : '',
-      userResult.errors.length > 0 ? `❌ Ошибок: ${userResult.errors.length}` : '',
+      hasThreats ? `⚠️ Угроз: ${userResult.threatsDetected}` : '',
+      hasActions ? `⚔️ Защищено: ${userResult.actionsTaken}` : '',
+      hasErrors ? `❌ Ошибок: ${userResult.errors.length}` : '',
       ``,
-      `_Следующая проверка через 30 мин_`,
+      `_Sentinel работает 24/7_`,
     ]
       .filter(Boolean)
       .join('\n');
     await notificationService.sendTelegramNotification(user.id, message);
   }
 
+  /**
+   * Send cycle summary to ADMIN only
+   * Only send if there were actions or errors (don't spam admin either!)
+   */
   private async sendCycleSummary(result: SentinelRunResult): Promise<void> {
+    // 🔴 CRITICAL: Only notify admin if something happened!
+    const hasActions = result.actionsTaken > 0;
+    const hasErrors = result.errors.length > 0;
+
+    if (!hasActions && !hasErrors) {
+      // Everything is fine - don't spam admin with "system OK" every 30 min
+      console.log(
+        `✅ Cycle complete: ${result.usersProcessed} users, all OK (no admin notification)`
+      );
+      return;
+    }
+
     const time = new Date().toLocaleTimeString('ru-RU', {
       hour: '2-digit',
       minute: '2-digit',
@@ -555,14 +590,15 @@ export class SentinelService {
     const wbScanned = result.productsScanned?.wb || 0;
     const ozonScanned = result.productsScanned?.ozon || 0;
     const totalScanned = wbScanned + ozonScanned;
+
     let statusEmoji = '🟢',
       statusText = 'Система штатно';
-    if (result.errors.length > 0) {
+    if (hasErrors) {
       statusEmoji = '🔴';
       statusText = 'Есть ошибки';
-    } else if (result.actionsTaken > 0) {
+    } else if (hasActions) {
       statusEmoji = '⚔️';
-      statusText = 'Защита сработала';
+      statusText = 'Защита сработала!';
     }
 
     const message = [
@@ -573,10 +609,10 @@ export class SentinelService {
       ``,
       `👥 Магазинов: ${result.usersProcessed}`,
       `📦 Товаров: ${totalScanned}`,
-      result.actionsTaken > 0 ? `⚔️ Отражено: ${result.actionsTaken}` : '',
-      result.errors.length > 0 ? `❌ Ошибок: ${result.errors.length}` : '',
+      hasActions ? `⚔️ Отражено: ${result.actionsTaken}` : '',
+      hasErrors ? `❌ Ошибок: ${result.errors.length}` : '',
       ``,
-      `💡 _Следующая проверка через 30 минут_`,
+      `💡 _Sentinel работает 24/7_`,
     ]
       .filter(Boolean)
       .join('\n');
