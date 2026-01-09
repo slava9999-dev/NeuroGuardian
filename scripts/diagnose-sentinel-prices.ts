@@ -1,6 +1,6 @@
 /**
  * 🔍 ДИАГНОСТИКА SENTINEL: Проверка получения цен
- * 
+ *
  * Запуск: npx tsx scripts/diagnose-sentinel-prices.ts
  */
 
@@ -23,16 +23,19 @@ async function main() {
 
   try {
     // 1. Пользователи
+    // NOTE: users.id IS the Telegram user ID (no separate telegram_id column)
     console.log('👥 ПОЛЬЗОВАТЕЛИ С ЗАЩИТОЙ:');
     const usersRes = await sql`
-      SELECT id, telegram_id, first_name, protection_enabled, subscription_active
+      SELECT id, id as telegram_id, first_name, protection_enabled, subscription_active
       FROM users 
       WHERE protection_enabled = true OR subscription_active = true
     `;
-    
+
     console.log(`   Найдено: ${usersRes.rows.length} пользователей`);
     for (const user of usersRes.rows) {
-      console.log(`   - ID ${user.id}: ${user.first_name || 'Без имени'} (Telegram: ${user.telegram_id})`);
+      console.log(
+        `   - ID ${user.id}: ${user.first_name || 'Без имени'} (Telegram ID: ${user.id})`
+      );
     }
     console.log();
 
@@ -62,24 +65,24 @@ async function main() {
     console.log('📊 ДЕТАЛИ OZON ТОВАРОВ (первые 10):');
     console.log('-'.repeat(95));
     console.log(
-      'ID'.padEnd(8) + 
-      'Ozon ID'.padEnd(15) + 
-      'Цена в БД'.padEnd(12) + 
-      'Min Price'.padEnd(12) + 
-      'Monitored'.padEnd(10) +
-      'Название'
+      'ID'.padEnd(8) +
+        'Ozon ID'.padEnd(15) +
+        'Цена в БД'.padEnd(12) +
+        'Min Price'.padEnd(12) +
+        'Monitored'.padEnd(10) +
+        'Название'
     );
     console.log('-'.repeat(95));
 
     for (const p of ozonProducts.slice(0, 10)) {
       const ozonId = String(p.product_id).replace('ozon-', '');
       console.log(
-        String(p.id).padEnd(8) + 
-        ozonId.padEnd(15) + 
-        (p.current_price ? `${p.current_price}₽` : 'N/A').padEnd(12) + 
-        (p.min_price ? `${p.min_price}₽` : '❌ Нет').padEnd(12) + 
-        (p.is_monitored ? '✅' : '❌').padEnd(10) +
-        String(p.title || 'Без названия').substring(0, 35)
+        String(p.id).padEnd(8) +
+          ozonId.padEnd(15) +
+          (p.current_price ? `${p.current_price}₽` : 'N/A').padEnd(12) +
+          (p.min_price ? `${p.min_price}₽` : '❌ Нет').padEnd(12) +
+          (p.is_monitored ? '✅' : '❌').padEnd(10) +
+          String(p.title || 'Без названия').substring(0, 35)
       );
     }
     console.log('-'.repeat(95));
@@ -95,7 +98,7 @@ async function main() {
         COUNT(CASE WHEN is_monitored = true THEN 1 END) as monitored
       FROM products
     `;
-    
+
     const stats = statsRes.rows[0];
     console.log(`   📦 Всего товаров: ${stats.total}`);
     console.log(`   🛡️ С min_price (Stop-Loss): ${stats.with_min_price}`);
@@ -119,7 +122,9 @@ async function main() {
     } else {
       for (const l of logsRes.rows) {
         const time = new Date(l.created_at).toLocaleTimeString('ru-RU');
-        console.log(`   ${time}: ${l.threat_type} → ${l.defense_action} (${l.success ? '✅' : '❌'})`);
+        console.log(
+          `   ${time}: ${l.threat_type} → ${l.defense_action} (${l.success ? '✅' : '❌'})`
+        );
         console.log(`      Товар: ${String(l.product_title || '').substring(0, 40)}...`);
         console.log(`      Цена: ${l.detected_price}₽, Min: ${l.min_price}₽`);
       }
@@ -134,7 +139,7 @@ async function main() {
     // Проверка 1: Есть ли min_price?
     const withMinPrice = parseInt(String(stats.with_min_price) || '0');
     const total = parseInt(String(stats.total) || '0');
-    
+
     if (withMinPrice === 0) {
       console.log('   ⚠️ КРИТИЧНО: Ни один товар НЕ имеет min_price!');
       console.log('   → Sentinel не может защитить цену без min_price');
@@ -155,7 +160,6 @@ async function main() {
 
     console.log('='.repeat(60));
     console.log('✅ Диагностика завершена');
-
   } catch (error) {
     console.error('❌ Ошибка:', error);
     process.exit(1);

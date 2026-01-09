@@ -134,10 +134,12 @@ async function getUserChatId(userId: number): Promise<string | null> {
   let retries = 3;
   while (retries > 0) {
     try {
-      const result = await sql`SELECT telegram_id FROM users WHERE id = ${userId}`;
-      const telegramId = result.rows[0]?.telegram_id;
+      // IMPORTANT: In our schema, users.id IS the Telegram user ID (BIGINT PRIMARY KEY)
+      // There is NO separate telegram_id column - id is used directly
+      const result = await sql`SELECT id FROM users WHERE id = ${userId}`;
+      const telegramId = result.rows[0]?.id;
       if (!telegramId) {
-        console.warn(`[Notifications] User ${userId} has no telegram_id set`);
+        console.warn(`[Notifications] User ${userId} not found in database`);
         return null;
       }
       const tidString = telegramId.toString();

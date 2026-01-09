@@ -24,12 +24,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     // Get all active users (subscription OR protection enabled)
+    // NOTE: In our schema, users.id IS the Telegram user ID (BIGINT PRIMARY KEY)
+    // There is NO separate telegram_id column
     const users = await sql`
-      SELECT u.id, u.telegram_id, u.first_name
+      SELECT u.id, u.id as telegram_id, u.first_name
       FROM users u
       WHERE (u.subscription_active = true OR u.protection_enabled = true)
         AND u.is_active = true
-        AND u.telegram_id IS NOT NULL
     `;
 
     let sentCount = 0;
