@@ -1,25 +1,25 @@
 /**
  * 🔍 ТЕСТ: Почему Sentinel не может изменить цену на Ozon?
- * 
+ *
  * Проверяем API Ozon для update цен
  */
 
 import 'dotenv/config';
 import { sql } from '@vercel/postgres';
+import * as crypto from 'crypto';
 
 // Функция для расшифровки ключа (упрощённая)
 function decryptApiKey(encrypted: string): string | null {
   if (!encrypted) return null;
-  
+
   const key = process.env.ENCRYPTION_KEY;
   if (!key) {
     console.warn('⚠️ ENCRYPTION_KEY не настроен - пробуем как plaintext');
     return encrypted;
   }
-  
+
   try {
     // Простая XOR расшифровка (как в проекте)
-    const crypto = require('crypto');
     const decipher = crypto.createDecipher('aes-256-cbc', key);
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
@@ -36,8 +36,9 @@ async function main() {
   console.log();
 
   // 1. Получаем ключи первого пользователя
+  // NOTE: users.id IS the Telegram user ID (no separate telegram_id column)
   const userRes = await sql`
-    SELECT id, telegram_id, first_name, api_key_ozon, ozon_client_id
+    SELECT id, first_name, api_key_ozon, ozon_client_id
     FROM users 
     WHERE protection_enabled = true
     LIMIT 1
@@ -54,10 +55,10 @@ async function main() {
 
   // 2. Проверяем ключи
   console.log('🔑 ПРОВЕРКА КЛЮЧЕЙ:');
-  
+
   const hasOzonKey = !!user.api_key_ozon;
   const hasClientId = !!user.ozon_client_id;
-  
+
   console.log(`   api_key_ozon: ${hasOzonKey ? '✅ Есть (зашифрован)' : '❌ Отсутствует'}`);
   console.log(`   ozon_client_id: ${hasClientId ? '✅ Есть' : '❌ Отсутствует'}`);
   console.log();
@@ -69,13 +70,13 @@ async function main() {
 
   // 3. Попытка расшифровки
   console.log('🔐 РАСШИФРОВКА КЛЮЧЕЙ:');
-  
+
   let clientId: string | null = null;
   let apiKey: string | null = null;
 
   // Пробуем формат "CLIENT_ID:API_KEY"
   const decryptedOzon = decryptApiKey(user.api_key_ozon);
-  
+
   if (decryptedOzon?.includes(':')) {
     const [cid, akey] = decryptedOzon.split(':');
     clientId = cid;
@@ -99,7 +100,7 @@ async function main() {
 
   // 4. Тест API - получаем цену одного товара
   console.log('📡 ТЕСТ OZON API:');
-  
+
   // Получаем один товар
   const productRes = await sql`
     SELECT product_id, title, current_price, min_price 
@@ -115,7 +116,7 @@ async function main() {
 
   const product = productRes.rows[0];
   const ozonId = parseInt(String(product.product_id).replace('ozon-', ''));
-  
+
   console.log(`   Товар: ${product.title?.substring(0, 40)}...`);
   console.log(`   Ozon ID: ${ozonId}`);
   console.log(`   Цена в БД: ${product.current_price}₽`);
@@ -124,7 +125,7 @@ async function main() {
 
   // 5. Запрос текущей цены с Ozon API
   console.log('📥 ЗАПРОС ЦЕНЫ С OZON:');
-  
+
   try {
     const response = await fetch('https://api-seller.ozon.ru/v5/product/info/prices', {
       method: 'POST',
@@ -146,18 +147,20 @@ async function main() {
     console.log(`   Status: ${response.status}`);
 
     if (response.ok) {
-      const data = await response.json() as any;
+      const data = (await response.json()) as {
+        result?: { items?: Array<{ price?: { price?: string } }> };
+      };
       const item = data.result?.items?.[0];
-      
+
       if (item) {
         const price = parseFloat(item.price?.price || '0');
         console.log(`   ✅ Текущая цена на Ozon: ${price}₽`);
         console.log(`   Цена в БД: ${product.current_price}₽`);
-        
+
         if (price !== product.current_price) {
           console.log(`   ⚠️ РАСХОЖДЕНИЕ! БД: ${product.current_price}₽ vs Ozon: ${price}₽`);
         }
-        
+
         if (price < product.min_price) {
           console.log(`   🚨 УГРОЗА! Цена ${price}₽ НИЖЕ min_price ${product.min_price}₽`);
         }
