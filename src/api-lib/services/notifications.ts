@@ -123,35 +123,49 @@ async function sendTelegramMessage(
 
 /**
  * Get user's Telegram chat ID from database
+ *
+ * OPTIMIZATION: In our schema, users.id IS the Telegram user ID (BIGINT PRIMARY KEY).
+ * There is NO separate telegram_id column.
+ *
+ * We only need to verify the user EXISTS in the database once, then cache it.
  */
 const chatIdCache = new Map<number, string>();
+const nonExistentUsers = new Set<number>(); // Track users we've already checked don't exist
 
 async function getUserChatId(userId: number): Promise<string | null> {
-  // Check cache first
+  // Fast path: already cached
   const cached = chatIdCache.get(userId);
   if (cached) return cached;
 
+  // Fast path: we already know this user doesn't exist
+  if (nonExistentUsers.has(userId)) {
+    return null;
+  }
+
+  // Verify user exists in database (only check once, then cache)
   let retries = 3;
   while (retries > 0) {
     try {
-      // IMPORTANT: In our schema, users.id IS the Telegram user ID (BIGINT PRIMARY KEY)
-      // There is NO separate telegram_id column - id is used directly
-      const result = await sql`SELECT id FROM users WHERE id = ${userId}`;
-      const telegramId = result.rows[0]?.id;
-      if (!telegramId) {
+      // Quick existence check - more efficient than SELECT *
+      const result = await sql`SELECT 1 FROM users WHERE id = ${userId} LIMIT 1`;
+
+      if (result.rows.length === 0) {
         console.warn(`[Notifications] User ${userId} not found in database`);
+        nonExistentUsers.add(userId);
         return null;
       }
-      const tidString = telegramId.toString();
+
+      // User exists! Cache the chat ID (which is the same as user ID)
+      const tidString = userId.toString();
       chatIdCache.set(userId, tidString);
       return tidString;
     } catch (error) {
       retries--;
       if (retries === 0) {
-        console.error('Failed to get user chat ID after 3 retries:', error);
+        console.error('Failed to verify user exists after 3 retries:', error);
         return null;
       }
-      console.warn(`⚠️ Retrying DB chat ID fetch for ${userId}... (${retries} left)`);
+      console.warn(`⚠️ Retrying DB check for user ${userId}... (${retries} left)`);
       await new Promise(resolve => setTimeout(resolve, 500));
     }
   }
