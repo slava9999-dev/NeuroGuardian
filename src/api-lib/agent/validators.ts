@@ -16,6 +16,7 @@ export const GetProductsArgsSchema = z.object({
   marketplace: z.enum(['WB', 'Ozon', 'all']).optional().default('all'),
   limit: z.number().int().min(1).max(100).optional().default(20),
   sort_by: z.enum(['price', 'stock', 'name']).optional().default('price'),
+  search: z.string().optional(), // Search by product title (partial match)
   account_id: z.number().optional(),
 });
 

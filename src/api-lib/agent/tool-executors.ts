@@ -99,6 +99,12 @@ export async function executeGetProducts(userId: number, rawArgs: unknown): Prom
     const marketplace = args.marketplace === 'all' ? undefined : args.marketplace;
     let filtered = filterProducts(products, marketplace);
 
+    // Search by title (case-insensitive partial match)
+    if (args.search && args.search.trim()) {
+      const searchLower = args.search.toLowerCase().trim();
+      filtered = filtered.filter(p => p.title.toLowerCase().includes(searchLower));
+    }
+
     // Sort
     if (args.sort_by === 'price') {
       filtered.sort((a, b) => (b.current_price || 0) - (a.current_price || 0));
