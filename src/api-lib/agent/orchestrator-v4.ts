@@ -889,6 +889,11 @@ async function handleSimpleIntent(message: string, context?: UserContext): Promi
     }
   }
 
+  // Благодарность — проверяем ПЕРЕД aboutPhrases, чтобы "Спасибо за помощь" не матчилось на "помощь"
+  if (normalized.includes('спасибо') || normalized.includes('благодарю')) {
+    return `Всегда пожалуйста, ${userName}! 😊 Есть ещё вопросы — обращайтесь, я на связи 24/7.`;
+  }
+
   // "Что ты умеешь" / "расскажи о себе"
   const aboutPhrases = [
     'что ты умеешь',
@@ -912,11 +917,6 @@ async function handleSimpleIntent(message: string, context?: UserContext): Promi
 
 ${hasKeys ? 'Скажите что проверить — я приступлю!' : 'Но сначала нужно подключить доступ к магазину.'}`;
     }
-  }
-
-  // Благодарность
-  if (normalized.includes('спасибо') || normalized.includes('благодарю')) {
-    return `Всегда пожалуйста, ${userName}! 😊 Есть ещё вопросы — обращайтесь, я на связи 24/7.`;
   }
 
   // Прощание
