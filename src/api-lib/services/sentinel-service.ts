@@ -508,23 +508,25 @@ export class SentinelService {
   }
 
   /**
-   * Send report to user ONLY if something happened (threats, actions, errors)
-   * Don't spam "everything is OK" every 30 minutes!
+   * Send report to user based on their notifications_mode setting
+   * 'all' (default) = send every 30 minutes
+   * 'threats_only' = only when threats/actions/errors occur
    */
   private async sendUserReport(user: DBUser, userResult: UserCycleResult): Promise<void> {
     const totalScanned = userResult.productsScanned.wb + userResult.productsScanned.ozon;
     if (totalScanned === 0) return;
 
-    // 🔴 CRITICAL: Only notify if something happened!
-    // Don't spam users with "everything OK" every 30 minutes
     const hasThreats = userResult.threatsDetected > 0;
     const hasActions = userResult.actionsTaken > 0;
     const hasErrors = userResult.errors.length > 0;
+    const hasSomething = hasThreats || hasActions || hasErrors;
 
-    if (!hasThreats && !hasActions && !hasErrors) {
-      // Everything is fine - DON'T send anything!
-      // Users will receive daily digest instead
-      console.log(`✅ User ${user.id}: All OK, skipping notification (no spam)`);
+    // Check user's notification preference (default: 'all')
+    const notificationsMode = user.notifications_mode || 'all';
+
+    if (notificationsMode === 'threats_only' && !hasSomething) {
+      // User chose to only receive notifications when something happens
+      console.log(`✅ User ${user.id}: All OK, notifications_mode=threats_only (skipping)`);
       return;
     }
 
@@ -558,7 +560,7 @@ export class SentinelService {
       hasActions ? `⚔️ Защищено: ${userResult.actionsTaken}` : '',
       hasErrors ? `❌ Ошибок: ${userResult.errors.length}` : '',
       ``,
-      `_Sentinel работает 24/7_`,
+      `_Следующая проверка через 30 мин_`,
     ]
       .filter(Boolean)
       .join('\n');
@@ -566,21 +568,12 @@ export class SentinelService {
   }
 
   /**
-   * Send cycle summary to ADMIN only
-   * Only send if there were actions or errors (don't spam admin either!)
+   * Send cycle summary to ADMIN
+   * Always sends to keep admin informed about system status
    */
   private async sendCycleSummary(result: SentinelRunResult): Promise<void> {
-    // 🔴 CRITICAL: Only notify admin if something happened!
     const hasActions = result.actionsTaken > 0;
     const hasErrors = result.errors.length > 0;
-
-    if (!hasActions && !hasErrors) {
-      // Everything is fine - don't spam admin with "system OK" every 30 min
-      console.log(
-        `✅ Cycle complete: ${result.usersProcessed} users, all OK (no admin notification)`
-      );
-      return;
-    }
 
     const time = new Date().toLocaleTimeString('ru-RU', {
       hour: '2-digit',
@@ -602,7 +595,7 @@ export class SentinelService {
     }
 
     const message = [
-      `🎩 *ИТОГИ ЦИКЛА*`,
+      `🎩 ИТОГИ ЦИКЛА`,
       `⏰ ${time} (МСК)`,
       ``,
       `${statusEmoji} *${statusText}*`,
@@ -612,7 +605,7 @@ export class SentinelService {
       hasActions ? `⚔️ Отражено: ${result.actionsTaken}` : '',
       hasErrors ? `❌ Ошибок: ${result.errors.length}` : '',
       ``,
-      `💡 _Sentinel работает 24/7_`,
+      `💡 Следующая проверка через 30 минут`,
     ]
       .filter(Boolean)
       .join('\n');

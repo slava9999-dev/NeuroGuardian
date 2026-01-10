@@ -105,6 +105,7 @@ export interface DBUser {
   price_buffer_percent: number; // INTEGER DEFAULT 5 — buffer for card discounts (Ozon Card, WB Pay)
   warning_threshold_percent: number; // INTEGER DEFAULT 10 — alert when price is within this % of min
   created_at: Date; // TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  notifications_mode: 'all' | 'threats_only'; // VARCHAR(20) DEFAULT 'all' — controls Sentinel report frequency
   updated_at: Date; // TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 }
 
