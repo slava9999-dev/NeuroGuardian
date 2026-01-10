@@ -10,12 +10,13 @@ const { Pool } = pkg;
 const connectionString = process.env.POSTGRES_URL?.replace(/\r/g, '').trim();
 const isLocal = connectionString?.includes('localhost') || connectionString?.includes('127.0.0.1');
 
+// Neon DB requires SSL
 const pool = new Pool({
   connectionString,
   ssl: isLocal ? false : { rejectUnauthorized: false },
-  max: 20, // Support more concurrent requests
-  idleTimeoutMillis: 30000, // Close idle clients after 30s
-  connectionTimeoutMillis: 5000, // Fail fast if pool is full
+  max: 10, // Neon has connection limits
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000, // Allow more time for cold start
 });
 
 /**

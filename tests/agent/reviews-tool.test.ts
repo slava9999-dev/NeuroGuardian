@@ -28,6 +28,26 @@ vi.mock('../../src/api-lib/services/index.js', () => ({
   getSystemEvents: vi.fn(),
 }));
 
+// Type for mock reviews matching the service output
+interface MockReview {
+  id: string;
+  marketplace: 'WB' | 'Ozon';
+  rating: number;
+  text: string;
+  author_name: string;
+  created_at: string;
+  status: 'new' | 'viewed' | 'replied';
+  product_title: string;
+  product_id: string;
+}
+
+// Type for the tool result data
+interface ReviewsResultData {
+  total?: number;
+  reviews: Array<{ author: string; rating: number; text: string }>;
+  message?: string;
+}
+
 describe('Review Tools', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -35,7 +55,7 @@ describe('Review Tools', () => {
 
   it('executeGetReviews should return formatted reviews', async () => {
     // Setup mock data
-    const mockReviews = [
+    const mockReviews: MockReview[] = [
       {
         id: '1',
         marketplace: 'WB',
@@ -60,9 +80,11 @@ describe('Review Tools', () => {
       },
     ];
 
-    vi.mocked(reviewService.getUserReviews).mockResolvedValue(mockReviews as any);
+    // Note: Mock returns all reviews regardless of marketplace filter
+    // The actual service would filter, but we're testing the executor's data transformation
+    vi.mocked(reviewService.getUserReviews).mockResolvedValue(mockReviews);
 
-    // Call the tool
+    // Call the tool with WB filter
     const result = await executeGetReviews(1, { limit: 10, marketplace: 'WB' });
 
     // Verify results
@@ -70,7 +92,7 @@ describe('Review Tools', () => {
     expect(result.data).toBeDefined();
 
     // Check specific fields
-    const data = result.data as any;
+    const data = result.data as ReviewsResultData;
     expect(data.total).toBe(2);
     expect(data.reviews).toHaveLength(2);
     expect(data.reviews[0].author).toBe('Иван');
@@ -87,7 +109,7 @@ describe('Review Tools', () => {
     const result = await executeGetReviews(1, { limit: 5 });
 
     expect(result.success).toBe(true);
-    const data = result.data as any;
+    const data = result.data as ReviewsResultData;
     expect(data.reviews).toEqual([]);
     expect(data.message).toContain('не найдено');
   });

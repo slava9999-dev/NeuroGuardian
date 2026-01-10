@@ -37,7 +37,13 @@
     "gpu:up": "cd docker/gpu && docker compose up -d",
     "gpu:down": "cd docker/gpu && docker compose down",
     "gpu:logs": "cd docker/gpu && docker compose logs -f",
-    "inngest:dev": "npx inngest-cli@latest dev -u http://localhost:3001/api/inngest"
+    "inngest:dev": "npx inngest-cli@latest dev -u http://localhost:3001/api/inngest",
+    "test:agent": "npx tsx tests/agent/run-professional-tests.ts",
+    "test:agent:pro": "npx tsx tests/agent/run-pro-tests.ts",
+    "test:agent:local": "npx vitest run tests/agent/viktor-local-e2e.test.ts",
+    "test:agent:verbose": "npx tsx tests/agent/run-professional-tests.ts --verbose",
+    "test:agent:setup": "npx tsx tests/agent/run-professional-tests.ts --setup",
+    "test:agent:cleanup": "npx tsx tests/agent/run-professional-tests.ts --cleanup"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.46",

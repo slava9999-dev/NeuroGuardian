@@ -56,23 +56,43 @@ import { logger, getSecret } from '../lib/index.js';
 async function getAvailableProviders(): Promise<LLMProvider[]> {
   const providers: LLMProvider[] = [];
 
-  // Fetch keys via Security Agent helper
-  const [openaiKey, groqKey] = await Promise.all([
-    getSecret('openai_api_key', 'llm_inference'),
-    getSecret('groq_api_key', 'llm_inference'),
-  ]);
+  // Fetch keys via Security Agent helper OR env (critical for tests)
+  const openaiKey =
+    (await getSecret('openai_api_key', 'llm_inference')) || process.env.OPENAI_API_KEY;
+  const groqKey = (await getSecret('groq_api_key', 'llm_inference')) || process.env.GROQ_API_KEY;
+  const openrouterKey = process.env.OPENROUTER_API_KEY;
 
-  if (groqKey) {
+  // PRIORITY 0: OpenRouter (Works from Russia, no VPN needed!)
+  if (openrouterKey) {
     providers.push({
-      name: 'Groq',
-      url: 'https://api.groq.com/openai/v1/chat/completions',
-      apiKey: groqKey,
-      model: 'llama-3.3-70b-versatile', // Latest top-tier model on Groq
+      name: 'OpenRouter',
+      url: 'https://openrouter.ai/api/v1/chat/completions',
+      apiKey: openrouterKey,
+      model: process.env.OPENROUTER_MODEL || 'mistralai/mistral-7b-instruct:free',
       supportsStructuredOutput: false,
       supportsJsonMode: true,
     });
+    console.log('[Orchestrator] Using OpenRouter (works from Russia)');
   }
 
+  // PRIORITY 1: Ollama (Local, no API key needed, perfect for tests)
+  if (process.env.USE_OLLAMA === 'true' || process.env.OLLAMA_MODEL) {
+    const ollamaUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+    const ollamaModel = process.env.OLLAMA_MODEL || 'mistral-nemo:latest';
+
+    providers.push({
+      name: 'Ollama',
+      url: `${ollamaUrl}/v1/chat/completions`,
+      apiKey: 'ollama', // Ollama doesn't need real API key
+      model: ollamaModel,
+      supportsStructuredOutput: false,
+      supportsJsonMode: true,
+    });
+
+    console.log(`[Orchestrator] Using Ollama: ${ollamaModel} at ${ollamaUrl}`);
+  }
+
+  // PRIORITY 1: OpenAI (More stable, better reasoning)
   if (openaiKey) {
     providers.push({
       name: 'OpenAI',
@@ -80,6 +100,18 @@ async function getAvailableProviders(): Promise<LLMProvider[]> {
       apiKey: openaiKey,
       model: 'gpt-4o-mini',
       supportsStructuredOutput: true,
+      supportsJsonMode: true,
+    });
+  }
+
+  // PRIORITY 2: Groq (Fast, but sometimes 403s)
+  if (groqKey) {
+    providers.push({
+      name: 'Groq',
+      url: 'https://api.groq.com/openai/v1/chat/completions',
+      apiKey: groqKey,
+      model: 'llama-3.1-70b-versatile',
+      supportsStructuredOutput: false,
       supportsJsonMode: true,
     });
   }
@@ -741,36 +773,27 @@ ${JSON.stringify(toolResultsSummary, null, 2)}
     const hasComplexAnalytics = toolResults.some(tr =>
       ['get_abc_analysis', 'calculate_unit_economics', 'get_stock_forecast'].includes(tr.tool)
     );
-    const hasMultipleTools = toolResults.length > 2;
 
+    // Detect complex scenarios for potential future model switching
+    // (hasMultipleTools = toolResults.length > 2 - currently unused)
     // Use gpt-4o for:
     // - Web search results (need to synthesize external data)
     // - Complex analytics (need to explain nuanced business insights)
-    // - Multiple tool results (need to combine data from different sources)
-    const useAdvancedModel = hasSearchWeb || hasComplexAnalytics || hasMultipleTools;
+    // Detect complex scenarios for potential future model switching
+    // const useAdvancedModel = hasSearchWeb || hasComplexAnalytics || hasMultipleTools;
 
-    const groqKey = await getSecret('groq_api_key', 'llm_inference');
-    const preferredModel = groqKey
-      ? useAdvancedModel
-        ? 'llama-3.3-70b-versatile'
-        : 'llama-3.3-70b-versatile'
-      : useAdvancedModel
-        ? 'gpt-4o'
-        : 'gpt-4o-mini';
-
-    logger.info('Answerer model selected', {
-      preferredModel,
-      provider: groqKey ? 'Groq' : 'OpenAI',
+    // Log model selection for debugging
+    logger.info('Answerer phase starting', {
       hasSearchWeb,
       hasComplexAnalytics,
       toolsCount: toolResults.length,
     });
 
+    // Use default provider model (OpenRouter → Groq → OpenAI fallback)
     const result = await callLLMWithFallback(messages, {
       temperature: 0.3,
       maxTokens: 1500,
       jsonSchema: ANSWER_JSON_SCHEMA,
-      preferredModel,
     });
 
     // Safe JSON parse with fallback
