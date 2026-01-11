@@ -20,6 +20,7 @@ export interface UserState {
   marketplace: 'WB' | 'Ozon' | 'both' | null;
   hasWbKey: boolean;
   hasOzonKey: boolean;
+  hasApiKeys: boolean;
   productsCount: number;
   subscriptionTier: 'free' | 'basic' | 'pro';
 
@@ -37,7 +38,14 @@ export interface UserState {
 
   /** Awaiting user input (e.g., cost_price after asking) */
   awaitingInput?: {
-    type: 'cost_price' | 'period' | 'product_name' | 'min_price' | 'confirmation';
+    type:
+      | 'cost_price'
+      | 'period'
+      | 'product_name'
+      | 'min_price'
+      | 'confirmation'
+      | 'percentage'
+      | 'nm_id';
     forProductId?: string;
     question: string;
     createdAt: Date;
@@ -67,6 +75,8 @@ export interface ChatMessage {
     intent?: string;
   };
 }
+
+export type AgentMessage = ChatMessage;
 
 // ============================================
 // TOOL TYPES

@@ -8,27 +8,50 @@
 
 ## 🎯 Current Phase: MONETIZATION LAUNCH (Phase 11) 🟢 PRODUCTION
 
-**Last Session:** 2026-01-10 (Session 31)
-**Focus:** 🧪 PROFESSIONAL E2E TESTS — Agent Validation & OpenRouter Integration
+**Last Session:** 2026-01-11 (Session 33)
+**Focus:** 🧱 AGENT TOOL MODULARIZATION — Migration to Lego-blocks Architecture
 
 **📋 Ключевые документы:**
 
 - `docs/CRITICAL_AUDIT_2026-01-04.md` — Полный отчёт аудита
 - `docs/MONETIZATION_ROADMAP.md` — Путеводитель монетизации
 - `docs/LAUNCH_CHECKLIST.md` — Интерактивный чеклист
-- `docs/TZ-OZON-API-RESEARCH.md` — Исследование Ozon API v5
 
 **🎯 СЛЕДУЮЩИЙ ШАГ:**
 
-- ✅ **E2E TESTS**: Профессиональные тесты агента — 80% pass rate
-- ✅ **OPENROUTER**: Интеграция LLM провайдера для России (без VPN)
-- ✅ **AGENT READY**: Все критические тесты проходят (3/3)
-- ⏳ Добавить колонку `cost_price` в БД для реальной экономики
+- ✅ **TOOL MIGRATION**: Все инструменты перенесены из `tool-executors.ts` в `src/agent/execution/tools/`
+- ✅ **TYPE SAFETY**: `npm run typecheck` проходит без ошибок (0 errors)
+- ✅ **ORCHESTRATOR V4**: Рефакторинг на использование `toolRegistry.execute()`
+- ⏳ Добавить колонку `cost_price` в БД для реальной экономики (Scheduled for next session)
 - ⏳ Исправить тест HIGH-003 (уточнение периода)
 
 ---
 
 ## ✅ Recently Completed
+
+### Session 2026-01-11 (Session 33 - Modular Agent Tools) 🧱
+
+**Переход на модульную архитектуру инструментов ("Lego-blocks"):**
+
+- [x] **TOOL MIGRATION**: Перенесено 19 инструментов из монолитного `tool-executors.ts` в индивидуальные файлы.
+- [x] **DELETION**: Удален `src/api-lib/agent/tool-executors.ts` (1990 строк кода).
+- [x] **CAMELCASE**: Все константы инструментов нормализованы к `camelCase` (например, `getProductsTool`).
+- [x] **REGISTRY**: Реализован `ToolRegistry` и метод автоматической валидации аргументов через Zod.
+- [x] **V4 BRIDGE**: Рефакторинг `orchestrator-v4.ts` для использования `toolRegistry.execute()`, что устранило 600+ строк switch-case кода.
+- [x] **TYPESCRIPT**: Исправлены все ошибки типов (TS7006, TS2345, TS2339) в новых инструментах.
+- [x] **MEMORY & STATE**: Созданы `MemoryManager.ts` и `StateManager.ts` для Agent V5.
+
+**Commits (pending):**
+
+- `feat(agent): modularize all agent tools into separate files and refactor orchestrator to use ToolRegistry`
+
+**Файлы изменены/созданы:**
+
+- `src/agent/execution/tools/*.ts` — 19 новых файлов инструментов
+- `src/agent/core/MemoryManager.ts`, `StateManager.ts` — ядро V5
+- `src/api-lib/agent/orchestrator-v4.ts` — рефакторинг вызова инструментов
+- `src/api-lib/agent/validators.ts` — расширение схем валидации
+- `src/api-lib/agent/tool-executors.ts` — **УДАЛЕН**
 
 ### Session 2026-01-11 (Session 32 - Agent V5 Integration) 🤖
 

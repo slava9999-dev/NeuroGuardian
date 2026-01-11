@@ -79,12 +79,14 @@ export const GetSystemLogsArgsSchema = z.object({
   limit: z.number().int().min(1).max(100).optional().default(50),
   severity: z.enum(['info', 'warning', 'error', 'critical']).optional(),
   entity_type: z.string().optional(),
+  user_id: z.number().optional(),
 });
 
 export const GetReviewsArgsSchema = z.object({
   limit: z.number().int().min(1).max(50).optional().default(10),
   is_replied: z.boolean().optional(),
-  marketplace: z.enum(['WB', 'Ozon']).optional(),
+  marketplace: z.enum(['WB', 'Ozon', 'all']).optional().default('all'),
+  product_id: z.string().optional(),
 });
 
 export const GetLowMarginProductsArgsSchema = z.object({
@@ -229,6 +231,9 @@ export type UpdateStocksArgs = z.infer<typeof UpdateStocksArgsSchema>;
 export type GetMarketplaceAccountsArgs = z.infer<typeof GetMarketplaceAccountsArgsSchema>;
 export type GetSystemLogsArgs = z.infer<typeof GetSystemLogsArgsSchema>;
 export type GetLowMarginProductsArgs = z.infer<typeof GetLowMarginProductsArgsSchema>;
+export type GetReviewsArgs = z.infer<typeof GetReviewsArgsSchema>;
+export type GenerateReviewReplyArgs = z.infer<typeof GenerateReviewReplyArgsSchema>;
+export type UpdateProductSettingsArgs = z.infer<typeof UpdateProductSettingsArgsSchema>;
 
 // Confirmation details types
 export type PriceChangeItem = z.infer<typeof PriceChangeItemSchema>;

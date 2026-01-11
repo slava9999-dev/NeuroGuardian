@@ -1,263 +1,316 @@
 // ============================================
 // NeuroGUARDIAN — State Manager
-// Manages user state across sessions
-// Enables contextual responses and pending actions
-// Version: 5.0.0 | Date: January 2026
+// Professional Architecture v5
 // ============================================
 
-import type { UserState } from '../../core/types/agent.types.js';
+import { sql } from '../../api-lib/services/database.js';
+import { getMarketplaceKeys } from '../../api-lib/services/index.js';
+import type { UserState } from '../../core/types/index.js';
 
-/**
- * State persistence interface
- * Can be implemented by PostgreSQL, Redis, or in-memory store
- */
-interface StateStore {
-  get(userId: number): Promise<UserState | null>;
-  set(userId: number, state: UserState): Promise<void>;
-  update(userId: number, partial: Partial<UserState>): Promise<void>;
-}
-
-/**
- * Default state for new users
- */
-function createDefaultState(userId: number): UserState {
-  const now = new Date();
-  return {
-    userId,
-    marketplace: null,
-    hasWbKey: false,
-    hasOzonKey: false,
-    productsCount: 0,
-    subscriptionTier: 'free',
-    lastMentionedProducts: [],
-    lastActiveAt: now,
-    sessionStartedAt: now,
-    totalQueries: 0,
-  };
-}
-
-/**
- * PostgreSQL-based state store
- */
-class PostgresStateStore implements StateStore {
-  async get(userId: number): Promise<UserState | null> {
-    const { sql } = await import('../../api-lib/services/database.js');
-
-    const result = await sql`
-      SELECT state_data FROM user_state WHERE user_id = ${userId}
-    `;
-
-    if (result.rows.length === 0) {
-      return null;
-    }
-
-    return result.rows[0].state_data as UserState;
-  }
-
-  async set(userId: number, state: UserState): Promise<void> {
-    const { sql } = await import('../../api-lib/services/database.js');
-
-    await sql`
-      INSERT INTO user_state (user_id, state_data, updated_at)
-      VALUES (${userId}, ${JSON.stringify(state)}, NOW())
-      ON CONFLICT (user_id) 
-      DO UPDATE SET state_data = ${JSON.stringify(state)}, updated_at = NOW()
-    `;
-  }
-
-  async update(userId: number, partial: Partial<UserState>): Promise<void> {
-    const current = await this.get(userId);
-    const updated = current
-      ? { ...current, ...partial, lastActiveAt: new Date() }
-      : { ...createDefaultState(userId), ...partial };
-    await this.set(userId, updated);
-  }
-}
-
-/**
- * In-memory state store (for testing/development)
- */
-class MemoryStateStore implements StateStore {
-  private states: Map<number, UserState> = new Map();
-
-  async get(userId: number): Promise<UserState | null> {
-    return this.states.get(userId) || null;
-  }
-
-  async set(userId: number, state: UserState): Promise<void> {
-    this.states.set(userId, state);
-  }
-
-  async update(userId: number, partial: Partial<UserState>): Promise<void> {
-    const current = await this.get(userId);
-    const updated = current
-      ? { ...current, ...partial, lastActiveAt: new Date() }
-      : { ...createDefaultState(userId), ...partial };
-    this.states.set(userId, updated);
-  }
-}
-
-/**
- * State Manager - Main class for managing user state
- *
- * Responsibilities:
- * - Load/save user state
- * - Track pending actions
- * - Track awaiting input
- * - Manage context (last mentioned products, etc.)
- */
 export class StateManager {
-  private store: StateStore;
+  private readonly TABLE_NAME = 'user_state';
 
-  constructor(store?: StateStore) {
-    // Use PostgreSQL in production, memory in development
-    this.store =
-      store ||
-      (process.env.NODE_ENV === 'test' ? new MemoryStateStore() : new PostgresStateStore());
+  constructor() {
+    this.ensureTableExists();
   }
 
   /**
-   * Get current state for a user
-   * Creates default state if not exists
+   * Ensure the user_state table exists
+   */
+  private async ensureTableExists(): Promise<void> {
+    try {
+      await sql`
+        CREATE TABLE IF NOT EXISTS ${sql(this.TABLE_NAME)} (
+          user_id INTEGER PRIMARY KEY,
+          marketplace TEXT,
+          has_api_keys BOOLEAN NOT NULL DEFAULT false,
+          products_count INTEGER NOT NULL DEFAULT 0,
+          subscription_tier TEXT NOT NULL DEFAULT 'free',
+          current_intent TEXT,
+          pending_action JSONB,
+          awaiting_input JSONB,
+          last_mentioned_products JSONB NOT NULL DEFAULT '[]'::jsonb,
+          last_query TEXT,
+          last_active_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+          session_started_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+          total_queries INTEGER NOT NULL DEFAULT 0,
+          created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+        )
+      `;
+    } catch (error) {
+      console.error('Failed to create user_state table:', error);
+    }
+  }
+
+  /**
+   * Get user state from database
    */
   async getState(userId: number): Promise<UserState> {
-    const state = await this.store.get(userId);
-    if (state) {
+    try {
+      const result = await sql`
+        SELECT * FROM ${sql(this.TABLE_NAME)} WHERE user_id = ${userId}
+      `;
+
+      let state: UserState;
+
+      if (result.rows.length > 0) {
+        const row = result.rows[0];
+        state = {
+          userId: userId,
+          marketplace: (row.marketplace as 'WB' | 'Ozon' | 'both' | null) || null,
+          hasApiKeys: row.has_api_keys || false,
+          hasWbKey: false,
+          hasOzonKey: false,
+          productsCount: row.products_count || 0,
+          subscriptionTier: (row.subscription_tier as 'free' | 'basic' | 'pro') || 'free',
+          currentIntent: row.current_intent || undefined,
+          pendingAction: row.pending_action
+            ? this.parseJsonWithDate(row.pending_action)
+            : undefined,
+          awaitingInput: row.awaiting_input
+            ? this.parseJsonWithDate(row.awaiting_input)
+            : undefined,
+          lastMentionedProducts: Array.isArray(row.last_mentioned_products)
+            ? row.last_mentioned_products
+            : [],
+          lastQuery: row.last_query || undefined,
+          lastActiveAt: new Date(row.last_active_at),
+          sessionStartedAt: new Date(row.session_started_at),
+          totalQueries: row.total_queries || 0,
+        };
+      } else {
+        state = this.getDefaultState(userId);
+      }
+
+      // Enrichment logic
+      const keys = await getMarketplaceKeys(userId);
+      state.hasWbKey = !!keys.wb;
+      state.hasOzonKey = !!keys.ozon;
+      state.hasApiKeys = !!keys.wb || !!keys.ozon;
+
       return state;
+    } catch (error) {
+      console.error(`Failed to get state for user ${userId}:`, error);
     }
 
-    // Create default state and enrich with user data
-    const defaultState = await this.enrichWithUserData(userId, createDefaultState(userId));
-    await this.store.set(userId, defaultState);
-    return defaultState;
+    return this.getDefaultState(userId);
+  }
+
+  private parseJsonWithDate(data: unknown): any {
+    if (typeof data === 'string') {
+      try {
+        const parsed = JSON.parse(data);
+        if (parsed && typeof parsed === 'object' && 'createdAt' in parsed) {
+          (parsed as any).createdAt = new Date((parsed as any).createdAt);
+        }
+        return parsed;
+      } catch {
+        return data;
+      }
+    }
+    if (data && typeof data === 'object' && data !== null && 'createdAt' in data) {
+      (data as any).createdAt = new Date((data as any).createdAt);
+    }
+    return data;
   }
 
   /**
-   * Update state partially
+   * Update user state partially
    */
   async updateState(userId: number, partial: Partial<UserState>): Promise<void> {
-    await this.store.update(userId, partial);
+    try {
+      const currentState = await this.getState(userId);
+      const newState = { ...currentState, ...partial, lastActiveAt: new Date() };
+
+      await sql`
+        INSERT INTO ${sql(this.TABLE_NAME)} (
+          user_id, marketplace, has_api_keys, products_count, subscription_tier,
+          current_intent, pending_action, awaiting_input, last_mentioned_products,
+          last_query, last_active_at, session_started_at, total_queries, updated_at
+        ) VALUES (
+          ${userId}, ${newState.marketplace}, ${newState.hasApiKeys}, ${newState.productsCount},
+          ${newState.subscriptionTier}, ${newState.currentIntent},
+          ${newState.pendingAction ? JSON.stringify(newState.pendingAction) : null},
+          ${newState.awaitingInput ? JSON.stringify(newState.awaitingInput) : null},
+          ${JSON.stringify(newState.lastMentionedProducts)}, ${newState.lastQuery || null}, 
+          ${newState.lastActiveAt}, ${newState.sessionStartedAt}, ${newState.totalQueries}, NOW()
+        )
+        ON CONFLICT (user_id) DO UPDATE SET
+          marketplace = EXCLUDED.marketplace,
+          has_api_keys = EXCLUDED.has_api_keys,
+          products_count = EXCLUDED.products_count,
+          subscription_tier = EXCLUDED.subscription_tier,
+          current_intent = EXCLUDED.current_intent,
+          pending_action = EXCLUDED.pending_action,
+          awaiting_input = EXCLUDED.awaiting_input,
+          last_mentioned_products = EXCLUDED.last_mentioned_products,
+          last_query = EXCLUDED.last_query,
+          last_active_at = EXCLUDED.last_active_at,
+          session_started_at = EXCLUDED.session_started_at,
+          total_queries = EXCLUDED.total_queries,
+          updated_at = EXCLUDED.updated_at
+      `;
+    } catch (error) {
+      console.error(`Failed to update state for user ${userId}:`, error);
+    }
   }
 
   /**
-   * Set a pending action that requires user confirmation
-   */
-  async setPendingAction(
-    userId: number,
-    action: NonNullable<UserState['pendingAction']>
-  ): Promise<void> {
-    await this.store.update(userId, {
-      pendingAction: { ...action, createdAt: new Date() },
-    });
-  }
-
-  /**
-   * Clear pending action after confirmation or rejection
+   * Clear pending action
    */
   async clearPendingAction(userId: number): Promise<void> {
-    await this.store.update(userId, { pendingAction: undefined });
+    await this.updateState(userId, { pendingAction: undefined });
   }
 
   /**
-   * Set awaiting input (agent asked a question, waiting for answer)
+   * Set awaiting input state
    */
   async setAwaitingInput(
     userId: number,
-    type: NonNullable<UserState['awaitingInput']>['type'],
+    type: string,
     question: string,
     forProductId?: string
   ): Promise<void> {
-    await this.store.update(userId, {
-      awaitingInput: { type, question, forProductId, createdAt: new Date() },
-    });
+    const validType = type as UserState['awaitingInput'] extends { type: infer T } | undefined
+      ? T
+      : never;
+
+    const awaitingInput = {
+      type: validType,
+      forProductId,
+      question: question || `Введите ${type}:`,
+      createdAt: new Date(),
+    };
+    await this.updateState(userId, { awaitingInput });
   }
 
   /**
-   * Clear awaiting input after receiving answer
+   * Clear awaiting input state
    */
   async clearAwaitingInput(userId: number): Promise<void> {
-    await this.store.update(userId, { awaitingInput: undefined });
+    await this.updateState(userId, { awaitingInput: undefined });
   }
 
   /**
-   * Track mentioned products for context
+   * Set current intent
    */
-  async trackMentionedProducts(userId: number, productIds: string[]): Promise<void> {
+  async setCurrentIntent(userId: number, intent: string): Promise<void> {
+    await this.updateState(userId, { currentIntent: intent });
+  }
+
+  /**
+   * Clear current intent
+   */
+  async clearCurrentIntent(userId: number): Promise<void> {
+    await this.updateState(userId, { currentIntent: undefined });
+  }
+
+  /**
+   * Increment query counter
+   */
+  async incrementQueryCount(userId: number): Promise<void> {
     const state = await this.getState(userId);
-    const updated = [...productIds, ...state.lastMentionedProducts].slice(0, 5);
-    await this.store.update(userId, { lastMentionedProducts: updated });
+    await this.updateState(userId, { totalQueries: state.totalQueries + 1 });
   }
 
-  /**
-   * Increment query counter and update last active
-   */
   async recordQuery(userId: number, query: string): Promise<void> {
-    const state = await this.getState(userId);
-    await this.store.update(userId, {
-      totalQueries: state.totalQueries + 1,
+    await this.updateState(userId, {
+      totalQueries: (await this.getState(userId)).totalQueries + 1,
       lastQuery: query,
-      lastActiveAt: new Date(),
     });
   }
 
   /**
-   * Check if user has an expired pending action (older than 10 minutes)
+   * Update last mentioned products
    */
+  async updateLastMentionedProducts(userId: number, productIds: string[]): Promise<void> {
+    await this.updateState(userId, { lastMentionedProducts: productIds });
+  }
+
+  async trackMentionedProducts(userId: number, productIds: string[]): Promise<void> {
+    await this.updateLastMentionedProducts(userId, productIds);
+  }
+
   async cleanupExpiredState(userId: number): Promise<void> {
     const state = await this.getState(userId);
-    const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
-
-    const updates: Partial<UserState> = {};
-
-    if (state.pendingAction && new Date(state.pendingAction.createdAt).getTime() < tenMinutesAgo) {
-      updates.pendingAction = undefined;
-    }
-
-    if (state.awaitingInput && new Date(state.awaitingInput.createdAt).getTime() < tenMinutesAgo) {
-      updates.awaitingInput = undefined;
-    }
-
-    if (Object.keys(updates).length > 0) {
-      await this.store.update(userId, updates);
+    const now = new Date();
+    // Clean interactive state if older than 30 mins
+    if (now.getTime() - state.lastActiveAt.getTime() > 30 * 60 * 1000) {
+      if (state.awaitingInput) await this.clearAwaitingInput(userId);
+      if (state.pendingAction) await this.clearPendingAction(userId);
+      if (state.currentIntent) await this.clearCurrentIntent(userId);
     }
   }
 
   /**
-   * Enrich state with user data from database
+   * Get default state
    */
-  private async enrichWithUserData(userId: number, state: UserState): Promise<UserState> {
+  private getDefaultState(userId: number): UserState {
+    return {
+      userId,
+      marketplace: 'both',
+      hasApiKeys: false,
+      hasWbKey: false,
+      hasOzonKey: false,
+      productsCount: 0,
+      subscriptionTier: 'free',
+      lastMentionedProducts: [],
+      lastActiveAt: new Date(),
+      sessionStartedAt: new Date(),
+      totalQueries: 0,
+    };
+  }
+
+  /**
+   * Reset user state (for testing)
+   */
+  async resetState(userId: number): Promise<void> {
     try {
-      const { getUserById, getProductsByUserId } =
-        await import('../../api-lib/services/database.js');
-
-      const user = await getUserById(userId);
-      if (user) {
-        state.hasWbKey = !!user.api_key_wb;
-        state.hasOzonKey = !!user.api_key_ozon;
-        state.subscriptionTier =
-          ((user as { subscription_tier?: string }).subscription_tier as
-            | 'free'
-            | 'basic'
-            | 'pro') ?? 'free';
-
-        if (state.hasWbKey && state.hasOzonKey) {
-          state.marketplace = 'both';
-        } else if (state.hasWbKey) {
-          state.marketplace = 'WB';
-        } else if (state.hasOzonKey) {
-          state.marketplace = 'Ozon';
-        }
-      }
-
-      const products = await getProductsByUserId(userId);
-      state.productsCount = products.length;
+      await sql`DELETE FROM ${sql(this.TABLE_NAME)} WHERE user_id = ${userId}`;
     } catch (error) {
-      console.warn('[StateManager] Failed to enrich state:', error);
+      console.error(`Failed to reset state for user ${userId}:`, error);
     }
+  }
 
-    return state;
+  /**
+   * Get session duration in minutes
+   */
+  async getSessionDuration(userId: number): Promise<number> {
+    const state = await this.getState(userId);
+    const now = new Date();
+    return Math.floor((now.getTime() - state.sessionStartedAt.getTime()) / (1000 * 60));
+  }
+
+  /**
+   * Check if user is in onboarding mode (no API keys)
+   */
+  async isOnboardingMode(userId: number): Promise<boolean> {
+    const state = await this.getState(userId);
+    return !state.hasApiKeys;
+  }
+
+  /**
+   * Update API keys status
+   */
+  async updateApiKeysStatus(userId: number, hasKeys: boolean): Promise<void> {
+    await this.updateState(userId, { hasApiKeys: hasKeys });
+  }
+
+  /**
+   * Update products count
+   */
+  async updateProductsCount(userId: number, count: number): Promise<void> {
+    await this.updateState(userId, { productsCount: count });
+  }
+
+  /**
+   * Update subscription tier
+   */
+  async updateSubscriptionTier(userId: number, tier: 'free' | 'basic' | 'pro'): Promise<void> {
+    await this.updateState(userId, { subscriptionTier: tier });
   }
 }
 
-// Singleton instance
+// Export singleton instance
 export const stateManager = new StateManager();

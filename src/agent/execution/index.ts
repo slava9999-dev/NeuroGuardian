@@ -13,13 +13,35 @@ export {
 
 // Import all tools
 import { toolRegistry } from './ToolRegistry.js';
+
+// Read tools
 import { getProductsTool } from './tools/GetProductsTool.js';
+import { getOrdersTool } from './tools/GetOrdersTool.js';
+import { getWarehouseStocksTool } from './tools/GetWarehouseStocksTool.js';
+import { getMarketplaceAccountsTool } from './tools/GetMarketplaceAccountsTool.js';
+import { getReviewsTool } from './tools/GetReviewsTool.js';
+
+// Analyze tools
 import { getSalesStatsTool } from './tools/GetSalesStatsTool.js';
-import { setStopLossTool } from './tools/SetStopLossTool.js';
 import { calculateUnitEconomicsTool } from './tools/CalculateEconomicsTool.js';
-import { searchWebTool } from './tools/SearchWebTool.js';
+import { getAbcAnalysisTool } from './tools/GetAbcAnalysisTool.js';
+import { getStockForecastTool } from './tools/GetStockForecastTool.js';
+import { getLowMarginProductsTool } from './tools/GetLowMarginProductsTool.js';
+
+// Write tools
+import { setStopLossTool } from './tools/SetStopLossTool.js';
 import { bulkProtectProductsTool } from './tools/BulkProtectTool.js';
 import { updatePricesTool } from './tools/UpdatePricesTool.js';
+import { updateStocksTool } from './tools/UpdateStocksTool.js';
+import { updateProductSettingsTool } from './tools/UpdateProductSettingsTool.js';
+
+// Search tools
+import { searchWebTool } from './tools/SearchWebTool.js';
+import { getMarketplaceInfoTool } from './tools/GetMarketplaceInfoTool.js';
+import { getCompetitorPriceTool } from './tools/GetCompetitorPriceTool.js';
+
+// Admin
+import { getSystemLogsTool } from './tools/GetSystemLogsTool.js';
 
 /**
  * Register all available tools
@@ -28,18 +50,32 @@ import { updatePricesTool } from './tools/UpdatePricesTool.js';
 export function registerAllTools(): void {
   // Read tools (no side effects)
   toolRegistry.register(getProductsTool);
+  toolRegistry.register(getOrdersTool);
+  toolRegistry.register(getWarehouseStocksTool);
+  toolRegistry.register(getMarketplaceAccountsTool);
+  toolRegistry.register(getReviewsTool);
 
   // Analyze tools (calculations, stats)
   toolRegistry.register(getSalesStatsTool);
   toolRegistry.register(calculateUnitEconomicsTool);
+  toolRegistry.register(getAbcAnalysisTool);
+  toolRegistry.register(getStockForecastTool);
+  toolRegistry.register(getLowMarginProductsTool);
 
   // Write tools (require confirmation)
   toolRegistry.register(setStopLossTool);
   toolRegistry.register(bulkProtectProductsTool);
   toolRegistry.register(updatePricesTool);
+  toolRegistry.register(updateStocksTool);
+  toolRegistry.register(updateProductSettingsTool);
 
   // Search tools
   toolRegistry.register(searchWebTool);
+  toolRegistry.register(getMarketplaceInfoTool);
+  toolRegistry.register(getCompetitorPriceTool);
+
+  // Admin
+  toolRegistry.register(getSystemLogsTool);
 
   console.log(
     `[ToolRegistry] Registered ${toolRegistry.getStats().total} tools:`,
@@ -55,3 +91,16 @@ export { calculateUnitEconomicsTool } from './tools/CalculateEconomicsTool.js';
 export { searchWebTool } from './tools/SearchWebTool.js';
 export { bulkProtectProductsTool } from './tools/BulkProtectTool.js';
 export { updatePricesTool } from './tools/UpdatePricesTool.js';
+
+export { getOrdersTool } from './tools/GetOrdersTool.js';
+export { getWarehouseStocksTool } from './tools/GetWarehouseStocksTool.js';
+export { getAbcAnalysisTool } from './tools/GetAbcAnalysisTool.js';
+export { getStockForecastTool } from './tools/GetStockForecastTool.js';
+export { getMarketplaceInfoTool } from './tools/GetMarketplaceInfoTool.js';
+export { getMarketplaceAccountsTool } from './tools/GetMarketplaceAccountsTool.js';
+export { updateStocksTool } from './tools/UpdateStocksTool.js';
+export { updateProductSettingsTool } from './tools/UpdateProductSettingsTool.js';
+export { getSystemLogsTool } from './tools/GetSystemLogsTool.js';
+export { getCompetitorPriceTool } from './tools/GetCompetitorPriceTool.js';
+export { getReviewsTool } from './tools/GetReviewsTool.js';
+export { getLowMarginProductsTool } from './tools/GetLowMarginProductsTool.js';

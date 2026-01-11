@@ -17,27 +17,10 @@ import {
   type ToolName,
 } from './schemas-v4.js';
 import { buildPlannerPrompt, buildAnswererPrompt } from './prompts/system-v5.js';
-import {
-  executeGetProducts,
-  executeGetSalesStats,
-  executeGetOrders,
-  executeGetWarehouseStocks,
-  executeCalculateUnitEconomics,
-  executeGetAbcAnalysis,
-  executeGetStockForecast,
-  executeGetMarketplaceInfo,
-  executeGetMarketplaceAccounts,
-  executeSearchWeb,
-  executeUpdatePrices,
-  executeUpdateStocks,
-  executeSetStopLoss,
-  executeBulkProtectProducts,
-  executeGetSystemLogs,
-  executeGetCompetitorPrice,
-  executeGetReviews,
-  executeGetLowMarginProducts,
-  executeUpdateProductSettings,
-} from './tool-executors.js';
+import { toolRegistry, registerAllTools } from '../../agent/execution/index.js';
+
+// Initialize tools
+registerAllTools();
 // ============================================
 // LLM PROVIDER CONFIG
 // ============================================
@@ -641,48 +624,7 @@ async function executeTool(
   userId: number
 ): Promise<{ success: boolean; data?: unknown; error?: string }> {
   try {
-    switch (toolName) {
-      case 'get_products':
-        return await executeGetProducts(userId, args);
-      case 'get_sales_stats':
-        return await executeGetSalesStats(userId, args);
-      case 'get_orders':
-        return await executeGetOrders(userId, args);
-      case 'get_warehouse_stocks':
-        return await executeGetWarehouseStocks(userId, args);
-      case 'calculate_unit_economics':
-        return await executeCalculateUnitEconomics(userId, args);
-      case 'get_abc_analysis':
-        return await executeGetAbcAnalysis(userId, args);
-      case 'get_stock_forecast':
-        return await executeGetStockForecast(userId, args);
-      case 'get_marketplace_info':
-        return executeGetMarketplaceInfo(args);
-      case 'get_marketplace_accounts':
-        return await executeGetMarketplaceAccounts(userId, args);
-      case 'get_competitor_price':
-        return await executeGetCompetitorPrice(userId, args);
-      case 'search_web':
-        return await executeSearchWeb(userId, args);
-      case 'update_prices':
-        return await executeUpdatePrices(userId, args);
-      case 'update_stocks':
-        return await executeUpdateStocks(userId, args);
-      case 'set_stop_loss':
-        return await executeSetStopLoss(userId, args);
-      case 'bulk_protect_products':
-        return await executeBulkProtectProducts(userId, args);
-      case 'get_system_logs':
-        return await executeGetSystemLogs(userId, args);
-      case 'get_reviews':
-        return await executeGetReviews(userId, args);
-      case 'get_low_margin_products':
-        return await executeGetLowMarginProducts(userId, args);
-      case 'update_product_settings':
-        return await executeUpdateProductSettings(userId, args);
-      default:
-        return { success: false, error: `Unknown tool: ${toolName}` };
-    }
+    return await toolRegistry.execute(toolName, userId, args);
   } catch (error) {
     return { success: false, error: String(error) };
   }
