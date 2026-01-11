@@ -62,20 +62,7 @@ async function getAvailableProviders(): Promise<LLMProvider[]> {
   const groqKey = (await getSecret('groq_api_key', 'llm_inference')) || process.env.GROQ_API_KEY;
   const openrouterKey = process.env.OPENROUTER_API_KEY;
 
-  // PRIORITY 0: OpenRouter (Works from Russia, no VPN needed!)
-  if (openrouterKey) {
-    providers.push({
-      name: 'OpenRouter',
-      url: 'https://openrouter.ai/api/v1/chat/completions',
-      apiKey: openrouterKey,
-      model: process.env.OPENROUTER_MODEL || 'mistralai/mistral-7b-instruct:free',
-      supportsStructuredOutput: false,
-      supportsJsonMode: true,
-    });
-    console.log('[Orchestrator] Using OpenRouter (works from Russia)');
-  }
-
-  // PRIORITY 1: Ollama (Local, no API key needed, perfect for tests)
+  // PRIORITY 0: Ollama FIRST when USE_OLLAMA=true (skip cloud API delays for local testing)
   if (process.env.USE_OLLAMA === 'true' || process.env.OLLAMA_MODEL) {
     const ollamaUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
     const ollamaModel = process.env.OLLAMA_MODEL || 'mistral-nemo:latest';
@@ -89,7 +76,20 @@ async function getAvailableProviders(): Promise<LLMProvider[]> {
       supportsJsonMode: true,
     });
 
-    console.log(`[Orchestrator] Using Ollama: ${ollamaModel} at ${ollamaUrl}`);
+    console.log(`[Orchestrator] Using Ollama FIRST: ${ollamaModel} at ${ollamaUrl}`);
+  }
+
+  // PRIORITY 1: OpenRouter (Works from Russia, no VPN needed!)
+  if (openrouterKey && process.env.USE_OLLAMA !== 'true') {
+    providers.push({
+      name: 'OpenRouter',
+      url: 'https://openrouter.ai/api/v1/chat/completions',
+      apiKey: openrouterKey,
+      model: process.env.OPENROUTER_MODEL || 'mistralai/mistral-7b-instruct:free',
+      supportsStructuredOutput: false,
+      supportsJsonMode: true,
+    });
+    console.log('[Orchestrator] Using OpenRouter (works from Russia)');
   }
 
   // PRIORITY 1: OpenAI (More stable, better reasoning)

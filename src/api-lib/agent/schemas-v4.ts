@@ -43,7 +43,7 @@ export type ToolName = z.infer<typeof ToolNameEnum>;
 export const PlannedToolSchema = z.object({
   tool: ToolNameEnum,
   args: z.record(z.string(), z.unknown()).describe('Arguments for the tool'),
-  reason: z.string().describe('Why this tool is needed'),
+  reason: z.string().optional().describe('Why this tool is needed'),
 });
 
 /**
@@ -491,7 +491,7 @@ export const PLAN_JSON_SCHEMA = {
             },
             reason: { type: 'string' },
           },
-          required: ['tool', 'args', 'reason'],
+          required: ['tool', 'args'],
           additionalProperties: false,
         },
       },

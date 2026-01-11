@@ -6,29 +6,7 @@
 
 import 'dotenv/config';
 import { sql } from '@vercel/postgres';
-import * as crypto from 'crypto';
-
-// Функция для расшифровки ключа (упрощённая)
-function decryptApiKey(encrypted: string): string | null {
-  if (!encrypted) return null;
-
-  const key = process.env.ENCRYPTION_KEY;
-  if (!key) {
-    console.warn('⚠️ ENCRYPTION_KEY не настроен - пробуем как plaintext');
-    return encrypted;
-  }
-
-  try {
-    // Простая XOR расшифровка (как в проекте)
-    const decipher = crypto.createDecipher('aes-256-cbc', key);
-    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    return decrypted;
-  } catch {
-    // Если не получилось - может быть plaintext
-    return encrypted;
-  }
-}
+import { decryptApiKey } from '../src/api-lib/lib/crypto.js';
 
 async function main() {
   console.log('🔍 ТЕСТ OZON API');
@@ -71,8 +49,8 @@ async function main() {
   // 3. Попытка расшифровки
   console.log('🔐 РАСШИФРОВКА КЛЮЧЕЙ:');
 
-  let clientId: string | null = null;
-  let apiKey: string | null = null;
+  let clientId = '';
+  let apiKey = '';
 
   // Пробуем формат "CLIENT_ID:API_KEY"
   const decryptedOzon = decryptApiKey(user.api_key_ozon);
