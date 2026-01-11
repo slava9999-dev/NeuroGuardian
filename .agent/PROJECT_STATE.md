@@ -1,6 +1,6 @@
 # 📊 Project State — NeuroGUARDIAN
 
-# Updated: 2026-01-10T14:56:00+03:00
+# Updated: 2026-01-11T18:30:00+03:00
 
 # This file tracks current progress and is updated at end of each session
 
@@ -8,8 +8,8 @@
 
 ## 🎯 Current Phase: MONETIZATION LAUNCH (Phase 11) 🟢 PRODUCTION
 
-**Last Session:** 2026-01-11 (Session 33)
-**Focus:** 🧱 AGENT TOOL MODULARIZATION — Migration to Lego-blocks Architecture
+**Last Session:** 2026-01-11 (Session 36)
+**Focus:** 🐛 SYNC NOTIFICATION FIX — Fixing 0 products bug and Ozon API fallback
 
 **📋 Ключевые документы:**
 
@@ -29,25 +29,18 @@
 
 ## ✅ Recently Completed
 
-### Session 2026-01-11 (Session 34 - Sentinel Architecture V5) 🛡️
+### Session 2026-01-11 (Session 36 - Sync Notification Fix) 🐛
 
-**Модуляризация Sentinel ("Lego-blocks" Phase 5):**
+**Исправление уведомлений о синхронизации:**
 
-- [x] **REFACTOR**: Монолитный `SentinelService.ts` (600+ строк) разбит на независимые классы в `src/sentinel/`.
-- [x] **COMPONENTS**:
-  - `SentinelOrchestrator`: Координирует процесс проверки.
-  - `PriceMonitor`: Получает цены с маркетплейсов (WB/Ozon).
-  - `ThreatDetector`: Чистая логика обнаружения угроз (Unit Economics, Stop-Loss).
-  - `DefenseExecutor`: Применение защиты (Smart Repricing, Zero Stock).
-  - `ReportGenerator` & `AlertSender`: Формирование и отправка отчетов.
-- [x] **TYPE SAFETY**: Строгая типизация всех компонентов, `npm run typecheck` ✅.
-- [x] **BACKWARD COMPAT**: Старый `sentinel-service.ts` превращен в ре-экспорт для совместимости.
+- [x] **BUG FIX**: "Sync Complete" с 0 товаров, но "Report" говорил "System OK".
+  - **Root Cause**: `PriceMonitor` молча игнорировал пустые ответы API Ozon, а n8n handler не рапортовал о 0 товарах как о предупреждении.
+  - **Fix**: Убран silent fallback в `PriceMonitor`, добавлены явные warnings в `marketplace.ts` и `n8n-webhooks.ts`.
+- [x] **STABILITY**: `API_KEY_ENCRYPTION_KEY` отсутствие теперь `console.error` вместо `throw` (восстановление доступности).
 
-**Файлы изменены/созданы:**
+**Commits:**
 
-- `src/sentinel/*.ts` — 6 новых файлов (ядро Sentinel V5)
-- `src/api-lib/services/sentinel-service.ts` — refactor (export barrel)
-- `src/api-lib/handlers/sentinel.ts` — обновлен импорт ThreatDetector
+- `fix(sentinel): improve product sync logging and remove unsafe Ozon price fallback`
 
 ### Session 2026-01-11 (Session 35 - Cyberpunk Security Hardening) 🔐
 
@@ -62,50 +55,37 @@
 
 - `security(core): apply Cyberpunk Patch v1 - harden auth, secrets, and sentinel alerts`
 
-**Файлы изменены:**
+### Session 2026-01-11 (Session 34.2 - Sentinel V5 Dashboard & Economics) 📊
 
-- `src/api-lib/lib/constants.ts` — fail fast security
-- `src/api-lib/lib/telegram.ts` — removal of dev backdoor
-- `src/sentinel/AlertSender.ts` — new critical alert method
-- `src/sentinel/SentinelOrchestrator.ts` — integration of critical alerts
-
-### Session 2026-01-11 (Session 35.1 - Sentinel V5 Dashboard) 📊
-
-**Визуализация защиты (Frontend V5):**
+**Визуализация защиты и Unit Economics:**
 
 - [x] **DASHBOARD UI**: Создан компонент `SentinelDashboard.tsx` с реальным отображением угроз (V5 ThreatDetector).
 - [x] **INTEGRATION**: `DashboardPage.tsx` переведен на новый компонент.
-- [x] **REAL-TIME**: Автообновление статуса каждые 30 секунд, кнопка принудительного сканирования.
-- [x] **ANALYTICS**: Графики сэкономленных средств, статистика атак и эрозии маржи.
+- [x] **REAL-TIME**: Автообновление статуса каждые 30 секунд.
+- [x] **BULK UPDATE**: Создан `BulkUpdateCostsModal` для массовой загрузки себестоимости.
 
 **Commits:**
 
 - `feat(ui): implement Sentinel V5 Dashboard with real-time threat monitoring`
+- `feat(economics): implement Bulk Cost Update UI and API for Unit Economics`
 
-**Файлы изменены:**
+### Session 2026-01-11 (Session 34.1 - Sentinel Architecture V5) 🛡️
 
-- `src/components/dashboard/SentinelDashboard.tsx` — новый компонент
-- `src/pages/DashboardPage.tsx` — интеграция
-- `src/lib/telegram.ts` — helper for initData
+**Модуляризация Sentinel ("Lego-blocks" Phase 5):**
 
-### Session 2026-01-11 (Session 35.2 - Unit Economics UI) 💰A
-
-**Удобный ввод себестоимости (Unit Economics):**
-
-- [x] **BULK UPDATE**: Создан `BulkUpdateCostsModal` для массовой загрузки себестоимости (Copy-Paste из Excel).
-- [x] **API**: Реализован эндпоинт `batch-update-costs` с валидацией прав доступа.
-- [x] **UX**: Интеграция кнопки "Загрузить себестоимость" в `ProductsPage`.
+- [x] **REFACTOR**: Монолитный `SentinelService.ts` (600+ строк) разбит на независимые классы в `src/sentinel/`.
+- [x] **COMPONENTS**:
+  - `SentinelOrchestrator`: Координирует процесс проверки.
+  - `PriceMonitor`: Получает цены с маркетплейсов (WB/Ozon).
+  - `ThreatDetector`: Чистая логика обнаружения угроз (Unit Economics, Stop-Loss).
+  - `DefenseExecutor`: Применение защиты (Smart Repricing, Zero Stock).
+  - `ReportGenerator` & `AlertSender`: Формирование и отправка отчетов.
+- [x] **TYPE SAFETY**: Строгая типизация всех компонентов, `npm run typecheck` ✅.
+- [x] **BACKWARD COMPAT**: Старый `sentinel-service.ts` превращен в ре-экспорт для совместимости.
 
 **Commits:**
 
-- `feat(economics): implement Bulk Cost Update UI and API for Unit Economics`
-
-**Файлы изменены:**
-
-- `src/api-lib/handlers/products.ts` — новый эндпоинт
-- `src/components/dashboard/BulkUpdateCostsModal.tsx` — UI компонент
-- `src/pages/ProductsPage.tsx` — кнопка вызова
-- `api/index.ts` — роутинг
+- `refactor(sentinel): split monolithic service into orchestrator, monitor, detector, and executor components`
 
 ### Session 2026-01-11 (Session 33 - Modular Agent Tools) 🧱
 
@@ -643,7 +623,7 @@ By Category:
 
 ## 🔮 Next Session Suggestions
 
-1.  **Frontend Sentinel Dashboard**: Подключить Frontend (`SentinelDashboard.tsx`) к новому API (`/api?action=sentinel-dashboard`), чтобы отображать угрозы V5 (эрозия, stop-loss).
-2.  **Cost Price Population**: Реализовать массовое заполнение `cost_price` (импорт из Excel или ввод через UI), так как колонка в БД уже есть.
-3.  **Fix High-003 Test**: Исправить тест "Уточнение периода" в `run-pro-tests.ts`, чтобы он проходил стабильно.
-4.  **Unit Economics UI**: Добавить отображение реальной маржинальности в список товаров.
+1.  **Fix High-003 Test**: Исправить тест "Уточнение периода" в `run-pro-tests.ts`, чтобы он проходил стабильно.
+2.  **Unit Economics Display**: Добавить отображение реальной маржинальности (ROI/Margin) прямо в список товаров на `ProductsPage`.
+3.  **Competitor Monitoring UI**: Реализовать интерфейс для просмотра цен конкурентов и управления ссылками на них.
+4.  **Notification settings**: Добавить возможность настройки получателей уведомлений через UI.

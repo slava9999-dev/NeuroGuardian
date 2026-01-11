@@ -55,7 +55,7 @@ export function ProductsPage({ onBack }: ProductsPageProps) {
   }, [products, user]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-stone-900 to-stone-800 pb-24">
+    <div className="min-h-screen bg-linear-to-b from-stone-900 to-stone-800 pb-24">
       {/* Header - Compact Mobile Version */}
       <header className="sticky top-0 z-10 bg-stone-900/95 backdrop-blur-md border-b border-stone-800 px-3 py-2">
         <div className="flex items-center justify-between gap-2">
@@ -63,7 +63,7 @@ export function ProductsPage({ onBack }: ProductsPageProps) {
           <div className="flex items-center gap-2 min-w-0">
             <button
               onClick={onBack}
-              className="p-1.5 rounded-lg hover:bg-stone-800 transition-colors text-stone-400 flex-shrink-0"
+              className="p-1.5 rounded-lg hover:bg-stone-800 transition-colors text-stone-400 shrink-0"
             >
               <svg
                 width="18"
@@ -85,7 +85,7 @@ export function ProductsPage({ onBack }: ProductsPageProps) {
           </div>
 
           {/* Global Switch - Compact */}
-          <div className="flex-shrink-0">
+          <div className="shrink-0">
             <GlobalSwitch compact />
           </div>
         </div>
@@ -127,7 +127,7 @@ export function ProductsPage({ onBack }: ProductsPageProps) {
         {/* Saved Amount - Only if > 0 */}
         {stats.savedAmount > 0 && (
           <motion.div
-            className="p-4 rounded-xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/30"
+            className="p-4 rounded-xl bg-linear-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/30"
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
           >
