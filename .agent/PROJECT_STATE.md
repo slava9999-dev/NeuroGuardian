@@ -28,6 +28,22 @@
 
 ## ✅ Recently Completed
 
+### Session 2026-01-12 (Session 39 - Marketplace Refactor & Type Safety) 🏗️
+
+**Рефакторинг сервисов маркетплейсов и устранение техдолга:**
+
+- [x] **REFACTOR**: Монолитный `marketplace.ts` (1900+ строк) разделен на модульные сервисы: `WbService`, `OzonService`, `MarketplaceService`.
+- [x] **ARCHITECTURE**: Внедрен паттерн Service-Repository. Создан `MarketplaceAccountRepository` для централизованного управления ключами API.
+- [x] **BRIDGE ADAPTER**: Реализован `marketplace-bridge.ts` для обеспечения обратной совместимости с существующим кодом.
+- [x] **TYPE SAFETY**: Полностью устранены неявные `any` в слое работы с маркетплейсами. Исправлены ошибки компиляции TypeScript.
+- [x] **CLEANUP**: Успешно удален устаревший файл `src/api-lib/services/marketplace.ts`.
+- [x] **VERIFICATION**: `npm run typecheck` выполняется успешно. Тесты логики маркетплейсов проходят.
+
+**Commits:**
+
+- `refactor(marketplace): split monolithic service into Wb/Ozon services and bridge adapter`
+- `fix(types): resolve typescript errors in marketplace consumers and tools`
+
 ### Session 2026-01-11 (Session 38 - Agent V5 Fixes) 🤖
 
 **Стабилизация и запуск Agent V5:**

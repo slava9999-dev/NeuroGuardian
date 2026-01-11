@@ -34,7 +34,8 @@ export const getWarehouseStocksTool = defineTool({
         const items = await fetchOzonStocksV3(keys.ozon.clientId, keys.ozon.apiKey);
 
         for (const item of items) {
-          const totalStock = item.stocks?.reduce((sum, s) => sum + (s.present || 0), 0) || 0;
+          const totalStock =
+            item.stocks?.reduce((sum: number, s: any) => sum + (s.present || 0), 0) || 0;
 
           if (!args.low_stock_only || totalStock < 10) {
             stocks.push({

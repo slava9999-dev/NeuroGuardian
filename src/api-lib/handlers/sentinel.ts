@@ -128,7 +128,7 @@ export async function handleSentinelDashboard(
   const { ThreatDetector } = await import('../../sentinel/ThreatDetector.js');
   const threatDetector = new ThreatDetector();
   const { getMarketplaceKeys, fetchWbPrices, fetchOzonCurrentPrices } =
-    await import('../services/marketplace.js');
+    await import('../services/marketplace-bridge.js');
 
   try {
     const { timeRange = '24h' } = req.query;

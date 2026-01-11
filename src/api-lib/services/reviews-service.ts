@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { getMarketplaceKeys } from './marketplace.js';
+import { getMarketplaceKeys } from './marketplace-bridge.js';
 
 // Types
 export interface Review {

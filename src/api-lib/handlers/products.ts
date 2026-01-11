@@ -7,18 +7,12 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql } from '@vercel/postgres';
 
 // Import from modular library
-import {
-  decryptApiKey,
-  sanitizeInput,
-  isSubscriptionActive,
-  getProductLimit,
-} from '../lib/index.js';
+import { sanitizeInput, isSubscriptionActive, getProductLimit } from '../lib/index.js';
 import {
   getUserById,
   getProductsByUserId,
   updateProductMinPrice,
   updateProductCostPrice,
-  type MarketplaceProduct,
 } from '../services/index.js';
 
 // fetchWithRetry moved to api-lib/lib/index.js
@@ -35,7 +29,8 @@ export async function handleProducts(
   if (req.method === 'GET') {
     const products = await getProductsByUserId(userId);
 
-    const formatted = products.map((p: Record<string, unknown>) => ({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const formatted = (products as any[]).map(p => ({
       id: p.product_id,
       productId: p.product_id, // CRITICAL: Frontend needs this for updates!
       nmId: p.nm_id,
@@ -102,6 +97,9 @@ export async function handleProducts(
   }
 }
 
+import { marketplaceService } from '../../core/services/MarketplaceService.js';
+import { productRepository } from '../../core/repositories/ProductRepository.js';
+
 /**
  * Handle sync-products action — fetch products from WB/Ozon APIs
  */
@@ -111,7 +109,7 @@ export async function handleSyncProducts(
   userId: number
 ): Promise<VercelResponse> {
   const { marketplace } = req.body || {};
-  const mp = marketplace || 'Ozon';
+  const mp = (marketplace || 'Ozon') as 'WB' | 'Ozon';
 
   // Get user's subscription status
   const user = await getUserById(userId);
@@ -136,6 +134,10 @@ export async function handleSyncProducts(
     a => a.is_active && a.marketplace.toLowerCase() === mp.toLowerCase()
   );
 
+  console.log(
+    `DEBUG: handleSyncProducts userId=${userId} mp=${mp} accounts=${accounts.length} active=${activeAccounts.length}`
+  );
+
   let totalSaved = 0;
   const summary: string[] = [];
   let limitReached = false;
@@ -144,41 +146,75 @@ export async function handleSyncProducts(
     if (activeAccounts.length > 0) {
       // Multi-account sync
       for (const account of activeAccounts) {
-        let apiKey = '';
-        if (mp === 'WB' && account.wb_token) {
-          apiKey = decryptApiKey(account.wb_token);
-        } else if (mp === 'Ozon' && account.ozon_client_id && account.ozon_api_key) {
-          // Encode in format expected by legacy logic (clientId:apiKey) or handle separately
-          // The logic below decodes standard strings, let's adapt it.
-          // Actually, let's just use the logic below which expects 'clientId:apiKey' for Ozon if we reuse code,
-          // OR we can make the sync logic invalidatingly cleaner.
-          // For minimal refactor, let's construct the key string.
-          const clientId = decryptApiKey(account.ozon_client_id);
-          const token = decryptApiKey(account.ozon_api_key);
-          if (clientId && token) {
-            apiKey = `${clientId}:${token}`;
+        try {
+          const products = await marketplaceService.fetchProducts(userId, mp, 100, account.id);
+
+          // Assign account_id and filter by limit
+          const productsToSave = products.map(p => ({
+            ...p,
+            account_id: account.id,
+          }));
+
+          const limitedProducts = productsToSave.slice(0, productLimit);
+          if (productsToSave.length > productLimit) limitReached = true;
+
+          if (limitedProducts.length > 0) {
+            // Need DBProduct type mapping here or ProductRepository should accept Partial<DBProduct>
+            // Ideally we need to map MarketplaceProduct to DBProduct shape
+            // Let's rely on type compatibility as much as possible, or map explicitly
+            const dbProducts = limitedProducts.map(p => ({
+              user_id: userId,
+              product_id: p.product_id,
+              nm_id: p.nm_id || null,
+              title: p.title,
+              image_url: p.image_url,
+              current_price: p.current_price,
+              estimated_buyer_price: p.current_price, // Fallback if not calculated
+              current_stock: p.current_stock,
+              marketplace: p.marketplace,
+              account_id: account.id,
+            }));
+            await productRepository.saveBatch(userId, dbProducts);
+            totalSaved += limitedProducts.length;
+            summary.push(`${account.name}: ${limitedProducts.length}`);
           }
+        } catch (e) {
+          console.error(`Error syncing account ${account.name}:`, e);
         }
-
-        if (!apiKey) continue;
-
-        const result = await performSync(userId, mp, apiKey, productLimit, account.id);
-        totalSaved += result.savedCount;
-        summary.push(`${account.name}: ${result.savedCount}`);
-        if (result.limitReached) limitReached = true;
       }
     } else {
-      // Legacy sync (Single account from user table)
-      const encryptedApiKey = mp === 'WB' ? user.api_key_wb : user.api_key_ozon;
-      if (!encryptedApiKey) {
-        return res.status(400).json({ error: `${mp} API ключ не настроен` });
-      }
-      const apiKey = decryptApiKey(encryptedApiKey);
+      // Legacy sync
+      try {
+        const products = await marketplaceService.fetchProducts(userId, mp, 100);
 
-      const result = await performSync(userId, mp, apiKey, productLimit);
-      totalSaved += result.savedCount;
-      summary.push(`Основной: ${result.savedCount}`);
-      if (result.limitReached) limitReached = true;
+        const productsToSave = products.map(p => ({
+          ...p,
+          account_id: undefined,
+        }));
+
+        const limitedProducts = productsToSave.slice(0, productLimit);
+        if (productsToSave.length > productLimit) limitReached = true;
+
+        if (limitedProducts.length > 0) {
+          const dbProducts = limitedProducts.map(p => ({
+            user_id: userId,
+            product_id: p.product_id,
+            nm_id: p.nm_id || null,
+            title: p.title,
+            image_url: p.image_url,
+            current_price: p.current_price,
+            estimated_buyer_price: p.current_price, // Fallback if not calculated
+            current_stock: p.current_stock,
+            marketplace: p.marketplace,
+          }));
+          await productRepository.saveBatch(userId, dbProducts);
+          totalSaved += limitedProducts.length;
+          summary.push(`Основной: ${limitedProducts.length}`);
+        }
+      } catch (e) {
+        // If legacy sync fails, it might be due to missing keys, which is expected for new users
+        console.warn('Legacy sync failed (expected if only accounts used):', e);
+      }
     }
 
     // Update user total
@@ -196,56 +232,6 @@ export async function handleSyncProducts(
   } catch (error) {
     console.error('Sync products error:', error);
     return res.status(500).json({ error: 'Internal sync error' });
-  }
-}
-
-/**
- * Helper function to perform sync for a specific set of keys
- */
-async function performSync(
-  userId: number,
-  mp: string,
-  apiKey: string,
-  productLimit: number,
-  accountId?: number
-): Promise<{ savedCount: number; limitReached: boolean }> {
-  // Import unified services
-  const { fetchWbProducts, fetchOzonProducts, saveProducts } = await import('../services/index.js');
-
-  let products: MarketplaceProduct[] = [];
-
-  try {
-    if (mp === 'Ozon') {
-      const [clientId, apiToken] = apiKey.includes(':') ? apiKey.split(':') : [apiKey, apiKey];
-      products = await fetchOzonProducts(clientId, apiToken, 100);
-    } else if (mp === 'WB') {
-      products = await fetchWbProducts(apiKey, 100);
-    }
-
-    // Assign account_id and filter by limit if needed
-    const productsToSave = products.map(p => ({
-      ...p,
-      account_id: accountId,
-    }));
-
-    // Handle subscription limits
-    const limitedProducts = productsToSave.slice(0, productLimit);
-    const limitReached = productsToSave.length > productLimit;
-
-    if (limitedProducts.length > 0) {
-      await saveProducts(userId, limitedProducts);
-    }
-
-    return {
-      savedCount: limitedProducts.length,
-      limitReached,
-    };
-  } catch (error) {
-    console.error(
-      `❌ [performSync] Error syncing ${mp} for account ${accountId || 'legacy'}:`,
-      error
-    );
-    return { savedCount: 0, limitReached: false };
   }
 }
 
@@ -345,6 +331,11 @@ export async function handleBatchSetStopLoss(
  * Applies min_price to WB/Ozon for all products that have min_price set
  * This is used to fix prices on marketplaces after bugs
  */
+/**
+ * Handle apply-min-prices action
+ * Applies min_price to WB/Ozon for all products that have min_price set
+ * This is used to fix prices on marketplaces after bugs
+ */
 export async function handleApplyMinPrices(
   _req: VercelRequest,
   res: VercelResponse,
@@ -353,20 +344,9 @@ export async function handleApplyMinPrices(
   console.log(`🔧 Apply min_prices to marketplace for user ${userId}`);
 
   try {
-    // Import marketplace functions
-    const { getMarketplaceKeys, updateWbPrices, updateOzonPrices } =
-      await import('../services/marketplace.js');
-
-    // Get user's marketplace keys
-    const keys = await getMarketplaceKeys(userId);
-
-    if (!keys.wb && !keys.ozon) {
-      return res.status(400).json({ error: 'No marketplace keys configured' });
-    }
-
-    // Get products with min_price set
+    // Get products with min_price set, including account_id
     const productsRes = await sql`
-      SELECT product_id, title, nm_id, min_price, marketplace, offer_id
+      SELECT product_id, title, nm_id, min_price, marketplace, offer_id, account_id
       FROM products
       WHERE user_id = ${userId}
       AND min_price > 0
@@ -382,51 +362,52 @@ export async function handleApplyMinPrices(
       });
     }
 
-    let wbUpdated = 0;
-    let ozonUpdated = 0;
+    let totalUpdated = 0;
     const errors: string[] = [];
 
-    // Apply WB prices
-    if (keys.wb) {
-      const wbProducts = products.filter(p => p.marketplace === 'WB' && p.nm_id && p.min_price > 0);
+    // Group by marketplace and account_id
+    // Key: "MARKETPLACE:ACCOUNT_ID" (account_id can be 'null')
+    const grouped = new Map<string, typeof products>();
 
-      if (wbProducts.length > 0) {
-        const updates = wbProducts.map(p => ({
-          nmId: p.nm_id,
-          price: p.min_price, // min_price is already in RUBLES
-        }));
-
-        console.log(`📡 Applying ${updates.length} WB prices:`, JSON.stringify(updates));
-
-        const result = await updateWbPrices(keys.wb, updates);
-
-        if (result.success) {
-          wbUpdated = result.count;
-          console.log(`✅ WB: Updated ${wbUpdated} prices`);
-        } else {
-          errors.push(`WB: ${result.error}`);
-        }
+    for (const p of products) {
+      const key = `${p.marketplace}:${p.account_id || 'legacy'}`;
+      if (!grouped.has(key)) {
+        grouped.set(key, []);
       }
+      grouped.get(key)?.push(p);
     }
 
-    // Apply Ozon prices
-    if (keys.ozon) {
-      const ozonProducts = products.filter(p => p.marketplace === 'Ozon' && p.min_price > 0);
+    for (const [key, groupProducts] of grouped.entries()) {
+      const [mp, accIdStr] = key.split(':');
+      const marketplace = mp as 'WB' | 'Ozon';
+      const accountId = accIdStr === 'legacy' ? undefined : Number(accIdStr);
 
-      if (ozonProducts.length > 0) {
-        const updates = ozonProducts.map(p => ({
-          productId: parseInt(p.product_id.replace('ozon-', '')),
-          price: p.min_price,
-        }));
+      try {
+        const updates = groupProducts
+          .map(p => ({
+            id: marketplace === 'WB' ? p.nm_id : parseInt(p.product_id.replace('ozon-', '')),
+            price: p.min_price,
+          }))
+          .filter(u => u.id); // Ensure valid IDs
 
-        const result = await updateOzonPrices(keys.ozon.clientId, keys.ozon.apiKey, updates);
-
-        if (result.success) {
-          ozonUpdated = result.count;
-          console.log(`✅ Ozon: Updated ${ozonUpdated} prices`);
-        } else {
-          errors.push(`Ozon: ${result.error}`);
+        if (updates.length > 0) {
+          const result = await marketplaceService.updatePrices(
+            userId,
+            marketplace,
+            updates,
+            accountId
+          );
+          if (result.success) {
+            totalUpdated += result.count;
+            console.log(`✅ ${marketplace} (acc=${accountId}): Updated ${result.count} prices`);
+          } else {
+            errors.push(`${marketplace} (acc=${accountId}): ${result.error}`);
+          }
         }
+      } catch (e) {
+        errors.push(
+          `${marketplace} (acc=${accountId}): ${e instanceof Error ? e.message : 'Unknown error'}`
+        );
       }
     }
 
@@ -438,14 +419,10 @@ export async function handleApplyMinPrices(
       AND min_price > 0
     `;
 
-    const totalUpdated = wbUpdated + ozonUpdated;
-
     return res.json({
       success: errors.length === 0,
-      message: `Цены применены: WB=${wbUpdated}, Ozon=${ozonUpdated}`,
+      message: `Цены применены. Обновлено: ${totalUpdated}`,
       updated: totalUpdated,
-      wbUpdated,
-      ozonUpdated,
       errors: errors.length > 0 ? errors : undefined,
     });
   } catch (error) {

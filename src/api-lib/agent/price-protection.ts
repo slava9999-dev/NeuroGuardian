@@ -13,7 +13,7 @@ import {
   updateOzonPrices,
   getMarketplaceKeys,
   type MarketplaceProduct,
-} from '../services/marketplace.js';
+} from '../services/marketplace-bridge.js';
 import { logOpsEvent, logPriceChange } from '../services/ops-logger.js';
 
 // ============================================

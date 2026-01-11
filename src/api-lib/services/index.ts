@@ -63,46 +63,8 @@ export {
   sendTelegramNotification,
 } from './notifications.js';
 
-// Marketplace (WB & Ozon unified API)
-export {
-  getMarketplaceKeys,
-  fetchWbProducts,
-  fetchWbPrices,
-  fetchWbStocks,
-  updateWbPrices,
-  fetchOzonProducts,
-  updateOzonPrices,
-  fetchOzonSalesStats,
-  fetchWbSalesStats,
-  // Sentinel defense operations
-  fetchOzonCurrentPrices,
-  fetchOzonProductInfo,
-  fetchOzonStocksV3,
-  fetchOzonAnalytics,
-  fetchWbOrders,
-  fetchOzonOrders,
-  fetchOzonFbsUnfulfilledOrders,
-  setOzonZeroStock,
-  setOzonDefensePrice,
-  setWbZeroStock,
-  setWbDefensePrice,
-  // FBS Stock management
-  updateWbStockFbs,
-  getWbFbsWarehouses,
-  updateOzonStockFbs,
-  getOzonFbsWarehouses,
-  // Buyer price estimation (since Ozon removed marketing_price from API)
-  calculateOzonBuyerPrice,
-  calculateWbBuyerPrice,
-  OZON_DISCOUNT_CONFIG,
-  WB_DISCOUNT_CONFIG,
-  type MarketplaceProduct,
-  type MarketplacePriceUpdate,
-  type MarketplaceSalesStats,
-  type MarketplaceApiKeys,
-  // Sales Sync
-  syncSalesHistory,
-} from './marketplace.js';
+// Marketplace (Unified via Bridge)
+export * from './marketplace-bridge.js';
 
 // Unit Economics (Dec 2024)
 export {

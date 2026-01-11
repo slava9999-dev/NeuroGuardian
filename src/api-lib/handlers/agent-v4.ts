@@ -418,7 +418,7 @@ export async function handleAgentV4Confirm(
     updateWbStockFbs,
     updateOzonStockFbs,
     getMarketplaceKeys,
-  } = await import('../services/marketplace.js');
+  } = await import('../services/marketplace-bridge.js');
   const { updateProductMinPrice, getProductsByUserId } = await import('../services/database.js');
   const { validatePriceUpdateSync } = await import('../services/price-guard.js');
 
@@ -593,7 +593,7 @@ export async function handleAgentV4Confirm(
         const ozonUpdates = stockUpdates.filter(u => u.marketplace === 'Ozon');
 
         const accountId = pendingAction.details.account_id as number | undefined;
-        const { getMarketplaceKeys } = await import('../services/marketplace.js');
+        const { getMarketplaceKeys } = await import('../services/marketplace-bridge.js');
         const keys = await getMarketplaceKeys(userId, accountId);
 
         let wbResult: { success: boolean; count: number; error?: string } = {

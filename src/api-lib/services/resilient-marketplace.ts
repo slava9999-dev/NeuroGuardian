@@ -15,7 +15,7 @@ import {
   updateOzonPrices,
   fetchOzonCurrentPrices,
   type MarketplaceProduct,
-} from './marketplace.js';
+} from './marketplace-bridge.js';
 
 // ============================================
 // TYPES
