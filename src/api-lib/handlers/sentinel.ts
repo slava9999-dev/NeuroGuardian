@@ -9,6 +9,7 @@ import { verifyAdminAccessAsync, extractAnyAuthAsync } from '../middleware/auth.
 
 /**
  * Handle check-prices action (Sentinel Cron)
+ * Supports ?includeReport=true to send daily report after price check (for Vercel Hobby single-cron limit)
  */
 export async function handleCheckPrices(
   req: VercelRequest,
