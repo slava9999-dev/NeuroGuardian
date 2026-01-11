@@ -69,6 +69,25 @@
 - `src/sentinel/AlertSender.ts` — new critical alert method
 - `src/sentinel/SentinelOrchestrator.ts` — integration of critical alerts
 
+### Session 2026-01-11 (Session 35.1 - Sentinel V5 Dashboard) 📊
+
+**Визуализация защиты (Frontend V5):**
+
+- [x] **DASHBOARD UI**: Создан компонент `SentinelDashboard.tsx` с реальным отображением угроз (V5 ThreatDetector).
+- [x] **INTEGRATION**: `DashboardPage.tsx` переведен на новый компонент.
+- [x] **REAL-TIME**: Автообновление статуса каждые 30 секунд, кнопка принудительного сканирования.
+- [x] **ANALYTICS**: Графики сэкономленных средств, статистика атак и эрозии маржи.
+
+**Commits:**
+
+- `feat(ui): implement Sentinel V5 Dashboard with real-time threat monitoring`
+
+**Файлы изменены:**
+
+- `src/components/dashboard/SentinelDashboard.tsx` — новый компонент
+- `src/pages/DashboardPage.tsx` — интеграция
+- `src/lib/telegram.ts` — helper for initData
+
 ### Session 2026-01-11 (Session 33 - Modular Agent Tools) 🧱
 
 **Переход на модульную архитектуру инструментов ("Lego-blocks"):**

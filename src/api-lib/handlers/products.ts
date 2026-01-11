@@ -456,3 +456,88 @@ export async function handleApplyMinPrices(
     });
   }
 }
+
+/**
+ * Handle batch-update-costs action
+ * Allows mass updating of cost_price for unit economics
+ */
+export async function handleBatchUpdateCosts(
+  req: VercelRequest,
+  res: VercelResponse,
+  userId: number
+): Promise<VercelResponse> {
+  const { updates } = req.body || {};
+
+  if (!Array.isArray(updates) || updates.length === 0) {
+    return res.status(400).json({
+      error: 'Invalid updates format',
+      message: 'Expected array of { productId, costPrice }',
+    });
+  }
+
+  // Limit batch size to prevent timeouts
+  if (updates.length > 100) {
+    return res.status(400).json({
+      error: 'Batch too large',
+      message: 'Max 100 items per request',
+    });
+  }
+
+  try {
+    const results = {
+      success: 0,
+      failed: 0,
+      errors: [] as string[],
+    };
+
+    // 1. Get all user products to verify ownership efficiently
+    const ownershipCheck = await sql`
+      SELECT product_id FROM products WHERE user_id = ${userId}
+    `;
+    const userProductIds = new Set(ownershipCheck.rows.map(r => r.product_id));
+
+    // 2. Process updates
+    // Using individual updates for safety and explicit error handling per item
+    // For 100 items, parallel Promise.all is acceptable
+    const updatePromises = updates.map(async (item: any) => {
+      const { productId, costPrice } = item;
+      const cost = Number(costPrice);
+
+      if (!productId || isNaN(cost) || cost < 0) {
+        results.failed++;
+        results.errors.push(`Invalid data for ${productId}: cost must be >= 0`);
+        return;
+      }
+
+      if (!userProductIds.has(productId)) {
+        results.failed++;
+        results.errors.push(`Access denied for ${productId}`);
+        return;
+      }
+
+      try {
+        await updateProductCostPrice(userId, productId, cost);
+        results.success++;
+      } catch (e: any) {
+        results.failed++;
+        results.errors.push(`DB Error ${productId}: ${e.message}`);
+      }
+    });
+
+    await Promise.all(updatePromises);
+
+    console.log(
+      `💰 Batch Costs (Modular): user=${userId}, success=${results.success}, failed=${results.failed}`
+    );
+
+    return res.json({
+      success: true,
+      updated: results.success,
+      failed: results.failed,
+      errors: results.errors.length > 0 ? results.errors : undefined,
+    });
+  } catch (error) {
+    console.error('Batch update costs error:', error);
+    return res.status(500).json({ error: 'Internal server error during batch update' });
+  }
+}

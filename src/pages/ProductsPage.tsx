@@ -9,6 +9,7 @@ import { useAppStore, useProductsStore } from '../stores';
 import { GlobalSwitch } from '../components/controls/GlobalSwitch';
 import { DashboardGrid } from '../components/dashboard/DashboardGrid';
 import { BulkStopLossModal } from '../components/dashboard/BulkStopLossModal';
+import { BulkUpdateCostsModal } from '../components/dashboard/BulkUpdateCostsModal';
 import { LogHistory } from '../components/dashboard/LogHistory';
 import { hapticFeedback } from '../lib/telegram';
 
@@ -34,6 +35,7 @@ export function ProductsPage({ onBack }: ProductsPageProps) {
   const products = useProductsStore(state => state.products);
 
   const [showBulkStopLoss, setShowBulkStopLoss] = useState(false);
+  const [showBulkCosts, setShowBulkCosts] = useState(false);
   const [showLogHistory, setShowLogHistory] = useState(false);
 
   // NOTE: Mock data loading removed for production safety (AUDIT-2025-12-28)
@@ -162,6 +164,18 @@ export function ProductsPage({ onBack }: ProductsPageProps) {
             </svg>
             <span className="text-sm">Включить Сторожа</span>
           </button>
+
+          <button
+            onClick={() => {
+              hapticFeedback('light');
+              setShowBulkCosts(true);
+            }}
+            className="py-3 px-4 rounded-xl bg-blue-500/20 border border-blue-500/30 text-blue-400 hover:bg-blue-500/30 transition-all"
+            title="Загрузить себестоимость"
+          >
+            📦
+          </button>
+
           <button
             onClick={() => {
               hapticFeedback('light');
@@ -219,6 +233,7 @@ export function ProductsPage({ onBack }: ProductsPageProps) {
 
       {/* Modals */}
       <BulkStopLossModal isOpen={showBulkStopLoss} onClose={() => setShowBulkStopLoss(false)} />
+      <BulkUpdateCostsModal isOpen={showBulkCosts} onClose={() => setShowBulkCosts(false)} />
       {showLogHistory && (
         <LogHistory isOpen={showLogHistory} onClose={() => setShowLogHistory(false)} />
       )}
