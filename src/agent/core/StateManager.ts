@@ -9,19 +9,22 @@ import type { UserState } from '../../core/types/index.js';
 
 export class StateManager {
   private readonly TABLE_NAME = 'user_state';
+  private tableChecked = false;
 
   constructor() {
-    this.ensureTableExists();
+    // No longer calling async method in constructor to prevent unhandled rejections
   }
 
   /**
-   * Ensure the user_state table exists
+   * Lazily ensure the table exists
    */
-  private async ensureTableExists(): Promise<void> {
+  private async lazyEnsureTableExists(): Promise<void> {
+    if (this.tableChecked) return;
+
     try {
       await sql`
         CREATE TABLE IF NOT EXISTS ${sql(this.TABLE_NAME)} (
-          user_id INTEGER PRIMARY KEY,
+          user_id BIGINT PRIMARY KEY,
           marketplace TEXT,
           has_api_keys BOOLEAN NOT NULL DEFAULT false,
           products_count INTEGER NOT NULL DEFAULT 0,
@@ -38,8 +41,10 @@ export class StateManager {
           updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
         )
       `;
+      this.tableChecked = true;
     } catch (error) {
       console.error('Failed to create user_state table:', error);
+      // Don't set tableChecked to true so we retry next time
     }
   }
 
@@ -47,6 +52,8 @@ export class StateManager {
    * Get user state from database
    */
   async getState(userId: number): Promise<UserState> {
+    await this.lazyEnsureTableExists();
+
     try {
       const result = await sql`
         SELECT * FROM ${sql(this.TABLE_NAME)} WHERE user_id = ${userId}
@@ -57,7 +64,7 @@ export class StateManager {
       if (result.rows.length > 0) {
         const row = result.rows[0];
         state = {
-          userId: userId,
+          userId: Number(userId),
           marketplace: (row.marketplace as 'WB' | 'Ozon' | 'both' | null) || null,
           hasApiKeys: row.has_api_keys || false,
           hasWbKey: false,
@@ -66,10 +73,10 @@ export class StateManager {
           subscriptionTier: (row.subscription_tier as 'free' | 'basic' | 'pro') || 'free',
           currentIntent: row.current_intent || undefined,
           pendingAction: row.pending_action
-            ? this.parseJsonWithDate(row.pending_action)
+            ? (this.parseJsonWithDate(row.pending_action) as UserState['pendingAction'])
             : undefined,
           awaitingInput: row.awaiting_input
-            ? this.parseJsonWithDate(row.awaiting_input)
+            ? (this.parseJsonWithDate(row.awaiting_input) as UserState['awaitingInput'])
             : undefined,
           lastMentionedProducts: Array.isArray(row.last_mentioned_products)
             ? row.last_mentioned_products
@@ -97,12 +104,12 @@ export class StateManager {
     return this.getDefaultState(userId);
   }
 
-  private parseJsonWithDate(data: unknown): any {
+  private parseJsonWithDate(data: unknown): unknown {
     if (typeof data === 'string') {
       try {
         const parsed = JSON.parse(data);
         if (parsed && typeof parsed === 'object' && 'createdAt' in parsed) {
-          (parsed as any).createdAt = new Date((parsed as any).createdAt);
+          (parsed as Record<string, unknown>).createdAt = new Date(String(parsed.createdAt));
         }
         return parsed;
       } catch {
@@ -110,7 +117,7 @@ export class StateManager {
       }
     }
     if (data && typeof data === 'object' && data !== null && 'createdAt' in data) {
-      (data as any).createdAt = new Date((data as any).createdAt);
+      (data as Record<string, unknown>).createdAt = new Date(String((data as any).createdAt));
     }
     return data;
   }
@@ -119,6 +126,8 @@ export class StateManager {
    * Update user state partially
    */
   async updateState(userId: number, partial: Partial<UserState>): Promise<void> {
+    await this.lazyEnsureTableExists();
+
     try {
       const currentState = await this.getState(userId);
       const newState = { ...currentState, ...partial, lastActiveAt: new Date() };
@@ -215,8 +224,9 @@ export class StateManager {
   }
 
   async recordQuery(userId: number, query: string): Promise<void> {
+    const state = await this.getState(userId);
     await this.updateState(userId, {
-      totalQueries: (await this.getState(userId)).totalQueries + 1,
+      totalQueries: state.totalQueries + 1,
       lastQuery: query,
     });
   }
@@ -266,6 +276,7 @@ export class StateManager {
    * Reset user state (for testing)
    */
   async resetState(userId: number): Promise<void> {
+    await this.lazyEnsureTableExists();
     try {
       await sql`DELETE FROM ${sql(this.TABLE_NAME)} WHERE user_id = ${userId}`;
     } catch (error) {

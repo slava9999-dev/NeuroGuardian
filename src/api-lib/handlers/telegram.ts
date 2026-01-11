@@ -6,7 +6,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql } from '@vercel/postgres';
-import { orchestrateV4 } from '../agent/orchestrator-v4.js';
+import { orchestrateV5 } from '../../agent/core/AgentOrchestratorV5.js';
 import { logger } from '../lib/index.js';
 
 // ============================================
@@ -336,15 +336,21 @@ ${!isActive ? '\n💡 Оформите подписку для продолже�
 // MESSAGE HANDLER (VIKTOR AI)
 // ============================================
 
-async function handleUserMessage(chatId: number, userId: number, text: string): Promise<void> {
+async function handleUserMessage(
+  chatId: number,
+  userId: number,
+  text: string,
+  userName?: string
+): Promise<void> {
   // Show typing indicator
   await sendTypingAction(chatId);
 
   try {
-    // Call Viktor AI Agent
-    const result = await orchestrateV4(text, {
+    // Call Viktor AI Agent V5
+    const result = await orchestrateV5(text, {
       userId,
-      marketplace: 'all',
+      isFirstContact: false, // Could be improved based on history
+      userName: userName || 'друг',
     });
 
     if (result.success) {
@@ -449,7 +455,18 @@ async function handleCallbackQuery(query: TelegramCallbackQuery): Promise<void> 
       const command = `Установи цену ${price} для товара с артикулом ${externalId} на ${marketplace}`;
 
       try {
-        const result = await orchestrateV4(command, { userId, marketplace: 'all' });
+        const result = await orchestrateV5(command, {
+          userId,
+          isFirstContact: false,
+          userName: query.from.first_name,
+          directExecution: {
+            tool: 'update_prices', // Optimistic execution hint
+            args: {
+              marketplace,
+              products: [{ product_id: externalId, new_price: parseFloat(price) }],
+            },
+          },
+        });
 
         if (result.success) {
           await sendTelegramMessage(
@@ -618,11 +635,11 @@ export async function handleTelegramWebhook(
             break;
           default:
             // Unknown command - treat as message
-            await handleUserMessage(chatId, userId, text);
+            await handleUserMessage(chatId, userId, text, user.first_name);
         }
       } else if (text) {
         // Regular message - send to Viktor AI
-        await handleUserMessage(chatId, userId, text);
+        await handleUserMessage(chatId, userId, text, user.first_name);
       }
     }
 

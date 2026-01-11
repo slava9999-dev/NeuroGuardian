@@ -1,19 +1,4 @@
-// ============================================
-// NeuroGUARDIAN — Agent V5 Verification Script
-// ============================================
-
-import dotenv from 'dotenv';
-import fs from 'fs';
-
-// Load env vars
-if (fs.existsSync('.env.production')) {
-  dotenv.config({ path: '.env.production' });
-  console.log('Loaded .env.production');
-} else {
-  dotenv.config();
-  console.log('Loaded default .env');
-}
-
+import './env.js';
 import { registerAllTools } from '../src/agent/execution/index.js';
 import { agentOrchestratorV5 } from '../src/agent/core/AgentOrchestratorV5.js';
 import { OrchestratorContext } from '../src/core/types/agent.types.js';

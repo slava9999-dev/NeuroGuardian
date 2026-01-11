@@ -11,9 +11,15 @@ const ENCRYPTION_ALGORITHM = 'aes-256-gcm';
 /**
  * Encrypt API key using AES-256-GCM
  * Format: iv:authTag:encryptedData (all hex)
+ * @throws Will throw error if encryption key is not configured
  */
 export function encryptApiKey(apiKey: string): string {
-  if (!apiKey || !API_KEY_ENCRYPTION_KEY) return apiKey;
+  if (!apiKey) return apiKey;
+  if (!API_KEY_ENCRYPTION_KEY) {
+    throw new Error(
+      'CRYPTOGRAPHIC_ERROR: API_KEY_ENCRYPTION_KEY is not configured. Refusing to store plaintext secrets.'
+    );
+  }
 
   try {
     const key = Buffer.from(API_KEY_ENCRYPTION_KEY.slice(0, 32), 'utf8');
@@ -27,24 +33,39 @@ export function encryptApiKey(apiKey: string): string {
     return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted}`;
   } catch (error) {
     console.error('Encryption error:', error);
-    return apiKey; // Fallback
+    throw new Error(
+      'CRYPTOGRAPHIC_ERROR: Failed to encrypt API key. This is a critical security failure.'
+    );
   }
 }
 
 /**
  * Decrypt API key using AES-256-GCM
+ * @throws Will throw error if decryption fails or key is not configured
  */
 export function decryptApiKey(encryptedKey: string): string {
   if (!encryptedKey) return '';
 
   // Check if key is encrypted (contains colons for iv:authTag:data format)
-  if (!encryptedKey.includes(':') || !API_KEY_ENCRYPTION_KEY) {
-    return encryptedKey; // Not encrypted or no key configured
+  if (!encryptedKey.includes(':')) {
+    // AUDIT-FIX: Allow legacy plaintext keys during migration
+    // console.warn('CRYPTOGRAPHIC_WARNING: Legacy plaintext key detected.');
+    return encryptedKey;
+  }
+
+  if (!API_KEY_ENCRYPTION_KEY) {
+    throw new Error(
+      'CRYPTOGRAPHIC_ERROR: API_KEY_ENCRYPTION_KEY is not configured. Cannot decrypt secrets.'
+    );
   }
 
   try {
     const [ivHex, authTagHex, encrypted] = encryptedKey.split(':');
-    if (!ivHex || !authTagHex || !encrypted) return encryptedKey;
+    if (!ivHex || !authTagHex || !encrypted) {
+      throw new Error(
+        'CRYPTOGRAPHIC_ERROR: Invalid encrypted key format. Missing required components.'
+      );
+    }
 
     const key = Buffer.from(API_KEY_ENCRYPTION_KEY.slice(0, 32), 'utf8');
     const iv = Buffer.from(ivHex, 'hex');
@@ -59,6 +80,8 @@ export function decryptApiKey(encryptedKey: string): string {
     return decrypted;
   } catch (error) {
     console.error('Decryption error:', error);
-    return encryptedKey; // Return as-is if decryption fails
+    throw new Error(
+      'CRYPTOGRAPHIC_ERROR: Failed to decrypt API key. The key may be corrupted or the encryption key may have changed.'
+    );
   }
 }

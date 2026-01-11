@@ -4,7 +4,7 @@
 // Single Source of Truth for marketplace operations
 // ============================================
 
-import { decryptApiKey, fetchWithRetry } from '../lib/index.js';
+import { decryptApiKey, fetchWithRetry, withCircuitBreaker } from '../lib/index.js';
 import { getUserById, upsertMarketplaceOrders, type MarketplaceOrder } from './database.js';
 import type {
   WbCard,
@@ -226,14 +226,11 @@ export async function fetchWbStocks(apiKey: string, nmIds: number[]): Promise<Ma
   console.log(`🚀 WB STOCKS START: Fetching for ${nmIds.length} products, first nmId=${nmIds[0]}`);
 
   try {
-    // Step 1: Try FBS warehouses first
-    console.log(`🔍 WB FBS: Fetching warehouses...`);
-    const warehousesRes = await fetchWithRetry(
-      'https://marketplace-api.wildberries.ru/api/v3/warehouses',
-      {
+    const warehousesRes = await withCircuitBreaker('wb_api', () =>
+      fetchWithRetry('https://marketplace-api.wildberries.ru/api/v3/warehouses', {
         method: 'GET',
         headers: { Authorization: apiKey },
-      }
+      })
     );
 
     console.log(`📡 WB Warehouses API: status=${warehousesRes.status}`);
@@ -315,14 +312,16 @@ export async function fetchWbStocks(apiKey: string, nmIds: number[]): Promise<Ma
 
     const today = new Date();
     const dateFrom = new Date(today);
-    dateFrom.setDate(today.getDate() - 1); // Yesterday
-
-    const fboRes = await fetchWithRetry(
-      `https://statistics-api.wildberries.ru/api/v1/supplier/stocks?dateFrom=${dateFrom.toISOString().split('T')[0]}`,
-      {
-        method: 'GET',
-        headers: { Authorization: apiKey },
-      }
+    const fboRes = await withCircuitBreaker('wb_api', () =>
+      fetchWithRetry(
+        `https://statistics-api.wildberries.ru/api/v1/supplier/stocks?dateFrom=${
+          dateFrom.toISOString().split('T')[0]
+        }`,
+        {
+          method: 'GET',
+          headers: { Authorization: apiKey },
+        }
+      )
     );
 
     console.log(`📡 WB FBO Statistics API: status=${fboRes.status}`);
@@ -367,9 +366,8 @@ export async function fetchWbProducts(apiKey: string, limit = 100): Promise<Mark
   // Step 1: Get product cards from Content API
   let cards: WbCard[] = [];
   try {
-    const cardsResponse = await fetchWithRetry(
-      'https://content-api.wildberries.ru/content/v2/get/cards/list',
-      {
+    const cardsResponse = await withCircuitBreaker('wb_api', () =>
+      fetchWithRetry('https://content-api.wildberries.ru/content/v2/get/cards/list', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -381,7 +379,7 @@ export async function fetchWbProducts(apiKey: string, limit = 100): Promise<Mark
             filter: { withPhoto: -1 },
           },
         }),
-      }
+      })
     );
 
     if (!cardsResponse.ok) {
@@ -448,13 +446,12 @@ export async function fetchWbPrices(
     // Step 1: Try Prices API first
 
     const url = new URL('https://discounts-prices-api.wildberries.ru/api/v2/list/goods/filter');
-    url.searchParams.set('limit', '1000');
-    url.searchParams.set('offset', '0');
-
-    const response = await fetchWithRetry(url.toString(), {
-      method: 'GET',
-      headers: { Authorization: apiKey },
-    });
+    const response = await withCircuitBreaker('wb_api', () =>
+      fetchWithRetry(url.toString(), {
+        method: 'GET',
+        headers: { Authorization: apiKey },
+      })
+    );
 
     if (response.ok) {
       const data = (await response.json()) as { data: { listGoods: WbGoodsItem[] } };
@@ -753,15 +750,17 @@ export async function fetchOzonProducts(
 ): Promise<MarketplaceProduct[]> {
   // Step 1: Get product list
   try {
-    const listResponse = await fetchWithRetry('https://api-seller.ozon.ru/v3/product/list', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Client-Id': clientId,
-        'Api-Key': apiKey,
-      },
-      body: JSON.stringify({ filter: {}, last_id: '', limit }),
-    });
+    const listResponse = await withCircuitBreaker('ozon_api', () =>
+      fetchWithRetry('https://api-seller.ozon.ru/v3/product/list', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Client-Id': clientId,
+          'Api-Key': apiKey,
+        },
+        body: JSON.stringify({ filter: {}, last_id: '', limit }),
+      })
+    );
 
     if (!listResponse.ok) {
       const errorText = await listResponse.text();
@@ -777,15 +776,17 @@ export async function fetchOzonProducts(
 
     // Step 2: Get product details (moved inside try block to be safe)
     const productIds = items.map(item => item.product_id);
-    const detailResponse = await fetchWithRetry('https://api-seller.ozon.ru/v3/product/info/list', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Client-Id': clientId,
-        'Api-Key': apiKey,
-      },
-      body: JSON.stringify({ product_id: productIds }),
-    });
+    const detailResponse = await withCircuitBreaker('ozon_api', () =>
+      fetchWithRetry('https://api-seller.ozon.ru/v3/product/info/list', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Client-Id': clientId,
+          'Api-Key': apiKey,
+        },
+        body: JSON.stringify({ product_id: productIds }),
+      })
+    );
 
     if (!detailResponse.ok) {
       throw new Error(`Ozon Product Info API error: ${detailResponse.status}`);

@@ -182,11 +182,7 @@ export async function extractAnyAuthAsync(req: VercelRequest): Promise<AuthResul
   try {
     // Admin Key Bypass: Allow testing/admin access with valid admin key
     // This is safe because ADMIN_API_KEY itself is secret
-    const adminKey = (
-      (req.headers['x-admin-key'] as string) ||
-      (req.query.key as string) ||
-      ''
-    ).trim();
+    const adminKey = ((req.headers['x-admin-key'] as string) || '').trim();
     const telegramId = req.query?.telegramId || req.body?.telegramId;
 
     if (adminKey && telegramId) {
@@ -281,7 +277,7 @@ export function extractAnyAuth(req: VercelRequest): AuthResult {
  */
 export async function verifyAdminAccessAsync(req: VercelRequest): Promise<boolean> {
   const authHeader = req.headers.authorization || '';
-  const adminKey = (req.headers['x-admin-key'] as string) || (req.query.key as string) || '';
+  const adminKey = (req.headers['x-admin-key'] as string) || '';
 
   const [cronSecret, expectedAdminKey] = await Promise.all([
     getSecret('cron_secret', 'admin_access_verify'),
@@ -324,7 +320,7 @@ export async function verifyAdminAccessAsync(req: VercelRequest): Promise<boolea
  */
 export function verifyAdminAccess(req: VercelRequest): boolean {
   const authHeader = req.headers.authorization || '';
-  const adminKey = (req.headers['x-admin-key'] as string) || (req.query.key as string) || '';
+  const adminKey = (req.headers['x-admin-key'] as string) || '';
 
   const cronSecret = getSecretSync('cron_secret');
   const expectedAdminKey = getSecretSync('admin_api_key');

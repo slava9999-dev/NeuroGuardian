@@ -53,14 +53,6 @@ export {
   saveProducts,
 } from './database.js';
 
-// YooKassa
-export {
-  createYookassaPayment,
-  getPaymentStatus,
-  isValidYookassaIP,
-  type PaymentResult,
-} from './yookassa.js';
-
 // Notifications
 // Notifications
 export {

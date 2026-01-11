@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { PriceShieldService, PriceRule } from '../../src/api-lib/services/price-shield.js';
+import { PriceShieldService, PriceRule } from '../../src/api-lib/services/legacy/price-shield.js';
 
 describe('PriceShieldService', () => {
   const service = new PriceShieldService();

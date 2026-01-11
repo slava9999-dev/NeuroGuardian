@@ -16,6 +16,9 @@ import { stateManager } from './StateManager.js';
 import { contextResolver } from './ContextResolver.js';
 import { promptBuilder } from './PromptBuilder.js';
 import { toolRegistry } from '../execution/ToolRegistry.js';
+import { llmRouter } from '../../infrastructure/llm/LLMRouter.js';
+
+import type { LLMMessage } from '../../infrastructure/llm/LLMProvider.js';
 
 // ============================================
 // TYPES
@@ -78,6 +81,11 @@ export class AgentOrchestratorV5 {
       // ========================================
       const userState = await stateManager.getState(context.userId);
       const resolvedContext = await contextResolver.resolve(context.userId, message);
+
+      // Merge direct execution from context if provided
+      if (context.directExecution && !resolvedContext.directExecution) {
+        resolvedContext.directExecution = context.directExecution;
+      }
 
       console.log(`[Orchestrator V5] Context resolved:`, {
         isContextual: resolvedContext.isContextualResponse,
@@ -270,16 +278,15 @@ export class AgentOrchestratorV5 {
     userMessage: string
   ): Promise<{ success: boolean; plan?: AgentPlan; error?: string; tokensUsed: number }> {
     try {
-      const { callLLMWithFallback } = await import('../../api-lib/agent/orchestrator-v4.js');
-
-      const messages = [
+      const messages: LLMMessage[] = [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage },
       ];
 
-      const result = await callLLMWithFallback(messages, {
+      const result = await llmRouter.complete(messages, {
         temperature: 0.1,
         maxTokens: 500,
+        jsonMode: true, // Force JSON for planner
       });
 
       // Parse JSON
@@ -348,8 +355,6 @@ export class AgentOrchestratorV5 {
     tokensUsed: number;
   }> {
     try {
-      const { callLLMWithFallback } = await import('../../api-lib/agent/orchestrator-v4.js');
-
       const systemPrompt = promptBuilder.buildAnswererPrompt({
         userState,
         recentHistory: conversationHistory || [],
@@ -362,12 +367,12 @@ ${JSON.stringify(toolResults, null, 2)}
 
 Сформируй ответ в формате JSON.`;
 
-      const result = await callLLMWithFallback(
+      const result = await llmRouter.complete(
         [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage },
         ],
-        { temperature: 0.3, maxTokens: 1500 }
+        { temperature: 0.3, maxTokens: 1500, jsonMode: true }
       );
 
       const parsed = JSON.parse(result.content);

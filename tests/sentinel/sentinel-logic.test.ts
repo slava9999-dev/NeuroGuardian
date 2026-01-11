@@ -50,7 +50,7 @@ vi.mock('../../src/api-lib/services/notifications.js', () => ({
   },
 }));
 
-vi.mock('../../src/api-lib/services/price-shield.js', () => ({
+vi.mock('../../src/api-lib/services/_deprecated/price-shield.js', () => ({
   priceShield: {
     getRulesForUser: vi.fn(() => Promise.resolve([])), // Default: no rules -> regular logic
     calculateOptimalPrice: vi.fn(),

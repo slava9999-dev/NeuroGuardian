@@ -5,7 +5,7 @@
 
 import { sql } from './database.js';
 import { logOpsEvent } from './ops-logger.js';
-import { callLLMWithFallback } from '../agent/orchestrator-v4.js';
+import { llmRouter } from '../../infrastructure/llm/LLMRouter.js';
 import { getSecret } from '../lib/secrets-helper.js';
 
 // ============================================
@@ -244,7 +244,7 @@ function getAlertButtons(alert: Alert): Record<string, unknown> | undefined {
 async function generateSmartMessage(alert: Alert): Promise<string | null> {
   // TEMP: Skip LLM call to avoid timeouts when local LLM is not running
   // Re-enable when Groq or other cloud LLM is configured
-  return null;
+  // return null; // This line was commented out as per the instruction to enable LLM
 
   // Only for relevant alert types
   const smartTypes: AlertType[] = [
@@ -281,7 +281,7 @@ async function generateSmartMessage(alert: Alert): Promise<string | null> {
 Данные:\n${context}`;
 
   try {
-    const response = await callLLMWithFallback(
+    const response = await llmRouter.complete(
       [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
@@ -289,7 +289,6 @@ async function generateSmartMessage(alert: Alert): Promise<string | null> {
       {
         temperature: 0.7,
         maxTokens: 500,
-        preferredModel: 'llama-3.3-70b-versatile',
       }
     );
 

@@ -1,128 +1,66 @@
-import { getLLMConfig, type LLMConfig } from '../../core/config/llm.config.js';
-import { LLMError } from '../../core/errors/AgentErrors.js';
-import type { LLMCompletionResult } from '../../core/types/agent.types.js';
+import type { LLMProvider, LLMMessage, LLMResponse } from './LLMProvider.js';
+import { getLLMConfig } from '../../core/config/llm.config.js';
+import { OpenRouterProvider } from './OpenRouterProvider.js';
+import { OpenAIProvider } from './OpenAIProvider.js';
 
 export class LLMRouter {
-  private config: LLMConfig | null = null;
+  private providers: LLMProvider[] = [];
+  private initialized = false;
 
-  constructor() {}
-
-  private async ensureConfig(): Promise<LLMConfig> {
-    if (!this.config) {
-      this.config = await getLLMConfig();
+  constructor(providers?: LLMProvider[]) {
+    if (providers) {
+      this.providers = providers;
+      this.initialized = true;
     }
-    return this.config;
   }
 
-  /**
-   * Route a completion request to the appropriate model
-   */
-  async complete(
-    prompt: string,
-    mode: 'planner' | 'chat' | 'fast' = 'chat',
-    options: {
-      temperature?: number;
-      maxTokens?: number;
-      jsonMode?: boolean;
-    } = {}
-  ): Promise<LLMCompletionResult> {
-    const config = await this.ensureConfig();
-    const model = config.models[mode];
+  private async ensureInitialized() {
+    if (this.initialized) return;
 
     try {
+      const config = await getLLMConfig();
+      // Initialize based on config provider
       if (config.provider === 'openrouter') {
-        return await this.callOpenRouter(prompt, model, config.apiKey, options);
+        this.providers.push(new OpenRouterProvider());
+        // Fallback: if we have openai key, add it?
+        // For now, adhere to explicit config choice for primary
       } else if (config.provider === 'openai') {
-        return await this.callOpenAI(prompt, model, config.apiKey, options);
+        this.providers.push(new OpenAIProvider());
       } else {
-        throw new Error(`Unsupported provider: ${config.provider}`);
+        // Default to OpenRouter if unknown or not set?
+        // Or throw
+        console.warn(`Unknown LLM provider in config: ${config.provider}`);
       }
-    } catch (error) {
-      console.error(`LLM Call Failed (${mode}/${model}):`, error);
-      throw new LLMError(config.provider, error instanceof Error ? error.message : String(error));
+
+      // Add backup providers if keys available?
+      // Logic for backup keys would need to be in config or fetched here.
+      // Keeping it simple: 1 provider from config for now + explicit injects.
+    } catch (e) {
+      console.warn('Failed to initialize LLM config', e);
     }
+    this.initialized = true;
   }
 
-  private async callOpenRouter(
-    prompt: string,
-    model: string,
-    apiKey: string,
-    options: any
-  ): Promise<LLMCompletionResult> {
-    const startTime = Date.now();
+  async complete(messages: LLMMessage[], options?: any): Promise<LLMResponse> {
+    await this.ensureInitialized();
 
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://neuroguardian.app',
-        'X-Title': 'NeuroGUARDIAN',
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: options.temperature ?? 0.7,
-        max_tokens: options.maxTokens,
-        response_format: options.jsonMode ? { type: 'json_object' } : undefined,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`OpenRouter API Error: ${response.status} ${errorText}`);
+    if (this.providers.length === 0) {
+      throw new Error('No LLM providers initialized');
     }
 
-    const data = (await response.json()) as any;
-    const content = data.choices[0]?.message?.content || '';
-    const tokensUsed = data.usage?.total_tokens || 0;
+    const errors: Error[] = [];
 
-    return {
-      content,
-      tokensUsed,
-      provider: 'openrouter',
-      latencyMs: Date.now() - startTime,
-    };
-  }
-
-  private async callOpenAI(
-    prompt: string,
-    model: string,
-    apiKey: string,
-    options: any
-  ): Promise<LLMCompletionResult> {
-    const startTime = Date.now();
-
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: options.temperature ?? 0.7,
-        max_tokens: options.maxTokens,
-        response_format: options.jsonMode ? { type: 'json_object' } : undefined,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`OpenAI API Error: ${response.status} ${errorText}`);
+    for (const provider of this.providers) {
+      try {
+        return await provider.complete(messages, options);
+      } catch (error) {
+        console.warn(`[LLMRouter] Provider ${provider.name} failed:`, error);
+        errors.push(error as Error);
+        continue;
+      }
     }
 
-    const data = (await response.json()) as any;
-    const content = data.choices[0]?.message?.content || '';
-    const tokensUsed = data.usage?.total_tokens || 0;
-
-    return {
-      content,
-      tokensUsed,
-      provider: 'openai',
-      latencyMs: Date.now() - startTime,
-    };
+    throw new Error(`All LLM providers failed. Errors: ${errors.map(e => e.message).join(', ')}`);
   }
 }
 

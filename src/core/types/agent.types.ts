@@ -149,6 +149,13 @@ export interface OrchestratorContext {
   userName?: string;
   isFirstContact?: boolean;
   onboardingMode?: boolean;
+  /** Force direct tool execution (bypasses planning) */
+  directExecution?: {
+    tool: string;
+    args: Record<string, unknown>;
+  };
+  /** Marketplace context for the current request */
+  marketplace?: 'WB' | 'Ozon' | 'both';
 }
 
 /**

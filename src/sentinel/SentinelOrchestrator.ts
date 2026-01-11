@@ -6,7 +6,7 @@ import { SentinelDefenseExecutor } from './DefenseExecutor.js';
 import { SentinelReportGenerator } from './ReportGenerator.js';
 import { SentinelAlertSender } from './AlertSender.js';
 import type { SentinelRunResult, UserCycleResult } from './types.js';
-import { priceShield, type PriceRule } from '../api-lib/services/price-shield.js';
+import { priceShield, type PriceRule } from '../api-lib/services/legacy/price-shield.js';
 import { getCompetitorPrice } from '../api-lib/services/competitor-monitor.js';
 
 export class SentinelOrchestrator {
@@ -70,7 +70,8 @@ export class SentinelOrchestrator {
         } catch (err) {
           const errorMsg = `Error processing user ${user.id}: ${err instanceof Error ? err.message : String(err)}`;
           console.error(errorMsg);
-          result.errors.push(errorMsg);
+          // AUDIT-FIX: Prevent error leakage
+          result.errors.push(`Processing failed for user ${user.id}`);
           // Alert admin immediately on user processing failure
           await this.alertSender.sendCriticalError(`Processing User ${user.id}`, err);
         }
@@ -158,7 +159,7 @@ export class SentinelOrchestrator {
       const rule = rulesMap.get(product.product_id);
       if (rule && rule.auto_adjust && rule.competitor_tracking && rule.competitor_nmids) {
         try {
-          const competitors = rule.competitor_nmids.split(',').map(s => s.trim());
+          const competitors = rule.competitor_nmids.split(',').map((s: string) => s.trim());
           if (competitors.length > 0) {
             const competitorId = parseInt(competitors[0]);
             if (!isNaN(competitorId)) {

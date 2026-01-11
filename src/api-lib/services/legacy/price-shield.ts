@@ -4,8 +4,8 @@
 // Version: 1.0.0 | Date: December 2024
 // ============================================
 
-import { sql } from './database.js';
-import type { DBPriceRule } from '../lib/types.js';
+import { sql } from '../database.js';
+import type { DBPriceRule } from '../../lib/types.js';
 
 export interface PriceRule {
   id: number;

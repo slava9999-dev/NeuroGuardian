@@ -5,10 +5,11 @@
 // ============================================
 
 // Use local pg driver for local development, @vercel/postgres for production
+// We check for VERCEL_REGION to ensure we're actually on the Vercel platform
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let sql: any;
 
-if (process.env.VERCEL) {
+if (process.env.VERCEL && process.env.VERCEL_REGION) {
   const { sql: vercelSql } = await import('@vercel/postgres');
   sql = vercelSql;
 } else {
@@ -18,7 +19,7 @@ if (process.env.VERCEL) {
 
 export { sql };
 
-import { logger } from '../lib/index.js';
+import { logger, encryptApiKey, decryptApiKey } from '../lib/index.js';
 import type { DBProduct, PendingPriceUpdate } from '../lib/types.js';
 
 export interface TelegramUser {
@@ -81,6 +82,19 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp?: string;
+}
+
+function decryptUser(user: TelegramUser): TelegramUser {
+  if (!user) return user;
+  try {
+    if (user.api_key_wb) user.api_key_wb = decryptApiKey(user.api_key_wb);
+    if (user.api_key_ozon) user.api_key_ozon = decryptApiKey(user.api_key_ozon);
+    // ozon_client_id might be encrypted or plaintext
+    if (user.ozon_client_id) user.ozon_client_id = decryptApiKey(user.ozon_client_id);
+  } catch (e) {
+    logger.warn(`Failed to decrypt keys for user ${user.id}`, { error: e });
+  }
+  return user;
 }
 
 /**
@@ -267,7 +281,8 @@ export async function initializeDatabase(): Promise<void> {
  */
 export async function getUserById(id: number): Promise<TelegramUser | null> {
   const result = await sql`SELECT * FROM users WHERE id = ${id}`;
-  return (result.rows[0] as TelegramUser) || null;
+  const user = result.rows[0] as TelegramUser;
+  return user ? decryptUser(user) : null;
 }
 
 /**
@@ -282,8 +297,10 @@ export async function createOrUpdateUser(user: Partial<TelegramUser>): Promise<T
     VALUES (
       ${user.id}, ${user.username || null}, ${user.first_name}, 
       ${user.last_name || null}, ${user.photo_url || null},
-      ${user.api_key_wb || null}, ${user.api_key_ozon || null}, 
-      ${user.ozon_client_id || null}, NOW()
+      ${user.api_key_wb ? encryptApiKey(user.api_key_wb) : null}, 
+      ${user.api_key_ozon ? encryptApiKey(user.api_key_ozon) : null}, 
+      ${user.ozon_client_id ? encryptApiKey(user.ozon_client_id) : null}, 
+      NOW()
     )
     ON CONFLICT (id) DO UPDATE SET
       username = EXCLUDED.username,
@@ -424,9 +441,9 @@ export async function getUsersWithExpiringSubscriptions(days: number): Promise<T
 
   // Use parameterized query with safe interval construction
   const result = await sql`
-    SELECT * FROM users 
-    WHERE subscription_active = true 
-    AND subscription_end <= NOW() + (${days} || ' days')::interval
+    SELECT * FROM users
+    WHERE subscription_active = true
+    AND subscription_end <= NOW() + ${days} * INTERVAL '1 day'
   `;
   return result.rows as TelegramUser[];
 }
@@ -636,7 +653,7 @@ export async function getActiveUsersForSentinel() {
     WHERE is_active = true 
       AND (protection_enabled = true OR subscription_active = true)
   `;
-  return result.rows as TelegramUser[];
+  return (result.rows as TelegramUser[]).map(decryptUser);
 }
 
 /**
@@ -644,7 +661,7 @@ export async function getActiveUsersForSentinel() {
  */
 export async function getAllUsers(): Promise<TelegramUser[]> {
   const result = await sql`SELECT * FROM users ORDER BY created_at DESC`;
-  return result.rows as TelegramUser[];
+  return (result.rows as TelegramUser[]).map(decryptUser);
 }
 
 /**

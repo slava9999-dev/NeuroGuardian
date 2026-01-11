@@ -344,4 +344,4 @@ CRON_SECRET=your-cron-secret
 
 © 2024 ИП Дмитричев А.Г. Все права защищены.
 
-NeuroGUARDIAN v2.10.0 — AI-Powered Marketplace Protection
+NeuroGUARDIAN v3.0.0 — AI-Powered Marketplace Protection

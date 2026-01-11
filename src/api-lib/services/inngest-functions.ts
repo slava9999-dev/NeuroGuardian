@@ -9,7 +9,7 @@ import { classifyQuery, type IntentType, type RouteTarget } from '../agent/moe-r
 import { logger } from '../lib/logger.js';
 import { sentinelService } from './sentinel-service.js';
 import { memoryService } from './memory-service.js';
-import { orchestrateV4 } from '../agent/orchestrator-v4.js';
+import { orchestrateV5 } from '../../agent/core/AgentOrchestratorV5.js';
 
 // ============================================
 // TYPES
@@ -291,12 +291,12 @@ async function handleStatsQuery(params: {
 
   // Use orchestrateV4 with stats-focused context
   // The orchestrator will determine the right tool to call
+
   try {
-    const result = await orchestrateV4(query, {
+    const result = await orchestrateV5(query, {
       userId,
-      marketplace: marketplace || 'all',
-      wbApiKey: params.wbApiKey,
-      ozonApiKey: params.ozonApiKey,
+      isFirstContact: false,
+      marketplace: marketplace === 'all' ? 'both' : marketplace || 'both',
     });
 
     return {
@@ -304,7 +304,7 @@ async function handleStatsQuery(params: {
       data: {
         message: result.message,
         actions: result.actions,
-        data: result.data,
+        data: result.toolResults?.[0]?.data, // Heuristic: first tool result data
       },
     };
   } catch (e) {
@@ -375,15 +375,18 @@ async function handleComplexQuery(params: {
   logger.debug('[Inngest] Handling complex query via cloud', { userId });
 
   try {
-    const result = await orchestrateV4(
+    const result = await orchestrateV5(
       query,
       {
         userId,
-        marketplace: marketplace || 'all',
-        wbApiKey: params.wbApiKey,
-        ozonApiKey: params.ozonApiKey,
+        isFirstContact: false,
+        marketplace: marketplace === 'all' ? 'both' : marketplace || 'both',
       },
-      conversationHistory
+      conversationHistory.map(m => ({
+        role: m.role as 'user' | 'assistant' | 'system',
+        content: m.content,
+        timestamp: new Date(),
+      }))
     );
 
     return {
@@ -392,7 +395,7 @@ async function handleComplexQuery(params: {
         message: result.message,
         actions: result.actions,
         links: result.links,
-        data: result.data,
+        data: result.toolResults?.[0]?.data,
         tokensUsed: result.tokensUsed,
         toolsCalled: result.toolsCalled,
       },
