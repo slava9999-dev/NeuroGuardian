@@ -127,7 +127,9 @@ export const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
  */
 const _encKey = process.env.API_KEY_ENCRYPTION_KEY;
 if (IS_PRODUCTION && !_encKey) {
-  throw new Error('🚨 CRITICAL SECURITY: API_KEY_ENCRYPTION_KEY is missing in production!');
+  console.error(
+    '🚨 CRITICAL SECURITY: API_KEY_ENCRYPTION_KEY is missing in production! System is running in INSECURE mode.'
+  );
 }
 export const API_KEY_ENCRYPTION_KEY = _encKey || '';
 

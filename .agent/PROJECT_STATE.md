@@ -88,6 +88,25 @@
 - `src/pages/DashboardPage.tsx` — интеграция
 - `src/lib/telegram.ts` — helper for initData
 
+### Session 2026-01-11 (Session 35.2 - Unit Economics UI) 💰A
+
+**Удобный ввод себестоимости (Unit Economics):**
+
+- [x] **BULK UPDATE**: Создан `BulkUpdateCostsModal` для массовой загрузки себестоимости (Copy-Paste из Excel).
+- [x] **API**: Реализован эндпоинт `batch-update-costs` с валидацией прав доступа.
+- [x] **UX**: Интеграция кнопки "Загрузить себестоимость" в `ProductsPage`.
+
+**Commits:**
+
+- `feat(economics): implement Bulk Cost Update UI and API for Unit Economics`
+
+**Файлы изменены:**
+
+- `src/api-lib/handlers/products.ts` — новый эндпоинт
+- `src/components/dashboard/BulkUpdateCostsModal.tsx` — UI компонент
+- `src/pages/ProductsPage.tsx` — кнопка вызова
+- `api/index.ts` — роутинг
+
 ### Session 2026-01-11 (Session 33 - Modular Agent Tools) 🧱
 
 **Переход на модульную архитектуру инструментов ("Lego-blocks"):**
