@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { defineTool } from '../ToolRegistry.js';
 import { UpdateStocksArgsSchema } from '../../../api-lib/agent/validators.js';
 import { getProductsByUserId } from '../../../api-lib/services/index.js';
@@ -11,11 +12,26 @@ export const updateStocksTool = defineTool({
   schema: UpdateStocksArgsSchema,
   examples: ['Установи остаток 10 для товара X', 'Обнови остатки'],
   execute: async (userId, args) => {
-    const products = await getProductsByUserId(userId, args.account_id);
+    // Validate arguments first
+    const validation = UpdateStocksArgsSchema.safeParse(args);
+    if (!validation.success) {
+      const errorMessages = validation.error.issues
+        .map((err: z.ZodIssue) => `${err.path.join('.')}: ${err.message}`)
+        .join('; ');
+
+      return {
+        success: false,
+        error: `Неверные параметры: ${errorMessages}`,
+      };
+    }
+
+    const validatedArgs = validation.data;
+
+    const products = await getProductsByUserId(userId, validatedArgs.account_id);
     const updates = [];
 
-    for (const item of args.products) {
-      const filtered = filterProducts(products, args.marketplace, item.product_id);
+    for (const item of validatedArgs.products) {
+      const filtered = filterProducts(products, validatedArgs.marketplace, item.product_id);
       if (filtered.length > 0) {
         const p = filtered[0];
         updates.push({

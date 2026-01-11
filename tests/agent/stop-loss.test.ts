@@ -5,13 +5,14 @@
 // ============================================
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { executeSetStopLoss } from '../../src/api-lib/agent/tool-executors.js';
+import { setStopLossTool } from '../../src/agent/execution/tools/SetStopLossTool.js';
 import * as dbService from '../../src/api-lib/services/database.js';
 
 // Mock database service
 vi.mock('../../src/api-lib/services/database.js', () => ({
   getProductsByUserId: vi.fn(),
-  // Re-export other things if needed, but we only need getProductsByUserId for this tool
+  updateProductMinPrice: vi.fn(),
+  // Re-export other things if needed, but we only need these for this tool
 }));
 
 describe('executeSetStopLoss', () => {
@@ -31,9 +32,10 @@ describe('executeSetStopLoss', () => {
   it('should calculate stop-loss by absolute price', async () => {
     vi.mocked(dbService.getProductsByUserId).mockResolvedValue([MOCK_PRODUCT] as any);
 
-    const result = await executeSetStopLoss(MOCK_USER_ID, {
+    const result = await setStopLossTool.execute(MOCK_USER_ID, {
       product_id: 'test-product-123',
       min_price: 850,
+      notify_on_trigger: true,
     });
 
     expect(result.success).toBe(true);
@@ -47,9 +49,10 @@ describe('executeSetStopLoss', () => {
   it('should calculate stop-loss by percentage', async () => {
     vi.mocked(dbService.getProductsByUserId).mockResolvedValue([MOCK_PRODUCT] as any);
 
-    const result = await executeSetStopLoss(MOCK_USER_ID, {
+    const result = await setStopLossTool.execute(MOCK_USER_ID, {
       product_id: 'test-product-123',
       percentage: 15,
+      notify_on_trigger: true,
     });
 
     expect(result.success).toBe(true);
@@ -62,8 +65,9 @@ describe('executeSetStopLoss', () => {
   it('should use default 10% if no price or percentage provided', async () => {
     vi.mocked(dbService.getProductsByUserId).mockResolvedValue([MOCK_PRODUCT] as any);
 
-    const result = await executeSetStopLoss(MOCK_USER_ID, {
+    const result = await setStopLossTool.execute(MOCK_USER_ID, {
       product_id: 'test-product-123',
+      notify_on_trigger: true,
     });
 
     expect(result.success).toBe(true);
@@ -76,8 +80,9 @@ describe('executeSetStopLoss', () => {
   it('should return error if product not found', async () => {
     vi.mocked(dbService.getProductsByUserId).mockResolvedValue([] as any);
 
-    const result = await executeSetStopLoss(MOCK_USER_ID, {
+    const result = await setStopLossTool.execute(MOCK_USER_ID, {
       product_id: 'non-existent',
+      notify_on_trigger: true,
     });
 
     expect(result.success).toBe(false);
@@ -86,9 +91,9 @@ describe('executeSetStopLoss', () => {
 
   it('should fail on invalid arguments (Zod validation)', async () => {
     // missing product_id
-    const result = await executeSetStopLoss(MOCK_USER_ID, {
+    const result = await setStopLossTool.execute(MOCK_USER_ID, {
       min_price: 500,
-    });
+    } as any);
 
     expect(result.success).toBe(false);
     // Zod returns "Invalid input" when field is missing
@@ -96,9 +101,10 @@ describe('executeSetStopLoss', () => {
   });
 
   it('should fail on negative price', async () => {
-    const result = await executeSetStopLoss(MOCK_USER_ID, {
+    const result = await setStopLossTool.execute(MOCK_USER_ID, {
       product_id: 'test',
       min_price: -100,
+      notify_on_trigger: true,
     });
 
     expect(result.success).toBe(false);
@@ -106,9 +112,10 @@ describe('executeSetStopLoss', () => {
   });
 
   it('should fail on too high percentage (>50%)', async () => {
-    const result = await executeSetStopLoss(MOCK_USER_ID, {
+    const result = await setStopLossTool.execute(MOCK_USER_ID, {
       product_id: 'test',
       percentage: 60,
+      notify_on_trigger: true,
     });
 
     expect(result.success).toBe(false);

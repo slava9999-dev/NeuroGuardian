@@ -112,6 +112,7 @@ export const SetStopLossArgsSchema = z.object({
     .min(1, 'Percentage must be at least 1%')
     .max(50, 'Percentage cannot exceed 50%')
     .optional(),
+  notify_on_trigger: z.boolean().optional().default(true),
 });
 
 export const BulkProtectProductsArgsSchema = z.object({

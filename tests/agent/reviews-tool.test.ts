@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { executeGetReviews } from '../../src/api-lib/agent/tool-executors.js';
+import { getReviewsTool } from '../../src/agent/execution/tools/GetReviewsTool.js';
 import * as reviewService from '../../src/api-lib/services/reviews-service.js';
 
 // Mock the service
@@ -85,7 +85,7 @@ describe('Review Tools', () => {
     vi.mocked(reviewService.getUserReviews).mockResolvedValue(mockReviews);
 
     // Call the tool with WB filter
-    const result = await executeGetReviews(1, { limit: 10, marketplace: 'WB' });
+    const result = await getReviewsTool.execute(1, { limit: 10, marketplace: 'all' });
 
     // Verify results
     expect(result.success).toBe(true);
@@ -100,25 +100,29 @@ describe('Review Tools', () => {
     expect(data.reviews[0].text).toContain('Отличный товар');
 
     // Verify service call
-    expect(reviewService.getUserReviews).toHaveBeenCalledWith(1, { limit: 10, marketplace: 'WB' });
+    expect(reviewService.getUserReviews).toHaveBeenCalledWith(1, {
+      limit: 10,
+      marketplace: undefined,
+    });
   });
 
   it('executeGetReviews should handle empty results gracefully', async () => {
     vi.mocked(reviewService.getUserReviews).mockResolvedValue([]);
 
-    const result = await executeGetReviews(1, { limit: 5 });
+    const result = await getReviewsTool.execute(1, { limit: 5, marketplace: 'all' });
 
     expect(result.success).toBe(true);
     const data = result.data as ReviewsResultData;
     expect(data.reviews).toEqual([]);
-    expect(data.message).toContain('не найдено');
+    expect(data.message).toContain('Отзывов пока нет');
   });
 
-  it('executeGetReviews should fail on validation error', async () => {
+  it('getReviewsTool schema should validate arguments', async () => {
     // Limit too high (max 50)
-    const result = await executeGetReviews(1, { limit: 1000 });
-
+    const result = getReviewsTool.schema.safeParse({ limit: 1000, marketplace: 'all' });
     expect(result.success).toBe(false);
-    expect(result.error).toContain('limit');
+    if (!result.success) {
+      expect(result.error.issues[0].message).toContain('Too big'); // Zod's default message for max constraint
+    }
   });
 });

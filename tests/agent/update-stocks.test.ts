@@ -5,12 +5,37 @@
 // ============================================
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { executeUpdateStocks } from '../../src/api-lib/agent/tool-executors.js';
+import { updateStocksTool } from '../../src/agent/execution/tools/UpdateStocksTool.js';
 import * as dbService from '../../src/api-lib/services/database.js';
 
 // Mock database service
 vi.mock('../../src/api-lib/services/database.js', () => ({
   getProductsByUserId: vi.fn(),
+}));
+
+// Mock notifications service to prevent circular dependency
+vi.mock('../../src/api-lib/services/notifications.js', () => ({
+  sendAlert: vi.fn(),
+  sendAlertToAdmin: vi.fn(),
+  sendAlertToUser: vi.fn(),
+  sendHourlyReport: vi.fn(),
+  sendDailyReport: vi.fn(),
+  sendWelcomeMessage: vi.fn(),
+  sendTelegramNotification: vi.fn(),
+  notificationService: {
+    sendAlert: vi.fn(),
+    sendAlertToAdmin: vi.fn(),
+    sendAlertToUser: vi.fn(),
+    sendHourlyReport: vi.fn(),
+    sendDailyReport: vi.fn(),
+    sendWelcomeMessage: vi.fn(),
+    sendTelegramNotification: vi.fn(),
+  },
+}));
+
+// Mock orchestrator to prevent circular dependency
+vi.mock('../../src/api-lib/agent/orchestrator-v4.js', () => ({
+  callLLMWithFallback: vi.fn(),
 }));
 
 describe('executeUpdateStocks', () => {
@@ -39,16 +64,17 @@ describe('executeUpdateStocks', () => {
   it('should prepare stock updates for valid products', async () => {
     vi.mocked(dbService.getProductsByUserId).mockResolvedValue(MOCK_PRODUCTS as any);
 
-    const result = await executeUpdateStocks(MOCK_USER_ID, {
+    const result = await updateStocksTool.execute(MOCK_USER_ID, {
       marketplace: 'WB',
       products: [{ product_id: 'wb-product-1', new_stock: 100 }],
     });
 
     expect(result.success).toBe(true);
-    expect(result.data.stock_updates).toHaveLength(1);
-    expect(result.data.stock_updates[0]).toMatchObject({
+    const data = result.data as any;
+    expect(data.updates).toHaveLength(1);
+    expect(data.updates[0]).toMatchObject({
       product_id: 'wb-product-1',
-      sku: '111',
+      title: 'WB Item',
       newStock: 100,
       currentStock: 50,
       marketplace: 'WB',
@@ -58,15 +84,16 @@ describe('executeUpdateStocks', () => {
   it('should handle multiple products and mixed marketplaces if requested correctly', async () => {
     vi.mocked(dbService.getProductsByUserId).mockResolvedValue(MOCK_PRODUCTS as any);
 
-    const result = await executeUpdateStocks(MOCK_USER_ID, {
+    const result = await updateStocksTool.execute(MOCK_USER_ID, {
       marketplace: 'Ozon',
       products: [{ product_id: 'ozon-product-2', new_stock: 0 }],
     });
 
     expect(result.success).toBe(true);
-    expect(result.data.stock_updates[0]).toMatchObject({
+    const data = result.data as any;
+    expect(data.updates[0]).toMatchObject({
       product_id: 'ozon-product-2',
-      offer_id: 'OZON-OFFER-2',
+      title: 'Ozon Item',
       newStock: 0,
       currentStock: 30,
       marketplace: 'Ozon',
@@ -76,17 +103,17 @@ describe('executeUpdateStocks', () => {
   it('should return error if no products matched', async () => {
     vi.mocked(dbService.getProductsByUserId).mockResolvedValue(MOCK_PRODUCTS as any);
 
-    const result = await executeUpdateStocks(MOCK_USER_ID, {
+    const result = await updateStocksTool.execute(MOCK_USER_ID, {
       marketplace: 'WB',
       products: [{ product_id: 'non-existent', new_stock: 10 }],
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain('Товары для обновления остатков не найдены');
+    expect(result.error).toContain('Товары не найдены');
   });
 
   it('should fail on negative stock value (Zod)', async () => {
-    const result = await executeUpdateStocks(MOCK_USER_ID, {
+    const result = await updateStocksTool.execute(MOCK_USER_ID, {
       marketplace: 'WB',
       products: [{ product_id: 'wb-1', new_stock: -5 }],
     });
@@ -96,7 +123,7 @@ describe('executeUpdateStocks', () => {
   });
 
   it('should fail if marketplace is missing or invalid', async () => {
-    const result = await executeUpdateStocks(MOCK_USER_ID, {
+    const result = await updateStocksTool.execute(MOCK_USER_ID, {
       marketplace: 'AliExpress' as any,
       products: [{ product_id: 'wb-1', new_stock: 10 }],
     });
