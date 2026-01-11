@@ -36,4 +36,14 @@ export class SentinelAlertSender {
   async sendAdminSummary(message: string): Promise<void> {
     await notificationService.sendAlertToAdmin({ type: 'sentinel_alert', urgency: 'low', message });
   }
+
+  async sendCriticalError(context: string, error: unknown): Promise<void> {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const message = `🚨 **CRITICAL SENTINEL ERROR**\n\nContext: ${context}\nError: ${errorMessage}`;
+    await notificationService.sendAlertToAdmin({
+      type: 'sentinel_alert',
+      urgency: 'critical',
+      message,
+    });
+  }
 }

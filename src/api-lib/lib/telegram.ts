@@ -39,15 +39,8 @@ export function validateTelegramInitData(initData: string): InitDataValidationRe
 
     // Bot token validation
     if (!TELEGRAM_BOT_TOKEN) {
-      if (!IS_PRODUCTION) {
-        console.warn('⚠️ [DEV] TELEGRAM_BOT_TOKEN not set, skipping signature validation');
-        const userJson = params.get('user');
-        if (!userJson) {
-          return { valid: false, user: null, error: 'Missing user in initData' };
-        }
-        const user = JSON.parse(userJson) as TelegramUser;
-        return { valid: true, user };
-      }
+      console.error('❌ TELEGRAM_BOT_TOKEN not configured!');
+      return { valid: false, user: null, error: 'Auth system not configured (Token missing)' };
 
       console.error('❌ PRODUCTION: TELEGRAM_BOT_TOKEN not configured!');
       return { valid: false, user: null, error: 'Auth system not configured' };

@@ -71,12 +71,15 @@ export class SentinelOrchestrator {
           const errorMsg = `Error processing user ${user.id}: ${err instanceof Error ? err.message : String(err)}`;
           console.error(errorMsg);
           result.errors.push(errorMsg);
+          // Alert admin immediately on user processing failure
+          await this.alertSender.sendCriticalError(`Processing User ${user.id}`, err);
         }
       }
 
       await this.sendCycleSummary(result);
     } catch (err) {
       result.errors.push(`Critical cycle error: ${err}`);
+      await this.alertSender.sendCriticalError('Sentinel Cycle Critical Failure', err);
     }
 
     return result;

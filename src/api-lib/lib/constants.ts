@@ -125,7 +125,11 @@ export const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 /**
  * @deprecated Use getSecret('api_key_encryption_key') instead
  */
-export const API_KEY_ENCRYPTION_KEY = process.env.API_KEY_ENCRYPTION_KEY || '';
+const _encKey = process.env.API_KEY_ENCRYPTION_KEY;
+if (IS_PRODUCTION && !_encKey) {
+  throw new Error('🚨 CRITICAL SECURITY: API_KEY_ENCRYPTION_KEY is missing in production!');
+}
+export const API_KEY_ENCRYPTION_KEY = _encKey || '';
 
 export const ALLOWED_ORIGINS = [
   'https://neuro-guardian.vercel.app',
