@@ -8,8 +8,8 @@
 
 ## 🎯 Current Phase: MONETIZATION LAUNCH (Phase 11) 🟢 PRODUCTION
 
-**Last Session:** 2026-01-11 (Session 36)
-**Focus:** 🐛 SYNC NOTIFICATION FIX — Fixing 0 products bug and Ozon API fallback
+**Last Session:** 2026-01-11 (Session 37)
+**Focus:** 🩺 E2E TEST FIXES — Stabilizing smoke tests and fixing mock data mismatches
 
 **📋 Ключевые документы:**
 
@@ -28,6 +28,20 @@
 ---
 
 ## ✅ Recently Completed
+
+### Session 2026-01-11 (Session 37 - Agent E2E Fixes) 🧪
+
+**Стабилизация E2E тестов (`smoke.spec.ts`):**
+
+- [x] **MOCK DATA FIX**: Данные для `action=products` приведены в полное соответствие с интерфейсом `Product` (добавлены `userId`, `isMonitored`, timestamps).
+- [x] **API CONTRACT**: Исправлен формат ответа `agent-v4` (теперь возвращается плоская строка `message` вместо объекта `content`).
+- [x] **ROBUST SELECTORS**: Переход с хрупких CSS-селекторов на `getByRole('button')` для навигации.
+- [x] **ASYNC HANDLING**: Добавлены задержки и проверки статуса ("Online", исчезновение лоадера) для предотвращения race conditions.
+- [ ] **KNOWN ISSUE**: Тесты "should navigate to products page" и "interaction with agent" иногда падают по таймауту видимости элементов (требуется отладка в CI среде).
+
+**Commits:**
+
+- `fix(tests): align smoke tests mock data with API schema and improve selector stability`
 
 ### Session 2026-01-11 (Session 36 - Sync Notification Fix) 🐛
 
