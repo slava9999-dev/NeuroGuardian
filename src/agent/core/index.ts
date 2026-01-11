@@ -3,6 +3,7 @@
 // Version: 5.0.0 | Date: January 2026
 // ============================================
 
+export { knowledgeBase, KnowledgeBase, type KnowledgeDoc } from './KnowledgeBase.js';
 export { stateManager, StateManager } from './StateManager.js';
 export { contextResolver, ContextResolver } from './ContextResolver.js';
 export { promptBuilder, PromptBuilder } from './PromptBuilder.js';

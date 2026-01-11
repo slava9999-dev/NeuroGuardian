@@ -5,8 +5,9 @@
 // Version: 5.0.0 | Date: January 2026
 // ============================================
 
-import type { UserState, ChatMessage } from '../../core/types/agent.types.js';
+import type { UserState, ChatMessage, ToolDefinition } from '../../core/types/agent.types.js';
 import { toolRegistry } from '../execution/ToolRegistry.js';
+import { knowledgeBase } from './KnowledgeBase.js';
 
 /**
  * Prompt context for building
@@ -32,10 +33,54 @@ interface PromptContext {
  */
 export class PromptBuilder {
   /**
-   * Build planner prompt
-   * Used for deciding which tools to call
+   * Build knowledge context (RAG)
    */
-  buildPlannerPrompt(context: PromptContext): string {
+  private async buildKnowledgeContext(query: string): Promise<string> {
+    try {
+      if (!query) return '';
+
+      const docs = await knowledgeBase.search(query, 2);
+
+      if (docs.length === 0) return '';
+
+      const context = docs.map(d => `SOURCE: ${d.title}\n${d.content}`).join('\n\n');
+
+      return `## РЕЛЕВАНТНЫЕ ЗНАНИЯ (RAG)
+<KNOWLEDGE_BASE>
+${context}
+</KNOWLEDGE_BASE>`;
+    } catch (error) {
+      console.error('RAG Error:', error);
+      return '';
+    }
+  }
+
+  /**
+   * Build complete prompt with all modules (Legacy build method)
+   * This is used by the orchestrator
+   */
+  async build(
+    _userId: number,
+    state: UserState,
+    _availableTools: ToolDefinition[],
+    query: string
+  ): Promise<string> {
+    const parts = [
+      CORE_PERSONALITY,
+      this.buildUserContext(state),
+      this.buildPendingContext(state),
+      await this.buildKnowledgeContext(query),
+      toolRegistry.generatePrompt({ includeExamples: true }),
+      PLANNER_OUTPUT_FORMAT,
+    ];
+
+    return parts.filter(Boolean).join('\n\n');
+  }
+
+  /**
+   * Build planner prompt (Preferred new method)
+   */
+  async buildPlannerPrompt(context: PromptContext, query: string): Promise<string> {
     const sections: string[] = [];
 
     // 1. Core personality (minimal)
@@ -45,21 +90,17 @@ export class PromptBuilder {
     sections.push(this.buildUserContext(context.userState));
 
     // 3. Pending state (if any)
-    if (context.userState.pendingAction || context.userState.awaitingInput) {
-      sections.push(this.buildPendingContext(context.userState));
-    }
+    sections.push(this.buildPendingContext(context.userState));
 
-    // 4. Tool descriptions (dynamic from registry)
+    // 4. RAG knowledge
+    sections.push(await this.buildKnowledgeContext(query));
+
+    // 5. Tool descriptions
     sections.push(toolRegistry.generatePrompt({ includeExamples: true }));
 
-    // 5. Recent history summary (if relevant)
+    // 6. Recent history summary
     if (context.recentHistory.length > 0) {
       sections.push(this.buildHistoryContext(context.recentHistory));
-    }
-
-    // 6. RAG knowledge (if available)
-    if (context.relevantKnowledge && context.relevantKnowledge.length > 0) {
-      sections.push(this.buildKnowledgeContext(context.relevantKnowledge));
     }
 
     // 7. First contact instructions
@@ -70,29 +111,21 @@ export class PromptBuilder {
     // 8. Output format
     sections.push(PLANNER_OUTPUT_FORMAT);
 
-    return sections.join('\n\n');
+    return sections.filter(Boolean).join('\n\n');
   }
 
   /**
    * Build answerer prompt
-   * Used for generating final response from tool results
    */
   buildAnswererPrompt(context: PromptContext): string {
     const sections: string[] = [];
 
-    // 1. Core personality
     sections.push(CORE_PERSONALITY);
-
-    // 2. Answerer-specific rules
     sections.push(ANSWERER_RULES);
-
-    // 3. User context
     sections.push(this.buildUserContext(context.userState));
-
-    // 4. Output format
     sections.push(ANSWERER_OUTPUT_FORMAT);
 
-    return sections.join('\n\n');
+    return sections.filter(Boolean).join('\n\n');
   }
 
   /**
@@ -119,21 +152,21 @@ export class PromptBuilder {
   }
 
   /**
-   * Build pending context (awaiting input or confirmation)
+   * Build pending context
    */
   private buildPendingContext(state: UserState): string {
-    const lines: string[] = ['## ⚠️ ОЖИДАЕМ ОТВЕТА'];
+    const lines: string[] = [];
 
     if (state.awaitingInput) {
+      lines.push('## ⚠️ ОЖИДАЕМ ОТВЕТА');
       lines.push(`Ты спросил: "${state.awaitingInput.question}"`);
       lines.push(`Ожидаешь: ${state.awaitingInput.type}`);
       if (state.awaitingInput.forProductId) {
         lines.push(`Для товара: ${state.awaitingInput.forProductId}`);
       }
       lines.push(`→ Если ответ — число или короткая фраза, это скорее всего ответ на твой вопрос!`);
-    }
-
-    if (state.pendingAction) {
+    } else if (state.pendingAction) {
+      lines.push('## ⚠️ ОЖИДАЕМ ПОДТВЕРЖДЕНИЯ');
       lines.push(`Действие ожидает подтверждения: ${state.pendingAction.type}`);
       lines.push(`→ Если "да"/"ok" — выполни действие. Если "нет"/"отмена" — отмени.`);
     }
@@ -157,28 +190,12 @@ export class PromptBuilder {
 
     return lines.join('\n');
   }
-
-  /**
-   * Build knowledge context from RAG
-   */
-  private buildKnowledgeContext(knowledge: string[]): string {
-    const lines: string[] = ['## РЕЛЕВАНТНЫЕ ЗНАНИЯ'];
-
-    for (const fact of knowledge.slice(0, 3)) {
-      lines.push(`• ${fact}`);
-    }
-
-    return lines.join('\n');
-  }
 }
 
 // ============================================
 // PROMPT MODULES (Static parts)
 // ============================================
 
-/**
- * Core personality - minimal, always included
- */
 const CORE_PERSONALITY = `# ВИКТОР — Управляющий Магазином
 
 Ты — Виктор, профессиональный управляющий магазинами на Wildberries и Ozon.
@@ -191,9 +208,6 @@ const CORE_PERSONALITY = `# ВИКТОР — Управляющий Магази
 4. Проактивно предупреждай о проблемах
 5. Не придумывай данные — если нет, скажи`;
 
-/**
- * First contact special instructions
- */
 const FIRST_CONTACT_INSTRUCTIONS = `## 🚀 ПЕРВЫЙ КОНТАКТ
 
 Это ПЕРВОЕ сообщение пользователя. Обязательно:
@@ -202,9 +216,6 @@ const FIRST_CONTACT_INSTRUCTIONS = `## 🚀 ПЕРВЫЙ КОНТАКТ
 3. Проверь есть ли API ключи
 4. Если нет ключей — дай инструкцию по получению`;
 
-/**
- * Planner output format
- */
 const PLANNER_OUTPUT_FORMAT = `## ФОРМАТ ОТВЕТА
 
 Отвечай СТРОГО в JSON:
@@ -218,9 +229,6 @@ const PLANNER_OUTPUT_FORMAT = `## ФОРМАТ ОТВЕТА
 
 Если не нужны инструменты (приветствие, благодарность) → tools: []`;
 
-/**
- * Answerer-specific rules
- */
 const ANSWERER_RULES = `## ПРАВИЛА ОТВЕТА
 
 1. Используй ТОЛЬКО данные из результатов инструментов
@@ -229,9 +237,6 @@ const ANSWERER_RULES = `## ПРАВИЛА ОТВЕТА
 4. Если есть проблема — предложи конкретное действие
 5. Если нужно подтверждение — чётко спроси да/нет`;
 
-/**
- * Answerer output format
- */
 const ANSWERER_OUTPUT_FORMAT = `## ФОРМАТ ОТВЕТА
 
 {

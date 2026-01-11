@@ -141,11 +141,14 @@ export class AgentOrchestratorV5 {
       const planStart = Date.now();
 
       const recentHistory = conversationHistory?.slice(-6) || [];
-      const plannerPrompt = promptBuilder.buildPlannerPrompt({
-        userState,
-        recentHistory,
-        isFirstContact: context.isFirstContact,
-      });
+      const plannerPrompt = await promptBuilder.buildPlannerPrompt(
+        {
+          userState,
+          recentHistory,
+          isFirstContact: context.isFirstContact,
+        },
+        resolvedContext.enrichedMessage
+      );
 
       const planResult = await this.callPlanner(plannerPrompt, resolvedContext.enrichedMessage);
 
