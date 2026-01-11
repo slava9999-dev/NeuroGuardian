@@ -8,16 +8,54 @@ const { Pool } = pkg;
 
 // Use POSTGRES_URL from .env
 const connectionString = process.env.POSTGRES_URL?.replace(/\r/g, '').trim();
-const isLocal = connectionString?.includes('localhost') || connectionString?.includes('127.0.0.1');
+const isLocal =
+  !connectionString ||
+  connectionString.includes('localhost') ||
+  connectionString.includes('127.0.0.1');
+
+let poolConfig: pkg.PoolConfig;
+
+if (connectionString && !isLocal) {
+  try {
+    const url = new URL(connectionString);
+    const password = decodeURIComponent(url.password); // Decode password in case of special chars
+    console.log(
+      `[Database] Connecting to ${url.hostname} as ${url.username} (pwd detected: ${!!password}, len: ${password?.length || 0})`
+    );
+
+    poolConfig = {
+      user: url.username,
+      password: password,
+      host: url.hostname,
+      port: parseInt(url.port || '5432'),
+      database: url.pathname.slice(1),
+      ssl: { rejectUnauthorized: false },
+      max: 10,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 10000,
+    };
+  } catch (e) {
+    console.warn('[Database] Manual parse failed, using connectionString directly');
+    poolConfig = {
+      connectionString,
+      ssl: { rejectUnauthorized: false },
+      max: 10,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 10000,
+    };
+  }
+} else {
+  poolConfig = {
+    connectionString,
+    ssl: false,
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+  };
+}
 
 // Neon DB requires SSL
-const pool = new Pool({
-  connectionString,
-  ssl: isLocal ? false : { rejectUnauthorized: false },
-  max: 10, // Neon has connection limits
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000, // Allow more time for cold start
-});
+const pool = new Pool(poolConfig);
 
 /**
  * Standard query function for local pg

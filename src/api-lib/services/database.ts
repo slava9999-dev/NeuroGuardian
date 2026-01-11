@@ -250,6 +250,15 @@ export async function initializeDatabase(): Promise<void> {
   await sql`CREATE INDEX IF NOT EXISTS idx_orders_account_id ON marketplace_orders(account_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_users_protection ON users(protection_enabled, subscription_active) WHERE protection_enabled = true`;
 
+  // 9. User State (Agent V5)
+  await sql`
+    CREATE TABLE IF NOT EXISTS user_state (
+      user_id BIGINT PRIMARY KEY,
+      state_data JSONB NOT NULL DEFAULT '{}',
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+
   logger.info('Database schema initialized');
 }
 

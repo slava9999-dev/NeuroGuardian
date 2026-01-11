@@ -89,6 +89,11 @@ import {
   handleAgentV4Status,
   handleAgentV4ConfirmSecure,
 } from '../src/api-lib/handlers/agent-v4.js';
+import {
+  handleAgentV5Secure,
+  handleAgentV5Status,
+  handleAgentV5ConfirmSecure,
+} from '../src/api-lib/handlers/agent-v5.js';
 
 // Chat handlers
 import {
@@ -404,13 +409,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // ========== AI AGENT ENDPOINTS ==========
       case 'agent':
+        return handleAgentV5Secure(req, res);
+
       case 'agent-v4':
         return handleAgentV4Secure(req, res);
 
       case 'agent-confirm':
+        return handleAgentV5ConfirmSecure(req, res);
+
+      case 'agent-v4-confirm':
         return handleAgentV4ConfirmSecure(req, res);
 
       case 'agent-status':
+      case 'agent-v5-status':
+        return handleAgentV5Status(req, res);
+
       case 'agent-v4-status':
         return handleAgentV4Status(req, res);
 

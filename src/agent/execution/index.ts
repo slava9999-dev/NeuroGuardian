@@ -19,6 +19,7 @@ import { setStopLossTool } from './tools/SetStopLossTool.js';
 import { calculateUnitEconomicsTool } from './tools/CalculateEconomicsTool.js';
 import { searchWebTool } from './tools/SearchWebTool.js';
 import { bulkProtectProductsTool } from './tools/BulkProtectTool.js';
+import { updatePricesTool } from './tools/UpdatePricesTool.js';
 
 /**
  * Register all available tools
@@ -35,6 +36,7 @@ export function registerAllTools(): void {
   // Write tools (require confirmation)
   toolRegistry.register(setStopLossTool);
   toolRegistry.register(bulkProtectProductsTool);
+  toolRegistry.register(updatePricesTool);
 
   // Search tools
   toolRegistry.register(searchWebTool);
@@ -52,3 +54,4 @@ export { setStopLossTool } from './tools/SetStopLossTool.js';
 export { calculateUnitEconomicsTool } from './tools/CalculateEconomicsTool.js';
 export { searchWebTool } from './tools/SearchWebTool.js';
 export { bulkProtectProductsTool } from './tools/BulkProtectTool.js';
+export { updatePricesTool } from './tools/UpdatePricesTool.js';

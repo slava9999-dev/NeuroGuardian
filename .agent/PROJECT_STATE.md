@@ -30,6 +30,30 @@
 
 ## ✅ Recently Completed
 
+### Session 2026-01-11 (Session 32 - Agent V5 Integration) 🤖
+
+**Интеграция архитектуры Агента V5 (Professional Multi-Agent):**
+
+- [x] **V5 HANDLERS**: Реализованы `handleAgentV5`, `handleAgentV5Confirm` (KV-based confirmation flow).
+- [x] **API ROUTING**: Маршрутизация `/api/agent` и `/api/agent-confirm` переключена на V5.
+- [x] **DATABASE**: Добавлена таблица `user_state` для хранения контекста диалога (скрипт `migrate-v5-table.ts`).
+- [x] **UPDATE PRICES TOOL**: Реализован отсутствовавший инструмент `update_prices` с поддержкой батчей и подтверждения.
+- [x] **LOCAL DB FIX**: Исправлен парсинг `POSTGRES_URL` и SSL для локальной разработки (Neon DB).
+- [x] **VERIFICATION**: Создан скрипт `scripts/verify-agent-v5.ts`, подтвердивший работу RAG и инструментов.
+
+**Commits (pending):**
+
+- `feat(agent): integrate Agent V5 architecture - handlers, router, tools, and DB migration`
+
+**Файлы изменены/созданы:**
+
+- `src/api-lib/handlers/agent-v5.ts` — основной handler
+- `api/index.ts` — маршрутизация
+- `src/agent/execution/tools/UpdatePricesTool.ts` — новый инструмент
+- `src/agent/execution/index.ts` — регистрация инструментов
+- `src/api-lib/services/database.ts` — схема БД
+- `scripts/verify-agent-v5.ts` — верификация
+
 ### Session 2026-01-10 (Session 31 - Professional E2E Tests) 🧪
 
 **Профессиональный E2E тест-раннер для агента:**
