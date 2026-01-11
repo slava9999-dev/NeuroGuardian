@@ -148,67 +148,89 @@ export async function handleN8nSyncProducts(
 
         // Sync WB products
         if (keys.wb) {
-          try {
-            const result = await fetchWbProductsResilient(keys.wb);
-
-            if (result.success && result.data) {
-              const wbProducts = result.data;
-              // Convert to format expected by saveProducts
-              const productsToSave = wbProducts.map(p => ({
-                nm_id: p.nm_id,
-                title: p.title,
-                price: p.current_price,
-                stocks: p.current_stock,
-                image_url: p.image_url,
-                marketplace: 'WB' as const,
-              }));
-
-              await saveProducts(user.id, productsToSave);
-              totalSynced += wbProducts.length;
-
-              if (result.fromFallback) {
-                errors.push(`WB sync for user ${user.id}: used cached data (API unavailable)`);
-              }
-            } else {
-              errors.push(`WB sync failed for user ${user.id}: ${result.error || 'No data'}`);
-            }
-          } catch (error) {
+          // Check if key looks encrypted (failed decryption)
+          if (keys.wb.includes(':') && keys.wb.length > 60) {
             errors.push(
-              `WB sync failed for user ${user.id}: ${error instanceof Error ? error.message : 'Unknown'}`
+              `WB System Error: API Key decryption failed (Check ENCRYPTION_KEY env var)`
             );
+          } else {
+            try {
+              const result = await fetchWbProductsResilient(keys.wb);
+
+              if (result.success && result.data) {
+                const wbProducts = result.data;
+                const productsToSave = wbProducts.map(p => ({
+                  nm_id: p.nm_id,
+                  title: p.title,
+                  price: p.current_price,
+                  stocks: p.current_stock,
+                  image_url: p.image_url,
+                  marketplace: 'WB' as const,
+                }));
+
+                if (productsToSave.length > 0) {
+                  await saveProducts(user.id, productsToSave);
+                  totalSynced += wbProducts.length;
+                } else {
+                  errors.push(
+                    `WB Warning: 0 products found for user ${user.id} (Check API Permissions)`
+                  );
+                }
+
+                if (result.fromFallback) {
+                  errors.push(`WB sync for user ${user.id}: used cached data (API unavailable)`);
+                }
+              } else {
+                errors.push(`WB sync failed for user ${user.id}: ${result.error || 'No data'}`);
+              }
+            } catch (error) {
+              errors.push(
+                `WB sync failed for user ${user.id}: ${error instanceof Error ? error.message : 'Unknown'}`
+              );
+            }
           }
         }
 
         // Sync Ozon products
         if (keys.ozon?.clientId && keys.ozon?.apiKey) {
-          try {
-            const result = await fetchOzonProductsResilient(keys.ozon.clientId, keys.ozon.apiKey);
+          // Check if keys look encrypted
+          if (keys.ozon.apiKey.includes(':') && keys.ozon.apiKey.length > 60) {
+            errors.push(`Ozon System Error: API Key decryption failed`);
+          } else {
+            try {
+              const result = await fetchOzonProductsResilient(keys.ozon.clientId, keys.ozon.apiKey);
 
-            if (result.success && result.data) {
-              const ozonProducts = result.data;
-              // Convert to format expected by saveProducts
-              const productsToSave = ozonProducts.map(p => ({
-                offer_id: p.product_id,
-                title: p.title,
-                price: p.current_price,
-                stocks: p.current_stock,
-                image_url: p.image_url,
-                marketplace: 'Ozon' as const,
-              }));
+              if (result.success && result.data) {
+                const ozonProducts = result.data;
+                const productsToSave = ozonProducts.map(p => ({
+                  offer_id: p.product_id,
+                  title: p.title,
+                  price: p.current_price,
+                  stocks: p.current_stock,
+                  image_url: p.image_url,
+                  marketplace: 'Ozon' as const,
+                }));
 
-              await saveProducts(user.id, productsToSave);
-              totalSynced += ozonProducts.length;
+                if (productsToSave.length > 0) {
+                  await saveProducts(user.id, productsToSave);
+                  totalSynced += ozonProducts.length;
+                } else {
+                  errors.push(
+                    `Ozon Warning: 0 products found for user ${user.id} (Check API Permissions)`
+                  );
+                }
 
-              if (result.fromFallback) {
-                errors.push(`Ozon sync for user ${user.id}: used cached data (API unavailable)`);
+                if (result.fromFallback) {
+                  errors.push(`Ozon sync for user ${user.id}: used cached data (API unavailable)`);
+                }
+              } else {
+                errors.push(`Ozon sync failed for user ${user.id}: ${result.error || 'No data'}`);
               }
-            } else {
-              errors.push(`Ozon sync failed for user ${user.id}: ${result.error || 'No data'}`);
+            } catch (error) {
+              errors.push(
+                `Ozon sync failed for user ${user.id}: ${error instanceof Error ? error.message : 'Unknown'}`
+              );
             }
-          } catch (error) {
-            errors.push(
-              `Ozon sync failed for user ${user.id}: ${error instanceof Error ? error.message : 'Unknown'}`
-            );
           }
         }
       } catch (error) {

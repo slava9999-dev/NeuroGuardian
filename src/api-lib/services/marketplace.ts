@@ -365,27 +365,45 @@ export async function fetchWbStocks(apiKey: string, nmIds: number[]): Promise<Ma
  */
 export async function fetchWbProducts(apiKey: string, limit = 100): Promise<MarketplaceProduct[]> {
   // Step 1: Get product cards from Content API
-  const cardsResponse = await fetchWithRetry(
-    'https://content-api.wildberries.ru/content/v2/get/cards/list',
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: apiKey,
-      },
-      body: JSON.stringify({
-        settings: { cursor: { limit }, filter: { withPhoto: -1 } },
-      }),
-    }
-  );
+  let cards: WbCard[] = [];
+  try {
+    const cardsResponse = await fetchWithRetry(
+      'https://content-api.wildberries.ru/content/v2/get/cards/list',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: apiKey,
+        },
+        body: JSON.stringify({
+          settings: {
+            cursor: { limit },
+            filter: { withPhoto: -1 },
+          },
+        }),
+      }
+    );
 
-  if (!cardsResponse.ok) {
-    throw new Error(`WB Content API error: ${cardsResponse.status}`);
+    if (!cardsResponse.ok) {
+      const text = await cardsResponse.text();
+      console.error(`❌ WB Content API Error: ${cardsResponse.status} ${text}`);
+      throw new Error(`WB Content API error: ${cardsResponse.status}`);
+    }
+
+    const cardsData = (await cardsResponse.json()) as { cards: WbCard[]; cursor?: unknown };
+    cards = cardsData.cards || [];
+
+    console.log(`📦 WB Content API: Received ${cards.length} cards`);
+    if (cards.length === 0) {
+      console.warn('⚠️ WB Content API returned 0 cards. Check API Key permissions "Контент".');
+      return [];
+    }
+  } catch (e) {
+    console.error('❌ WB Content API Fetch Failed:', e);
+    // Rethrow to let resilient wrapper handle it
+    throw e;
   }
 
-  const cardsData = (await cardsResponse.json()) as { cards: WbCard[] };
-
-  const cards: WbCard[] = cardsData.cards || [];
   const nmIds = cards.map(card => card.nmID);
 
   // Step 2: Fetch REAL prices from Prices API
@@ -734,84 +752,92 @@ export async function fetchOzonProducts(
   limit = 100
 ): Promise<MarketplaceProduct[]> {
   // Step 1: Get product list
-  const listResponse = await fetchWithRetry('https://api-seller.ozon.ru/v3/product/list', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Client-Id': clientId,
-      'Api-Key': apiKey,
-    },
-    body: JSON.stringify({ filter: {}, last_id: '', limit }),
-  });
+  try {
+    const listResponse = await fetchWithRetry('https://api-seller.ozon.ru/v3/product/list', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Client-Id': clientId,
+        'Api-Key': apiKey,
+      },
+      body: JSON.stringify({ filter: {}, last_id: '', limit }),
+    });
 
-  if (!listResponse.ok) {
-    const errorText = await listResponse.text();
-    throw new Error(`Ozon API error: ${listResponse.status} - ${errorText}`);
-  }
-
-  const listData = (await listResponse.json()) as { result: { items: OzonProductListItem[] } };
-
-  const items = listData.result?.items || [];
-
-  if (items.length === 0) return [];
-
-  // Step 2: Get product details
-  const productIds = items.map(item => item.product_id);
-  const detailResponse = await fetchWithRetry('https://api-seller.ozon.ru/v3/product/info/list', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Client-Id': clientId,
-      'Api-Key': apiKey,
-    },
-    body: JSON.stringify({ product_id: productIds }),
-  });
-
-  if (!detailResponse.ok) {
-    throw new Error(`Ozon Product Info API error: ${detailResponse.status}`);
-  }
-
-  const detailData = (await detailResponse.json()) as {
-    result: { items: OzonProductInfo[] };
-    items?: OzonProductInfo[];
-  };
-  const detailItems: OzonProductInfo[] = detailData.result?.items || detailData.items || [];
-
-  // Step 3: Map to unified format with estimated buyer price
-  return detailItems.map(item => {
-    const stocks: OzonStockItem[] = item.stocks?.stocks || [];
-    const totalStock = stocks.reduce((acc, s) => acc + (s.present || 0), 0);
-
-    let price = 0;
-    if (typeof item.price === 'object' && item.price !== null) {
-      price = parseFloat(item.price.marketing_price || item.price.price || '0');
-    } else if (typeof item.price === 'string') {
-      price = parseFloat(item.price || item.marketing_price || '0');
+    if (!listResponse.ok) {
+      const errorText = await listResponse.text();
+      console.error(`❌ Ozon List API Error: ${listResponse.status} ${errorText}`);
+      throw new Error(`Ozon API error: ${listResponse.status} - ${errorText}`);
     }
 
-    const roundedPrice = Math.round(price);
+    const listData = (await listResponse.json()) as { result: { items: OzonProductListItem[] } };
+    const items = listData.result?.items || [];
+    console.log(`🔵 Ozon API: Received ${items.length} items`);
 
-    // Calculate estimated buyer price (accounts for Ozon Card + typical discounts)
-    // Since Ozon removed marketing_price from API (Nov 2025), we estimate
-    const { price: buyerPrice, discountPercent } = calculateOzonBuyerPrice(roundedPrice);
+    if (items.length === 0) return [];
 
-    return {
-      product_id: `ozon-${item.id}`,
-      title: item.name || 'Без названия',
-      image_url:
-        (typeof item.primary_image === 'string'
-          ? item.primary_image
-          : (item.primary_image as string[])?.[0]) ||
-        item.images?.[0] ||
-        null,
-      current_price: roundedPrice,
-      estimated_buyer_price: buyerPrice,
-      marketplace_discount_percent: discountPercent,
-      current_stock: totalStock,
-      marketplace: 'Ozon' as const,
+    // Step 2: Get product details (moved inside try block to be safe)
+    const productIds = items.map(item => item.product_id);
+    const detailResponse = await fetchWithRetry('https://api-seller.ozon.ru/v3/product/info/list', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Client-Id': clientId,
+        'Api-Key': apiKey,
+      },
+      body: JSON.stringify({ product_id: productIds }),
+    });
+
+    if (!detailResponse.ok) {
+      throw new Error(`Ozon Product Info API error: ${detailResponse.status}`);
+    }
+
+    const detailData = (await detailResponse.json()) as {
+      result: { items: OzonProductInfo[] };
+      items?: OzonProductInfo[];
     };
-  });
+    const detailItems: OzonProductInfo[] = detailData.result?.items || detailData.items || [];
+
+    return detailItems.map(item => {
+      const stocks: OzonStockItem[] = item.stocks?.stocks || [];
+      const totalStock = stocks.reduce((acc, s) => acc + (s.present || 0), 0);
+
+      let price = 0;
+      if (typeof item.price === 'object' && item.price !== null) {
+        price = parseFloat(item.price.marketing_price || item.price.price || '0');
+      } else if (typeof item.price === 'string') {
+        price = parseFloat(item.price || item.marketing_price || '0');
+      }
+
+      const roundedPrice = Math.round(price);
+
+      // Calculate estimated buyer price (accounts for Ozon Card + typical discounts)
+      // Since Ozon removed marketing_price from API (Nov 2025), we estimate
+      const { price: buyerPrice, discountPercent } = calculateOzonBuyerPrice(roundedPrice);
+
+      return {
+        product_id: `ozon-${item.id}`,
+        title: item.name || 'Без названия',
+        image_url:
+          (typeof item.primary_image === 'string'
+            ? item.primary_image
+            : (item.primary_image as string[])?.[0]) ||
+          item.images?.[0] ||
+          null,
+        current_price: roundedPrice,
+        estimated_buyer_price: buyerPrice,
+        marketplace_discount_percent: discountPercent,
+        current_stock: totalStock,
+        marketplace: 'Ozon' as const,
+      };
+    });
+  } catch (e) {
+    console.error('❌ Ozon Products Fetch Failed:', e);
+    // Rethrow to let resilient wrapper handle it
+    throw e;
+  }
 }
+
+// Logic already implemented above, cleaning up the tail
 
 /**
  * Update prices on Ozon

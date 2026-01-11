@@ -57,16 +57,15 @@ export class SentinelPriceMonitor implements PriceMonitor {
             ozonIds
           );
 
-          // Fallback logic for zero/missing prices is kept for resilience,
-          // but we should log that it's stale data if we wanted to be strict.
-          // For now, mirroring original logic:
+          // REMOVED: Silent fallback to DB prices (`product.current_price`).
+          // If API returns 0 prices, we must report an error/warning, not pretend everything is fine.
           if (ozonPriceMap.size === 0) {
-            for (const product of ozonProducts) {
-              if (product.current_price && product.current_price > 0) {
-                const ozonId = parseInt(product.product_id.replace('ozon-', ''));
-                if (ozonId) ozonPriceMap.set(ozonId, product.current_price);
-              }
-            }
+            prices.errors.push(
+              `Ozon Monitor Warning: API returned 0 prices for ${ozonIds.length} products (User ${user.id})`
+            );
+          } else if (ozonPriceMap.size < ozonIds.length) {
+            // Optional: Warn about partial missing prices
+            // prices.errors.push(`Ozon Monitor: Only ${ozonPriceMap.size}/${ozonIds.length} prices retrieved`);
           }
 
           for (const [id, price] of ozonPriceMap.entries()) {
