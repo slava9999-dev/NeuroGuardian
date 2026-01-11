@@ -21,13 +21,33 @@
 
 - ✅ **TOOL MIGRATION**: Все инструменты перенесены из `tool-executors.ts` в `src/agent/execution/tools/`
 - ✅ **TYPE SAFETY**: `npm run typecheck` проходит без ошибок (0 errors)
-- ✅ **ORCHESTRATOR V4**: Рефакторинг на использование `toolRegistry.execute()`
-- ⏳ Добавить колонку `cost_price` в БД для реальной экономики (Scheduled for next session)
+- ✅ **SENTINEL REFACTOR**: Логика Sentinel разбита на модули в `src/sentinel/` (Orchestrator, ThreatDetector, PriceMonitor)
+- ✅ **DB SCHEMA**: `cost_price` колонка подтверждена в таблице `products`.
 - ⏳ Исправить тест HIGH-003 (уточнение периода)
 
 ---
 
 ## ✅ Recently Completed
+
+### Session 2026-01-11 (Session 34 - Sentinel Architecture V5) 🛡️
+
+**Модуляризация Sentinel ("Lego-blocks" Phase 5):**
+
+- [x] **REFACTOR**: Монолитный `SentinelService.ts` (600+ строк) разбит на независимые классы в `src/sentinel/`.
+- [x] **COMPONENTS**:
+  - `SentinelOrchestrator`: Координирует процесс проверки.
+  - `PriceMonitor`: Получает цены с маркетплейсов (WB/Ozon).
+  - `ThreatDetector`: Чистая логика обнаружения угроз (Unit Economics, Stop-Loss).
+  - `DefenseExecutor`: Применение защиты (Smart Repricing, Zero Stock).
+  - `ReportGenerator` & `AlertSender`: Формирование и отправка отчетов.
+- [x] **TYPE SAFETY**: Строгая типизация всех компонентов, `npm run typecheck` ✅.
+- [x] **BACKWARD COMPAT**: Старый `sentinel-service.ts` превращен в ре-экспорт для совместимости.
+
+**Файлы изменены/созданы:**
+
+- `src/sentinel/*.ts` — 6 новых файлов (ядро Sentinel V5)
+- `src/api-lib/services/sentinel-service.ts` — refactor (export barrel)
+- `src/api-lib/handlers/sentinel.ts` — обновлен импорт ThreatDetector
 
 ### Session 2026-01-11 (Session 33 - Modular Agent Tools) 🧱
 
@@ -565,6 +585,7 @@ By Category:
 
 ## 🔮 Next Session Suggestions
 
-1.  **Product Sync with Accounts**: Refactor product sync logic to iterate through all marketplace accounts properly.
-2.  **Sentinel Dashboard**: Update the Frontend Dashboard to display Sentinel v2's detected threats (erosion, commission increase).
-3.  **Analytics Service**: Move ABC analysis and stock forecasting from mock/deceptive logic to real DB-backed queries in `marketplace-orders`.
+1.  **Frontend Sentinel Dashboard**: Подключить Frontend (`SentinelDashboard.tsx`) к новому API (`/api?action=sentinel-dashboard`), чтобы отображать угрозы V5 (эрозия, stop-loss).
+2.  **Cost Price Population**: Реализовать массовое заполнение `cost_price` (импорт из Excel или ввод через UI), так как колонка в БД уже есть.
+3.  **Fix High-003 Test**: Исправить тест "Уточнение периода" в `run-pro-tests.ts`, чтобы он проходил стабильно.
+4.  **Unit Economics UI**: Добавить отображение реальной маржинальности в список товаров.

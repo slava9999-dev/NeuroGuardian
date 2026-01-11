@@ -87,20 +87,21 @@ Cron каждый час → Проверяет цены → Если пробл
                             │
                             ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│                    SENTINEL SERVICE                               │
-│                 (sentinel-service.ts)                             │
+│                    SENTINEL SERVICE V5                            │
+│                 (src/sentinel/SentinelOrchestrator.ts)            │
 │                                                                   │
-│  FOR EACH USER:                                                  │
-│  1. Получить все товары из БД                                    │
-│  2. Получить текущие цены с WB/Ozon API                          │
-│  3. Сравнить: была 1000₽, стала 900₽ → ПРОБЛЕМА!                 │
-│  4. Проверить price_rules: min_price = 950₽ → НАРУШЕНИЕ!         │
+│  ORCHESTRATOR:                                                   │
+│  1. PriceMonitor: Получить цены (WB + Ozon)                      │
+│  2. ThreatDetector: Найти угрозы (Эрозия, Stop-Loss)             │
+│  3. DefenseExecutor: Применить защиту (Repricing)                │
+│  4. AlertSender: Отправить уведомление                           │
 │                                                                   │
-│  THREAT DETECTOR:                                                │
-│  - Эрозия маржи (цена упала > 5%)                                │
-│  - Нарушение stop-loss (цена < min_price)                        │
-│  - Конкурент снизил цену                                         │
+│  THREAT DETECTOR (Modular):                                      │
+│  - OZON_CARD_EROSION (цена упала из-за СПП)                      │
+│  - COMPETITOR_PRICE_DROP (Stop-Loss нарушение)                   │
+│  - MARGIN_BELOW_ZERO (Убыточная продажа)                         │
 └───────────────────────────┬──────────────────────────────────────┘
+
                             │ Если найдены угрозы
                             ▼
 ┌──────────────────────────────────────────────────────────────────┐

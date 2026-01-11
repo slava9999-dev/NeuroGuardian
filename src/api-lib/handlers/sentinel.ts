@@ -5,6 +5,7 @@
 // ============================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { DBProduct } from '../lib/types.js';
 import { verifyAdminAccessAsync, extractAnyAuthAsync } from '../middleware/auth.js';
 
 /**
@@ -124,7 +125,8 @@ export async function handleSentinelDashboard(
   userId: number
 ): Promise<VercelResponse> {
   const { sql } = await import('@vercel/postgres');
-  const { scanProductThreats } = await import('../services/threat-detector.js');
+  const { ThreatDetector } = await import('../../sentinel/ThreatDetector.js');
+  const threatDetector = new ThreatDetector();
   const { getMarketplaceKeys, fetchWbPrices, fetchOzonCurrentPrices } =
     await import('../services/marketplace.js');
 
@@ -203,7 +205,7 @@ export async function handleSentinelDashboard(
             const livePrice = priceMap.get(product.nm_id);
             if (livePrice === undefined) continue;
 
-            const scan = scanProductThreats(product as any, livePrice, 'WB');
+            const scan = threatDetector.scanProductThreats(product as DBProduct, livePrice, 'WB');
             if (scan.hasThreats) {
               for (const threat of scan.threats) {
                 activeThreats.push({
@@ -245,7 +247,7 @@ export async function handleSentinelDashboard(
             const livePrice = priceMap.get(ozonId);
             if (livePrice === undefined) continue;
 
-            const scan = scanProductThreats(product as any, livePrice, 'Ozon');
+            const scan = threatDetector.scanProductThreats(product as DBProduct, livePrice, 'Ozon');
             if (scan.hasThreats) {
               for (const threat of scan.threats) {
                 activeThreats.push({
