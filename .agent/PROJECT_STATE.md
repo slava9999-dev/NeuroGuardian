@@ -49,6 +49,26 @@
 - `src/api-lib/services/sentinel-service.ts` — refactor (export barrel)
 - `src/api-lib/handlers/sentinel.ts` — обновлен импорт ThreatDetector
 
+### Session 2026-01-11 (Session 35 - Cyberpunk Security Hardening) 🔐
+
+**Реализация критических исправлений по результатам аудита ("Cyberpunk Patch v1"):**
+
+- [x] **HARD LOCKDOWN**: В `constants.ts` добавлена жесткая проверка наличия `API_KEY_ENCRYPTION_KEY` в продакшене. Приложение упадет, если ключа нет (Fail Fast).
+- [x] **AUTH SHIELD**: В `telegram.ts` полностью удален "dev bypass". Теперь любая среда требует валидной подписи Telegram или локального токена.
+- [x] **PANIC BUTTON**: В `SentinelOrchestrator` внедрен `alertSender.sendCriticalError` для мгновенного уведомления админа при падении цикла или обработки пользователя.
+- [x] **AUDIT RECORD**: Создан `docs/CYBERPUNK_AUDIT_2026-01-11.md` с полным отчетом о состоянии.
+
+**Commits:**
+
+- `security(core): apply Cyberpunk Patch v1 - harden auth, secrets, and sentinel alerts`
+
+**Файлы изменены:**
+
+- `src/api-lib/lib/constants.ts` — fail fast security
+- `src/api-lib/lib/telegram.ts` — removal of dev backdoor
+- `src/sentinel/AlertSender.ts` — new critical alert method
+- `src/sentinel/SentinelOrchestrator.ts` — integration of critical alerts
+
 ### Session 2026-01-11 (Session 33 - Modular Agent Tools) 🧱
 
 **Переход на модульную архитектуру инструментов ("Lego-blocks"):**
