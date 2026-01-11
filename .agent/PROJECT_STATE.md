@@ -1,6 +1,6 @@
 # 📊 Project State — NeuroGUARDIAN
 
-# Updated: 2026-01-11T18:30:00+03:00
+# Updated: 2026-01-11T22:35:00+03:00
 
 # This file tracks current progress and is updated at end of each session
 
@@ -8,8 +8,8 @@
 
 ## 🎯 Current Phase: MONETIZATION LAUNCH (Phase 11) 🟢 PRODUCTION
 
-**Last Session:** 2026-01-11 (Session 37)
-**Focus:** 🩺 E2E TEST FIXES — Stabilizing smoke tests and fixing mock data mismatches
+**Last Session:** 2026-01-11 (Session 38)
+**Focus:** 🤖 AGENT V5 VERIFICATION — Fixing database connection and initialization blockers
 
 **📋 Ключевые документы:**
 
@@ -19,15 +19,30 @@
 
 **🎯 СЛЕДУЮЩИЙ ШАГ:**
 
-- ✅ **TOOL MIGRATION**: Все инструменты перенесены из `tool-executors.ts` в `src/agent/execution/tools/`
-- ✅ **TYPE SAFETY**: `npm run typecheck` проходит без ошибок (0 errors)
-- ✅ **SENTINEL REFACTOR**: Логика Sentinel разбита на модули в `src/sentinel/` (Orchestrator, ThreatDetector, PriceMonitor)
-- ✅ **DB SCHEMA**: `cost_price` колонка подтверждена в таблице `products`.
-- ⏳ Исправить тест HIGH-003 (уточнение периода)
+- ✅ **AGENT V5 CORE**: Базовый функционал верифицирован (RAG + Tools)
+- ✅ **DB RESILIENCE**: Драйвер БД адаптирован к долгим задержкам (VPN/Neon)
+- ✅ **STATE MANAGEMENT**: `user_state` таблица автоматически инициализируется
+- ⏳ Финальная проверка интеграции Telegram с V5 в продакшене
 
 ---
 
 ## ✅ Recently Completed
+
+### Session 2026-01-11 (Session 38 - Agent V5 Fixes) 🤖
+
+**Стабилизация и запуск Agent V5:**
+
+- [x] **DATABASE FIX (SASL)**: Исправлена критическая ошибка `SASL: SCRAM-SERVER-FIRST-MESSAGE: client password must be a string`. Проблема решена через "ленивую" инициализацию пула и гарантированную загрузку `.env` перед импортом модулей.
+- [x] **BOOTSTRAP FIX**: Решена проблема `ReferenceError: Cannot access 'getOrdersTool' before initialization` путем настройки порядка импортов в `src/agent/execution/index.ts`.
+- [x] **NETWORK RESILIENCE**: В `database.local.ts` добавлен механизм retry и таймауты (30с) для стабильной работы через VPN/Neon.
+- [x] **STATE MANAGER UPGRADE**: `StateManager` переведен на безопасную инициализацию (lazy table creation) и строгую типизацию без `any`.
+- [x] **VERIFICATION RESULTS**: Скрипт `verify-agent-v5.ts` подтвердил успешное выполнение RAG запросов и вызов инструментов (`calculate_unit_economics`).
+
+**Commits:**
+
+- `fix(agent): resolve SASL database errors and tool initialization blockers for V5`
+- `refactor(db): implement robust connection pool with retry logic for VPN/Neon stability`
+- `feat(env): add reliable environment loader for script execution`
 
 ### Session 2026-01-11 (Session 37 - Agent E2E Fixes) 🧪
 
