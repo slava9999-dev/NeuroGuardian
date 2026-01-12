@@ -50,7 +50,7 @@ vi.mock('../../src/api-lib/services/notifications.js', () => ({
   },
 }));
 
-vi.mock('../../src/api-lib/services/_deprecated/price-shield.js', () => ({
+vi.mock('../../src/sentinel/PriceShield.js', () => ({
   priceShield: {
     getRulesForUser: vi.fn(() => Promise.resolve([])), // Default: no rules -> regular logic
     calculateOptimalPrice: vi.fn(),
@@ -101,9 +101,9 @@ vi.mock('../../security-agent/src/index.js', () => ({
   })),
 }));
 
-// Mock sentinel-service to return expected results
-vi.mock('../../src/api-lib/services/sentinel-service.js', () => ({
-  sentinelService: {
+// Mock sentinel orchestrator to return expected results
+vi.mock('../../src/sentinel/SentinelOrchestrator.js', () => ({
+  sentinelOrchestrator: {
     runCycle: vi.fn().mockResolvedValue({
       usersProcessed: 1,
       actionsTaken: 1,
@@ -117,7 +117,6 @@ vi.mock('../../src/api-lib/services/sentinel-service.js', () => ({
       errors: [],
     }),
   },
-  SentinelService: vi.fn(),
 }));
 
 // Mock fetch globally for Telegram alerts
