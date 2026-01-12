@@ -60,6 +60,22 @@
 - [x] **DEBUGGING**: Проведена диагностика сетевых проблем, подтверждена необходимость деплоя в стабильную среду (Vercel).
 - [x] **BUSINESS READY**: Код готов к работе в продакшене без использования моков.
 
+### Session 2026-01-12 (Session 44 - Build Fix & Stabilization) 🚑
+
+**Resolving Production Build & Test Issues:**
+
+- [x] **FIX MODULE RESOLUTION**: Удалены `.js` расширения из импортов во всех ключевых файлах (`api-lib/handlers`, `services`). Это решило критическую ошибку Vercel build `Cannot find module`.
+- [x] **FIX AGENT SCHEMA**: Добавлен параметр `search` в `PLAN_JSON_SCHEMA`, что позволило агенту корректно использовать `get_products` при нечетком поиске (исправление для E2E тестов).
+- [x] **FIX LOGGING**: Начата миграция на структурированный `logger` в `admin.ts` (Security P0).
+- [x] **VERIFICATION**: `npm run typecheck` проходит успешно (Exit code 0).
+
+**Commits:**
+
+- `fix(modules): remove .js extensions from imports to resolve vercel build errors`
+- `security(admin): replace console logs with structured logger and fix module imports`
+- `fix(agent-prompt): refine planner instructions for explicit tool chaining`
+- `fix(agent-schema): add search parameter to plan schema`
+
 **Commits:**
 
 - `fix(sentinel): optimize db queries and harden connection for VPN resilience`
