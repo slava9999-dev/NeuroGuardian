@@ -1,6 +1,6 @@
 # 📊 Project State — NeuroGUARDIAN
 
-# Updated: 2026-01-12T11:00:00+03:00
+# Updated: 2026-01-12T16:30:00+03:00
 
 # This file tracks current progress and is updated at end of each session
 
@@ -8,8 +8,8 @@
 
 ## 🎯 Current Phase: MONETIZATION LAUNCH (Phase 11) 🟢 PRODUCTION
 
-**Last Session:** 2026-01-12 (Session 43)
-**Focus:** 🛡️ Sentinel Refactoring & Production Stabilization
+**Last Session:** 2026-01-12 (Session 45)
+**Focus:** 🧪 Agent E2E Tests & Sentinel Advanced Scenarios
 
 **📋 Ключевые документы:**
 
@@ -17,6 +17,19 @@
 - `docs/MONETIZATION_ROADMAP.md` — Путеводитель монетизации
 - `docs/LAUNCH_CHECKLIST.md` — Интерактивный чеклист
   - `scripts/verify-agent-v5.ts` — верификация
+
+### Session 2026-01-12 (Session 45 - Agent & Sentinel Tests) 🧪
+
+**Fixing Agent Tool Selection & Sentinel Scenarios:**
+
+- [x] **E2E FIXES**: Updated `tests/agent/viktor-local-e2e.test.ts` to improve tool selection reliability (added missing parameters).
+- [x] **SENTINEL TESTS**: Added `tests/sentinel/advanced-scenarios.test.ts` for comprehensive threat detection and defense coverage.
+- [x] **DEBUGGING**: Updated `scripts/debug-sentinel-run.ts` to support targeted debugging.
+- [x] **CONFIG**: Updated `vitest.config.ts` for better test execution.
+
+**Commits:**
+
+- `test(agent): fix viktor-local-e2e tool selection and add sentinel advanced scenarios`
 
 ### Session 2026-01-12 (Session 43 - Sentinel Refactoring & Modularization) 🛡️
 
