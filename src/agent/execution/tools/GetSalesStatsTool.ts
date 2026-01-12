@@ -5,6 +5,7 @@
 
 import { z } from 'zod';
 import { defineTool } from '../ToolRegistry.js';
+import { marketplaceService } from '../../../api-lib/core-services/MarketplaceService.js';
 
 /**
  * Arguments schema for get_sales_stats tool
@@ -45,74 +46,59 @@ export const getSalesStatsTool = defineTool<GetSalesStatsArgs>({
 
   async execute(userId, args) {
     try {
-      const { getMarketplaceKeys, fetchWbSalesStats, fetchOzonSalesStats } =
-        await import('../../../api-lib/services/marketplace.js');
-
-      const keys = await getMarketplaceKeys(userId);
-
-      if (!keys.wb && !keys.ozon) {
-        return {
-          success: false,
-          error: 'Нет подключённых маркетплейсов. Добавьте API-ключ в настройках.',
-        };
-      }
-
       // Calculate date range based on period
       const { from, to } = calculateDateRange(args.period || 'week');
 
-      let wbStats = null;
-      let ozonStats = null;
+      interface ToolSalesStats {
+        marketplace: 'WB' | 'Ozon';
+        orders: number;
+        revenue: number;
+        returns: number;
+        avgOrderValue: number;
+      }
+
+      let wbStats: ToolSalesStats | null = null;
+      let ozonStats: ToolSalesStats | null = null;
       let totalOrders = 0;
       let totalRevenue = 0;
 
       // Fetch WB statistics
-      if (keys.wb && (!args.marketplace || args.marketplace === 'WB')) {
-        try {
-          // fetchWbSalesStats takes (apiKey, dateFrom) and returns aggregated stats
-          const wbData = await fetchWbSalesStats(keys.wb, from);
-
-          if (wbData) {
-            wbStats = {
-              marketplace: 'WB',
-              orders: wbData.orders,
-              revenue: wbData.revenue,
-              returns: wbData.returns || 0,
-              avgOrderValue: wbData.orders > 0 ? Math.round(wbData.revenue / wbData.orders) : 0,
-            };
-            totalOrders += wbStats.orders;
-            totalRevenue += wbStats.revenue;
-          }
-        } catch (error) {
-          console.error('[GetSalesStats] WB error:', error);
+      if (!args.marketplace || args.marketplace === 'WB') {
+        const stats = await marketplaceService.fetchSalesStats(userId, 'WB', from, to);
+        if (stats) {
+          wbStats = {
+            marketplace: 'WB',
+            orders: stats.orders,
+            revenue: stats.revenue,
+            returns: stats.returns,
+            avgOrderValue: stats.orders > 0 ? Math.round(stats.revenue / stats.orders) : 0,
+          };
+          totalOrders += stats.orders;
+          totalRevenue += stats.revenue;
         }
       }
 
       // Fetch Ozon statistics
-      if (keys.ozon && (!args.marketplace || args.marketplace === 'Ozon')) {
-        try {
-          // fetchOzonSalesStats takes (clientId, apiKey, dateFrom, dateTo)
-          const ozonData = await fetchOzonSalesStats(
-            keys.ozon.clientId,
-            keys.ozon.apiKey,
-            from,
-            to
-          );
-
-          if (ozonData) {
-            ozonStats = {
-              marketplace: 'Ozon',
-              orders: ozonData.orders,
-              revenue: ozonData.revenue,
-              returns: ozonData.returns || 0,
-              avgOrderValue:
-                ozonData.orders > 0 ? Math.round(ozonData.revenue / ozonData.orders) : 0,
-            };
-            totalOrders += ozonStats.orders;
-            totalRevenue += ozonStats.revenue;
-          }
-        } catch (error) {
-          console.error('[GetSalesStats] Ozon error:', error);
+      if (!args.marketplace || args.marketplace === 'Ozon') {
+        const stats = await marketplaceService.fetchSalesStats(userId, 'Ozon', from, to);
+        if (stats) {
+          ozonStats = {
+            marketplace: 'Ozon',
+            orders: stats.orders,
+            revenue: stats.revenue,
+            returns: stats.returns,
+            avgOrderValue: stats.orders > 0 ? Math.round(stats.revenue / stats.orders) : 0,
+          };
+          totalOrders += stats.orders;
+          totalRevenue += stats.revenue;
         }
+      }
+
+      if (!wbStats && !ozonStats) {
+        return {
+          success: false,
+          error: 'Нет данных или нет подключенных API ключей.',
+        };
       }
 
       // Calculate trends

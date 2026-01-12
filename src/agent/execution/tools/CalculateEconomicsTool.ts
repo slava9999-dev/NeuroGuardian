@@ -114,7 +114,7 @@ export const calculateUnitEconomicsTool = defineTool<CalculateUnitEconomicsArgs>
 
         // Use product data as defaults
         sellingPrice = sellingPrice || product.current_price;
-        costPrice = costPrice || product.cost_price;
+        costPrice = costPrice || product.cost_price || 0;
         marketplace = (product.marketplace?.toUpperCase() as 'WB' | 'Ozon') || marketplace;
       }
 

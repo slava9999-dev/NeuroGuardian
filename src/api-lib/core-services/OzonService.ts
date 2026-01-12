@@ -1,11 +1,11 @@
-import { fetchWithRetry } from '../../api-lib/lib/index.js';
+import { fetchWithRetry } from '../lib/index.js';
 import type {
   OzonProductInfo,
   OzonStockItem,
   OzonPriceUpdateResult,
   OzonError,
   OzonOrder,
-} from '../../api-lib/lib/marketplace-types.js';
+} from '../lib/marketplace-types.js';
 import type { MarketplaceProduct, MarketplaceSalesStats } from './MarketplaceTypes.js';
 
 export class OzonService {
@@ -399,8 +399,10 @@ export class OzonService {
       if (response.ok) {
         const responseData = await response.json();
         const results = responseData.result || [];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const failedItems = results.filter((r: any) => r.updated === false || r.errors?.length > 0);
+
+        const failedItems = results.filter(
+          (r: OzonPriceUpdateResult) => r.updated === false || (r.errors && r.errors.length > 0)
+        );
 
         if (failedItems.length > 0) {
           if (failedItems.length === validUpdates.length)
@@ -443,11 +445,13 @@ export class OzonService {
 
       if (response.ok) {
         const data = await response.json();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const warehouses = (data.result || []).map((w: any) => ({
-          id: w.warehouse_id,
-          name: w.name || `Склад ${w.warehouse_id}`,
-        }));
+
+        const warehouses = (data.result || []).map(
+          (w: { warehouse_id: number; name?: string }) => ({
+            id: w.warehouse_id,
+            name: w.name || `Склад ${w.warehouse_id}`,
+          })
+        );
         return { warehouses };
       } else {
         const errorText = await response.text();
@@ -498,7 +502,7 @@ export class OzonService {
   /**
    * Fetch Ozon stocks using v3 API
    */
-  async fetchStocks(clientId: string, apiKey: string, limit = 100): Promise<any[]> {
+  async fetchStocks(clientId: string, apiKey: string, limit = 100): Promise<unknown[]> {
     try {
       const response = await fetchWithRetry('https://api-seller.ozon.ru/v3/product/info/stocks', {
         method: 'POST',
@@ -534,7 +538,7 @@ export class OzonService {
     dateFrom: string,
     dateTo: string,
     metrics: string[] = ['revenue', 'ordered_units', 'returns']
-  ): Promise<any[]> {
+  ): Promise<unknown[]> {
     try {
       const response = await fetchWithRetry(this.ANALYTICS_API, {
         method: 'POST',
@@ -567,7 +571,11 @@ export class OzonService {
   /**
    * Fetch Ozon Product Info (v2)
    */
-  async fetchProductInfo(clientId: string, apiKey: string, productIds: string[]): Promise<any[]> {
+  async fetchProductInfo(
+    clientId: string,
+    apiKey: string,
+    productIds: string[]
+  ): Promise<unknown[]> {
     try {
       const response = await fetchWithRetry('https://api-seller.ozon.ru/v2/product/info', {
         method: 'POST',

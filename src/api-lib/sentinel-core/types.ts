@@ -1,4 +1,4 @@
-import type { DBUser, DBProduct } from '../api-lib/lib/types.js';
+import type { DBUser, DBProduct } from '../lib/types.js';
 
 export interface SentinelRunResult {
   usersProcessed: number;

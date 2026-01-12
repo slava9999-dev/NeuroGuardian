@@ -53,6 +53,12 @@ export function decryptApiKey(encryptedKey: string): string {
     return encryptedKey;
   }
 
+  const parts = encryptedKey.split(':');
+  // If it doesn't have exactly 3 parts, it's not our encryption format (e.g. might be "ClientId:ApiKey")
+  if (parts.length !== 3) {
+    return encryptedKey;
+  }
+
   if (!API_KEY_ENCRYPTION_KEY) {
     throw new Error(
       'CRYPTOGRAPHIC_ERROR: API_KEY_ENCRYPTION_KEY is not configured. Cannot decrypt secrets.'
@@ -60,7 +66,7 @@ export function decryptApiKey(encryptedKey: string): string {
   }
 
   try {
-    const [ivHex, authTagHex, encrypted] = encryptedKey.split(':');
+    const [ivHex, authTagHex, encrypted] = parts;
     if (!ivHex || !authTagHex || !encrypted) {
       throw new Error(
         'CRYPTOGRAPHIC_ERROR: Invalid encrypted key format. Missing required components.'

@@ -1,6 +1,6 @@
 import { defineTool } from '../ToolRegistry.js';
 import { GetAbcAnalysisArgsSchema } from '../../../api-lib/agent/validators.js';
-import { syncSalesHistory } from '../../../api-lib/services/marketplace.js';
+import { marketplaceService } from '../../../api-lib/core-services/MarketplaceService.js';
 import { getProductsByUserId, getSalesHistory } from '../../../api-lib/services/index.js';
 import type { DBProduct } from '../../../api-lib/lib/types.js';
 
@@ -26,7 +26,7 @@ export const getAbcAnalysisTool = defineTool({
     const dateFrom = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
 
     // 2. Sync fresh data
-    await syncSalesHistory(userId, daysBack, args.account_id);
+    await marketplaceService.syncSalesHistory(userId, daysBack, args.account_id);
 
     // 3. Fetch from DB
     const [products, orders] = await Promise.all([

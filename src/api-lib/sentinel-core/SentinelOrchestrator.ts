@@ -1,13 +1,13 @@
-import { sql } from '../api-lib/services/database.js';
-import type { DBUser, DBProduct } from '../api-lib/lib/types.js';
+import { sql } from '../services/database.js';
+import type { DBUser, DBProduct } from '../lib/types.js';
 import { SentinelPriceMonitor } from './PriceMonitor.js';
 import { ThreatDetector, ThreatType } from './ThreatDetector.js';
 import { SentinelDefenseExecutor } from './DefenseExecutor.js';
 import { SentinelReportGenerator } from './ReportGenerator.js';
 import { SentinelAlertSender } from './AlertSender.js';
 import type { SentinelRunResult, UserCycleResult } from './types.js';
-import { priceShield, type PriceRule } from '../api-lib/services/legacy/price-shield.js';
-import { getCompetitorPrice } from '../api-lib/services/competitor-monitor.js';
+import { priceShield, type PriceRule } from '../services/legacy/price-shield.js';
+import { getCompetitorPrice } from '../services/competitor-monitor.js';
 
 export class SentinelOrchestrator {
   private priceMonitor: SentinelPriceMonitor;

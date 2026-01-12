@@ -1,5 +1,5 @@
-import type { DBUser, DBProduct } from '../api-lib/lib/types.js';
-import { calculateUnitEconomics, estimateCostPrice } from '../api-lib/services/unit-economics.js';
+import type { DBUser, DBProduct } from '../lib/types.js';
+import { calculateUnitEconomics, estimateCostPrice } from '../services/unit-economics.js';
 
 export const ThreatType = {
   OZON_CARD_EROSION: 'ozon_card_erosion',

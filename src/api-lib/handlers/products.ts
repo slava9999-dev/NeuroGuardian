@@ -29,8 +29,25 @@ export async function handleProducts(
   if (req.method === 'GET') {
     const products = await getProductsByUserId(userId);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const formatted = (products as any[]).map(p => ({
+    // Define a type for the product object returned from the DB
+    interface DbProduct {
+      product_id: string;
+      nm_id: string | null;
+      vendor_code: string | null;
+      title: string | null;
+      image_url: string | null;
+      current_price: number | null;
+      estimated_buyer_price: number | null;
+      marketplace_discount_percent: number | null;
+      min_price: number | null;
+      cost_price: number | null;
+      current_stock: number | null;
+      marketplace: string;
+      status: string;
+      is_monitored: boolean;
+    }
+
+    const formatted = (products as unknown as DbProduct[]).map(p => ({
       id: p.product_id,
       productId: p.product_id, // CRITICAL: Frontend needs this for updates!
       nmId: p.nm_id,
@@ -97,8 +114,8 @@ export async function handleProducts(
   }
 }
 
-import { marketplaceService } from '../../core/services/MarketplaceService.js';
-import { productRepository } from '../../core/repositories/ProductRepository.js';
+import { marketplaceService } from '../core-services/MarketplaceService.js';
+import { productRepository } from '../repositories/ProductRepository.js';
 
 /**
  * Handle sync-products action — fetch products from WB/Ozon APIs
@@ -476,7 +493,12 @@ export async function handleBatchUpdateCosts(
     // 2. Process updates
     // Using individual updates for safety and explicit error handling per item
     // For 100 items, parallel Promise.all is acceptable
-    const updatePromises = updates.map(async (item: any) => {
+    interface UpdateItem {
+      productId: string;
+      costPrice: number;
+    }
+
+    const updatePromises = updates.map(async (item: UpdateItem) => {
       const { productId, costPrice } = item;
       const cost = Number(costPrice);
 
@@ -495,9 +517,10 @@ export async function handleBatchUpdateCosts(
       try {
         await updateProductCostPrice(userId, productId, cost);
         results.success++;
-      } catch (e: any) {
+      } catch (e) {
+        const error = e as Error;
         results.failed++;
-        results.errors.push(`DB Error ${productId}: ${e.message}`);
+        results.errors.push(`DB Error ${productId}: ${error.message}`);
       }
     });
 

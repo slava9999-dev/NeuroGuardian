@@ -125,7 +125,7 @@ export async function handleSentinelDashboard(
   userId: number
 ): Promise<VercelResponse> {
   const { sql } = await import('@vercel/postgres');
-  const { ThreatDetector } = await import('../../sentinel/ThreatDetector.js');
+  const { ThreatDetector } = await import('../sentinel-core/ThreatDetector.js');
   const threatDetector = new ThreatDetector();
   const { getMarketplaceKeys, fetchWbPrices, fetchOzonCurrentPrices } =
     await import('../services/marketplace-bridge.js');
@@ -193,7 +193,9 @@ export async function handleSentinelDashboard(
     const keys = await getMarketplaceKeys(userId);
 
     if (keys.wb) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const wbProducts = products.filter((p: any) => p.marketplace === 'WB');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const nmIds = wbProducts.map((p: any) => p.nm_id).filter((id: any) => id !== null);
 
       if (nmIds.length > 0) {
@@ -229,8 +231,10 @@ export async function handleSentinelDashboard(
     }
 
     if (keys.ozon) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const ozonProducts = products.filter((p: any) => p.marketplace === 'Ozon');
       const ozonIds = ozonProducts
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .map((p: any) => parseInt(p.product_id.replace('ozon-', '')))
         .filter(Boolean);
 
@@ -289,6 +293,7 @@ export async function handleSentinelDashboard(
         },
 
         // Defense history
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         recentActions: actionsResult.rows.map((row: any) => ({
           id: row.id,
           productTitle: row.product_title,

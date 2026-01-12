@@ -19,7 +19,7 @@ if (process.env.VERCEL && process.env.VERCEL_REGION) {
 
 export { sql };
 
-import { logger, encryptApiKey, decryptApiKey } from '../lib/index.js';
+import { logger, decryptApiKey } from '../lib/index.js';
 import type { DBProduct, PendingPriceUpdate } from '../lib/types.js';
 
 export interface TelegramUser {
@@ -276,73 +276,39 @@ export async function initializeDatabase(): Promise<void> {
   logger.info('Database schema initialized');
 }
 
+import { userRepository } from '../repositories/UserRepository.js';
+import { productRepository } from '../repositories/ProductRepository.js';
+
 /**
  * Get user by ID
  */
 export async function getUserById(id: number): Promise<TelegramUser | null> {
-  const result = await sql`SELECT * FROM users WHERE id = ${id}`;
-  const user = result.rows[0] as TelegramUser;
-  return user ? decryptUser(user) : null;
+  return userRepository.getById(id);
 }
 
 /**
  * Create or update user
  */
 export async function createOrUpdateUser(user: Partial<TelegramUser>): Promise<TelegramUser> {
-  const result = await sql`
-    INSERT INTO users (
-      id, username, first_name, last_name, photo_url,
-      api_key_wb, api_key_ozon, ozon_client_id, updated_at
-    )
-    VALUES (
-      ${user.id}, ${user.username || null}, ${user.first_name}, 
-      ${user.last_name || null}, ${user.photo_url || null},
-      ${user.api_key_wb ? encryptApiKey(user.api_key_wb) : null}, 
-      ${user.api_key_ozon ? encryptApiKey(user.api_key_ozon) : null}, 
-      ${user.ozon_client_id ? encryptApiKey(user.ozon_client_id) : null}, 
-      NOW()
-    )
-    ON CONFLICT (id) DO UPDATE SET
-      username = EXCLUDED.username,
-      first_name = EXCLUDED.first_name,
-      last_name = EXCLUDED.last_name,
-      photo_url = EXCLUDED.photo_url,
-      updated_at = NOW()
-    RETURNING *
-  `;
-  return result.rows[0] as TelegramUser;
+  return userRepository.createOrUpdate(user);
 }
 
 export async function setProtectionEnabled(id: number, enabled: boolean): Promise<void> {
-  await sql`UPDATE users SET protection_enabled = ${enabled}, updated_at = NOW() WHERE id = ${id}`;
+  return userRepository.setProtectionEnabled(id, enabled);
 }
 
 export async function setDefenseMode(
   id: number,
   mode: 'zero_stock' | 'price_correction'
 ): Promise<void> {
-  await sql`UPDATE users SET defense_mode = ${mode}, updated_at = NOW() WHERE id = ${id}`;
+  return userRepository.setDefenseMode(id, mode);
 }
 
 /**
  * Get user's products
  */
 export async function getProductsByUserId(userId: number, accountId?: number) {
-  if (accountId) {
-    const result = await sql`
-      SELECT * FROM products 
-      WHERE user_id = ${userId} AND account_id = ${accountId}
-      ORDER BY created_at DESC
-    `;
-    return result.rows;
-  }
-
-  const result = await sql`
-    SELECT * FROM products 
-    WHERE user_id = ${userId} 
-    ORDER BY created_at DESC
-  `;
-  return result.rows;
+  return productRepository.getByUserId(userId, accountId);
 }
 
 export async function updateProductMinPrice(
@@ -350,7 +316,7 @@ export async function updateProductMinPrice(
   productId: string,
   minPrice: number
 ): Promise<void> {
-  await sql`UPDATE products SET min_price = ${minPrice}, updated_at = NOW() WHERE user_id = ${userId} AND product_id = ${productId}`;
+  return productRepository.updateMinPrice(userId, productId, minPrice);
 }
 
 export async function updateProductCostPrice(
@@ -358,16 +324,14 @@ export async function updateProductCostPrice(
   productId: string,
   costPrice: number
 ): Promise<void> {
-  await sql`UPDATE products SET cost_price = ${costPrice}, updated_at = NOW() WHERE user_id = ${userId} AND product_id = ${productId}`;
+  return productRepository.updateCostPrice(userId, productId, costPrice);
 }
 
 export async function batchUpdateCostPrices(
   userId: number,
   updates: Array<{ productId: string; costPrice: number }>
 ): Promise<void> {
-  for (const update of updates) {
-    await updateProductCostPrice(userId, update.productId, update.costPrice);
-  }
+  return productRepository.batchUpdateCostPrices(userId, updates);
 }
 
 export async function updateProductCategory(
@@ -387,7 +351,7 @@ export async function updateProductPrice(
   productId: string,
   price: number
 ): Promise<void> {
-  await sql`UPDATE products SET current_price = ${price}, updated_at = NOW() WHERE user_id = ${userId} AND product_id = ${productId}`;
+  return productRepository.updatePrice(userId, productId, price);
 }
 
 export async function batchUpdateWbPrices(_userId: number, _updates: unknown[]): Promise<void> {

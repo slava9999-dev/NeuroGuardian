@@ -53,14 +53,18 @@ export class MemoryManager {
   private readonly FACTS_TABLE = 'memory_facts';
   private readonly SUMMARIES_TABLE = 'memory_summaries';
 
+  private tablesChecked = false;
+
   constructor() {
-    this.ensureTablesExist();
+    // Lazy initialization used instead of async constructor
   }
 
   /**
-   * Ensure all memory tables exist
+   * Lazily ensure all memory tables exist
    */
-  private async ensureTablesExist(): Promise<void> {
+  private async lazyEnsureTablesExist(): Promise<void> {
+    if (this.tablesChecked) return;
+
     try {
       // Messages table
       await sql`
@@ -98,6 +102,7 @@ export class MemoryManager {
           updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
         )
       `;
+      this.tablesChecked = true;
     } catch (error) {
       console.error('Failed to create memory tables:', error);
     }
@@ -107,6 +112,7 @@ export class MemoryManager {
    * Save message to short-term memory
    */
   async saveMessage(userId: number, role: 'user' | 'assistant', content: string): Promise<void> {
+    await this.lazyEnsureTablesExist();
     try {
       await sql`
         INSERT INTO ${sql(this.MESSAGES_TABLE)} (user_id, role, content)
@@ -121,6 +127,7 @@ export class MemoryManager {
    * Get recent conversation history
    */
   async getRecentHistory(userId: number, limit: number = 5): Promise<AgentMessage[]> {
+    await this.lazyEnsureTablesExist();
     try {
       const result = await sql`
         SELECT * FROM ${sql(this.MESSAGES_TABLE)}
@@ -150,6 +157,7 @@ export class MemoryManager {
     type: FactType,
     overwriteExisting: boolean = false
   ): Promise<void> {
+    await this.lazyEnsureTablesExist();
     try {
       const factId = this.generateFactId(userId, type, fact);
 
@@ -178,6 +186,7 @@ export class MemoryManager {
    * Search for relevant facts using simple keyword matching
    */
   async searchRelevantFacts(userId: number, query: string): Promise<string[]> {
+    await this.lazyEnsureTablesExist();
     try {
       const keywords = this.extractKeywords(query);
       const pattern = keywords.join('|');
@@ -201,6 +210,7 @@ export class MemoryManager {
    * Get user preferences from memory
    */
   async getUserPreferences(userId: number): Promise<Record<string, string>> {
+    await this.lazyEnsureTablesExist();
     try {
       const result = await sql`
         SELECT content FROM ${sql(this.FACTS_TABLE)}
@@ -231,6 +241,7 @@ export class MemoryManager {
    * Update fact access statistics
    */
   async accessFact(factId: string): Promise<void> {
+    await this.lazyEnsureTablesExist();
     try {
       await sql`
         UPDATE ${sql(this.FACTS_TABLE)}
@@ -246,6 +257,7 @@ export class MemoryManager {
    * Summarize and archive old memories
    */
   async summarizeAndArchive(userId: number): Promise<void> {
+    await this.lazyEnsureTablesExist();
     try {
       // Get all facts for user
       const factsResult = await sql`
@@ -292,6 +304,7 @@ export class MemoryManager {
    * Clear user memory (for testing or user request)
    */
   async clearMemory(userId: number): Promise<void> {
+    await this.lazyEnsureTablesExist();
     try {
       await sql`DELETE FROM ${sql(this.MESSAGES_TABLE)} WHERE user_id = ${userId}`;
       await sql`DELETE FROM ${sql(this.FACTS_TABLE)} WHERE user_id = ${userId}`;
@@ -309,6 +322,7 @@ export class MemoryManager {
     factCount: number;
     lastSummaryAt?: Date;
   }> {
+    await this.lazyEnsureTablesExist();
     try {
       const [messagesResult, factsResult, summaryResult] = await Promise.all([
         sql`SELECT COUNT(*) as count FROM ${sql(this.MESSAGES_TABLE)} WHERE user_id = ${userId}`,

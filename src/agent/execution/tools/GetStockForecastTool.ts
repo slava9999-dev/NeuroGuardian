@@ -1,6 +1,6 @@
 import { defineTool } from '../ToolRegistry.js';
 import { GetStockForecastArgsSchema } from '../../../api-lib/agent/validators.js';
-import { syncSalesHistory } from '../../../api-lib/services/marketplace.js';
+import { marketplaceService } from '../../../api-lib/core-services/MarketplaceService.js';
 import { getProductsByUserId, getSalesHistory } from '../../../api-lib/services/index.js';
 import type { DBProduct } from '../../../api-lib/lib/types.js';
 
@@ -13,7 +13,7 @@ export const getStockForecastTool = defineTool({
   examples: ['Когда закончится товар?', 'Прогноз остатков', 'На сколько дней хватит товара?'],
   execute: async (userId, args) => {
     // 1. Sync sales for velocity (last 30 days)
-    await syncSalesHistory(userId, 30, args.account_id);
+    await marketplaceService.syncSalesHistory(userId, 30, args.account_id);
     const now = new Date();
     const dateFrom = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
@@ -38,7 +38,17 @@ export const getStockForecastTool = defineTool({
     }
 
     // 4. Forecast
-    const forecasts = targetProducts.map((p: DBProduct) => {
+    interface ForecastItem {
+      id: string;
+      title: string;
+      marketplace: 'WB' | 'Ozon';
+      stock: number;
+      velocity: number;
+      daysLeft: number;
+      status: 'critical' | 'warning' | 'ok';
+    }
+
+    const forecasts: ForecastItem[] = targetProducts.map((p: DBProduct) => {
       const sold30 = salesMap.get(p.product_id) || 0;
       const velocity = sold30 / 30; // units/day
       const stock = p.current_stock || 0;
@@ -54,7 +64,10 @@ export const getStockForecastTool = defineTool({
         stock,
         velocity: Number(velocity.toFixed(2)),
         daysLeft,
-        status: daysLeft < 7 ? 'critical' : daysLeft < 14 ? 'warning' : 'ok',
+        status: (daysLeft < 7 ? 'critical' : daysLeft < 14 ? 'warning' : 'ok') as
+          | 'critical'
+          | 'warning'
+          | 'ok',
       };
     });
 
@@ -64,7 +77,7 @@ export const getStockForecastTool = defineTool({
       success: true,
       data: {
         totalAnalyzed: forecasts.length,
-        criticalCount: forecasts.filter((f: any) => f.status === 'critical').length,
+        criticalCount: forecasts.filter(f => f.status === 'critical').length,
         forecasts: sorted.slice(0, 50),
       },
     };

@@ -1,9 +1,5 @@
-import type { DBUser, DBProduct } from '../api-lib/lib/types.js';
-import {
-  notificationService,
-  sendAlert,
-  type AlertUrgency,
-} from '../api-lib/services/notifications.js';
+import type { DBUser, DBProduct } from '../lib/types.js';
+import { notificationService, sendAlert, type AlertUrgency } from '../services/notifications.js';
 import type { Threat } from './ThreatDetector.js';
 
 export class SentinelAlertSender {

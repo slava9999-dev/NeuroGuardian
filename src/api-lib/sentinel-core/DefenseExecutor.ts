@@ -1,15 +1,7 @@
-import type { DBUser, DBProduct } from '../api-lib/lib/types.js';
-import {
-  setWbDefensePrice,
-  setWbZeroStock,
-  setOzonDefensePrice,
-  setOzonZeroStock,
-  updateWbPrices,
-  updateOzonPrices,
-  getMarketplaceKeys,
-} from '../api-lib/services/marketplace.js';
-import { logSentinelAction } from '../api-lib/services/database.js';
-import { sendAlert } from '../api-lib/services/notifications.js';
+import type { DBUser, DBProduct } from '../lib/types.js';
+import { marketplaceService } from '../core-services/MarketplaceService.js';
+import { logSentinelAction } from '../services/database.js';
+import { sendAlert } from '../services/notifications.js';
 import type { SentinelRunResult, UserCycleResult } from './types.js';
 
 export class SentinelDefenseExecutor {
@@ -26,7 +18,6 @@ export class SentinelDefenseExecutor {
     const minPrice = product.min_price;
     let success = false;
     let errorMsg = '';
-    const keys = await getMarketplaceKeys(user.id);
 
     // Sanity check
     if (minPrice > livePrice * 5 && minPrice > 10000) {
@@ -37,34 +28,17 @@ export class SentinelDefenseExecutor {
     }
 
     try {
-      if (marketplace === 'WB' && keys.wb) {
-        const nmId = product.nm_id;
-        if (!nmId) throw new Error('Missing nmId for WB');
-        if (defenseMode === 'zero_stock') {
-          const res = await setWbZeroStock(keys.wb, [String(nmId)]);
-          success = res.success;
-          errorMsg = res.error || '';
-        } else {
-          const res = await setWbDefensePrice(keys.wb, [{ nmId, price: minPrice }]);
-          success = res.success;
-          errorMsg = res.error || '';
-        }
-      } else if (marketplace === 'Ozon' && keys.ozon) {
-        const ozonId = parseInt(product.product_id.replace('ozon-', ''));
-        const offerId = product.offer_id || product.product_id;
-        if (defenseMode === 'zero_stock') {
-          const res = await setOzonZeroStock(keys.ozon.clientId, keys.ozon.apiKey, [
-            { productId: ozonId, offerId },
-          ]);
-          success = res.success;
-          errorMsg = res.error || '';
-        } else {
-          const res = await setOzonDefensePrice(keys.ozon.clientId, keys.ozon.apiKey, [
-            { productId: ozonId, offerId, price: minPrice },
-          ]);
-          success = res.success;
-          errorMsg = res.error || '';
-        }
+      const pId = marketplace === 'WB' ? product.nm_id || product.product_id : product.product_id;
+      const productObj = { id: pId, offerId: product.offer_id || undefined, price: minPrice };
+
+      if (defenseMode === 'zero_stock') {
+        const res = await marketplaceService.setZeroStock(user.id, marketplace, [productObj]);
+        success = res.success;
+        errorMsg = res.error || '';
+      } else {
+        const res = await marketplaceService.setDefensePrice(user.id, marketplace, [productObj]);
+        success = res.success;
+        errorMsg = res.error || '';
       }
     } catch (err) {
       errorMsg = err instanceof Error ? err.message : String(err);
@@ -117,21 +91,20 @@ export class SentinelDefenseExecutor {
     userResult?: UserCycleResult
   ): Promise<void> {
     let updateSuccess = false;
-    const keys = await getMarketplaceKeys(user.id);
 
     try {
-      if (marketplace === 'WB' && product.nm_id && keys.wb) {
-        const res = await updateWbPrices(keys.wb, [{ nmId: product.nm_id, price: newPrice }]);
-        updateSuccess = res.success;
-      } else if (marketplace === 'Ozon' && keys.ozon) {
-        const res = await updateOzonPrices(keys.ozon.clientId, keys.ozon.apiKey, [
-          {
-            productId: parseInt(product.product_id.replace('ozon-', '')),
-            price: newPrice,
-          },
-        ]);
-        updateSuccess = res.success;
-      }
+      // Prepare update object
+      const pId =
+        marketplace === 'WB'
+          ? product.nm_id || Number(product.product_id.replace('wb-', ''))
+          : parseInt(product.product_id.replace('ozon-', ''));
+
+      if (!pId) throw new Error(`Invalid ID for product ${product.product_id}`);
+
+      const res = await marketplaceService.updatePrices(user.id, marketplace, [
+        { id: pId, price: newPrice },
+      ]);
+      updateSuccess = res.success;
     } catch (e) {
       console.error(`Smart Reprice failed for ${product.product_id}`, e);
     }

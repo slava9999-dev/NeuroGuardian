@@ -4,17 +4,16 @@ import {
   WB_DISCOUNT_CONFIG,
   calculateOzonBuyerPrice,
   calculateWbBuyerPrice,
-} from '../../core/services/MarketplaceService.js';
-import { wbService } from '../../core/services/WbService.js';
-import { ozonService } from '../../core/services/OzonService.js';
-import { marketplaceAccountRepository } from '../../core/repositories/MarketplaceAccountRepository.js';
+} from '../core-services/MarketplaceService.js';
+import { wbService } from '../core-services/WbService.js';
+import { ozonService } from '../core-services/OzonService.js';
+import { marketplaceAccountRepository } from '../repositories/MarketplaceAccountRepository.js';
 
-// Types re-export
 // Types re-export
 export type {
   MarketplaceProduct,
   MarketplaceSalesStats,
-} from '../../core/services/MarketplaceTypes.js';
+} from '../core-services/MarketplaceTypes.js';
 export interface MarketplaceApiKeys {
   wb?: string;
   ozon?: { clientId: string; apiKey: string };
@@ -50,8 +49,11 @@ export const setWbDefensePrice = (
   apiKey: string,
   products: Array<{ nmId: number; price: number }>
 ) => wbService.updatePrices(apiKey, products);
-export const updateWbStockFbs = (apiKey: string, warehouseId: number, updates: any[]) =>
-  wbService.updateStock(apiKey, warehouseId, updates);
+export const updateWbStockFbs = (
+  apiKey: string,
+  warehouseId: number,
+  updates: Array<{ sku: string; amount: number }>
+) => wbService.updateStock(apiKey, warehouseId, updates);
 export const getWbFbsWarehouses = (apiKey: string) => wbService.getWarehouses(apiKey);
 
 // Ozon Functions
@@ -107,6 +109,7 @@ export const setOzonDefensePrice = (
   apiKey: string,
   products: Array<{ productId: number; offerId: string; price: number }>
 ) => ozonService.setDefensePrice(clientId, apiKey, products);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const updateOzonStockFbs = (clientId: string, apiKey: string, updates: any[]) =>
   ozonService.updateStockFbs(clientId, apiKey, updates);
 export const getOzonFbsWarehouses = (clientId: string, apiKey: string) =>

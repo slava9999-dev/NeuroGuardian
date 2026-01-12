@@ -2,8 +2,8 @@ import { wbService } from './WbService.js';
 import { ozonService } from './OzonService.js';
 import { marketplaceAccountRepository } from '../repositories/MarketplaceAccountRepository.js';
 import type { MarketplaceProduct, MarketplaceSalesStats } from './MarketplaceTypes.js';
-import { upsertMarketplaceOrders, type MarketplaceOrder } from '../../api-lib/services/database.js';
-import type { WbStatisticsSale, OzonOrder } from '../../api-lib/lib/marketplace-types.js';
+import { upsertMarketplaceOrders, type MarketplaceOrder } from '../services/database.js';
+import type { WbStatisticsSale, OzonOrder } from '../lib/marketplace-types.js';
 
 // ============================================
 // MARKETPLACE DISCOUNT ESTIMATION

@@ -1,17 +1,18 @@
 import * as dotenv from 'dotenv';
-dotenv.config({ path: '.env.production' });
+import path from 'path';
 
-// ПРИНУДИТЕЛЬНО ВЫСТАВЛЯЕМ ПЕРЕМЕННЫЕ ОКРУЖЕНИЯ ДО ЛЮБЫХ ИМПОРТОВ
+// FORCE ENVIRONMENT VARIABLES BEFORE IMPORTS
+dotenv.config({ path: path.resolve(process.cwd(), '.env.production') });
+
 process.env.NODE_ENV = 'production';
 process.env.LOCAL_DEV = '';
 process.env.DEBUG = 'true';
 
 console.log('🌍 Environment set to PRODUCTION/DEBUG mode');
 
-// Трюк для ESM: импортируем сервисы ПОСЛЕ конфигурации env
+// Dynamic imports to ensure env vars are set first
 const { sentinelService } = await import('../src/api-lib/services/sentinel-service.js');
-const { getMarketplaceKeys } = await import('../src/api-lib/services/marketplace.js');
-const { sql } = await import('@vercel/postgres');
+const { sql } = await import('../src/api-lib/services/database.js');
 
 async function debugRun() {
   const userId = 7548070478; // Вячеслав
@@ -32,15 +33,7 @@ async function debugRun() {
     console.log(`💳 Подписка: ${user.subscription_active ? 'АКТИВНА' : 'НЕТ'}`);
 
     // 4. ЗАПУСК ЦИКЛА
-    console.log('\n⚙️ Передача управления в SentinelService.processUser()...');
-    const summary = {
-      usersProcessed: 1,
-      threatsDetected: 0,
-      actionsTaken: 0,
-      errors: [],
-      productsScanned: { wb: 0, ozon: 0 },
-      defenseDetails: [],
-    };
+    console.log('\n⚙️ Запуск SentinelService.runForUser()...');
 
     // Тайм-аут на выполнение, чтобы не висело вечно
     const timeout = setTimeout(() => {
@@ -49,28 +42,34 @@ async function debugRun() {
       );
     }, 30000);
 
-    await sentinelService.processUser(user as any, summary);
+    const summary = await sentinelService.runForUser(userId);
     clearTimeout(timeout);
 
     console.log('\n🏁 РЕЗУЛЬТАТ ПРОВЕРКИ:');
-    console.log(
-      `✅ Товаров реально опрошено по API: ${summary.productsScanned.wb + summary.productsScanned.ozon}`
-    );
+
+    // Безопасное чтение свойств
+    const wbScanned = summary.productsScanned?.wb || 0;
+    const ozonScanned = summary.productsScanned?.ozon || 0;
+    const totalScanned = wbScanned + ozonScanned;
+
+    console.log(`✅ Товаров реально опрошено по API: ${totalScanned}`);
     console.log(`⚠️ Угроз найдено: ${summary.threatsDetected}`);
     console.log(`⚔️ Действий защиты: ${summary.actionsTaken}`);
 
-    if (summary.errors.length > 0) {
+    if (summary.errors && summary.errors.length > 0) {
       console.log('\n❌ ОШИБКИ API / СИСТЕМЫ:');
-      summary.errors.forEach(e => console.error(`- ${e}`));
+      summary.errors.forEach((e: string) => console.error(`- ${e}`));
     }
 
-    if (summary.productsScanned.wb + summary.productsScanned.ozon === 0 && !summary.errors.length) {
+    if (totalScanned === 0 && (!summary.errors || summary.errors.length === 0)) {
       console.log(
         '🛑 ВНИМАНИЕ: Сторож не нашел товаров для проверки. Проверьте флаг is_monitored.'
       );
     }
   } catch (err) {
     console.error('\n💥 КРИТИЧЕСКИЙ СБОЙ СКРИПТА:', err);
+  } finally {
+    process.exit(0);
   }
 }
 

@@ -8,8 +8,8 @@
 
 ## 🎯 Current Phase: MONETIZATION LAUNCH (Phase 11) 🟢 PRODUCTION
 
-**Last Session:** 2026-01-11 (Session 38)
-**Focus:** 🤖 AGENT V5 VERIFICATION — Fixing database connection and initialization blockers
+**Last Session:** 2026-01-12 (Session 42)
+**Focus:** 🚑 EMERGENCY FIX — Resolving ERR_MODULE_NOT_FOUND in Production
 
 **📋 Ключевые документы:**
 
@@ -17,6 +17,19 @@
 - `docs/MONETIZATION_ROADMAP.md` — Путеводитель монетизации
 - `docs/LAUNCH_CHECKLIST.md` — Интерактивный чеклист
   - `scripts/verify-agent-v5.ts` — верификация
+
+### Session 2026-01-12 (Session 42 - Emergency Build Fix) 🚑
+
+**Emergency Fix for 500 Errors in Production:**
+
+- [x] **CRITICAL FIX**: Fixed `Error [ERR_MODULE_NOT_FOUND]` for `src/core/repositories/ProductRepository.js` in production.
+  - **Root Cause**: `tsconfig.api.json` excluded `src/core` and `src/sentinel` from compilation context, causing Vercel's bundler to skip these files despite them being imported.
+  - **Resolution**: Updated `tsconfig.api.json` include array.
+  - **Verification**: Local `tsc -b` and `tsx` execution verified correct import resolution. 283 regression tests passed.
+
+**Commits:**
+
+- `fix(build): include src/core and sentinal modules in Vercel API build context`
 
 ### Session 2026-01-12 (Session 40 - Sentinel Production Hardening) 🛡️
 

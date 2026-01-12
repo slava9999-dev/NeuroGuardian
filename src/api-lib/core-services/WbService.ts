@@ -1,11 +1,11 @@
-import { fetchWithRetry } from '../../api-lib/lib/index.js';
+import { fetchWithRetry } from '../lib/index.js';
 import type {
   WbCard,
   WbGoodsItem,
   WbTaskHistoryItem,
   WbTaskDetail,
   WbStatisticsSale,
-} from '../../api-lib/lib/marketplace-types.js';
+} from '../lib/marketplace-types.js';
 import type { MarketplaceProduct, MarketplaceSalesStats } from './MarketplaceTypes.js';
 
 export class WbService {
