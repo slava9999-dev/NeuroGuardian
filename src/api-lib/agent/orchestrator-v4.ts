@@ -308,9 +308,15 @@ export async function orchestrateV4(
   // Check for simple intents that don't need tools
   console.log('[Orchestrator V4] Checking for simple intent...');
   const simpleResponse = await handleSimpleIntent(message, context);
-  if (simpleResponse) {
+
+  // Safely check if simpleResponse is a string (legacy) or an object (future)
+  if (simpleResponse && (typeof simpleResponse === 'string' || (simpleResponse as any).success)) {
     console.log('[Orchestrator V4] Simple intent matched, returning personalized response');
-    return createSimpleResult(simpleResponse, startTime);
+    const msg =
+      typeof simpleResponse === 'string'
+        ? simpleResponse
+        : (simpleResponse as any).message || 'Hello';
+    return createSimpleResult(msg, startTime);
   }
   console.log('[Orchestrator V4] No simple intent match, proceeding to planning phase');
 
