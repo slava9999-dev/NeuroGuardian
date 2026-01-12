@@ -6,9 +6,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql } from '@vercel/postgres';
 
-import { getUserById, initializeDatabase } from '../services/index';
-import { getSecret, logger } from '../lib/index';
-import { verifyAdminAccessAsync } from '../middleware/auth';
+import { getUserById, initializeDatabase } from '../services/index.js';
+import { getSecret, logger } from '../lib/index.js';
+import { verifyAdminAccessAsync } from '../middleware/auth.js';
 
 /**
  * Helper to get Telegram secrets
@@ -676,8 +676,8 @@ export async function handleAdminTestTelegram(
   _req: VercelRequest,
   res: VercelResponse
 ): Promise<VercelResponse> {
-  const { notificationService } = await import('../services/notifications');
-  const { getSecret } = await import('../lib/secrets-helper');
+  const { notificationService } = await import('../services/notifications.js');
+  const { getSecret } = await import('../lib/secrets-helper.js');
 
   const adminChatId = await getSecret('admin_chat_id');
   const botToken = await getSecret('telegram_bot_token');

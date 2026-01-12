@@ -7,7 +7,7 @@
 import { ChromaClient, type Collection, type Metadata, DefaultEmbeddingFunction } from 'chromadb';
 import { OpenAIEmbeddings } from '@langchain/openai';
 import { kv } from '@vercel/kv';
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
 import { logger } from '../lib/logger.js';
 
 // ============================================
