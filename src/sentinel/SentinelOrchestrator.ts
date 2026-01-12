@@ -140,16 +140,13 @@ export class SentinelOrchestrator {
         );
 
         // AUDIT-FIX: Select ONLY required columns to minimize packet size for VPN/MTU stability
-        const rawQuery = `
+        // Use ANY() for safe parameterization of ID list
+        const chunkRes = await sql`
                         SELECT id, user_id, product_id, nm_id, title, current_price, min_price, 
-                               current_stock, marketplace, is_monitored, account_id 
+                                current_stock, marketplace, is_monitored, account_id 
                         FROM products 
-                        WHERE id IN (${chunk.join(',')})
+                        WHERE id = ANY(${chunk})
                     `;
-
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore - We know sql() returns Raw in local driver, handled by template literal
-        const chunkRes = await sql`${sql(rawQuery)}`;
         const rows = (chunkRes as unknown as { rows: DBProduct[] }).rows;
 
         if (rows) {
