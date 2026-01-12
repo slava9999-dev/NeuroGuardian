@@ -16,17 +16,23 @@
 - `docs/CRITICAL_AUDIT_2026-01-04.md` — Полный отчёт аудита
 - `docs/MONETIZATION_ROADMAP.md` — Путеводитель монетизации
 - `docs/LAUNCH_CHECKLIST.md` — Интерактивный чеклист
+  - `scripts/verify-agent-v5.ts` — верификация
 
-**🎯 СЛЕДУЮЩИЙ ШАГ:**
+### Session 2026-01-12 (Session 40 - Sentinel Production Hardening) 🛡️
 
-- ✅ **AGENT V5 CORE**: Базовый функционал верифицирован (RAG + Tools)
-- ✅ **DB RESILIENCE**: Драйвер БД адаптирован к долгим задержкам (VPN/Neon)
-- ✅ **STATE MANAGEMENT**: `user_state` таблица автоматически инициализируется
-- ⏳ Финальная проверка интеграции Telegram с V5 в продакшене
+**Повышение надежности Sentinel и БД в условиях нестабильной сети (VPN/Neon):**
 
----
+- [x] **DATABASE RESILIENCE**: Внедрены TCP Keep-Alive и увеличенные таймауты (60с) в `database.local.ts` для предотвращения обрывов соединений.
+- [x] **SENTINEL OPTIMIZATION**:
+  - Реализован механизм чанков (по 10 товаров) вместо массовой выборки.
+  - Оптимизированы SQL-запросы: выборка только необходимых полей вместо `SELECT *`.
+  - Исправлена структура класса `SentinelOrchestrator` после сбоя редактирования.
+- [x] **DEBUGGING**: Проведена диагностика сетевых проблем, подтверждена необходимость деплоя в стабильную среду (Vercel).
+- [x] **BUSINESS READY**: Код готов к работе в продакшене без использования моков.
 
-## ✅ Recently Completed
+**Commits:**
+
+- `fix(sentinel): optimize db queries and harden connection for VPN resilience`
 
 ### Session 2026-01-12 (Session 39 - Marketplace Refactor & Type Safety) 🏗️
 
