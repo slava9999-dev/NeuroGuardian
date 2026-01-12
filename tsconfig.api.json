@@ -15,7 +15,7 @@
       "@neuroguardian/security-agent": ["./security-agent/src/index.ts"]
     }
   },
-  "include": ["api/**/*", "src/api-lib/**/*"],
+  "include": ["api/**/*", "src/api-lib/**/*", "src/core/**/*", "src/sentinel/**/*", "src/agent/**/*", "src/infrastructure/**/*"],
   "references": [
     { "path": "./security-agent" }
   ]
