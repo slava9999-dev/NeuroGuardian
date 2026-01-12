@@ -5,6 +5,8 @@ import type {
   OzonPriceUpdateResult,
   OzonError,
   OzonOrder,
+  OzonStockV3Item,
+  OzonAnalyticsRow,
 } from '../lib/marketplace-types.js';
 import type { MarketplaceProduct, MarketplaceSalesStats } from './MarketplaceTypes.js';
 
@@ -502,7 +504,7 @@ export class OzonService {
   /**
    * Fetch Ozon stocks using v3 API
    */
-  async fetchStocks(clientId: string, apiKey: string, limit = 100): Promise<unknown[]> {
+  async fetchStocks(clientId: string, apiKey: string, limit = 100): Promise<OzonStockV3Item[]> {
     try {
       const response = await fetchWithRetry('https://api-seller.ozon.ru/v3/product/info/stocks', {
         method: 'POST',
@@ -519,8 +521,7 @@ export class OzonService {
 
       if (response.ok) {
         const data = await response.json();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = data as { result: { items: any[] } };
+        const result = data as { result: { items: OzonStockV3Item[] } };
         return result.result?.items || [];
       }
     } catch (e) {
@@ -538,7 +539,7 @@ export class OzonService {
     dateFrom: string,
     dateTo: string,
     metrics: string[] = ['revenue', 'ordered_units', 'returns']
-  ): Promise<unknown[]> {
+  ): Promise<OzonAnalyticsRow[]> {
     try {
       const response = await fetchWithRetry(this.ANALYTICS_API, {
         method: 'POST',
@@ -558,8 +559,7 @@ export class OzonService {
 
       if (response.ok) {
         const data = await response.json();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = data as { result: { data: any[] } };
+        const result = data as { result: { data: OzonAnalyticsRow[] } };
         return result.result?.data || [];
       }
     } catch (e) {
@@ -575,7 +575,7 @@ export class OzonService {
     clientId: string,
     apiKey: string,
     productIds: string[]
-  ): Promise<unknown[]> {
+  ): Promise<OzonProductInfo[]> {
     try {
       const response = await fetchWithRetry('https://api-seller.ozon.ru/v2/product/info', {
         method: 'POST',
@@ -589,8 +589,7 @@ export class OzonService {
 
       if (response.ok) {
         const data = await response.json();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = data as { result: { items: any[] } };
+        const result = data as { result: { items: OzonProductInfo[] } };
         return result.result?.items || [];
       }
     } catch (e) {

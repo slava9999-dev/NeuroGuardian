@@ -1,5 +1,6 @@
 import { defineTool } from '../ToolRegistry.js';
 import { GetWarehouseStocksArgsSchema } from '../../../api-lib/agent/validators.js';
+import type { OzonStockV3Item } from '../../../api-lib/lib/marketplace-types.js';
 import {
   getMarketplaceKeys,
   fetchOzonStocksV3,
@@ -33,9 +34,8 @@ export const getWarehouseStocksTool = defineTool({
       try {
         const items = await fetchOzonStocksV3(keys.ozon.clientId, keys.ozon.apiKey);
 
-        for (const item of items) {
-          const totalStock =
-            item.stocks?.reduce((sum: number, s: any) => sum + (s.present || 0), 0) || 0;
+        for (const item of items as OzonStockV3Item[]) {
+          const totalStock = item.stocks?.reduce((sum, s) => sum + (s.present || 0), 0) || 0;
 
           if (!args.low_stock_only || totalStock < 10) {
             stocks.push({
