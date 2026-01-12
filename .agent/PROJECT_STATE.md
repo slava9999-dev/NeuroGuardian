@@ -83,7 +83,7 @@
 
 **Resolving Production Build & Test Issues:**
 
-- [x] **FIX MODULE RESOLUTION**: Удалены `.js` расширения из импортов во всех ключевых файлах (`api-lib/handlers`, `services`). Это решило критическую ошибку Vercel build `Cannot find module`.
+- [x] **FIX MODULE RESOLUTION**: Восстановлены `.js` расширения в импортах для совместимости с Vercel build (NodeNext resolution). Ранее удаленные расширения приводили к ошибкам `TS2835`.
 - [x] **FIX AGENT SCHEMA**: Добавлен параметр `search` в `PLAN_JSON_SCHEMA`, что позволило агенту корректно использовать `get_products` при нечетком поиске (исправление для E2E тестов).
 - [x] **FIX LOGGING**: Начата миграция на структурированный `logger` в `admin.ts` (Security P0).
 - [x] **VERIFICATION**: `npm run typecheck` проходит успешно (Exit code 0).

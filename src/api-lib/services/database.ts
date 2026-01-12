@@ -372,8 +372,8 @@ export async function initializeDatabase(): Promise<void> {
   logger.info('Database schema initialized');
 }
 
-import { userRepository } from '../repositories/UserRepository';
-import { productRepository } from '../repositories/ProductRepository';
+import { userRepository } from '../repositories/UserRepository.js';
+import { productRepository } from '../repositories/ProductRepository.js';
 
 /**
  * Get user by ID

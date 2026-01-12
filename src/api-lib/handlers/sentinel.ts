@@ -5,11 +5,11 @@
 // ============================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import type { DBProduct } from '../lib/types';
-import { verifyAdminAccessAsync, extractAnyAuthAsync } from '../middleware/auth';
+import type { DBProduct } from '../lib/types.js';
+import { verifyAdminAccessAsync, extractAnyAuthAsync } from '../middleware/auth.js';
 
-import { sentinelOrchestrator as sentinelService } from '../../sentinel/SentinelOrchestrator';
-import { getSecret } from '../lib/secrets-helper';
+import { sentinelOrchestrator as sentinelService } from '../../sentinel/SentinelOrchestrator.js';
+import { getSecret } from '../lib/secrets-helper.js';
 
 /**
  * Handle check-prices action (Sentinel Cron)
@@ -125,10 +125,10 @@ export async function handleSentinelDashboard(
   userId: number
 ): Promise<VercelResponse> {
   const { sql } = await import('@vercel/postgres');
-  const { ThreatDetector } = await import('../../sentinel/ThreatDetector');
+  const { ThreatDetector } = await import('../../sentinel/ThreatDetector.js');
   const threatDetector = new ThreatDetector();
   const { getMarketplaceKeys, fetchWbPrices, fetchOzonCurrentPrices } =
-    await import('../services/marketplace-bridge');
+    await import('../services/marketplace-bridge.js');
 
   try {
     const { timeRange = '24h' } = req.query;
