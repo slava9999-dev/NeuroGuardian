@@ -6,9 +6,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql } from '@vercel/postgres';
 
-import { getUserById, initializeDatabase } from '../services/index.js';
-import { getSecret } from '../lib/index.js';
-import { verifyAdminAccessAsync } from '../middleware/auth.js';
+import { getUserById, initializeDatabase } from '../services/index';
+import { getSecret, logger } from '../lib/index';
+import { verifyAdminAccessAsync } from '../middleware/auth';
 
 /**
  * Helper to get Telegram secrets
@@ -72,9 +72,7 @@ export async function handleResetDb(
     process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
 
   if (isProduction) {
-    console.error(
-      `🚨 SECURITY ALERT: Database reset ATTEMPTED in PRODUCTION from IP: ${clientIp}!`
-    );
+    logger.error(`🚨 SECURITY ALERT: Database reset ATTEMPTED in PRODUCTION from IP: ${clientIp}!`);
     return res.status(403).json({
       error: 'Database reset is PERMANENTLY DISABLED in production',
       hint: 'This endpoint only works in development/staging environments',
@@ -85,7 +83,7 @@ export async function handleResetDb(
   const dangerousOpsEnabled = await getSecret('dangerous_operations_enabled', 'feature_flag_check');
 
   if (dangerousOpsEnabled !== 'true' && process.env.DANGEROUS_OPERATIONS_ENABLED !== 'true') {
-    console.warn(
+    logger.warn(
       `🚨 SECURITY: Reset DB attempted but DANGEROUS_OPERATIONS_ENABLED is not true. IP: ${clientIp}`
     );
     return res.status(403).json({
@@ -96,7 +94,7 @@ export async function handleResetDb(
 
   const isAdmin = await validateAdminAccess(req);
   if (!isAdmin) {
-    console.warn(`🚨 SECURITY: Unauthorized Reset DB attempt from IP: ${clientIp}`);
+    logger.warn(`🚨 SECURITY: Unauthorized Reset DB attempt from IP: ${clientIp}`);
     return res.status(403).json({ error: 'Admin access required' });
   }
 
@@ -105,7 +103,7 @@ export async function handleResetDb(
   const expectedSecret = await getSecret('admin_secret_key', 'db_reset_verification');
 
   if (!expectedSecret || adminSecret !== expectedSecret) {
-    console.warn(
+    logger.warn(
       `🚨 SECURITY: Reset DB attempted with invalid or missing adminSecret. IP: ${clientIp}`
     );
     return res.status(403).json({
@@ -121,7 +119,7 @@ export async function handleResetDb(
     });
   }
 
-  console.warn(`🔥 SECURITY: DATABASE RESET INITIATED by IP: ${clientIp}`);
+  logger.warn(`🔥 SECURITY: DATABASE RESET INITIATED by IP: ${clientIp}`);
 
   await sql`DROP TABLE IF EXISTS sentinel_logs CASCADE`;
   await sql`DROP TABLE IF EXISTS transactions CASCADE`;
@@ -326,7 +324,7 @@ export async function handleRunMigration(
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('Migration error:', error);
+    logger.error('Migration error:', error);
     return res.status(500).json({
       error: 'Migration failed',
       details: error instanceof Error ? error.message : 'Unknown error',
@@ -532,7 +530,7 @@ export async function handleSentinelLogs(
       })),
     });
   } catch (error) {
-    console.error('Sentinel logs error:', error);
+    logger.error('Sentinel logs error:', error);
     return res.status(500).json({ error: 'Failed to fetch sentinel logs' });
   }
 }
@@ -678,8 +676,8 @@ export async function handleAdminTestTelegram(
   _req: VercelRequest,
   res: VercelResponse
 ): Promise<VercelResponse> {
-  const { notificationService } = await import('../services/notifications.js');
-  const { getSecret } = await import('../lib/secrets-helper.js');
+  const { notificationService } = await import('../services/notifications');
+  const { getSecret } = await import('../lib/secrets-helper');
 
   const adminChatId = await getSecret('admin_chat_id');
   const botToken = await getSecret('telegram_bot_token');
