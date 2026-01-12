@@ -85,6 +85,7 @@ export class MemoryService {
   private embeddings: EmbeddingProvider | null = null;
   private localRedis: Redis | null = null;
   private collectionsCache: Map<string, Collection> = new Map();
+
   private state: MemoryServiceState = {
     initialized: false,
     chromaHealthy: false,
