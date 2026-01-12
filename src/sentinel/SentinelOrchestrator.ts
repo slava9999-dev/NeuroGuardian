@@ -1,13 +1,13 @@
-import { sql } from '../services/database.js';
-import type { DBUser, DBProduct } from '../lib/types.js';
+import { sql } from '../api-lib/services/database.js';
+import type { DBUser, DBProduct } from '../api-lib/lib/types.js';
 import { SentinelPriceMonitor } from './PriceMonitor.js';
-import { ThreatDetector, ThreatType } from './ThreatDetector.js';
+import { ThreatDetector, ThreatType, type Threat } from './ThreatDetector.js';
 import { SentinelDefenseExecutor } from './DefenseExecutor.js';
 import { SentinelReportGenerator } from './ReportGenerator.js';
 import { SentinelAlertSender } from './AlertSender.js';
 import type { SentinelRunResult, UserCycleResult } from './types.js';
-import { priceShield, type PriceRule } from '../services/legacy/price-shield.js';
-import { getCompetitorPrice } from '../services/competitor-monitor.js';
+import { priceShield, type PriceRule } from '../api-lib/services/legacy/price-shield.js';
+import { getCompetitorPrice } from '../api-lib/services/competitor-monitor.js';
 
 export class SentinelOrchestrator {
   private priceMonitor: SentinelPriceMonitor;
@@ -122,8 +122,7 @@ export class SentinelOrchestrator {
 
     // Explicitly cast to number[] assuming id is serial/number.
     // We map safely.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const productIds: number[] = idRes.rows.map((r: any) => r.id);
+    const productIds: number[] = (idRes.rows as { id: number }[]).map(r => r.id);
 
     if (productIds.length === 0) return;
 
@@ -151,9 +150,7 @@ export class SentinelOrchestrator {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore - We know sql() returns Raw in local driver, handled by template literal
         const chunkRes = await sql`${sql(rawQuery)}`;
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const rows = (chunkRes as any).rows as DBProduct[];
+        const rows = (chunkRes as unknown as { rows: DBProduct[] }).rows;
 
         if (rows) {
           products.push(...rows);
@@ -246,9 +243,12 @@ export class SentinelOrchestrator {
         summary.threatsDetected += scan.threats.length;
         if (userResult) userResult.threatsDetected += scan.threats.length;
 
-        const stopLossThreat = scan.threats.find(t => t.type === ThreatType.COMPETITOR_PRICE_DROP);
+        const stopLossThreat = scan.threats.find(
+          (t: Threat) => t.type === ThreatType.COMPETITOR_PRICE_DROP
+        );
         const erosionThreat = scan.threats.find(
-          t => t.type === ThreatType.OZON_CARD_EROSION || t.type === ThreatType.MARGIN_BELOW_ZERO
+          (t: Threat) =>
+            t.type === ThreatType.OZON_CARD_EROSION || t.type === ThreatType.MARGIN_BELOW_ZERO
         );
 
         if (stopLossThreat && user.protection_enabled) {

@@ -1,5 +1,5 @@
-import type { DBUser, DBProduct } from '../lib/types.js';
-import { marketplaceService } from '../core-services/MarketplaceService.js';
+import type { DBUser, DBProduct } from '../api-lib/lib/types.js';
+import { marketplaceService } from '../api-lib/core-services/MarketplaceService.js';
 import type { PriceMonitor } from './types.js';
 
 export class SentinelPriceMonitor implements PriceMonitor {

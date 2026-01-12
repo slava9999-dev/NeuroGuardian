@@ -1,7 +1,7 @@
-import type { DBUser, DBProduct } from '../lib/types.js';
-import { marketplaceService } from '../core-services/MarketplaceService.js';
-import { logSentinelAction } from '../services/database.js';
-import { sendAlert } from '../services/notifications.js';
+import type { DBUser, DBProduct } from '../api-lib/lib/types.js';
+import { marketplaceService } from '../api-lib/core-services/MarketplaceService.js';
+import { logSentinelAction } from '../api-lib/services/database.js';
+import { sendAlert } from '../api-lib/services/notifications.js';
 import type { SentinelRunResult, UserCycleResult } from './types.js';
 
 export class SentinelDefenseExecutor {

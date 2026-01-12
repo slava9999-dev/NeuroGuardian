@@ -1,4 +1,4 @@
-import type { DBUser } from '../lib/types.js';
+import type { DBUser } from '../api-lib/lib/types.js';
 import type { UserCycleResult } from './types.js';
 
 export class SentinelReportGenerator {

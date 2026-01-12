@@ -125,7 +125,7 @@ export async function handleSentinelDashboard(
   userId: number
 ): Promise<VercelResponse> {
   const { sql } = await import('@vercel/postgres');
-  const { ThreatDetector } = await import('../sentinel-core/ThreatDetector.js');
+  const { ThreatDetector } = await import('../../sentinel/ThreatDetector.js');
   const threatDetector = new ThreatDetector();
   const { getMarketplaceKeys, fetchWbPrices, fetchOzonCurrentPrices } =
     await import('../services/marketplace-bridge.js');
