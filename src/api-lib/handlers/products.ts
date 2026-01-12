@@ -114,8 +114,8 @@ export async function handleProducts(
   }
 }
 
-import { marketplaceService } from '../core-services/MarketplaceService.js';
-import { productRepository } from '../repositories/ProductRepository.js';
+import { marketplaceService } from '../core-services/MarketplaceService';
+import { productRepository } from '../repositories/ProductRepository';
 
 /**
  * Handle sync-products action — fetch products from WB/Ozon APIs

@@ -6,21 +6,21 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@vercel/kv';
-import { sanitizeInput, checkRateLimit, isSubscriptionActive, getSecret } from '../lib/index.js';
+import { sanitizeInput, checkRateLimit, isSubscriptionActive, getSecret } from '../lib/index';
 
-import { getUserById, getProductsByUserId } from '../services/index.js';
+import { getUserById, getProductsByUserId } from '../services/index';
 
 // Metrics
-import { createAgentMetrics, logAgentMetrics } from '../agent/metrics.js';
+import { createAgentMetrics, logAgentMetrics } from '../agent/metrics';
 
 // V5 Architecture
-import { agentOrchestratorV5 } from '../../agent/core/AgentOrchestratorV5.js';
-import { type OrchestratorContext } from '../../core/types/agent.types.js';
-import { registerAllTools } from '../../agent/execution/index.js'; // Register tools
+import { agentOrchestratorV5 } from '../../agent/core/AgentOrchestratorV5';
+import { type OrchestratorContext } from '../../core/types/agent.types';
+import { registerAllTools } from '../../agent/execution/index'; // Register tools
 
 // Security
 import { securityMiddleware } from '@neuroguardian/security-agent';
-import { verifyAdminAccessAsync, extractTelegramAuth } from '../middleware/auth.js';
+import { verifyAdminAccessAsync, extractTelegramAuth } from '../middleware/auth';
 
 // Initialize tools once
 try {
@@ -30,7 +30,7 @@ try {
 }
 
 // Additional imports for confirmation phase
-import { toolRegistry } from '../../agent/execution/ToolRegistry.js';
+import { toolRegistry } from '../../agent/execution/ToolRegistry';
 
 // Interfaces
 interface DBUserRecord {
