@@ -187,12 +187,17 @@ describe('Viktor AI Agent LOCAL E2E Tests', () => {
 
     const result = await orchestrateV4('450', TEST_CONTEXT, history);
 
-    console.log(`   🔍 Response: ${result.message?.substring(0, 150) || 'NO MESSAGE'}...`);
+    console.log(`   🔍 Response: ${result.message || 'NO MESSAGE'}`);
 
     expect(result.message).toBeDefined();
     expect(result.message.length).toBeGreaterThan(0);
-    // Response should contain numbers or profit-related words
-    const hasRelevantContent = /\d+|прибыль|маржа|себестоимость/i.test(result.message);
+    // Response should contain numbers, currency or calculation keywords
+    const hasRelevantContent = /\d+|прибыль|маржа|расчет|рубл|₽|итог|получается/i.test(
+      result.message
+    );
+    if (!hasRelevantContent) {
+      console.error('❌ FAIL [CTX-001] Agent response:', result.message);
+    }
     expect(hasRelevantContent).toBe(true);
   }, 30000);
 

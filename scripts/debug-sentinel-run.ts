@@ -11,7 +11,8 @@ process.env.DEBUG = 'true';
 console.log('🌍 Environment set to PRODUCTION/DEBUG mode');
 
 // Dynamic imports to ensure env vars are set first
-const { sentinelService } = await import('../src/api-lib/services/sentinel-service.js');
+const { sentinelOrchestrator: sentinelService } =
+  await import('../src/sentinel/SentinelOrchestrator.js');
 const { sql } = await import('../src/api-lib/services/database.js');
 
 async function debugRun() {
