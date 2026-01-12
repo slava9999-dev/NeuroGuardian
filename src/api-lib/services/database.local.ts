@@ -24,8 +24,9 @@ function getPool(): pkg.Pool {
       ssl: isLocalhost || hasSslMode ? undefined : { rejectUnauthorized: false },
       max: 10,
       idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 15000,
+      connectionTimeoutMillis: 60000,
       keepAlive: true,
+      keepAliveInitialDelayMillis: 10000,
     };
 
     _pool = new Pool(poolConfig);
@@ -51,11 +52,16 @@ function getPool(): pkg.Pool {
 
 export async function query(text: string, params?: unknown[]): Promise<QueryResult> {
   const pool = getPool();
+  console.log(
+    `[DB] Acquire client... (Pool: ${pool.totalCount} total, ${pool.idleCount} idle, ${pool.waitingCount} waiting)`
+  );
   const client = await pool.connect();
+  console.log('[DB] Client acquired');
   try {
     return await client.query(text, params);
   } finally {
     client.release();
+    console.log('[DB] Client released');
   }
 }
 
@@ -72,22 +78,30 @@ async function executeWithRetry(text: string, values: unknown[]): Promise<QueryR
     let client: PoolClient | null = null;
     try {
       const pool = getPool();
+      console.log(
+        `[DB] Retry Loop: ${retries}. Pool: ${pool.totalCount}/${pool.idleCount}/${pool.waitingCount}`
+      );
 
       const clientPromise = pool.connect();
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('DB_CONNECT_TIMEOUT')), 15000)
+        setTimeout(() => reject(new Error('DB_CONNECT_TIMEOUT')), 60000)
       );
 
       client = await (Promise.race([clientPromise, timeoutPromise]) as Promise<PoolClient>);
+      console.log('[DB] Client acquired (Retry Loop)');
 
       const queryPromise = client.query(text, values);
       const queryTimeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('DB_QUERY_TIMEOUT')), 30000)
+        setTimeout(() => {
+          const snippet = text.length > 100 ? text.substring(0, 100) + '...' : text;
+          reject(new Error(`DB_QUERY_TIMEOUT: ${snippet}`));
+        }, 60000)
       );
 
       const res = await (Promise.race([queryPromise, queryTimeout]) as Promise<QueryResult>);
       return res;
     } catch (error: unknown) {
+      console.warn(`[DB] Error: ${error}`);
       retries--;
       const msg = error instanceof Error ? error.message : String(error);
 
@@ -103,7 +117,10 @@ async function executeWithRetry(text: string, values: unknown[]): Promise<QueryR
       }
       throw error;
     } finally {
-      if (client) client.release();
+      if (client) {
+        client.release();
+        console.log('[DB] Client released (Retry Loop)');
+      }
     }
   }
   throw new Error('Database retries exhausted');

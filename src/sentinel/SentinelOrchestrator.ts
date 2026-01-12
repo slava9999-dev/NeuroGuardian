@@ -111,12 +111,61 @@ export class SentinelOrchestrator {
     summary: SentinelRunResult,
     userResult?: UserCycleResult
   ): Promise<void> {
-    const productsRes = await sql`
-      SELECT * FROM products 
+    // AUDIT-FIX: Fetch product IDs first, then fetch details in chunks to avoid MTU issues on VPN
+
+    // 1. Get all relevant IDs first (lightweight query)
+    const idRes = await sql`
+      SELECT id FROM products 
       WHERE user_id = ${user.id} 
       AND (is_monitored = true OR min_price > 0)
     `;
-    const products = productsRes.rows as DBProduct[];
+
+    // Explicitly cast to number[] assuming id is serial/number.
+    // We map safely.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const productIds: number[] = idRes.rows.map((r: any) => r.id);
+
+    if (productIds.length === 0) return;
+
+    // chunk size 10 is a reasonable balance for production
+    const CHUNK_SIZE = 10;
+    const products: DBProduct[] = [];
+
+    for (let i = 0; i < productIds.length; i += CHUNK_SIZE) {
+      const chunk = productIds.slice(i, i + CHUNK_SIZE);
+      if (chunk.length === 0) continue;
+
+      try {
+        console.log(
+          `[Sentinel] Fetching products chunk ${Math.floor(i / CHUNK_SIZE) + 1}... (${chunk.length} items)`
+        );
+
+        // AUDIT-FIX: Select ONLY required columns to minimize packet size for VPN/MTU stability
+        const rawQuery = `
+                        SELECT id, user_id, product_id, nm_id, title, current_price, min_price, 
+                               current_stock, marketplace, is_monitored, account_id 
+                        FROM products 
+                        WHERE id IN (${chunk.join(',')})
+                    `;
+
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore - We know sql() returns Raw in local driver, handled by template literal
+        const chunkRes = await sql`${sql(rawQuery)}`;
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rows = (chunkRes as any).rows as DBProduct[];
+
+        if (rows) {
+          products.push(...rows);
+        }
+
+        // Add delay to let connection breathe on bad VPN
+        await new Promise(r => setTimeout(r, 1000));
+      } catch (e) {
+        console.error(`Error fetching chunk ${chunk}:`, e);
+        summary.errors.push(`Failed to fetch product chunk: ${e}`);
+      }
+    }
 
     if (products.length === 0) return;
 
@@ -226,7 +275,19 @@ export class SentinelOrchestrator {
       }
 
       // Update current price in database
-      await sql`UPDATE products SET current_price = ${livePrice}, updated_at = NOW() WHERE id = ${product.id}`;
+      // AUDIT-FIX: Use fire-and-forget or batch update to avoid DB timeout in loop
+      // We push to a promise array and await later, or update in background
+      // For now, let's just log it and do it
+      // console.log(`[Sentinel] Updating price for ${product.id} to ${livePrice}`);
+      try {
+        // Use a shorter timeout for this update or skip await if not critical?
+        // No, must be consistent.
+        await sql`UPDATE products SET current_price = ${livePrice}, updated_at = NOW() WHERE id = ${product.id}`;
+      } catch (e) {
+        const msg = `Failed to update price in DB for ${product.id}: ${e}`;
+        console.warn(msg);
+        summary.errors.push(msg);
+      }
     }
   }
 
