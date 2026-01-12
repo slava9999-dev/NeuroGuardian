@@ -15,7 +15,7 @@ async function check() {
     // 1. Fetch IDs
     console.log('📦 Fetching IDs...');
     const idRes = await sql`SELECT id FROM products WHERE user_id = 7548070478`;
-    const ids = idRes.rows.map((r: any) => r.id);
+    const ids = idRes.rows.map((r: { id: string | number }) => r.id);
     console.log(`✅ IDs fetched: ${ids.length}`);
 
     // 2. Fetch Chunks

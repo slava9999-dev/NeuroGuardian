@@ -49,10 +49,6 @@ interface DBMemoryFact {
 }
 
 export class MemoryManager {
-  private readonly MESSAGES_TABLE = 'agent_messages';
-  private readonly FACTS_TABLE = 'memory_facts';
-  private readonly SUMMARIES_TABLE = 'memory_summaries';
-
   private tablesChecked = false;
 
   constructor() {
@@ -68,7 +64,7 @@ export class MemoryManager {
     try {
       // Messages table
       await sql`
-        CREATE TABLE IF NOT EXISTS ${sql(this.MESSAGES_TABLE)} (
+        CREATE TABLE IF NOT EXISTS agent_messages (
           id SERIAL PRIMARY KEY,
           user_id INTEGER NOT NULL,
           role TEXT NOT NULL,
@@ -80,7 +76,7 @@ export class MemoryManager {
 
       // Facts table
       await sql`
-        CREATE TABLE IF NOT EXISTS ${sql(this.FACTS_TABLE)} (
+        CREATE TABLE IF NOT EXISTS memory_facts (
           id TEXT PRIMARY KEY,
           user_id INTEGER NOT NULL,
           type TEXT NOT NULL,
@@ -93,7 +89,7 @@ export class MemoryManager {
 
       // Summaries table
       await sql`
-        CREATE TABLE IF NOT EXISTS ${sql(this.SUMMARIES_TABLE)} (
+        CREATE TABLE IF NOT EXISTS memory_summaries (
           user_id INTEGER PRIMARY KEY,
           total_facts INTEGER NOT NULL DEFAULT 0,
           last_summary_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
@@ -115,7 +111,7 @@ export class MemoryManager {
     await this.lazyEnsureTablesExist();
     try {
       await sql`
-        INSERT INTO ${sql(this.MESSAGES_TABLE)} (user_id, role, content)
+        INSERT INTO agent_messages (user_id, role, content)
         VALUES (${userId}, ${role}, ${content})
       `;
     } catch (error) {
@@ -130,7 +126,7 @@ export class MemoryManager {
     await this.lazyEnsureTablesExist();
     try {
       const result = await sql`
-        SELECT * FROM ${sql(this.MESSAGES_TABLE)}
+        SELECT * FROM agent_messages
         WHERE user_id = ${userId}
         ORDER BY timestamp DESC
         LIMIT ${limit}
@@ -163,7 +159,7 @@ export class MemoryManager {
 
       if (overwriteExisting) {
         await sql`
-          INSERT INTO ${sql(this.FACTS_TABLE)} (id, user_id, type, content)
+          INSERT INTO memory_facts (id, user_id, type, content)
           VALUES (${factId}, ${userId}, ${type}, ${fact})
           ON CONFLICT (id) DO UPDATE SET
             content = EXCLUDED.content,
@@ -172,7 +168,7 @@ export class MemoryManager {
         `;
       } else {
         await sql`
-          INSERT INTO ${sql(this.FACTS_TABLE)} (id, user_id, type, content)
+          INSERT INTO memory_facts (id, user_id, type, content)
           VALUES (${factId}, ${userId}, ${type}, ${fact})
           ON CONFLICT (id) DO NOTHING
         `;
@@ -192,7 +188,7 @@ export class MemoryManager {
       const pattern = keywords.join('|');
 
       const result = await sql`
-        SELECT content FROM ${sql(this.FACTS_TABLE)}
+        SELECT content FROM memory_facts
         WHERE user_id = ${userId}
         AND content ~* ${pattern}
         ORDER BY last_accessed_at DESC, access_count DESC
@@ -213,7 +209,7 @@ export class MemoryManager {
     await this.lazyEnsureTablesExist();
     try {
       const result = await sql`
-        SELECT content FROM ${sql(this.FACTS_TABLE)}
+        SELECT content FROM memory_facts
         WHERE user_id = ${userId} AND type = 'user_preference'
         ORDER BY last_accessed_at DESC
         LIMIT 10
@@ -244,7 +240,7 @@ export class MemoryManager {
     await this.lazyEnsureTablesExist();
     try {
       await sql`
-        UPDATE ${sql(this.FACTS_TABLE)}
+        UPDATE memory_facts
         SET last_accessed_at = NOW(), access_count = access_count + 1
         WHERE id = ${factId}
       `;
@@ -261,7 +257,7 @@ export class MemoryManager {
     try {
       // Get all facts for user
       const factsResult = await sql`
-        SELECT * FROM ${sql(this.FACTS_TABLE)}
+        SELECT * FROM memory_facts
         WHERE user_id = ${userId}
         ORDER BY created_at DESC
       `;
@@ -273,7 +269,7 @@ export class MemoryManager {
 
       // Save or update summary
       await sql`
-        INSERT INTO ${sql(this.SUMMARIES_TABLE)} (
+        INSERT INTO memory_summaries (
           user_id, total_facts, summary
         ) VALUES (
           ${userId}, ${factsResult.rows.length}, ${summary}
@@ -286,10 +282,10 @@ export class MemoryManager {
 
       // Archive old messages (keep last 50)
       await sql`
-        DELETE FROM ${sql(this.MESSAGES_TABLE)}
+        DELETE FROM agent_messages
         WHERE user_id = ${userId}
         AND id NOT IN (
-          SELECT id FROM ${sql(this.MESSAGES_TABLE)}
+          SELECT id FROM agent_messages
           WHERE user_id = ${userId}
           ORDER BY timestamp DESC
           LIMIT 50
@@ -306,9 +302,9 @@ export class MemoryManager {
   async clearMemory(userId: number): Promise<void> {
     await this.lazyEnsureTablesExist();
     try {
-      await sql`DELETE FROM ${sql(this.MESSAGES_TABLE)} WHERE user_id = ${userId}`;
-      await sql`DELETE FROM ${sql(this.FACTS_TABLE)} WHERE user_id = ${userId}`;
-      await sql`DELETE FROM ${sql(this.SUMMARIES_TABLE)} WHERE user_id = ${userId}`;
+      await sql`DELETE FROM agent_messages WHERE user_id = ${userId}`;
+      await sql`DELETE FROM memory_facts WHERE user_id = ${userId}`;
+      await sql`DELETE FROM memory_summaries WHERE user_id = ${userId}`;
     } catch (error) {
       console.error(`Failed to clear memory for user ${userId}:`, error);
     }
@@ -325,9 +321,9 @@ export class MemoryManager {
     await this.lazyEnsureTablesExist();
     try {
       const [messagesResult, factsResult, summaryResult] = await Promise.all([
-        sql`SELECT COUNT(*) as count FROM ${sql(this.MESSAGES_TABLE)} WHERE user_id = ${userId}`,
-        sql`SELECT COUNT(*) as count FROM ${sql(this.FACTS_TABLE)} WHERE user_id = ${userId}`,
-        sql`SELECT last_summary_at FROM ${sql(this.SUMMARIES_TABLE)} WHERE user_id = ${userId}`,
+        sql`SELECT COUNT(*) as count FROM agent_messages WHERE user_id = ${userId}`,
+        sql`SELECT COUNT(*) as count FROM memory_facts WHERE user_id = ${userId}`,
+        sql`SELECT last_summary_at FROM memory_summaries WHERE user_id = ${userId}`,
       ]);
 
       return {
