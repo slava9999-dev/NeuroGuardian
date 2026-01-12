@@ -8,7 +8,6 @@ import { getMarketplaceKeys } from '../../api-lib/services/index.js';
 import type { UserState } from '../../core/types/index.js';
 
 export class StateManager {
-  private readonly TABLE_NAME = 'user_state';
   private tableChecked = false;
 
   constructor() {
@@ -23,7 +22,7 @@ export class StateManager {
 
     try {
       await sql`
-        CREATE TABLE IF NOT EXISTS ${sql(this.TABLE_NAME)} (
+        CREATE TABLE IF NOT EXISTS user_state (
           user_id BIGINT PRIMARY KEY,
           marketplace TEXT,
           has_api_keys BOOLEAN NOT NULL DEFAULT false,
@@ -56,7 +55,7 @@ export class StateManager {
 
     try {
       const result = await sql`
-        SELECT * FROM ${sql(this.TABLE_NAME)} WHERE user_id = ${userId}
+        SELECT * FROM user_state WHERE user_id = ${userId}
       `;
 
       let state: UserState;
@@ -133,7 +132,7 @@ export class StateManager {
       const newState = { ...currentState, ...partial, lastActiveAt: new Date() };
 
       await sql`
-        INSERT INTO ${sql(this.TABLE_NAME)} (
+        INSERT INTO user_state (
           user_id, marketplace, has_api_keys, products_count, subscription_tier,
           current_intent, pending_action, awaiting_input, last_mentioned_products,
           last_query, last_active_at, session_started_at, total_queries, updated_at
@@ -278,7 +277,7 @@ export class StateManager {
   async resetState(userId: number): Promise<void> {
     await this.lazyEnsureTableExists();
     try {
-      await sql`DELETE FROM ${sql(this.TABLE_NAME)} WHERE user_id = ${userId}`;
+      await sql`DELETE FROM user_state WHERE user_id = ${userId}`;
     } catch (error) {
       console.error(`Failed to reset state for user ${userId}:`, error);
     }

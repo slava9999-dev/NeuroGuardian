@@ -60,8 +60,8 @@ export function extractNmIdFromUrl(input: string | number): number | null {
  */
 export async function fetchWbCompetitorData(nmId: number | string): Promise<CompetitorData | null> {
   // WB API Endpoint (dest=-1257786 is Moscow default)
-  // curr=rub (rubles)
-  const url = `https://card.wb.ru/cards/v1/detail?appType=1&curr=rub&dest=-1257786&spp=30&nm=${nmId}`;
+  // v4 is the current version as of 2026
+  const url = `https://card.wb.ru/cards/v4/detail?appType=1&curr=rub&dest=-1257786&spp=30&nm=${nmId}`;
 
   try {
     const response = await fetch(url, {
@@ -76,30 +76,52 @@ export async function fetchWbCompetitorData(nmId: number | string): Promise<Comp
       throw new Error(`WB API Error: ${response.status} ${response.statusText}`);
     }
 
-    interface WbPublicProduct {
-      salePriceU?: number;
-      priceU?: number;
-      sizes?: Array<{
-        stocks?: Array<{ qty: number }>;
-      }>;
+    interface WbPriceV4 {
+      basic: number;
+      product: number;
+      total?: number;
     }
 
-    const data = (await response.json()) as { data?: { products?: WbPublicProduct[] } };
+    interface WbSizeV4 {
+      price?: WbPriceV4;
+      stocks?: Array<{ qty: number }>;
+    }
 
-    if (!data.data?.products?.length) {
-      console.warn(`Competitor monitor: Product ${nmId} not found on WB`);
+    interface WbProductV4 {
+      priceU?: number; // Legacy/fallback
+      salePriceU?: number; // Legacy/fallback
+      sizes?: WbSizeV4[];
+    }
+
+    const rawData = await response.json();
+    // Support both { data: { products: [...] } } and { products: [...] }
+    const products = (rawData.data?.products || rawData.products) as WbProductV4[];
+
+    if (!products?.length) {
+      console.warn(`Competitor monitor: Product ${nmId} not found on WB (Empty products array)`);
       return null;
     }
 
-    const product = data.data.products[0];
+    const product = products[0];
 
-    // WB API prices are in kopecks (cents), so divide by 100
-    // salePriceU - цена продажи (с СПП и всеми скидками)
-    // priceU - базовая цена (зачеркнутая)
+    // v4 logic: price is inside sizes
+    const firstSizeWithPrice = product.sizes?.find((s: WbSizeV4) => s.price);
+    const priceObj = firstSizeWithPrice?.price;
 
-    // Fallback: иногда salePriceU нет, берем priceU
-    const finalPrice = ((product.salePriceU || product.priceU) ?? 0) / 100;
-    const basicPrice = ((product.priceU || product.salePriceU) ?? 0) / 100;
+    // Prices are in kopecks (cents), so divide by 100
+    // product - цена после скидки продавца
+    // basic - базовая цена
+    let finalPrice = 0;
+    let basicPrice = 0;
+
+    if (priceObj) {
+      finalPrice = (priceObj.product || priceObj.basic || 0) / 100;
+      basicPrice = (priceObj.basic || priceObj.product || 0) / 100;
+    } else {
+      // Fallback to legacy fields if v4 structure is missing but fields remain
+      finalPrice = ((product.salePriceU || product.priceU) ?? 0) / 100;
+      basicPrice = ((product.priceU || product.salePriceU) ?? 0) / 100;
+    }
 
     // Calculate total stock across all sizes/warehouses
     let totalStock = 0;
@@ -122,7 +144,6 @@ export async function fetchWbCompetitorData(nmId: number | string): Promise<Comp
     };
   } catch (error) {
     console.error(`Failed to fetch WB competitor ${nmId}:`, error);
-    // В боевом режиме не возвращаем заглушки, возвращаем null (ошибка получения)
     return null;
   }
 }

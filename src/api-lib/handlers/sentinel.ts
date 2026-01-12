@@ -8,6 +8,9 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import type { DBProduct } from '../lib/types.js';
 import { verifyAdminAccessAsync, extractAnyAuthAsync } from '../middleware/auth.js';
 
+import { sentinelOrchestrator as sentinelService } from '../../sentinel/SentinelOrchestrator.js';
+import { getSecret } from '../lib/secrets-helper.js';
+
 /**
  * Handle check-prices action (Sentinel Cron)
  * Supports ?includeReport=true to send daily report after price check (for Vercel Hobby single-cron limit)
@@ -16,9 +19,6 @@ export async function handleCheckPrices(
   req: VercelRequest,
   res: VercelResponse
 ): Promise<VercelResponse> {
-  const { sentinelService } = await import('../services/sentinel-service.js');
-  const { getSecret } = await import('../lib/secrets-helper.js');
-
   // 1. Authentication Strategy
   // Priority 1: Specific User Context (Telegram, Cron+ID, Admin+ID)
   // This supports providing X-Telegram-Id along with the Cron Secret to run for a specific user.

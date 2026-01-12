@@ -25,14 +25,7 @@ async function check() {
       console.log(`📦 Fetching chunk ${i / CHUNK_SIZE + 1} (${chunk.length} items)...`);
 
       try {
-        const rawQuery = `SELECT * FROM products WHERE id IN (${chunk.join(',')})`;
-        // Simulating the Raw construction manually if needed, or just using sql tag if we can imports
-        // But here we import sql from database.local directly probably so we need Raw class?
-        // Wait, sql string works?
-        // In database.local.ts `sql(string)` returns `Raw`.
-        // So `sql`${sql(string)}`` works.
-
-        const res = await sql`${sql(rawQuery)}`;
+        const res = await sql`SELECT * FROM products WHERE id = ANY(${chunk})`;
         console.log(`✅ Chunk ${i / CHUNK_SIZE + 1} fetched: ${(res as any).rows.length} rows`);
 
         await new Promise(r => setTimeout(r, 500));

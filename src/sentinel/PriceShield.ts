@@ -1,11 +1,9 @@
-// ============================================
 // NeuroGUARDIAN — PriceShield Service (Smart Repricing)
 // Logic for competitor following and margin protection
-// Version: 1.0.0 | Date: December 2024
-// ============================================
+// Version: 1.1.0 | Date: January 2026
 
-import { sql } from '../database.js';
-import type { DBPriceRule } from '../../lib/types.js';
+import { sql } from '../api-lib/services/database.js';
+import type { DBPriceRule } from '../api-lib/lib/types.js';
 
 export interface PriceRule {
   id: number;
@@ -38,7 +36,6 @@ export class PriceShieldService {
     rule: PriceRule
   ): RepricingResult {
     // 1. If no competitor tracking or no competitor price, stick to current or max?
-    // For now, if no competitor signal, we do nothing unless we want to 'return to max' logic (smart recovery)
     if (!rule.competitor_tracking || !competitorPrice || rule.price_match_strategy === 'none') {
       return {
         newPrice: currentPrice,
@@ -137,13 +134,12 @@ export class PriceShieldService {
         auto_adjust: row.auto_adjust,
       }));
     } catch (error) {
-      // Table might not exist yet - return empty array gracefully
       const errorMessage = error instanceof Error ? error.message : String(error);
       if (errorMessage.includes('does not exist')) {
         console.warn('[PriceShield] price_rules table not found, returning empty rules');
         return [];
       }
-      throw error; // Re-throw if it's a different error
+      throw error;
     }
   }
 }

@@ -6,18 +6,114 @@
 
 // Use local pg driver for local development, @vercel/postgres for production
 // We check for VERCEL_REGION to ensure we're actually on the Vercel platform
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let sql: any;
 
-if (process.env.VERCEL && process.env.VERCEL_REGION) {
-  const { sql: vercelSql } = await import('@vercel/postgres');
-  sql = vercelSql;
-} else {
-  const { sql: localSql } = await import('./database.local.js');
-  sql = localSql;
+// Use pg pool for all environments to ensure resilience (retries, timeouts)
+import pkg from 'pg';
+const { Pool } = pkg;
+import type { QueryResult, PoolConfig, PoolClient } from 'pg';
+
+let _pool: pkg.Pool | null = null;
+
+function getPool(): pkg.Pool {
+  if (_pool) return _pool;
+
+  const connectionString = (process.env.POSTGRES_URL || process.env.DATABASE_URL)
+    ?.replace(/\r/g, '')
+    .trim();
+
+  if (!connectionString) {
+    throw new Error('DATABASE_URL or POSTGRES_URL is not configured');
+  }
+
+  const isLocalhost =
+    connectionString.includes('localhost') || connectionString.includes('127.0.0.1');
+  const hasSslMode = connectionString.includes('sslmode=');
+
+  const poolConfig: PoolConfig = {
+    connectionString,
+    // Vercel Postgres/Neon requires SSL in production, but localhost doesn't
+    ssl: isLocalhost || hasSslMode ? undefined : { rejectUnauthorized: false },
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 60000,
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10000,
+  };
+
+  _pool = new Pool(poolConfig);
+
+  _pool.on('error', (err: Error) => {
+    // Ignore terminated connections (common in serverless/lambdas)
+    if (!err.message.includes('terminated') && !err.message.includes('ECONNRESET')) {
+      console.error('[Database] Global Pool Error:', err.message);
+    }
+  });
+
+  return _pool;
 }
 
-export { sql };
+/**
+ * Execute query with automatic retries for transient network errors
+ */
+async function executeWithRetry(text: string, values: unknown[]): Promise<QueryResult> {
+  const pool = getPool();
+  let retries = 3;
+
+  while (retries > 0) {
+    let client: PoolClient | null = null;
+    try {
+      // 1. Connect with timeout
+      const clientPromise = pool.connect();
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('DB_CONNECT_TIMEOUT')), 15000)
+      );
+
+      client = await (Promise.race([clientPromise, timeoutPromise]) as Promise<PoolClient>);
+
+      // 2. Execute with timeout
+      const queryPromise = client.query(text, values);
+      const queryTimeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('DB_QUERY_TIMEOUT')), 30000)
+      );
+
+      const res = await (Promise.race([queryPromise, queryTimeout]) as Promise<QueryResult>);
+      return res;
+    } catch (error: any) {
+      retries--;
+      const msg = error.message || String(error);
+      const isTransient =
+        msg.includes('timeout') ||
+        msg.includes('terminated') ||
+        msg.includes('RESET') ||
+        msg.includes('SSL');
+
+      if (isTransient && retries > 0) {
+        console.warn(`[Database] Transient error, retrying (${retries} left): ${msg}`);
+        await new Promise(r => setTimeout(r, 1000));
+        continue;
+      }
+      throw error;
+    } finally {
+      if (client) client.release();
+    }
+  }
+  throw new Error('Database retries exhausted');
+}
+
+/**
+ * Tagged template literal for SQL queries (compatible with @vercel/postgres)
+ */
+export const sql = (strings: TemplateStringsArray, ...values: unknown[]): Promise<QueryResult> => {
+  let text = strings[0];
+  const queryValues: unknown[] = [];
+
+  for (let i = 0; i < values.length; i++) {
+    queryValues.push(values[i]);
+    text += `$${queryValues.length}${strings[i + 1]}`;
+  }
+
+  return executeWithRetry(text, queryValues);
+};
 
 import { logger, decryptApiKey } from '../lib/index.js';
 import type { DBProduct, PendingPriceUpdate } from '../lib/types.js';

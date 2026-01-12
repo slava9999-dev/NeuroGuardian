@@ -7,7 +7,7 @@
 import { inngest } from '../lib/inngest.js';
 import { classifyQuery, type IntentType, type RouteTarget } from '../agent/moe-router.js';
 import { logger } from '../lib/logger.js';
-import { sentinelService } from './sentinel-service.js';
+import { sentinelOrchestrator as sentinelService } from '../../sentinel/SentinelOrchestrator.js';
 import { memoryService } from './memory-service.js';
 import { orchestrateV5 } from '../../agent/core/AgentOrchestratorV5.js';
 

@@ -6,7 +6,7 @@ import { SentinelDefenseExecutor } from './DefenseExecutor.js';
 import { SentinelReportGenerator } from './ReportGenerator.js';
 import { SentinelAlertSender } from './AlertSender.js';
 import type { SentinelRunResult, UserCycleResult } from './types.js';
-import { priceShield, type PriceRule } from '../api-lib/services/legacy/price-shield.js';
+import { priceShield, type PriceRule } from './PriceShield.js';
 import { getCompetitorPrice } from '../api-lib/services/competitor-monitor.js';
 
 export class SentinelOrchestrator {
