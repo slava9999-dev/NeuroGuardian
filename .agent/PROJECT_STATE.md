@@ -1,6 +1,6 @@
 # 📊 Project State — NeuroGUARDIAN
 
-# Updated: 2026-01-11T22:35:00+03:00
+# Updated: 2026-01-12T11:00:00+03:00
 
 # This file tracks current progress and is updated at end of each session
 
@@ -8,8 +8,8 @@
 
 ## 🎯 Current Phase: MONETIZATION LAUNCH (Phase 11) 🟢 PRODUCTION
 
-**Last Session:** 2026-01-12 (Session 42)
-**Focus:** 🚑 EMERGENCY FIX — Resolving ERR_MODULE_NOT_FOUND in Production
+**Last Session:** 2026-01-12 (Session 43)
+**Focus:** 🛡️ Sentinel Refactoring & Production Stabilization
 
 **📋 Ключевые документы:**
 
@@ -17,6 +17,23 @@
 - `docs/MONETIZATION_ROADMAP.md` — Путеводитель монетизации
 - `docs/LAUNCH_CHECKLIST.md` — Интерактивный чеклист
   - `scripts/verify-agent-v5.ts` — верификация
+
+### Session 2026-01-12 (Session 43 - Sentinel Refactoring & Modularization) 🛡️
+
+**Finalizing Sentinel Refactor and Production Readiness:**
+
+- [x] **REFACTOR**: Moved Sentinel core logic from `src/api-lib/sentinel-core` to a dedicated top-level `src/sentinel` directory.
+- [x] **MODULARITY**: Updated all relative imports, handlers (`sentinel.ts`), and proxy services (`sentinel-service.ts`) to point to the new location.
+- [x] **TYPE SAFETY**: Resolved all remaining explicit `any` types in `SentinelOrchestrator.ts`. Added missing Ozon API types to `OzonService.ts` and `marketplace-types.ts`.
+- [x] **PRODUCTION FIX**: Resolved a critical SQL syntax error (`NeonDbError`) caused by incorrect use of template literals in production environment. Switch to `ANY()` for ID filtering.
+- [x] **LINTING & BUILD**: Fixed `eslint.config.js` to exclude `dist` and `node_modules`. Verified `npm run typecheck` and `npm test` (283 pass).
+- [x] **DEPLOY**: Successfully pushed verified changes to `main` branch.
+
+**Commits:**
+
+- `refactor(sentinel): move sentinel-core to top-level src/sentinel and fix path resolution`
+- `fix(types): resolve Ozon service type errors and fix Warehouse tool imports`
+- `fix(sentinel): resolve SQL syntax error in production`
 
 ### Session 2026-01-12 (Session 42 - Emergency Build Fix) 🚑
 
@@ -695,7 +712,7 @@ By Category:
 
 ## 🔮 Next Session Suggestions
 
-1.  **Fix High-003 Test**: Исправить тест "Уточнение периода" в `run-pro-tests.ts`, чтобы он проходил стабильно.
-2.  **Unit Economics Display**: Добавить отображение реальной маржинальности (ROI/Margin) прямо в список товаров на `ProductsPage`.
-3.  **Competitor Monitoring UI**: Реализовать интерфейс для просмотра цен конкурентов и управления ссылками на них.
-4.  **Notification settings**: Добавить возможность настройки получателей уведомлений через UI.
+1.  **Uniform Architecture**: Decide whether to move `src/sentinel` back to `src/api-lib/services` or move other core services to root-level directories for consistency.
+2.  **Legacy Cleanup**: Audit and remove `old-marketplace.ts` to reduce project size and confusion.
+3.  **DB Utility**: Implement a `fetchInChunks` helper in `database.ts` to encapsulate VPN-resilient fetching logic.
+4.  **Scaling Monitor**: Monitor Sentinel execution time on Vercel to ensure it doesn't exceed 10s timeout for large accounts.
