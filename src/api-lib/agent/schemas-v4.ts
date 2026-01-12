@@ -455,6 +455,10 @@ export const PLAN_JSON_SCHEMA = {
                   type: 'string',
                   description: 'Search query',
                 },
+                search: {
+                  type: 'string',
+                  description: 'Search term for finding products (alias for query)',
+                },
                 status: {
                   type: 'string',
                   enum: ['all', 'new', 'processing', 'delivered', 'cancelled'],
