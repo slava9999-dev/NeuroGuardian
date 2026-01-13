@@ -15,6 +15,7 @@ import type {
 import { stateManager } from './StateManager.js';
 import { contextResolver } from './ContextResolver.js';
 import { promptBuilder } from './PromptBuilder.js';
+import { memoryManager } from './MemoryManager.js';
 import { toolRegistry } from '../execution/ToolRegistry.js';
 import { llmRouter } from '../../infrastructure/llm/LLMRouter.js';
 import { logger } from '../../api-lib/lib/logger.js';
@@ -55,8 +56,8 @@ interface PhaseMetrics {
  * 8. Save State → Persist for next message
  */
 export class AgentOrchestratorV5 {
-  // TODO: Integrate MemoryService in Phase 3
-  // private memoryService: MemoryServiceInterface | null = null;
+  // ✅ Memory integration enabled (Phase 3 complete)
+  private memoryEnabled = true;
 
   /**
    * Main entry point
@@ -93,6 +94,14 @@ export class AgentOrchestratorV5 {
         type: resolvedContext.responseType,
         directExecution: !!resolvedContext.directExecution,
       });
+
+      // ========================================
+      // MEMORY: Save user message
+      // ========================================
+      if (this.memoryEnabled) {
+        await memoryManager.saveMessage(context.userId, 'user', message);
+        logger.debug('Memory: user message saved', { userId: context.userId });
+      }
 
       // ========================================
       // SHORT-CIRCUIT: Direct Execution
@@ -207,6 +216,15 @@ export class AgentOrchestratorV5 {
       // PHASE 5: State Update
       // ========================================
       await this.updateStateAfterResponse(context.userId, message, plan, toolResults);
+
+      // ========================================
+      // MEMORY: Save assistant response & extract facts
+      // ========================================
+      if (this.memoryEnabled) {
+        await memoryManager.saveMessage(context.userId, 'assistant', answer.message);
+        await this.extractAndSaveFacts(context.userId, message, answer.message, toolResults);
+        logger.debug('Memory: assistant response saved', { userId: context.userId });
+      }
 
       // ========================================
       // Build Result
@@ -440,6 +458,90 @@ ${JSON.stringify(toolResults, null, 2)}
 
     if (productIds.length > 0) {
       await stateManager.trackMentionedProducts(userId, productIds);
+    }
+  }
+
+  /**
+   * Extract and save important facts to long-term memory
+   * This enables the agent to remember important information across sessions
+   */
+  private async extractAndSaveFacts(
+    userId: number,
+    userMessage: string,
+    _assistantResponse: string,
+    toolResults: Array<ToolResult & { tool: string }>
+  ): Promise<void> {
+    try {
+      // Extract cost_price facts from tool results
+      for (const result of toolResults) {
+        if (result.success && result.tool === 'set_cost_price' && result.data) {
+          const data = result.data as { product_name?: string; cost_price?: number };
+          if (data.product_name && data.cost_price) {
+            await memoryManager.saveImportantFact(
+              userId,
+              `Себестоимость "${data.product_name}" = ${data.cost_price}₽`,
+              'product_info',
+              true // overwrite existing
+            );
+          }
+        }
+
+        // Extract min_price / stop-loss facts
+        if (result.success && result.tool === 'set_stop_loss' && result.data) {
+          const data = result.data as { product_name?: string; min_price?: number };
+          if (data.product_name && data.min_price) {
+            await memoryManager.saveImportantFact(
+              userId,
+              `Минимальная цена "${data.product_name}" = ${data.min_price}₽`,
+              'product_info',
+              true
+            );
+          }
+        }
+      }
+
+      // Detect user preferences from message patterns
+      const lowerMessage = userMessage.toLowerCase();
+
+      if (
+        lowerMessage.includes('кратко') ||
+        lowerMessage.includes('коротко') ||
+        lowerMessage.includes('без деталей')
+      ) {
+        await memoryManager.saveImportantFact(
+          userId,
+          'Предпочитает краткие ответы',
+          'user_preference'
+        );
+      }
+
+      if (
+        lowerMessage.includes('подробно') ||
+        lowerMessage.includes('детально') ||
+        lowerMessage.includes('во всех подробностях')
+      ) {
+        await memoryManager.saveImportantFact(
+          userId,
+          'Предпочитает подробные ответы',
+          'user_preference'
+        );
+      }
+
+      // Detect business rules
+      const marginMatch = lowerMessage.match(/маржа\s*(?:не менее|минимум|от)\s*(\d+)/i);
+      if (marginMatch) {
+        await memoryManager.saveImportantFact(
+          userId,
+          `Минимальная маржа ${marginMatch[1]}%`,
+          'business_rule',
+          true
+        );
+      }
+
+      logger.debug('Memory facts extracted', { userId });
+    } catch (error) {
+      // Non-critical - don't fail the main flow
+      logger.warn('Failed to extract memory facts', { error, userId });
     }
   }
 
