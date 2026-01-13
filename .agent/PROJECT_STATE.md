@@ -17,6 +17,26 @@
 > Проект должен быть РЕАЛЬНО готов к массовому тестированию в реальном времени!
 > См. `docs/RELEASE_PREPARATION.md` для полного чеклиста.
 
+### Session 2026-01-14 (Session 51 - Release Candidate Polish) 🚀
+
+**Release Audit & Final Polish:**
+
+> ✅ **MAJOR:** Система полностью готова к релизу (Release Candidate). Критические баги исправлены, основные флоу проверены.
+
+**Verified & Fixed:**
+
+- [x] **Sentinel**: Гранулярный тест пройден (API Цены -> Угрозы -> Защита).
+- [x] **Payments**: Логика апгрейда подписки (Free -> Pro) проверена симулятором.
+- [x] **Agent Logic**: Исправлен баг "Анализ конкурентов" (теперь запрашивает ссылку/артикул).
+- [x] **Marketing**: Созданы посты для Telegram/VK (стратегия "Utility & Safety").
+- [x] **Cleanup**: Проект очищен от отладочных скриптов.
+
+**Commits:**
+
+- `fix(agent): align calculator tool with unit-economics service logic`
+- `fix(agent): prevent auto-fetching user products for competitor analysis queries`
+- `docs: update project state`
+
 ### Session 2026-01-13 (Session 50 - Agent Intelligence & Knowledge Base) 🧠
 
 **Experience Learning + Response Guardrails + Knowledge Base Expansion:**
@@ -106,7 +126,15 @@
 
 ---
 
-## ✅ Recently Completed (Sessions 47-50)
+## ✅ Recently Completed (Sessions 48-51)
+
+### Session 51 - Release Candidate Polish
+
+- [x] SENTINEL VERIFIED: Full granular cycle confirmed
+- [x] PAYMENTS VERIFIED: Subscription upgrade logic confirmed
+- [x] AGENT FIX: Competitor analysis prompt logic corrected
+
+### Session 50 - Agent Intelligence & Knowledge Base
 
 ### Session 49 - Database Resilience & Ozon Verification
 
@@ -153,12 +181,12 @@
 
 ## 🟡 Important TODO (P1)
 
-| #   | Feature                 | Status  | Notes          |
-| --- | ----------------------- | ------- | -------------- |
-| 1   | Креативы для TG рекламы | ⏳ TODO | 3-5 вариантов  |
-| 2   | Выбор TG каналов        | ⏳ TODO | бюджет 10,000₽ |
-| 3   | A/B тестирование        | ⏳ TODO | UTM метки      |
+| #   | Feature                 | Status  | Notes                      |
+| --- | ----------------------- | ------- | -------------------------- |
+| 1   | Креативы для TG рекламы | ✅ DONE | Strategy: Utility & Safety |
+| 2   | Выбор TG каналов        | ⏳ TODO | бюджет 10,000₽             |
+| 3   | A/B тестирование        | ⏳ TODO | UTM метки                  |
 
 ---
 
-_Last updated: 2026-01-13T22:48:00+03:00_
+_Last updated: 2026-01-14T01:15:00+03:00_
