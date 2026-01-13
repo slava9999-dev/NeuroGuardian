@@ -15,9 +15,10 @@ export default defineConfig({
     // Exclude E2E tests - they require real LLM and should run separately via npm run test:agent:pro
     exclude: [
       '**/node_modules/**',
-      // '**/viktor-e2e.test.ts',
-      // '**/viktor-local-e2e.test.ts',
-      // '**/viktor-safe-e2e.test.ts',
+      // E2E tests require real LLM calls - run separately via npm run test:agent:pro
+      '**/viktor-e2e.test.ts',
+      '**/viktor-local-e2e.test.ts',
+      '**/viktor-safe-e2e.test.ts',
     ],
     coverage: {
       provider: 'v8',
