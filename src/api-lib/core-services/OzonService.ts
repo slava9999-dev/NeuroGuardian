@@ -15,7 +15,7 @@ export class OzonService {
   private readonly PRODUCT_LIST_API = 'https://api-seller.ozon.ru/v3/product/list';
   private readonly PRODUCT_INFO_API = 'https://api-seller.ozon.ru/v3/product/info/list';
   private readonly ANALYTICS_API = 'https://api-seller.ozon.ru/v1/analytics/data';
-  private readonly PRICE_INFO_API = 'https://api-seller.ozon.ru/v1/product/info/prices';
+  private readonly PRICE_INFO_API = 'https://api-seller.ozon.ru/v5/product/info/prices';
   private readonly STOCK_UPDATE_API = 'https://api-seller.ozon.ru/v1/product/import/stocks'; // v1/product/import/stocks for zeroing, v2/products/stocks for updates
 
   /**
@@ -236,10 +236,6 @@ export class OzonService {
     }
     return null;
   }
-
-  /**
-   * Fetch current prices from Ozon for price monitoring
-   */
   async fetchCurrentPrices(
     clientId: string,
     apiKey: string,
@@ -258,7 +254,11 @@ export class OzonService {
           'Api-Key': apiKey,
         },
         body: JSON.stringify({
-          product_id: productIds,
+          filter: {
+            product_id: productIds,
+            visibility: 'ALL',
+          },
+          limit: 1000,
         }),
       });
 

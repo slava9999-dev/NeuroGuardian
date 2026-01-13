@@ -42,6 +42,7 @@
 - [x] `ops-logger.ts` — Полный переход на logger (Audit Trail)
 - [x] `ToolRegistry` и инструменты (Orders, Stocks) — Чистый лог
 - [x] `KnowledgeBase` & `StateManager` — Устранены console.error
+- [x] `OzonService.ts` — Upgrade to API v5 (`fetchCurrentPrices` fix)
 
 **Часть 2: Memory Management Integration (COURSE COMPLIANCE)**
 
