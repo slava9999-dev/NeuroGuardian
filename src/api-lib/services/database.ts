@@ -33,11 +33,11 @@ function getPool(): pkg.Pool {
     connectionString,
     // Vercel Postgres/Neon requires SSL in production, but localhost doesn't
     ssl: isLocalhost || hasSslMode ? undefined : { rejectUnauthorized: false },
-    max: 10,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 60000,
+    max: 20,
+    idleTimeoutMillis: 60000, // Increase idle timeout
+    connectionTimeoutMillis: 90000, // Wait up to 1.5 min for a connection
     keepAlive: true,
-    keepAliveInitialDelayMillis: 10000,
+    keepAliveInitialDelayMillis: 500, // Very aggressive keep-alive
   };
 
   _pool = new Pool(poolConfig);
@@ -57,44 +57,58 @@ function getPool(): pkg.Pool {
  */
 async function executeWithRetry(text: string, values: unknown[]): Promise<QueryResult> {
   const pool = getPool();
-  let retries = 3;
+  const retries = 5; // Increased retries for unstable environments
+  let attempt = 0;
 
-  while (retries > 0) {
+  while (attempt < retries) {
+    attempt++;
     let client: PoolClient | null = null;
+    const clientErrorHandler = (_err: Error) => {
+      // Internal error handler to prevent unhandled 'error' event
+    };
+
     try {
       // 1. Connect with timeout
       const clientPromise = pool.connect();
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('DB_CONNECT_TIMEOUT')), 15000)
+        setTimeout(() => reject(new Error('DB_CONNECT_TIMEOUT')), 20000)
       );
 
       client = await (Promise.race([clientPromise, timeoutPromise]) as Promise<PoolClient>);
+      client.on('error', clientErrorHandler);
 
       // 2. Execute with timeout
       const queryPromise = client.query(text, values);
       const queryTimeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('DB_QUERY_TIMEOUT')), 30000)
+        setTimeout(() => reject(new Error('DB_QUERY_TIMEOUT')), 90000)
       );
 
       const res = await (Promise.race([queryPromise, queryTimeout]) as Promise<QueryResult>);
       return res;
-    } catch (error: any) {
-      retries--;
-      const msg = error.message || String(error);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
       const isTransient =
         msg.includes('timeout') ||
         msg.includes('terminated') ||
+        msg.includes('unexpected') ||
         msg.includes('RESET') ||
-        msg.includes('SSL');
+        msg.includes('SSL') ||
+        msg.includes('ECONNRESET') ||
+        msg.includes('DB_CONNECT_TIMEOUT') ||
+        msg.includes('DB_QUERY_TIMEOUT');
 
-      if (isTransient && retries > 0) {
-        console.warn(`[Database] Transient error, retrying (${retries} left): ${msg}`);
-        await new Promise(r => setTimeout(r, 1000));
+      if (isTransient && attempt < retries) {
+        console.warn(`[Database] Attempt ${attempt}/${retries} failed: ${msg}. Retrying...`);
+        // Exponential backoff
+        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt - 1)));
         continue;
       }
       throw error;
     } finally {
-      if (client) client.release();
+      if (client) {
+        client.removeListener('error', clientErrorHandler);
+        client.release();
+      }
     }
   }
   throw new Error('Database retries exhausted');

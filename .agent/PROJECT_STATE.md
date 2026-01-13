@@ -34,6 +34,22 @@
 - `src/api-lib/core-services/OzonService.ts`
 - `src/api-lib/services/notifications.ts`
 
+### Session 2026-01-13 (Session 49 - Database Resilience & Ozon Verification) 🛡️
+
+**Network Hardening & Final Ozon V5 Confirmation:**
+
+> ✅ **SUCCESS:** Ozon V5 API confirmed working (prices fetched successfully). Database connection hardened against unstable VPN environments.
+
+- [x] **DATABASE RESILIENCE:** Updated `database.ts` with aggressive keep-alive (500ms), increased timeouts (90s), and retry logic (5 attempts) to handle "Connection terminated unexpectedly" errors on unstable networks.
+- [x] **SENTINEL OPTIMIZATION:** Reduced chunk size from 10 to 5 products in `SentinelOrchestrator.ts` to minimize packet loss risks.
+- [x] **OZON VERIFIED:** Debug scripts confirmed successful price fetching from Ozon V5 API using DB credentials.
+- [x] **CLEANUP:** Removed temporary debug scripts (`debug-sentinel-run.ts`, `diagnose-ozon-failure.ts`).
+
+**Files Modified:**
+
+- `src/api-lib/services/database.ts` (Hardening)
+- `src/sentinel/SentinelOrchestrator.ts` (Chunk size optimization)
+
 ### Session 2026-01-13 (Session 47 - Critical Audit + Memory Integration) 🔬
 
 **Глубокий критический аудит, рефакторинг логирования и интеграция памяти:**

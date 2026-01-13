@@ -145,8 +145,8 @@ export class SentinelOrchestrator {
 
     if (productIds.length === 0) return;
 
-    // chunk size 10 is a reasonable balance for production
-    const CHUNK_SIZE = 10;
+    // chunk size 5 is safer for unstable MTU/VPN connections
+    const CHUNK_SIZE = 5;
     const products: DBProduct[] = [];
 
     for (let i = 0; i < productIds.length; i += CHUNK_SIZE) {
