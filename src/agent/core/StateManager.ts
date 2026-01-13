@@ -5,6 +5,7 @@
 
 import { sql } from '../../api-lib/services/database.js';
 import { getMarketplaceKeys } from '../../api-lib/services/index.js';
+import { logger } from '../../api-lib/lib/logger.js';
 import type { UserState } from '../../core/types/index.js';
 
 export class StateManager {
@@ -42,7 +43,7 @@ export class StateManager {
       `;
       this.tableChecked = true;
     } catch (error) {
-      console.error('Failed to create user_state table:', error);
+      logger.error('Failed to create user_state table:', error);
       // Don't set tableChecked to true so we retry next time
     }
   }
@@ -97,7 +98,7 @@ export class StateManager {
 
       return state;
     } catch (error) {
-      console.error(`Failed to get state for user ${userId}:`, error);
+      logger.error(`Failed to get state for user ${userId}:`, error);
     }
 
     return this.getDefaultState(userId);
@@ -160,7 +161,7 @@ export class StateManager {
           updated_at = EXCLUDED.updated_at
       `;
     } catch (error) {
-      console.error(`Failed to update state for user ${userId}:`, error);
+      logger.error(`Failed to update state for user ${userId}:`, error);
     }
   }
 
@@ -279,7 +280,7 @@ export class StateManager {
     try {
       await sql`DELETE FROM user_state WHERE user_id = ${userId}`;
     } catch (error) {
-      console.error(`Failed to reset state for user ${userId}:`, error);
+      logger.error(`Failed to reset state for user ${userId}:`, error);
     }
   }
 

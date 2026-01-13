@@ -1,6 +1,7 @@
 import { marketplaceService, type Marketplace } from '@/services/marketplaceService';
 import { notificationService } from '@/services/notificationService';
 import { db } from '@/lib/db';
+import { logger } from '@/api-lib/lib/logger';
 
 interface UnifiedProduct {
   id: string;
@@ -253,7 +254,7 @@ export class PriceProtectionAgent {
         [JSON.stringify({ ...results, durationMs })]
       );
     } catch (e) {
-      console.error('Failed to log execution', e);
+      logger.error('Failed to log execution', e);
     }
   }
 }

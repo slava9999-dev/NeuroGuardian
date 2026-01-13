@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { logger } from '@/api-lib/lib/logger';
 
 interface TelegramConfig {
   botToken: string;
@@ -94,7 +95,7 @@ export class NotificationService {
 
       return response.ok;
     } catch (error) {
-      console.error('Telegram error:', error);
+      logger.error('Telegram error:', error);
       return false;
     }
   }
@@ -128,7 +129,7 @@ export class NotificationService {
         [JSON.stringify(alert)]
       );
     } catch (e) {
-      console.error('Failed to log notification', e);
+      logger.error('Failed to log notification', e);
     }
   }
 }

@@ -39,6 +39,9 @@
 - [x] `sentinel.ts` — Production-grade логирование для мониторинга
 - [x] `SentinelOrchestrator.ts` — Структурированное логирование
 - [x] `AgentOrchestratorV5.ts` — Интеграция logger
+- [x] `ops-logger.ts` — Полный переход на logger (Audit Trail)
+- [x] `ToolRegistry` и инструменты (Orders, Stocks) — Чистый лог
+- [x] `KnowledgeBase` & `StateManager` — Устранены console.error
 
 **Часть 2: Memory Management Integration (COURSE COMPLIANCE)**
 

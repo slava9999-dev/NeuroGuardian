@@ -6,6 +6,7 @@
 // ============================================
 
 import type { z } from 'zod';
+import { logger } from '../../api-lib/lib/logger.js';
 import type { ToolDefinition, ToolResult } from '../../core/types/agent.types.js';
 
 /**
@@ -48,7 +49,7 @@ export class ToolRegistry {
    */
   register<TArgs>(tool: ToolDefinition<TArgs>): void {
     if (this.tools.has(tool.name)) {
-      console.warn(`[ToolRegistry] Overwriting existing tool: ${tool.name}`);
+      logger.warn(`[ToolRegistry] Overwriting existing tool: ${tool.name}`);
     }
     this.tools.set(tool.name, tool as ToolDefinition);
   }

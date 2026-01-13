@@ -1,21 +1,28 @@
 import { z } from 'zod';
+import { logger } from '@/api-lib/lib/logger';
 
 // WB Product Schema
 export const WBProductSchema = z.object({
   nmId: z.number(),
   vendorCode: z.string(),
-  sizes: z.array(z.object({
-    price: z.number().optional(),
-    discountedPrice: z.number().optional(),
-  })).optional(),
+  sizes: z
+    .array(
+      z.object({
+        price: z.number().optional(),
+        discountedPrice: z.number().optional(),
+      })
+    )
+    .optional(),
 });
 
 export const WBCardsResponseSchema = z.object({
   cards: z.array(WBProductSchema).optional().default([]),
-  cursor: z.object({
-    nmId: z.number().optional(),
-    updatedAt: z.string().optional(),
-  }).optional(),
+  cursor: z
+    .object({
+      nmId: z.number().optional(),
+      updatedAt: z.string().optional(),
+    })
+    .optional(),
 });
 
 // Ozon Product Schema
@@ -34,14 +41,10 @@ export const OzonProductListResponseSchema = z.object({
 });
 
 // Safe parser wrapper
-export function safeParseAPI<T>(
-  schema: z.ZodSchema<T>,
-  data: unknown,
-  fallback: T
-): T {
+export function safeParseAPI<T>(schema: z.ZodSchema<T>, data: unknown, fallback: T): T {
   const result = schema.safeParse(data);
   if (!result.success) {
-    console.error('❌ API Validation Error:', result.error.format());
+    logger.error('❌ API Validation Error:', result.error.format());
     return fallback;
   }
   return result.data;

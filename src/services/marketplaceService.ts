@@ -1,6 +1,7 @@
 import { WildberriesClient } from '@/integrations/wildberries/client';
 import { OzonClient } from '@/integrations/ozon/client';
 import { EventEmitter } from 'events';
+import { logger } from '@/api-lib/lib/logger'; // Using alias if available, or relative path
 
 export type Marketplace = 'wildberries' | 'ozon';
 
@@ -144,9 +145,9 @@ export class MarketplaceService extends EventEmitter {
       // But typically services shouldn't hard-depend on specific DB client instance path if it varies.
       // We'll skip DB write here in standard code to avoid compilation error if db module missing.
       // We will implement this properly when connecting PriceProtectionAgent which has db access.
-      console.log(`[MarketplaceService] ${type}`, data);
+      logger.info(`[MarketplaceService] ${type}`, data);
     } catch (e) {
-      console.error('Failed to log event', e);
+      logger.error('Failed to log event', e);
     }
   }
 }

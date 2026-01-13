@@ -164,6 +164,7 @@ export class AgentOrchestratorV5 {
           userState,
           recentHistory,
           isFirstContact: context.isFirstContact,
+          userId: context.userId, // Enable memory context retrieval
         },
         resolvedContext.enrichedMessage
       );

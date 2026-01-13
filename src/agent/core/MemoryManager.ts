@@ -4,6 +4,7 @@
 // ============================================
 
 import { sql } from '../../api-lib/services/database.js';
+import { logger } from '../../api-lib/lib/logger.js';
 import type { AgentMessage } from '../../core/types/index.js';
 
 export type FactType =
@@ -100,7 +101,7 @@ export class MemoryManager {
       `;
       this.tablesChecked = true;
     } catch (error) {
-      console.error('Failed to create memory tables:', error);
+      logger.error('Failed to create memory tables:', error);
     }
   }
 
@@ -115,7 +116,7 @@ export class MemoryManager {
         VALUES (${userId}, ${role}, ${content})
       `;
     } catch (error) {
-      console.error(`Failed to save message for user ${userId}:`, error);
+      logger.error(`Failed to save message for user ${userId}:`, error);
     }
   }
 
@@ -139,7 +140,7 @@ export class MemoryManager {
         userId: row.user_id,
       }));
     } catch (error) {
-      console.error(`Failed to get history for user ${userId}:`, error);
+      logger.error(`Failed to get history for user ${userId}:`, error);
       return [];
     }
   }
@@ -174,7 +175,7 @@ export class MemoryManager {
         `;
       }
     } catch (error) {
-      console.error(`Failed to save fact for user ${userId}:`, error);
+      logger.error(`Failed to save fact for user ${userId}:`, error);
     }
   }
 
@@ -197,7 +198,7 @@ export class MemoryManager {
 
       return result.rows.map((row: { content: string }) => row.content);
     } catch (error) {
-      console.error(`Failed to search facts for user ${userId}:`, error);
+      logger.error(`Failed to search facts for user ${userId}:`, error);
       return [];
     }
   }
@@ -228,7 +229,7 @@ export class MemoryManager {
 
       return preferences;
     } catch (error) {
-      console.error(`Failed to get preferences for user ${userId}:`, error);
+      logger.error(`Failed to get preferences for user ${userId}:`, error);
       return {};
     }
   }
@@ -245,7 +246,7 @@ export class MemoryManager {
         WHERE id = ${factId}
       `;
     } catch (error) {
-      console.error(`Failed to update fact access ${factId}:`, error);
+      logger.error(`Failed to update fact access ${factId}:`, error);
     }
   }
 
@@ -292,7 +293,7 @@ export class MemoryManager {
         )
       `;
     } catch (error) {
-      console.error(`Failed to summarize memory for user ${userId}:`, error);
+      logger.error(`Failed to summarize memory for user ${userId}:`, error);
     }
   }
 
@@ -306,7 +307,7 @@ export class MemoryManager {
       await sql`DELETE FROM memory_facts WHERE user_id = ${userId}`;
       await sql`DELETE FROM memory_summaries WHERE user_id = ${userId}`;
     } catch (error) {
-      console.error(`Failed to clear memory for user ${userId}:`, error);
+      logger.error(`Failed to clear memory for user ${userId}:`, error);
     }
   }
 
@@ -334,7 +335,7 @@ export class MemoryManager {
           : undefined,
       };
     } catch (error) {
-      console.error(`Failed to get memory stats for user ${userId}:`, error);
+      logger.error(`Failed to get memory stats for user ${userId}:`, error);
       return { messageCount: 0, factCount: 0 };
     }
   }

@@ -4,6 +4,7 @@
 // ============================================
 
 import { sql } from './database.js';
+import { logger } from '../lib/logger.js';
 
 // ============================================
 // TYPES
@@ -103,7 +104,8 @@ export interface AuditEntry {
 export async function logOpsEvent(event: OpsEvent): Promise<number | null> {
   // TEMP: Skip DB logging to avoid ECONNRESET errors
   // Just log to console for now
-  console.log(
+  // Just log to console for now
+  logger.info(
     `[OpsLog] ${event.eventType}: ${event.eventSource} - ${JSON.stringify(event.payload || {}).substring(0, 100)}`
   );
   return null;
@@ -139,7 +141,7 @@ export async function logOpsEvent(event: OpsEvent): Promise<number | null> {
 
     return result.rows[0]?.id || null;
   } catch (error) {
-    console.error('Failed to log ops event:', error);
+    logger.error('Failed to log ops event:', error);
     // Don't throw - logging should not break main flow
     return null;
   }
@@ -160,7 +162,7 @@ export async function markEventProcessed(
       WHERE id = ${eventId}
     `;
   } catch (error) {
-    console.error('Failed to mark event processed:', error);
+    logger.error('Failed to mark event processed:', error);
   }
 }
 
@@ -187,7 +189,7 @@ export async function getPendingEvents(
     `;
     return result.rows as Array<{ id: number; payload: Record<string, unknown>; created_at: Date }>;
   } catch (error) {
-    console.error('Failed to get pending events:', error);
+    logger.error('Failed to get pending events:', error);
     return [];
   }
 }
@@ -217,7 +219,7 @@ export async function getUserEvents(
     `;
     return result.rows;
   } catch (error) {
-    console.error('Failed to get user events:', error);
+    logger.error('Failed to get user events:', error);
     return [];
   }
 }
@@ -243,7 +245,7 @@ export async function getEventStats(userId?: number, hours = 24): Promise<Record
     }
     return stats;
   } catch (error) {
-    console.error('Failed to get event stats:', error);
+    logger.error('Failed to get event stats:', error);
     return {};
   }
 }
@@ -273,7 +275,7 @@ export async function getSystemEvents(
     `;
     return result.rows;
   } catch (error) {
-    console.error('Failed to get system events:', error);
+    logger.error('Failed to get system events:', error);
     return [];
   }
 }
@@ -316,7 +318,7 @@ export async function logAudit(entry: AuditEntry): Promise<number | null> {
 
     return result.rows[0]?.id || null;
   } catch (error) {
-    console.error('Failed to log audit entry:', error);
+    logger.error('Failed to log audit entry:', error);
     // Don't throw - audit logging should not break main flow
     return null;
   }
@@ -380,7 +382,7 @@ export async function getAuditTrail(
     `;
     return result.rows;
   } catch (error) {
-    console.error('Failed to get audit trail:', error);
+    logger.error('Failed to get audit trail:', error);
     return [];
   }
 }
@@ -400,7 +402,7 @@ export async function getRecentAuditEntries(limit = 100): Promise<Array<Record<s
     `;
     return result.rows;
   } catch (error) {
-    console.error('Failed to get recent audit entries:', error);
+    logger.error('Failed to get recent audit entries:', error);
     return [];
   }
 }

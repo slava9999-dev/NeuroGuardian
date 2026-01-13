@@ -5,6 +5,7 @@ import {
   fetchWbOrders,
   fetchOzonFbsUnfulfilledOrders,
 } from '../../../api-lib/services/index.js';
+import { logger } from '../../../api-lib/lib/logger.js';
 
 export const getOrdersTool = defineTool({
   name: 'get_orders',
@@ -57,7 +58,7 @@ export const getOrdersTool = defineTool({
           });
         }
       } catch (e) {
-        console.error('Ozon orders error:', e);
+        logger.error('Ozon orders error:', e, { userId });
       }
     }
 
@@ -78,7 +79,7 @@ export const getOrdersTool = defineTool({
           }
         }
       } catch (e) {
-        console.error('WB orders error:', e);
+        logger.error('WB orders error:', e, { userId });
       }
     }
 

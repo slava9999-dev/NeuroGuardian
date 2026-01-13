@@ -8,6 +8,8 @@
 import type { UserState, ChatMessage, ToolDefinition } from '../../core/types/agent.types.js';
 import { toolRegistry } from '../execution/ToolRegistry.js';
 import { knowledgeBase } from './KnowledgeBase.js';
+import { memoryManager } from './MemoryManager.js';
+import { logger } from '../../api-lib/lib/logger.js';
 
 /**
  * Prompt context for building
@@ -17,6 +19,7 @@ interface PromptContext {
   recentHistory: ChatMessage[];
   relevantKnowledge?: string[];
   isFirstContact?: boolean;
+  userId?: number; // For memory retrieval
 }
 
 /**
@@ -50,7 +53,50 @@ export class PromptBuilder {
 ${context}
 </KNOWLEDGE_BASE>`;
     } catch (error) {
-      console.error('RAG Error:', error);
+      logger.warn('RAG Error', { error });
+      return '';
+    }
+  }
+
+  /**
+   * Build memory context from long-term memory
+   * This retrieves stored facts about the user and their business
+   */
+  private async buildMemoryContext(userId: number, query: string): Promise<string> {
+    try {
+      const lines: string[] = [];
+
+      // 1. Get user preferences
+      const preferences = await memoryManager.getUserPreferences(userId);
+      if (Object.keys(preferences).length > 0) {
+        lines.push('## 📝 ПАМЯТЬ О ПОЛЬЗОВАТЕЛЕ');
+        lines.push('Ты помнишь об этом пользователе:');
+        for (const [key, value] of Object.entries(preferences)) {
+          lines.push(`- ${key}: ${value}`);
+        }
+      }
+
+      // 2. Search for relevant facts based on query
+      const relevantFacts = await memoryManager.searchRelevantFacts(userId, query);
+      if (relevantFacts.length > 0) {
+        if (lines.length === 0) {
+          lines.push('## 📝 ПАМЯТЬ О БИЗНЕСЕ');
+        } else {
+          lines.push('');
+          lines.push('### Известные факты:');
+        }
+        for (const fact of relevantFacts.slice(0, 5)) {
+          lines.push(`- ${fact}`);
+        }
+      }
+
+      if (lines.length > 0) {
+        logger.debug('Memory context built', { userId, factsCount: relevantFacts.length });
+      }
+
+      return lines.join('\n');
+    } catch (error) {
+      logger.warn('Memory context error', { error, userId });
       return '';
     }
   }
@@ -98,17 +144,22 @@ ${context}
     // 5. Tool descriptions
     sections.push(toolRegistry.generatePrompt({ includeExamples: true }));
 
-    // 6. Recent history summary
+    // 6. Memory context (long-term facts)
+    if (context.userId) {
+      sections.push(await this.buildMemoryContext(context.userId, query));
+    }
+
+    // 7. Recent history summary
     if (context.recentHistory.length > 0) {
       sections.push(this.buildHistoryContext(context.recentHistory));
     }
 
-    // 7. First contact instructions
+    // 8. First contact instructions
     if (context.isFirstContact) {
       sections.push(FIRST_CONTACT_INSTRUCTIONS);
     }
 
-    // 8. Output format
+    // 9. Output format
     sections.push(PLANNER_OUTPUT_FORMAT);
 
     return sections.filter(Boolean).join('\n\n');

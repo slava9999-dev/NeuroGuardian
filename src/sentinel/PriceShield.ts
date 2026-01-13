@@ -3,6 +3,7 @@
 // Version: 1.1.0 | Date: January 2026
 
 import { sql } from '../api-lib/services/database.js';
+import { logger } from '../api-lib/lib/logger.js';
 import type { DBPriceRule } from '../api-lib/lib/types.js';
 
 export interface PriceRule {
@@ -136,7 +137,7 @@ export class PriceShieldService {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       if (errorMessage.includes('does not exist')) {
-        console.warn('[PriceShield] price_rules table not found, returning empty rules');
+        logger.warn('[PriceShield] price_rules table not found, returning empty rules', { userId });
         return [];
       }
       throw error;

@@ -10,6 +10,7 @@ export {
   ToolNotFoundError,
   ToolValidationError,
 } from './ToolRegistry.js';
+import { logger } from '../../api-lib/lib/logger.js';
 
 // Import all tools
 import { toolRegistry } from './ToolRegistry.js';
@@ -77,10 +78,9 @@ export function registerAllTools(): void {
   // Admin
   toolRegistry.register(getSystemLogsTool);
 
-  console.log(
-    `[ToolRegistry] Registered ${toolRegistry.getStats().total} tools:`,
-    toolRegistry.getNames().join(', ')
-  );
+  logger.info(`[ToolRegistry] Registered ${toolRegistry.getStats().total} tools:`, {
+    tools: toolRegistry.getNames(),
+  });
 }
 
 // Re-export individual tools for direct access

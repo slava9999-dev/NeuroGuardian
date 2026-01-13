@@ -5,6 +5,7 @@
 
 import { promises as fs } from 'fs';
 import path from 'path';
+import { logger } from '../../api-lib/lib/logger.js';
 
 /**
  * Knowledge Document
@@ -50,7 +51,7 @@ export class KnowledgeBase {
         if (process.env.NODE_ENV === 'development') {
           await fs.mkdir(this.itemsPath, { recursive: true });
         } else {
-          console.warn(`[KnowledgeBase] Directory not found: ${this.itemsPath}`);
+          logger.warn(`[KnowledgeBase] Directory not found: ${this.itemsPath}`);
           return;
         }
       }
@@ -71,9 +72,9 @@ export class KnowledgeBase {
       }
 
       this.isLoaded = true;
-      console.log(`[KnowledgeBase] Loaded ${this.docs.length} documents.`);
+      logger.info(`[KnowledgeBase] Loaded ${this.docs.length} documents.`);
     } catch (error) {
-      console.error('[KnowledgeBase] Init error:', error);
+      logger.error('[KnowledgeBase] Init error:', error);
     }
   }
 

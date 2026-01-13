@@ -2,6 +2,7 @@ import type { DBUser, DBProduct } from '../api-lib/lib/types.js';
 import { marketplaceService } from '../api-lib/core-services/MarketplaceService.js';
 import { logSentinelAction } from '../api-lib/services/database.js';
 import { sendAlert } from '../api-lib/services/notifications.js';
+import { logger } from '../api-lib/lib/logger.js';
 import type { SentinelRunResult, UserCycleResult } from './types.js';
 
 export class SentinelDefenseExecutor {
@@ -106,7 +107,7 @@ export class SentinelDefenseExecutor {
       ]);
       updateSuccess = res.success;
     } catch (e) {
-      console.error(`Smart Reprice failed for ${product.product_id}`, e);
+      logger.error(`Smart Reprice failed for ${product.product_id}`, e, { userId: user.id });
     }
 
     if (updateSuccess) {

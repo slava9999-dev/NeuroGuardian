@@ -6,6 +6,7 @@ import {
   fetchOzonStocksV3,
   fetchWbStocks,
 } from '../../../api-lib/services/index.js';
+import { logger } from '../../../api-lib/lib/logger.js';
 
 export const getWarehouseStocksTool = defineTool({
   name: 'get_warehouse_stocks',
@@ -47,7 +48,7 @@ export const getWarehouseStocksTool = defineTool({
           }
         }
       } catch (e) {
-        console.error('Ozon stocks error:', e);
+        logger.error('Ozon stocks error:', e, { userId });
       }
     }
 
@@ -66,7 +67,7 @@ export const getWarehouseStocksTool = defineTool({
           }
         });
       } catch (e) {
-        console.error('WB stocks error:', e);
+        logger.error('WB stocks error:', e, { userId });
       }
     }
 
