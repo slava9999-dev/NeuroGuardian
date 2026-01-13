@@ -127,7 +127,16 @@ describe('Viktor AI Agent LOCAL E2E Tests', () => {
       throw new Error('❌ No LLM API key found! Set GROQ_API_KEY or OPENAI_API_KEY');
     }
 
-    const module = await import('../../src/api-lib/agent/orchestrator-v4.js');
+    // 🩹 FIX: Restore global.fetch (broken by tests/setup.ts)
+    try {
+      const { fetch } = await import('undici');
+      global.fetch = fetch as any;
+      console.log('✅ Global fetch restored using undici');
+    } catch (e) {
+      console.warn('⚠️ Could not restore global.fetch via undici');
+    }
+
+    const module = await import('../../src/api-lib/agent/orchestrator-v4.ts');
     orchestrateV4 = module.orchestrateV4;
   });
 

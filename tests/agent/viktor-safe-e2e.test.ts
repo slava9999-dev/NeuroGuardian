@@ -294,8 +294,21 @@ describe('Viktor AI Agent SAFE E2E Tests', () => {
       throw new Error('❌ No LLM API key found! Set GROQ_API_KEY or OPENAI_API_KEY');
     }
 
+    // 🩹 FIX: Restore global.fetch (broken by tests/setup.ts)
+    // We need real network access for LLM calls!
+    try {
+      const { fetch } = await import('undici');
+      global.fetch = fetch as any;
+      console.log('✅ Global fetch restored using undici');
+    } catch (e) {
+      console.warn('⚠️ Could not restore global.fetch via undici, trying node native');
+      // Node 18+ has native fetch, but overwritten by setup.ts mock.
+      // If undici fails, we might be stuck unless we use node-fetch or similar.
+    }
+
     // Import orchestrator
-    const module = await import('../../src/api-lib/agent/orchestrator-v4.js');
+    // Use .ts extension to ensure we test source code
+    const module = await import('../../src/api-lib/agent/orchestrator-v4.ts');
     orchestrateV4 = module.orchestrateV4;
   });
 
