@@ -723,7 +723,7 @@ export function SettingsPage({
           <div className="flex items-center justify-between mb-2">
             <span className="text-white font-medium">
               {user?.subscriptionPlan === 'trial'
-                ? '🎁 Пробный период (3 дня)'
+                ? '🎁 Тест-драйв (7 дней бесплатно)'
                 : user?.subscriptionPlan === 'yearly'
                   ? '💎 Годовой Pro'
                   : user?.subscriptionPlan === 'pro'

@@ -1,7 +1,7 @@
 // ============================================
 // NeuroGUARDIAN — Agent Orchestrator v5
 // Professional multi-agent architecture
-// Version: 5.0.0 | Date: January 2026
+// Version: 5.2.0 | Date: January 2026
 // ============================================
 
 import type {
@@ -16,6 +16,8 @@ import { stateManager } from './StateManager.js';
 import { contextResolver } from './ContextResolver.js';
 import { promptBuilder } from './PromptBuilder.js';
 import { memoryManager } from './MemoryManager.js';
+import { experienceLearning } from './ExperienceLearning.js';
+import { responseValidator } from './ResponseValidator.js';
 import { toolRegistry } from '../execution/ToolRegistry.js';
 import { llmRouter } from '../../infrastructure/llm/LLMRouter.js';
 import { logger } from '../../api-lib/lib/logger.js';
@@ -214,6 +216,43 @@ export class AgentOrchestratorV5 {
       tokensUsed += answer.tokensUsed;
 
       // ========================================
+      // PHASE 4.5: Response Validation (Guardrails)
+      // ========================================
+      let finalMessage = answer.message;
+
+      try {
+        const validation = await responseValidator.validate(answer.message, {
+          userQuery: message,
+          toolResults: toolResults.map(t => ({
+            tool: t.tool,
+            success: t.success,
+            data: t.data,
+          })),
+          marketplace:
+            userState.marketplace === 'WB'
+              ? 'wb'
+              : userState.marketplace === 'Ozon'
+                ? 'ozon'
+                : undefined,
+        });
+
+        if (!validation.isValid) {
+          logger.warn('[Orchestrator] Response failed validation', {
+            score: validation.score,
+            issues: validation.issues.length,
+          });
+
+          // Use corrected response if available
+          if (validation.correctedResponse) {
+            finalMessage = validation.correctedResponse;
+          }
+        }
+      } catch (validationError) {
+        logger.warn('[Orchestrator] Validation failed', { error: validationError });
+        // Continue with original response
+      }
+
+      // ========================================
       // PHASE 5: State Update
       // ========================================
       await this.updateStateAfterResponse(context.userId, message, plan, toolResults);
@@ -222,16 +261,34 @@ export class AgentOrchestratorV5 {
       // MEMORY: Save assistant response & extract facts
       // ========================================
       if (this.memoryEnabled) {
-        await memoryManager.saveMessage(context.userId, 'assistant', answer.message);
-        await this.extractAndSaveFacts(context.userId, message, answer.message, toolResults);
+        await memoryManager.saveMessage(context.userId, 'assistant', finalMessage);
+        await this.extractAndSaveFacts(context.userId, message, finalMessage, toolResults);
         logger.debug('Memory: assistant response saved', { userId: context.userId });
+      }
+
+      // ========================================
+      // EXPERIENCE LEARNING: Analyze interaction
+      // ========================================
+      try {
+        // Get previous assistant message for correction detection
+        const previousMessages = await memoryManager.getRecentHistory(context.userId, 3);
+        const previousAgentMessage = previousMessages.find(m => m.role === 'assistant')?.content;
+
+        await experienceLearning.analyzeInteraction(
+          context.userId,
+          message,
+          finalMessage,
+          previousAgentMessage
+        );
+      } catch (learnError) {
+        logger.warn('Experience learning failed', { error: learnError });
       }
 
       // ========================================
       // Build Result
       // ========================================
       return this.buildResult(
-        answer.message,
+        finalMessage,
         answer.links,
         answer.actions,
         plan.tools.map(t => t.tool),

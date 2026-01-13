@@ -127,13 +127,31 @@ export function SubscriptionPage({ onBack }: SubscriptionPageProps) {
       </div>
 
       <div className="relative z-10 p-4 max-w-lg mx-auto space-y-6">
+        {/* Trial Banner */}
+        {user?.subscriptionPlan === 'trial' && (
+          <div className="bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-red-500/20 border border-amber-500/30 rounded-2xl p-4 text-center">
+            <div className="text-3xl mb-2">🎁</div>
+            <h2 className="text-xl font-bold text-white mb-1">Тест-драйв активен!</h2>
+            <p className="text-amber-300 text-sm">
+              У вас <strong>7 дней бесплатного</strong> доступа ко всем функциям
+            </p>
+            {user?.subscriptionExpiresAt && (
+              <p className="text-xs text-stone-400 mt-2">
+                Осталось до: {new Date(user.subscriptionExpiresAt).toLocaleDateString('ru-RU')}
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Current Status */}
         <div className="bg-gradient-to-br from-violet-500/10 to-purple-500/10 border border-violet-500/20 rounded-2xl p-4">
           <div className="flex justify-between items-start mb-2">
             <div>
               <p className="text-stone-400 text-sm">Текущий план</p>
               <h3 className="text-xl font-bold text-white capitalize">
-                {user?.subscriptionPlan || 'Free'}
+                {user?.subscriptionPlan === 'trial'
+                  ? '🎁 Тест-драйв'
+                  : user?.subscriptionPlan || 'Free'}
               </h3>
             </div>
             {user?.subscriptionActive && (
@@ -142,7 +160,7 @@ export function SubscriptionPage({ onBack }: SubscriptionPageProps) {
               </span>
             )}
           </div>
-          {user?.subscriptionExpiresAt && (
+          {user?.subscriptionExpiresAt && user?.subscriptionPlan !== 'trial' && (
             <p className="text-xs text-stone-500 mt-2">
               Истекает: {new Date(user.subscriptionExpiresAt).toLocaleDateString()}
             </p>

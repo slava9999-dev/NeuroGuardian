@@ -2,13 +2,14 @@
 // NeuroGUARDIAN — Dynamic Prompt Builder
 // Assembles prompts dynamically from modules
 // Reduces token usage by 70%
-// Version: 5.0.0 | Date: January 2026
+// Version: 5.1.0 | Date: January 2026
 // ============================================
 
 import type { UserState, ChatMessage, ToolDefinition } from '../../core/types/agent.types.js';
 import { toolRegistry } from '../execution/ToolRegistry.js';
 import { knowledgeBase } from './KnowledgeBase.js';
 import { memoryManager } from './MemoryManager.js';
+import { experienceLearning } from './ExperienceLearning.js';
 import { logger } from '../../api-lib/lib/logger.js';
 
 /**
@@ -149,17 +150,27 @@ ${context}
       sections.push(await this.buildMemoryContext(context.userId, query));
     }
 
-    // 7. Recent history summary
+    // 7. Experience Learning context (learn from past mistakes!)
+    try {
+      const learningContext = await experienceLearning.generateLearningContext(query);
+      if (learningContext) {
+        sections.push(learningContext);
+      }
+    } catch (error) {
+      logger.warn('Failed to get learning context', { error });
+    }
+
+    // 8. Recent history summary
     if (context.recentHistory.length > 0) {
       sections.push(this.buildHistoryContext(context.recentHistory));
     }
 
-    // 8. First contact instructions
+    // 9. First contact instructions
     if (context.isFirstContact) {
       sections.push(FIRST_CONTACT_INSTRUCTIONS);
     }
 
-    // 9. Output format
+    // 10. Output format
     sections.push(PLANNER_OUTPUT_FORMAT);
 
     return sections.filter(Boolean).join('\n\n');

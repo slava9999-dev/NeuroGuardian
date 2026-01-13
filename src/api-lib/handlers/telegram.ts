@@ -202,25 +202,62 @@ async function ensureUserExists(telegramUser: TelegramUser): Promise<number> {
 // COMMAND HANDLERS
 // ============================================
 
+async function sendTelegramPhoto(
+  chatId: number,
+  photoUrl: string,
+  caption?: string,
+  options?: { parseMode?: 'Markdown' | 'HTML'; replyMarkup?: object }
+): Promise<boolean> {
+  try {
+    const token = getBotToken();
+    const response = await fetch(`${TELEGRAM_API}${token}/sendPhoto`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        photo: photoUrl,
+        caption,
+        parse_mode: options?.parseMode || 'HTML',
+        reply_markup: options?.replyMarkup,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      logger.error('Telegram sendPhoto error', { error, chatId });
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    logger.error('Failed to send Telegram photo', error);
+    return false;
+  }
+}
+
 async function handleStartCommand(chatId: number, user: TelegramUser): Promise<void> {
   await ensureUserExists(user);
 
   const webAppUrl = process.env.WEBAPP_URL || 'https://neuro-guardian.vercel.app';
+  const bannerUrl = `${webAppUrl}/viktor_welcome_banner.png`;
+
+  // Отправляем приветственный баннер
+  await sendTelegramPhoto(chatId, bannerUrl);
 
   const welcomeMessage = `
 👋 <b>Привет, ${user.first_name}!</b>
 
-Я <b>Viktor</b> — ваш AI-помощник для управления магазином на Wildberries и Ozon.
+Я <b>Виктор</b> — ваш AI-защитник бизнеса на Wildberries и Ozon.
 
-🎯 <b>Что я умею:</b>
-• 📊 Показывать статистику продаж
-• 🛡️ Защищать маржу от принудительных акций
-• 💰 Управлять ценами автоматически
-• 📈 Анализировать тренды и конкурентов
+🛡️ <b>Что я делаю:</b>
+• Защищаю от принудительных скидок маркетплейсов
+• Мониторю цены конкурентов 24/7
+• Управляю ценами автоматически
+• Отправляю умные уведомления о проблемах
 
 🎁 <b>У вас 7 дней бесплатного доступа!</b>
 
-Напишите мне что-нибудь или нажмите кнопку ниже, чтобы открыть полное приложение.
+Напишите мне вопрос или откройте приложение:
 `;
 
   await sendTelegramMessage(chatId, welcomeMessage, {
@@ -229,7 +266,7 @@ async function handleStartCommand(chatId: number, user: TelegramUser): Promise<v
       inline_keyboard: [
         [
           {
-            text: '🚀 Открыть приложение',
+            text: '🚀 Открыть Виктора',
             web_app: { url: webAppUrl },
           },
         ],
@@ -239,8 +276,8 @@ async function handleStartCommand(chatId: number, user: TelegramUser): Promise<v
             callback_data: 'help',
           },
           {
-            text: '⚙️ Настройки',
-            callback_data: 'settings',
+            text: '📊 Статус',
+            callback_data: 'status',
           },
         ],
       ],
