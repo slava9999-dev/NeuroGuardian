@@ -1,6 +1,6 @@
 // ============================================
 // NeuroGUARDIAN — Calculate Unit Economics Tool
-// Version: 5.0.0 | Date: January 2026
+// Version: 5.0.1 | Date: January 2026
 // ============================================
 
 import { z } from 'zod';
@@ -36,7 +36,7 @@ type CalculateUnitEconomicsArgs = z.infer<typeof CalculateUnitEconomicsArgsSchem
 export const calculateUnitEconomicsTool = defineTool<CalculateUnitEconomicsArgs>({
   name: 'calculate_unit_economics',
   description:
-    'Рассчитать прибыль с товара с учётом ВСЕХ комиссий маркетплейса: комиссия, логистика, хранение, эквайринг.',
+    'Рассчитать прибыль с товара с учётом ВСЕХ комиссий маркетплейса: комиссия, логистика, хранение, эквайринг, Ozon Card.',
   schema: CalculateUnitEconomicsArgsSchema,
   category: 'analyze',
   requiresConfirmation: false,
@@ -48,58 +48,17 @@ export const calculateUnitEconomicsTool = defineTool<CalculateUnitEconomicsArgs>
 
   async execute(userId, args) {
     try {
-      // Inline profit calculation
-      const calculateProfitBreakdown = (params: {
-        sellingPrice: number;
-        costPrice: number;
-        marketplace: 'WB' | 'Ozon';
-        category?: string;
-      }) => {
-        const { sellingPrice, costPrice, marketplace } = params;
+      const { calculateUnitEconomics } =
+        await import('../../../api-lib/services/unit-economics.js');
+      const { getProductsByUserId } = await import('../../../api-lib/services/database.js');
 
-        // Commission rates by marketplace (average)
-        const commissionPercent = marketplace === 'WB' ? 15 : 18;
-        const commission = Math.round((sellingPrice * commissionPercent) / 100);
-
-        // Logistics (average FBO)
-        const logistics = marketplace === 'WB' ? 100 : 150;
-
-        // Storage (per month, approximate)
-        const storage = 20;
-
-        // Acquiring
-        const acquiring = Math.round(sellingPrice * 0.02);
-
-        // Ozon Card discount (seller pays 5%)
-        const ozonCard = marketplace === 'Ozon' ? Math.round(sellingPrice * 0.05) : 0;
-
-        const totalFees = commission + logistics + storage + acquiring + ozonCard;
-        const totalFeePercent = Math.round((totalFees / sellingPrice) * 100);
-        const netProfit = sellingPrice - costPrice - totalFees;
-        const profitMarginPercent = Math.round((netProfit / sellingPrice) * 100);
-
-        return {
-          commission,
-          commissionPercent,
-          logistics,
-          storage,
-          acquiring,
-          ozonCard,
-          totalFees,
-          totalFeePercent,
-          netProfit,
-          profitMarginPercent,
-        };
-      };
-
-      let product = null;
+      let product: DBProduct | undefined;
       let costPrice = args.cost_price;
       let sellingPrice = args.selling_price;
       let marketplace: 'WB' | 'Ozon' = args.marketplace || 'WB';
 
       // Find product if product_id provided
       if (args.product_id) {
-        const { getProductsByUserId } = await import('../../../api-lib/services/database.js');
         const products = await getProductsByUserId(userId);
         product = products.find(
           (p: DBProduct) => p.product_id === args.product_id || String(p.nm_id) === args.product_id
@@ -137,16 +96,20 @@ export const calculateUnitEconomicsTool = defineTool<CalculateUnitEconomicsArgs>
         };
       }
 
-      // Calculate profit breakdown
-      const breakdown = calculateProfitBreakdown({
-        sellingPrice,
-        costPrice,
-        marketplace,
-        category: product?.category || 'general',
+      // Calculate using REAL service
+      // This ensures 2025 rates, Ozon Card logic, and category-specific commissions are used
+      const result = calculateUnitEconomics({
+        price: sellingPrice,
+        costPrice: costPrice,
+        marketplace: marketplace,
+        category: product?.category || undefined, // Service handles category matching
+        // Defaults from service will be used for logistics/storage if not specific
+        fulfillmentType: 'fbo',
+        useOzonCard: true, // Always calculate hidden Ozon Card costs
       });
 
       // Determine profitability status
-      const marginPercent = breakdown.profitMarginPercent;
+      const marginPercent = result.margin;
       let status: 'profitable' | 'marginal' | 'loss';
       let recommendation: string;
 
@@ -161,11 +124,11 @@ export const calculateUnitEconomicsTool = defineTool<CalculateUnitEconomicsArgs>
         recommendation = 'Низкая маржа. Рекомендую поднять цену или снизить себестоимость.';
       } else {
         status = 'loss';
-        recommendation = `УБЫТОК! При каждой продаже теряете ${Math.abs(breakdown.netProfit)}₽. Срочно поднимите цену!`;
+        recommendation = `УБЫТОК! При каждой продаже теряете ${Math.abs(result.profit)}₽. Срочно поднимите цену!`;
       }
 
-      // Calculate break-even price
-      const breakEvenPrice = Math.ceil(costPrice / (1 - breakdown.totalFeePercent / 100));
+      // Format warnings
+      const warningMessages = result.warnings.map(w => w.message).join('\n⚠️ ');
 
       return {
         success: true,
@@ -178,29 +141,33 @@ export const calculateUnitEconomicsTool = defineTool<CalculateUnitEconomicsArgs>
               }
             : null,
           calculation: {
-            selling_price: sellingPrice,
-            cost_price: costPrice,
+            selling_price: result.revenue,
+            cost_price: result.costPrice,
             marketplace: marketplace,
 
             // Fee breakdown
             fees: {
-              commission: breakdown.commission,
-              commission_percent: breakdown.commissionPercent,
-              logistics: breakdown.logistics,
-              storage: breakdown.storage,
-              acquiring: breakdown.acquiring,
-              ozon_card: marketplace === 'Ozon' ? breakdown.ozonCard : 0,
-              total_fees: breakdown.totalFees,
-              total_fee_percent: breakdown.totalFeePercent,
+              commission: result.commission,
+              commission_percent: Math.round(result.commissionRate * 100),
+              logistics: result.logistics,
+              storage: result.storage,
+              acquiring: result.acquiring,
+              ozon_card: result.ozonCardCosts,
+              packaging: result.packagingCost,
+              total_fees: result.totalCosts - result.costPrice, // Fees including packaging
+              total_fee_percent: Math.round(
+                ((result.totalCosts - result.costPrice) / result.revenue) * 100
+              ),
             },
 
             // Result
-            net_profit: breakdown.netProfit,
-            profit_margin_percent: marginPercent,
-            break_even_price: breakEvenPrice,
+            net_profit: result.profit,
+            profit_margin_percent: result.margin,
+            break_even_price: result.minSafePrice,
           },
           status,
-          recommendation,
+          recommendation:
+            recommendation + (warningMessages ? `\n\n⚠️ WARN: ${warningMessages}` : ''),
         },
       };
     } catch (error) {
