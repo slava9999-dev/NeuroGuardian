@@ -113,14 +113,11 @@ function getAuthHeaders(): HeadersInit {
 
   if (initData) {
     headers['X-Init-Data'] = initData;
-    console.log('🔐 Using Telegram initData');
   } else if (import.meta.env.VITE_DEV_MODE === 'true' && import.meta.env.VITE_ADMIN_API_KEY) {
     // Dev mode: use admin key
     headers['X-Admin-Key'] = import.meta.env.VITE_ADMIN_API_KEY;
-    console.log('🔐 Using Admin API Key');
-  } else {
-    console.warn('⚠️ No auth method available!');
   }
+  // Note: No warning for missing auth - handled by API response
 
   return headers;
 }
