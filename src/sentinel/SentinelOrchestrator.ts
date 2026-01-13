@@ -28,6 +28,25 @@ export class SentinelOrchestrator {
    * Run a full cycle for all users
    */
   async runCycle(): Promise<SentinelRunResult> {
+    // Check Emergency Stop
+    try {
+      const flags =
+        await sql`SELECT value_bool FROM system_flags WHERE key = 'sentinel_emergency_stop'`;
+      if (flags.rows[0]?.value_bool) {
+        console.warn('⚠️ SENTINEL EMERGENCY STOP ACTIVE. Cycle aborted.');
+        return {
+          usersProcessed: 0,
+          threatsDetected: 0,
+          actionsTaken: 0,
+          errors: ['EMERGENCY STOP ACTIVE'],
+          productsScanned: { wb: 0, ozon: 0 },
+          defenseDetails: [],
+        };
+      }
+    } catch {
+      /* ignore if table missing */
+    }
+
     const result: SentinelRunResult = {
       usersProcessed: 0,
       threatsDetected: 0,
@@ -295,6 +314,7 @@ export class SentinelOrchestrator {
     const time = new Date().toLocaleTimeString('ru-RU', {
       hour: '2-digit',
       minute: '2-digit',
+      second: '2-digit',
       timeZone: 'Europe/Moscow',
     });
     const wbScanned = result.productsScanned?.wb || 0;
@@ -304,7 +324,7 @@ export class SentinelOrchestrator {
     let statusEmoji = '🟢',
       statusText = 'Система штатно';
     if (hasErrors) {
-      statusEmoji = '🔴';
+      statusEmoji = '🛑';
       statusText = 'Есть ошибки';
     } else if (hasActions) {
       statusEmoji = '⚔️';
@@ -315,10 +335,11 @@ export class SentinelOrchestrator {
       `🎩 ИТОГИ ЦИКЛА`,
       `⏰ ${time} (МСК)`,
       ``,
-      `${statusEmoji} *${statusText}*`,
+      `${statusEmoji} ${statusText}`,
       ``,
       `👥 Магазинов: ${result.usersProcessed}`,
-      `📦 Товаров: ${totalScanned}`,
+      `📦 Проверено: ${totalScanned}`,
+      `⚠️ Угроз: ${result.threatsDetected}`,
       hasActions ? `⚔️ Отражено: ${result.actionsTaken}` : '',
       hasErrors ? `❌ Ошибок: ${result.errors.length}` : '',
       ``,

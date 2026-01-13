@@ -23,35 +23,51 @@ export class SentinelReportGenerator {
       timeZone: 'Europe/Moscow',
     });
 
-    let statusEmoji = '🟢',
-      statusText = 'Всё в порядке';
+    // 1. HEADER & STATUS
+    let headerEmoji = '🛡️';
+    let statusHeader = 'Ваш магазин под защитой';
+    let statusDetail = 'Угроз не обнаружено. Цены и остатки в норме.';
+
     if (hasErrors) {
-      statusEmoji = '🔴';
-      statusText = 'Есть ошибки';
+      headerEmoji = '🚨';
+      statusHeader = 'Требуется внимание';
+      statusDetail = 'При проверке возникли ошибки подключения.';
     } else if (hasActions) {
-      statusEmoji = '⚔️';
-      statusText = 'Защита сработала!';
+      headerEmoji = '⚔️';
+      statusHeader = 'Атака отражена';
+      statusDetail = 'NeuroGuardian скорректировал цены для защиты выручки.';
     } else if (hasThreats) {
-      statusEmoji = '🟡';
-      statusText = 'Угрозы обнаружены';
+      headerEmoji = '⚠️';
+      statusHeader = 'Обнаружены риски';
+      statusDetail = 'Зафиксированы изменения у конкурентов или в рынке.';
     }
 
-    const message = [
-      `🛡️ *Отчёт по магазину*`,
-      `⏰ ${time} (МСК)`,
+    const reportLines = [
+      `${headerEmoji} *${statusHeader}*`,
+      `🕒 ${time} (МСК)`,
       ``,
-      `${statusEmoji} *${statusText}*`,
+      `${statusDetail}`,
       ``,
-      `📦 Проверено: ${totalScanned}`,
-      hasThreats ? `⚠️ Угроз: ${userResult.threatsDetected}` : '',
-      hasActions ? `⚔️ Защищено: ${userResult.actionsTaken}` : '',
-      hasErrors ? `❌ Ошибок: ${userResult.errors.length}` : '',
-      ``,
-      `_Следующая проверка через 30 мин_`,
-    ]
-      .filter(Boolean)
-      .join('\n');
+      `*Мониторинг:*`,
+      `📦 Всего товаров: ${totalScanned}`,
+    ];
 
-    return message;
+    if (userResult.productsScanned.wb > 0)
+      reportLines.push(` • Wildberries: ${userResult.productsScanned.wb}`);
+    if (userResult.productsScanned.ozon > 0)
+      reportLines.push(` • Ozon: ${userResult.productsScanned.ozon}`);
+
+    if (hasSomething) {
+      reportLines.push(``);
+      reportLines.push(`*События:*`);
+      if (hasThreats) reportLines.push(`⚠️ Рисков: ${userResult.threatsDetected}`);
+      if (hasActions) reportLines.push(`⚔️ Защищено: ${userResult.actionsTaken}`);
+      if (hasErrors) reportLines.push(`❌ Ошибок: ${userResult.errors.length}`);
+    }
+
+    reportLines.push(``);
+    reportLines.push(`_Следующая проверка через 30 мин_`);
+
+    return reportLines.join('\n');
   }
 }

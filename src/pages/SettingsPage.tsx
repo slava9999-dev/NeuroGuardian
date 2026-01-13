@@ -830,16 +830,33 @@ export function SettingsPage({
       )}
 
       {/* App info */}
-      <section className="text-center text-stone-500 text-sm">
-        <p>NeuroAgent v2.4.0</p>
-        <p>AI-ассистент для селлеров</p>
+      <section className="text-center text-stone-500 text-sm pb-8">
+        <p className="opacity-50">NeuroAgent v3.0.0 (GodMode Ready)</p>
+        <p className="opacity-30 text-xs">AI-ассистент для селлеров</p>
 
+        {/* Existing Ops Panel Link */}
         {onNavigate && (
           <button
             onClick={() => onNavigate('ops')}
-            className="mt-4 text-xs opacity-30 hover:opacity-100 transition-opacity"
+            className="mt-4 text-xs opacity-20 hover:opacity-100 transition-opacity uppercase tracking-widest mr-4"
           >
-            Admin Panel
+            OPS
+          </button>
+        )}
+
+        {/* HIDDEN GOD MODE ENTRY POINT */}
+        {/* Only visible for specific Admin IDs (Hardcoded + Env check on backend) */}
+        {onNavigate && user?.telegramId && [7548070478].includes(user.telegramId) && (
+          <button
+            onClick={() => {
+              hapticFeedback('heavy');
+              // Use a direct window location change or a router push if onNavigate supports arbitrary strings
+              // Assuming onNavigate maps to setCurrentPage in App.tsx which handles 'god-mode'
+              onNavigate('god-mode');
+            }}
+            className="mt-4 text-xs font-bold text-violet-500/50 hover:text-violet-500 transition-colors uppercase tracking-widest"
+          >
+            GOD_MODE
           </button>
         )}
       </section>

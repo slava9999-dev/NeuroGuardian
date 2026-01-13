@@ -80,12 +80,19 @@ export async function triggerN8nWorkflow(
   webhookPath: string,
   payload: N8nActionPayload
 ): Promise<boolean> {
+  // N8N DISABLED ARCHITECTURALLY
+  // eslint-disable-next-line no-constant-condition
+  if (true) {
+    if (process.env.DEBUG_N8N) console.log(`[Skipped] n8n trigger: ${webhookPath}`);
+    return false;
+  }
+
   if (!N8N_URL) {
     console.warn('N8N_WEBHOOK_URL not defined, skipping n8n trigger');
     return false;
   }
 
-  const url = `${N8N_URL.replace(/\/$/, '')}/${webhookPath.replace(/^\//, '')}`;
+  const url = `${N8N_URL!.replace(/\/$/, '')}/${webhookPath.replace(/^\//, '')}`;
   const startTime = Date.now();
 
   try {
@@ -124,7 +131,8 @@ export async function triggerN8nWorkflow(
     }
 
     return success;
-  } catch (error) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } catch (error: any) {
     console.error('Error triggering n8n workflow:', error);
 
     await logOpsEvent({

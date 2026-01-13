@@ -26,6 +26,9 @@ const OpsPanelPage = lazy(() =>
 const SubscriptionPage = lazy(() =>
   import('./pages/SubscriptionPage').then(m => ({ default: m.SubscriptionPage }))
 );
+const GodModePage = lazy(() =>
+  import('./pages/GodModePage').then(m => ({ default: m.GodModePage }))
+);
 
 // Loading screen with agent branding
 function LoadingScreen() {
@@ -111,7 +114,7 @@ const DEV_USER: User = {
 };
 
 // Pages enum - Agent is first!
-type Page = 'agent' | 'products' | 'settings' | 'info' | 'ops' | 'subscription';
+type Page = 'agent' | 'products' | 'settings' | 'info' | 'ops' | 'subscription' | 'god-mode';
 
 function App() {
   const setUser = useAppStore(state => state.setUser);
@@ -125,7 +128,9 @@ function App() {
     const pageParam = params.get('page') as Page;
     if (
       pageParam &&
-      ['agent', 'products', 'settings', 'info', 'ops', 'subscription'].includes(pageParam)
+      ['agent', 'products', 'settings', 'info', 'ops', 'subscription', 'god-mode'].includes(
+        pageParam
+      )
     ) {
       return pageParam;
     }
@@ -225,6 +230,7 @@ function App() {
   const goToSettings = () => setCurrentPage('settings');
   const goToInfo = () => setCurrentPage('info');
   const goToOps = () => setCurrentPage('ops');
+  const goToGodMode = () => setCurrentPage('god-mode');
 
   if (!isInitialized || isLoading) {
     return <LoadingScreen />;
@@ -260,12 +266,19 @@ function App() {
         {currentPage === 'agent' && <AgentPage />}
         {currentPage === 'products' && <ProductsPage onBack={goToAgent} />}
         {currentPage === 'settings' && (
-          <SettingsPage onBack={goToAgent} onNavigate={p => (p === 'ops' ? goToOps() : null)} />
+          <SettingsPage
+            onBack={goToAgent}
+            onNavigate={p => {
+              if (p === 'ops') goToOps();
+              if (p === 'god-mode') goToGodMode();
+            }}
+          />
         )}
         {currentPage === 'info' && <LegalPage onBack={goToAgent} />}
         {currentPage === 'info' && <LegalPage onBack={goToAgent} />}
         {currentPage === 'ops' && <OpsPanelPage onBack={goToAgent} />}
         {currentPage === 'subscription' && <SubscriptionPage onBack={goToSettings} />}
+        {currentPage === 'god-mode' && <GodModePage />}
       </Suspense>
 
       {/* Bottom Tab Bar - Simplified */}

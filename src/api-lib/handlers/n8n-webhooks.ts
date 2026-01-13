@@ -160,10 +160,11 @@ export async function handleN8nSyncProducts(
               if (result.success && result.data) {
                 const wbProducts = result.data;
                 const productsToSave = wbProducts.map(p => ({
+                  product_id: p.product_id,
                   nm_id: p.nm_id,
                   title: p.title,
-                  price: p.current_price,
-                  stocks: p.current_stock,
+                  current_price: p.current_price,
+                  current_stock: p.current_stock,
                   image_url: p.image_url,
                   marketplace: 'WB' as const,
                 }));
@@ -203,10 +204,11 @@ export async function handleN8nSyncProducts(
               if (result.success && result.data) {
                 const ozonProducts = result.data;
                 const productsToSave = ozonProducts.map(p => ({
-                  offer_id: p.product_id,
+                  product_id: p.product_id,
+                  offer_id: p.product_id.replace('ozon-', ''), // Fix: offer_id should be without prefix
                   title: p.title,
-                  price: p.current_price,
-                  stocks: p.current_stock,
+                  current_price: p.current_price,
+                  current_stock: p.current_stock,
                   image_url: p.image_url,
                   marketplace: 'Ozon' as const,
                 }));
@@ -362,7 +364,7 @@ export async function handleN8nGetStats(req: VercelRequest, res: VercelResponse)
     const usersResult = await sql`SELECT COUNT(*) as count FROM users`;
     const productsResult = await sql`SELECT COUNT(*) as count FROM products`;
 
-    let eventsResult: any = { rows: [] };
+    let eventsResult: { rows: Array<{ event_type: string; count: string }> } = { rows: [] };
     try {
       const result = await sql`
         SELECT event_type, COUNT(*) as count 
@@ -370,15 +372,17 @@ export async function handleN8nGetStats(req: VercelRequest, res: VercelResponse)
         WHERE created_at > NOW() - INTERVAL '24 hours'
         GROUP BY event_type
       `;
-      eventsResult = result;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      eventsResult = result as any;
     } catch {
       // Table might not exist yet
     }
 
-    let rulesResult: any = { rows: [{ count: '0' }] };
+    let rulesResult: { rows: Array<{ count: string }> } = { rows: [{ count: '0' }] };
     try {
       const result = await sql`SELECT COUNT(*) as count FROM price_rules WHERE active = true`;
-      rulesResult = result;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      rulesResult = result as any;
     } catch {
       // Table might not exist yet
     }
