@@ -19,6 +19,21 @@
 - `docs/MEMORY_MANAGEMENT.md` — 🆕 Документация Memory Management
   - `scripts/verify-agent-v5.ts` — верификация
 
+### Session 2026-01-13 (Session 48 - Ozon V5 & Notifications) 🛡️
+
+**Fixing Auto-Defense & Ozon API V5:**
+
+> ✅ **SUCCESS:** Ozon Service now correctly parses V5 API price objects. Agent notifications reliably confirm defense actions.
+
+- [x] **OZON API V5 FIX**: `OzonService.ts` updated to handle nested price objects `{ price: { price: "..." } }` returned by the new V5 endpoint. Previously this caused "0" prices.
+- [x] **NOTIFICATION TONE**: Updated `notifications.ts` prompt. The agent now explicitly _confirms_ price protection actions ("I updated the price") instead of recommending them.
+- [x] **DIAGNOSIS**: Validated API response structure using ephemeral debug scripts.
+
+**Files Modified:**
+
+- `src/api-lib/core-services/OzonService.ts`
+- `src/api-lib/services/notifications.ts`
+
 ### Session 2026-01-13 (Session 47 - Critical Audit + Memory Integration) 🔬
 
 **Глубокий критический аудит, рефакторинг логирования и интеграция памяти:**

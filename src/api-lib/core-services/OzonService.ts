@@ -267,8 +267,19 @@ export class OzonService {
         const items = data.result?.items || data.items || [];
 
         for (const p of items) {
-          const actualPrice = parseFloat(p.marketing_price || p.price || '0');
-          if (p.product_id && actualPrice > 0) {
+          let actualPrice = 0;
+          // V5 API returns price as an object { price: number, marketing_seller_price: number, ... }
+          if (p.price && typeof p.price === 'object') {
+            const inner = p.price;
+            actualPrice = parseFloat(
+              String(inner.price || inner.marketing_seller_price || inner.marketing_price || '0')
+            );
+          } else {
+            // Fallback for older formats
+            actualPrice = parseFloat(String(p.marketing_price || p.price || '0'));
+          }
+
+          if (p.product_id && !isNaN(actualPrice) && actualPrice > 0) {
             priceMap.set(p.product_id, Math.round(actualPrice));
           }
         }
