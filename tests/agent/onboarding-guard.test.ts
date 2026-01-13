@@ -15,6 +15,12 @@ vi.mock('../../src/api-lib/lib/index', () => ({
   checkRateLimit: vi.fn().mockResolvedValue({ allowed: true }),
   isSubscriptionActive: vi.fn().mockReturnValue(true),
   getSecret: vi.fn(),
+  logger: {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
 }));
 
 // 3. Mock Middleware

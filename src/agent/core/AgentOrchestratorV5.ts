@@ -17,6 +17,7 @@ import { contextResolver } from './ContextResolver.js';
 import { promptBuilder } from './PromptBuilder.js';
 import { toolRegistry } from '../execution/ToolRegistry.js';
 import { llmRouter } from '../../infrastructure/llm/LLMRouter.js';
+import { logger } from '../../api-lib/lib/logger.js';
 
 import type { LLMMessage } from '../../infrastructure/llm/LLMProvider.js';
 
@@ -73,7 +74,7 @@ export class AgentOrchestratorV5 {
       answeringTimeMs: 0,
     };
 
-    console.log(`[Orchestrator V5] Starting for user ${context.userId}`);
+    logger.debug('Orchestrator V5 starting', { userId: context.userId });
 
     try {
       // ========================================
@@ -87,7 +88,7 @@ export class AgentOrchestratorV5 {
         resolvedContext.directExecution = context.directExecution;
       }
 
-      console.log(`[Orchestrator V5] Context resolved:`, {
+      logger.debug('Context resolved', {
         isContextual: resolvedContext.isContextualResponse,
         type: resolvedContext.responseType,
         directExecution: !!resolvedContext.directExecution,
@@ -173,7 +174,7 @@ export class AgentOrchestratorV5 {
       }
 
       const plan = planResult.plan;
-      console.log(`[Orchestrator V5] Plan created:`, {
+      logger.debug('Plan created', {
         tools: plan.tools.map(t => t.tool),
         requiresConfirmation: plan.requiresConfirmation,
       });
@@ -222,7 +223,7 @@ export class AgentOrchestratorV5 {
         plan
       );
     } catch (error) {
-      console.error('[Orchestrator V5] Fatal error:', error);
+      logger.error('Orchestrator V5 fatal error', error, { userId: context.userId });
       return {
         success: false,
         message: 'Произошла ошибка. Попробуй ещё раз.',
@@ -302,7 +303,7 @@ export class AgentOrchestratorV5 {
         tokensUsed: result.tokensUsed,
       };
     } catch (error) {
-      console.error('[Orchestrator V5] Planner error:', error);
+      logger.error('Planner error', error);
       return {
         success: false,
         error: 'Не удалось обработать запрос',
@@ -396,7 +397,7 @@ ${JSON.stringify(toolResults, null, 2)}
         tokensUsed: result.tokensUsed,
       };
     } catch (error) {
-      console.error('[Orchestrator V5] Answerer error:', error);
+      logger.error('Answerer error', error);
 
       // Fallback: generate simple answer
       const successfulTools = toolResults.filter(r => r.success);

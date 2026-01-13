@@ -8,6 +8,7 @@ import { SentinelAlertSender } from './AlertSender.js';
 import type { SentinelRunResult, UserCycleResult } from './types.js';
 import { priceShield, type PriceRule } from './PriceShield.js';
 import { getCompetitorPrice } from '../api-lib/services/competitor-monitor.js';
+import { logger } from '../api-lib/lib/logger.js';
 
 export class SentinelOrchestrator {
   private priceMonitor: SentinelPriceMonitor;
@@ -33,7 +34,7 @@ export class SentinelOrchestrator {
       const flags =
         await sql`SELECT value_bool FROM system_flags WHERE key = 'sentinel_emergency_stop'`;
       if (flags.rows[0]?.value_bool) {
-        console.warn('⚠️ SENTINEL EMERGENCY STOP ACTIVE. Cycle aborted.');
+        logger.warn('Sentinel emergency stop active, cycle aborted');
         return {
           usersProcessed: 0,
           threatsDetected: 0,
@@ -65,7 +66,7 @@ export class SentinelOrchestrator {
       const users = usersRes.rows as DBUser[];
       result.usersProcessed = users.length;
 
-      console.log(`🛡️ Sentinel Cycle: Processing ${users.length} users...`);
+      logger.info('Sentinel cycle started', { usersCount: users.length });
 
       for (const user of users) {
         const userResult: UserCycleResult = {
@@ -87,8 +88,7 @@ export class SentinelOrchestrator {
             await this.alertSender.sendReport(user, report);
           }
         } catch (err) {
-          const errorMsg = `Error processing user ${user.id}: ${err instanceof Error ? err.message : String(err)}`;
-          console.error(errorMsg);
+          logger.error('User processing failed', err, { userId: user.id });
           // AUDIT-FIX: Prevent error leakage
           result.errors.push(`Processing failed for user ${user.id}`);
           // Alert admin immediately on user processing failure
@@ -154,9 +154,10 @@ export class SentinelOrchestrator {
       if (chunk.length === 0) continue;
 
       try {
-        console.log(
-          `[Sentinel] Fetching products chunk ${Math.floor(i / CHUNK_SIZE) + 1}... (${chunk.length} items)`
-        );
+        logger.debug('Fetching products chunk', {
+          chunkIndex: Math.floor(i / CHUNK_SIZE) + 1,
+          itemCount: chunk.length,
+        });
 
         // AUDIT-FIX: Select ONLY required columns to minimize packet size for VPN/MTU stability
         // Use ANY() for safe parameterization of ID list
@@ -175,7 +176,7 @@ export class SentinelOrchestrator {
         // Add delay to let connection breathe on bad VPN
         await new Promise(r => setTimeout(r, 1000));
       } catch (e) {
-        console.error(`Error fetching chunk ${chunk}:`, e);
+        logger.error('Error fetching product chunk', e, { chunkIds: chunk });
         summary.errors.push(`Failed to fetch product chunk: ${e}`);
       }
     }
@@ -248,7 +249,7 @@ export class SentinelOrchestrator {
             }
           }
         } catch (e) {
-          console.error(`❌ PriceShield error for ${product.product_id}:`, e);
+          logger.error('PriceShield repricing error', e, { productId: product.product_id });
         }
       }
 
@@ -300,9 +301,8 @@ export class SentinelOrchestrator {
         // No, must be consistent.
         await sql`UPDATE products SET current_price = ${livePrice}, updated_at = NOW() WHERE id = ${product.id}`;
       } catch (e) {
-        const msg = `Failed to update price in DB for ${product.id}: ${e}`;
-        console.warn(msg);
-        summary.errors.push(msg);
+        logger.warn('Failed to update price in DB', { productId: product.id, error: e });
+        summary.errors.push(`Failed to update price in DB for ${product.id}`);
       }
     }
   }

@@ -9,6 +9,7 @@ import { sql } from '@vercel/postgres';
 // Import subscription service
 import { SubscriptionService } from '../services/subscription-service.js';
 import { sendTelegramNotification } from '../services/notifications.js';
+import { logger } from '../lib/logger.js';
 
 /**
  * Handle create-payment action
@@ -46,7 +47,7 @@ export async function handleCreatePayment(
     if (!shopId || !secretKey) {
       // In development, allow test mode
       if (!isProduction) {
-        console.log('🧪 DEV MODE: Creating test payment');
+        logger.debug('DEV MODE: Creating test payment', { tier, userId });
         return res.json({
           success: true,
           testMode: true,
@@ -90,7 +91,7 @@ export async function handleCreatePayment(
       ...payment,
     });
   } catch (error) {
-    console.error('Failed to create payment:', error);
+    logger.error('Failed to create payment', error, { userId, tier: req.body?.tier });
     return res.status(500).json({
       error: 'Payment creation failed',
       message: error instanceof Error ? error.message : 'Unknown error',
@@ -145,7 +146,7 @@ export async function handlePaymentWebhook(
   };
 
   if (IS_PRODUCTION && !isYookassaIp(clientIP) && clientIP !== 'unknown') {
-    console.error(`🚫 BLOCKED: Webhook from unauthorized IP: ${clientIP}`);
+    logger.warn('Payment webhook blocked - unauthorized IP', { clientIP });
     return res.status(403).json({ error: 'Forbidden: Invalid source IP' });
   }
 
@@ -155,7 +156,7 @@ export async function handlePaymentWebhook(
   const webhookPayment = event.object;
   const paymentId = webhookPayment.id;
 
-  console.log(`💳 Payment webhook received: id=${paymentId}, status=${webhookPayment.status}`);
+  logger.info('Payment webhook received', { paymentId, status: webhookPayment.status });
 
   // ============================================
   // 🔐 SECURITY: Verify payment via YooKassa API
@@ -170,11 +171,14 @@ export async function handlePaymentWebhook(
     // Fetch REAL payment status from YooKassa API
     verifiedPayment = await yookassa.getPayment(paymentId);
 
-    console.log(`🔐 API Verification: id=${paymentId}, verified_status=${verifiedPayment.status}`);
+    logger.info('Payment API verification completed', {
+      paymentId,
+      verifiedStatus: verifiedPayment.status,
+    });
 
     // Compare webhook status with API status
     if (webhookPayment.status !== verifiedPayment.status) {
-      console.error(`🚨 SECURITY ALERT: Webhook status mismatch!`, {
+      logger.error('SECURITY ALERT: Webhook status mismatch', undefined, {
         webhookStatus: webhookPayment.status,
         apiStatus: verifiedPayment.status,
         paymentId,
@@ -183,7 +187,7 @@ export async function handlePaymentWebhook(
       // Use verified status, not webhook status
     }
   } catch (verifyError) {
-    console.error(`❌ Payment verification failed for ${paymentId}:`, verifyError);
+    logger.error('Payment verification failed', verifyError, { paymentId });
     // In production, reject unverifiable webhooks
     if (IS_PRODUCTION) {
       return res.status(500).json({
@@ -192,7 +196,7 @@ export async function handlePaymentWebhook(
       });
     }
     // In dev, fall back to webhook data with warning
-    console.warn('⚠️ DEV MODE: Using unverified webhook data');
+    logger.warn('DEV MODE: Using unverified webhook data');
     verifiedPayment = webhookPayment;
   }
 
@@ -203,9 +207,7 @@ export async function handlePaymentWebhook(
   const tier = metadata.tier;
   const billingPeriod = metadata.billing_period || 'monthly';
 
-  console.log(
-    `💳 Processing verified payment: status=${payment.status}, userId=${userId}, tier=${tier}`
-  );
+  logger.info('Processing verified payment', { status: payment.status, userId, tier });
 
   if (payment.status === 'succeeded' && userId && tier) {
     try {
@@ -215,7 +217,7 @@ export async function handlePaymentWebhook(
       `;
 
       if (existingPayment.rows[0]?.status === 'succeeded') {
-        console.log(`⏭️ Payment ${paymentId} already processed, skipping`);
+        logger.info('Payment already processed, skipping', { paymentId });
         return res.json({ success: true, message: 'Already processed' });
       }
 
@@ -252,10 +254,10 @@ export async function handlePaymentWebhook(
           `🛡️ Защита ваших товаров уже работает!`
       );
 
-      console.log(`✅ Subscription activated for user ${userId}: ${tier}`);
+      logger.info('Subscription activated', { userId, tier, billingPeriod });
       return res.json({ success: true });
     } catch (error) {
-      console.error('Failed to process payment webhook:', error);
+      logger.error('Failed to process payment webhook', error, { paymentId, userId });
       return res.status(500).json({ error: 'Failed to process payment' });
     }
   } else if (payment.status === 'canceled' && userId) {
@@ -266,7 +268,7 @@ export async function handlePaymentWebhook(
       WHERE payment_id = ${payment.id}
     `;
 
-    console.log(`❌ Payment canceled for user ${userId}`);
+    logger.info('Payment canceled', { userId, paymentId: payment.id });
     return res.json({ success: true });
   }
 

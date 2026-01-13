@@ -12,6 +12,7 @@ import {
   checkRateLimit,
   isSubscriptionActive,
   getSecret,
+  logger,
 } from '../lib/index.js';
 
 import { getUserById, getProductsByUserId } from '../services/index.js';
@@ -64,13 +65,13 @@ export async function handleAgentV4(
   req: VercelRequest,
   res: VercelResponse
 ): Promise<VercelResponse> {
-  console.log('[Agent V4 Handler] Request received, method:', req.method);
+  logger.debug('Agent V4 Handler request received', { method: req.method });
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  console.log('[Agent V4 Handler] Starting authentication...');
+  logger.debug('Agent V4 starting authentication');
   // 1. Authentication
   let userId: number;
 
@@ -80,7 +81,7 @@ export async function handleAgentV4(
   if (isAdmin && bypassTelegramId) {
     // Admin bypass for testing
     userId = parseInt(bypassTelegramId as string);
-    console.log(`🔑 Admin API access: user ${userId}`);
+    logger.info('Admin API access granted', { userId });
 
     // Audit this bypass
     const agent = getSecurityAgent();
@@ -102,21 +103,21 @@ export async function handleAgentV4(
     userId = auth.context.userId;
   }
 
-  console.log(`[Agent V4] User ID: ${userId}, isAdmin: ${isAdmin}`);
+  logger.debug('Agent V4 authenticated', { userId, isAdmin });
   let user: DBUserRecord | null = null;
 
   // Skip database fetch for admin bypass (local development)
   if (!isAdmin) {
-    console.log(`[Agent V4] Fetching user ${userId} from database...`);
+    logger.debug('Fetching user from database', { userId });
     try {
       user = (await getUserById(userId)) as DBUserRecord | null;
-      console.log(`[Agent V4] User fetched:`, user ? 'found' : 'not found');
+      logger.debug('User fetch completed', { found: !!user });
     } catch (error) {
-      console.error(`[Agent V4] Failed to fetch user ${userId}:`, error);
+      logger.error('Failed to fetch user', error, { userId });
       return res.status(500).json({ error: 'Database connection failed' });
     }
   } else {
-    console.log(`[Agent V4] Skipping database fetch for admin bypass`);
+    logger.debug('Skipping database fetch for admin bypass');
   }
 
   // 2. Check subscription
@@ -135,7 +136,7 @@ export async function handleAgentV4(
   }
 
   // 4. Rate limit (skip for admin)
-  console.log(`[Agent V4] Checking rate limit (isAdmin: ${isAdmin})...`);
+  logger.debug('Checking rate limit', { userId, isAdmin });
   if (!isAdmin) {
     const agentRateLimit = await checkRateLimit(`agent:${userId}`, true);
     if (!agentRateLimit.allowed) {
@@ -145,7 +146,7 @@ export async function handleAgentV4(
       });
     }
   } else {
-    console.log(`[Agent V4] Skipping rate limit for admin bypass`);
+    logger.debug('Skipping rate limit for admin bypass');
   }
 
   // 5. Load conversation history
@@ -160,24 +161,24 @@ export async function handleAgentV4(
         conversationHistory = savedHistory as typeof conversationHistory;
       }
     } catch (e) {
-      console.warn('⚠️ Failed to load chat history:', e);
+      logger.warn('Failed to load chat history', { error: e });
     }
   }
-  console.log(`[Agent V4] Conversation history loaded, length: ${conversationHistory.length}`);
+  logger.debug('Conversation history loaded', { length: conversationHistory.length });
 
   // 6. Fetch user products for context (skip for admin)
-  console.log(`[Agent V4] Fetching products (isAdmin: ${isAdmin})...`);
-  let products: any[] = [];
+  logger.debug('Fetching products', { userId, isAdmin });
+  let products: Array<{ min_price?: number; product_id: string; current_price?: number }> = [];
   let protectedCount = 0;
 
   if (!isAdmin) {
     products = await getProductsByUserId(userId);
     protectedCount = products.filter((p: { min_price?: number }) => (p.min_price || 0) > 0).length;
   } else {
-    console.log(`[Agent V4] Skipping product fetch for admin bypass`);
+    logger.debug('Skipping product fetch for admin bypass');
   }
 
-  console.log(`🚀 V4 Agent Request from User ${userId}: "${message.substring(0, 50)}..."`);
+  logger.info('Agent V4 request processing', { userId, messagePreview: message.substring(0, 50) });
 
   // 7. Build context for V4 Orchestrator
   // Определяем первый контакт по пустой истории
@@ -260,7 +261,7 @@ export async function handleAgentV4(
         (result.actions[0] as Record<string, unknown>).taskId = taskId;
       }
     } catch (e) {
-      console.warn('Failed to save chat state to KV:', e);
+      logger.warn('Failed to save chat state to KV', { error: e });
     }
   }
 
@@ -278,10 +279,12 @@ export async function handleAgentV4(
   logAgentMetrics(metrics).catch(() => {});
 
   if (process.env.NODE_ENV !== 'production') {
-    console.log(formatMetricsForLog(metrics));
-    console.log(
-      `📊 V4 Timing: plan=${result.planningTimeMs}ms, exec=${result.executionTimeMs}ms, answer=${result.answeringTimeMs}ms`
-    );
+    logger.debug('V4 metrics', { metrics: formatMetricsForLog(metrics) });
+    logger.debug('V4 timing', {
+      plan: result.planningTimeMs,
+      exec: result.executionTimeMs,
+      answer: result.answeringTimeMs,
+    });
   }
 
   // 11. Return structured response
@@ -649,9 +652,7 @@ export async function handleAgentV4Confirm(
     // Clear pending action
     await kv.del(`pending:v4:${userId}`);
 
-    console.log(
-      `✅ V4 Confirm executed: ${pendingAction.type} for user ${userId}, count: ${executedCount}`
-    );
+    logger.info('V4 Confirm executed', { actionType: pendingAction.type, userId, executedCount });
 
     return res.json({
       success: true,
@@ -661,7 +662,7 @@ export async function handleAgentV4Confirm(
       actionType: pendingAction.type,
     });
   } catch (error) {
-    console.error('V4 Confirm error:', error);
+    logger.error('V4 Confirm error', error, { userId, actionType: pendingAction?.type });
 
     // Don't delete pending action on error - let user retry
     return res.json({
@@ -680,6 +681,7 @@ export const handleAgentV4Secure = securityMiddleware(
     auditEvent: 'agent.v4.execute',
     rateLimit: { limit: 20, windowSeconds: 60 },
   },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ((req: any, res: any) => handleAgentV4(req, res)) as any
 );
 
@@ -690,5 +692,6 @@ export const handleAgentV4ConfirmSecure = securityMiddleware(
   {
     auditEvent: 'agent.v4.confirm',
   },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ((req: any, res: any) => handleAgentV4Confirm(req, res)) as any
 );

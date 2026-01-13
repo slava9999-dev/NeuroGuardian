@@ -10,6 +10,7 @@ import { verifyAdminAccessAsync, extractAnyAuthAsync } from '../middleware/auth.
 
 import { sentinelOrchestrator as sentinelService } from '../../sentinel/SentinelOrchestrator.js';
 import { getSecret } from '../lib/secrets-helper.js';
+import { logger } from '../lib/logger.js';
 
 /**
  * Handle check-prices action (Sentinel Cron)
@@ -35,12 +36,12 @@ export async function handleCheckPrices(
         const expectedSecret = await getSecret('cron_secret', 'sentinel_cron');
         if (querySecret === expectedSecret || querySecret === process.env.CRON_SECRET) {
           isGlobalAdmin = true;
-          console.log('✅ Authenticated via cron query param');
+          logger.info('Authenticated via cron query param');
         }
       } catch {
         if (querySecret === process.env.CRON_SECRET) {
           isGlobalAdmin = true;
-          console.log('✅ Authenticated via cron query param (env fallback)');
+          logger.info('Authenticated via cron query param (env fallback)');
         }
       }
     }
@@ -50,12 +51,13 @@ export async function handleCheckPrices(
     let result;
 
     if (authResult.success) {
-      console.log(
-        `🛡️ SENTINEL: Starting check for user ${authResult.context.userId} (Method: ${authResult.context.authMethod})...`
-      );
+      logger.info('Sentinel check started for user', {
+        userId: authResult.context.userId,
+        authMethod: authResult.context.authMethod,
+      });
       result = await sentinelService.runForUser(authResult.context.userId);
     } else if (isGlobalAdmin) {
-      console.log('🛡️ SENTINEL: Starting full global cycle (Admin/Cron)...');
+      logger.info('Sentinel full global cycle started');
       result = await sentinelService.runCycle();
     } else {
       return res.status(401).json({ error: 'Unauthorized' });
@@ -70,7 +72,7 @@ export async function handleCheckPrices(
       message: isGlobalAdmin ? 'Full cycle completed' : 'User check completed',
     });
   } catch (error) {
-    console.error('Sentinel Handler Error:', error);
+    logger.error('Sentinel Handler Error', error);
     return res.status(500).json({ error: 'Sentinel check failed' });
   }
 }
@@ -110,7 +112,7 @@ export async function handleSentinelStats(
       totalActions: summary.rows[0]?.total_actions || 0,
     });
   } catch (error) {
-    console.error('Sentinel Stats Error:', error);
+    logger.error('Sentinel Stats Error', error, { userId });
     return res.status(500).json({ error: 'Failed to fetch sentinel stats' });
   }
 }
@@ -225,7 +227,7 @@ export async function handleSentinelDashboard(
             }
           }
         } catch (e) {
-          console.error('[Sentinel Dashboard] WB scan failed:', e);
+          logger.warn('Sentinel Dashboard WB scan failed', { error: e });
         }
       }
     }
@@ -269,7 +271,7 @@ export async function handleSentinelDashboard(
             }
           }
         } catch (e) {
-          console.error('[Sentinel Dashboard] Ozon scan failed:', e);
+          logger.warn('Sentinel Dashboard Ozon scan failed', { error: e });
         }
       }
     }
@@ -328,7 +330,7 @@ export async function handleSentinelDashboard(
       },
     });
   } catch (error) {
-    console.error('Sentinel Dashboard Error:', error);
+    logger.error('Sentinel Dashboard Error', error, { userId });
     return res.status(500).json({ error: 'Failed to fetch sentinel dashboard' });
   }
 }
