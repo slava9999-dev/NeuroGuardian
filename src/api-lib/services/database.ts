@@ -289,6 +289,12 @@ export async function initializeDatabase(): Promise<void> {
   // Ensure account_id exists if table was created before
   await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS account_id INTEGER REFERENCES marketplace_accounts(id) ON DELETE SET NULL`;
 
+  // Add SPP Buffer columns for smart stop-loss calculation
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS target_buyer_price INTEGER`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS spp_buffer_percent INTEGER DEFAULT 25`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS auto_adjust_min_price BOOLEAN DEFAULT false`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS cost_price INTEGER DEFAULT 0`;
+
   // 4. Transactions
   await sql`
     CREATE TABLE IF NOT EXISTS transactions (

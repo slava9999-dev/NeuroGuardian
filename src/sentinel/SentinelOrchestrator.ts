@@ -163,7 +163,8 @@ export class SentinelOrchestrator {
         // Use ANY() for safe parameterization of ID list
         const chunkRes = await sql`
                         SELECT id, user_id, product_id, nm_id, title, current_price, min_price, 
-                                current_stock, marketplace, is_monitored, account_id 
+                                current_stock, marketplace, is_monitored, account_id,
+                                target_buyer_price, spp_buffer_percent, auto_adjust_min_price
                         FROM products 
                         WHERE id = ANY(${chunk})
                     `;
@@ -253,7 +254,40 @@ export class SentinelOrchestrator {
         }
       }
 
-      // B. Threat Detection
+      // B. SPP Buffer Auto-Adjustment (Smart Stop-Loss)
+      // If user set target_buyer_price, automatically adjust min_price to compensate for platform discounts
+      const targetBuyerPrice = product.target_buyer_price;
+      const sppBufferPercent = product.spp_buffer_percent ?? 25;
+      const autoAdjustEnabled = product.auto_adjust_min_price;
+
+      if (autoAdjustEnabled && targetBuyerPrice && targetBuyerPrice > 0) {
+        // Formula: min_price = target_buyer_price / (1 - spp_buffer_percent / 100)
+        const calculatedMinPrice = Math.ceil(targetBuyerPrice / (1 - sppBufferPercent / 100));
+
+        if (product.min_price < calculatedMinPrice) {
+          logger.info('SPP Buffer: Adjusting min_price', {
+            productId: product.product_id,
+            oldMinPrice: product.min_price,
+            newMinPrice: calculatedMinPrice,
+            targetBuyerPrice,
+            sppBufferPercent,
+          });
+
+          try {
+            await sql`
+              UPDATE products 
+              SET min_price = ${calculatedMinPrice}, updated_at = NOW() 
+              WHERE id = ${product.id}
+            `;
+            // Update local reference for threat detection
+            product.min_price = calculatedMinPrice;
+          } catch (e) {
+            logger.warn('Failed to auto-adjust min_price', { productId: product.id, error: e });
+          }
+        }
+      }
+
+      // C. Threat Detection
       const scan = this.threatDetector.scanProductThreats(product, livePrice, marketplace);
 
       if (scan.hasThreats) {

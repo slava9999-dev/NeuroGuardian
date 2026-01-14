@@ -157,6 +157,10 @@ export interface DBProduct {
   card_discount_buffer: number | null; // INTEGER DEFAULT 0 — per-product card discount buffer
   cost_price?: number | null; // INTEGER (Unit Economics)
   category?: string | null; // VARCHAR(255)
+  // SPP Buffer fields for smart stop-loss (Jan 2026)
+  target_buyer_price?: number | null; // INTEGER — desired minimum price for buyer
+  spp_buffer_percent?: number | null; // INTEGER DEFAULT 25 — expected platform discount %
+  auto_adjust_min_price?: boolean | null; // BOOLEAN DEFAULT false — auto-correct min_price
   // Pending price tracking fields (Dec 2024 Audit)
   pending_price: number | null; // INTEGER
   pending_task_id: number | null; // BIGINT
