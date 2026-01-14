@@ -1,0 +1,42 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e8]: Привет, как дела?
+      - generic [ref=e10]:
+        - img "Agent" [ref=e11]
+        - generic [ref=e12]:
+          - generic [ref=e13]: ❌ Не удалось получить ответ
+          - generic [ref=e15]: 09:14 AM
+    - banner [ref=e17]:
+      - generic [ref=e18]:
+        - img "NeuroAgent" [ref=e20]
+        - generic [ref=e22]:
+          - heading "NeuroAgent" [level=1] [ref=e23]
+          - paragraph [ref=e24]: Online
+        - button "Новый чат" [ref=e25]:
+          - img [ref=e26]
+          - generic [ref=e27]: Новый чат
+    - generic [ref=e29]:
+      - button [ref=e30]:
+        - img [ref=e31]
+      - textbox "Сообщение..." [ref=e33]
+      - button [active] [ref=e34]:
+        - img [ref=e35]
+  - navigation [ref=e38]:
+    - generic [ref=e39]:
+      - button "Agent Агент" [ref=e40]:
+        - img "Agent" [ref=e43]
+        - generic [ref=e44]: Агент
+      - button "Товары" [ref=e45]:
+        - img [ref=e46]
+        - generic [ref=e49]: Товары
+      - button "Настройки" [ref=e50]:
+        - img [ref=e51]
+        - generic [ref=e54]: Настройки
+      - button "Инфо" [ref=e55]:
+        - img [ref=e56]
+        - generic [ref=e58]: Инфо
+```

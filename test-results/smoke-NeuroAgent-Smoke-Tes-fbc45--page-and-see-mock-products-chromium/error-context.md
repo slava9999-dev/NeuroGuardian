@@ -1,0 +1,79 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - generic [ref=e5]:
+        - generic [ref=e6]:
+          - button [ref=e7]:
+            - img [ref=e8]
+          - generic [ref=e10]:
+            - heading "Товары" [level=1] [ref=e11]
+            - paragraph [ref=e12]: 0 • 0 защищено
+        - button "ВКЛ" [ref=e14] [cursor=pointer]:
+          - img [ref=e15]
+          - generic [ref=e18]: ВКЛ
+    - generic [ref=e20]:
+      - generic [ref=e21]:
+        - generic [ref=e22]:
+          - paragraph [ref=e23]: "0"
+          - paragraph [ref=e24]: Всего
+        - generic [ref=e25]:
+          - paragraph [ref=e26]: "0"
+          - paragraph [ref=e27]: Защита
+        - generic [ref=e28]:
+          - paragraph [ref=e29]: "0"
+          - paragraph [ref=e30]: Без
+        - generic [ref=e31]:
+          - paragraph [ref=e32]: "0"
+          - paragraph [ref=e33]: Триггер
+      - generic [ref=e34]:
+        - button "Включить Сторожа" [ref=e35]:
+          - img [ref=e36]
+          - generic [ref=e38]: Включить Сторожа
+        - button "📦" [ref=e39]
+        - button "История защиты" [ref=e40]:
+          - img [ref=e41]
+      - generic [ref=e43]:
+        - generic [ref=e44]:
+          - generic [ref=e45]:
+            - generic [ref=e46]: "Всего:"
+            - generic [ref=e47]: "0"
+          - generic [ref=e50]: "0"
+          - generic [ref=e53]: "0"
+          - generic [ref=e54]:
+            - generic [ref=e56]: "Защищено:"
+            - generic [ref=e57]: "0"
+        - generic [ref=e58]:
+          - generic [ref=e59]:
+            - img [ref=e60]
+            - textbox "Поиск по названию или артикулу..." [ref=e63]
+          - button "Фильтры" [ref=e64]:
+            - generic [ref=e65]:
+              - img [ref=e66]
+              - generic [ref=e68]: Фильтры
+            - img [ref=e69]
+        - generic [ref=e72]:
+          - img [ref=e73]
+          - paragraph [ref=e76]: Нет товаров
+          - paragraph [ref=e77]: Подключите API для синхронизации
+      - generic [ref=e78]:
+        - generic [ref=e79]: 📦
+        - heading "Нет товаров" [level=3] [ref=e80]
+        - paragraph [ref=e81]: Подключите API маркетплейса в настройках, чтобы синхронизировать товары
+  - navigation [ref=e82]:
+    - generic [ref=e83]:
+      - button "Agent Агент" [ref=e84]:
+        - img "Agent" [ref=e86]
+        - generic [ref=e88]: Агент
+      - button "Товары" [active] [ref=e89]:
+        - img [ref=e91]
+        - generic [ref=e94]: Товары
+      - button "Настройки" [ref=e95]:
+        - img [ref=e96]
+        - generic [ref=e99]: Настройки
+      - button "Инфо" [ref=e100]:
+        - img [ref=e101]
+        - generic [ref=e103]: Инфо
+```
