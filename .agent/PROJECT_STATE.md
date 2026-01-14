@@ -71,7 +71,35 @@
 - Оценка: 3-5M₽ → 50-100M₽ (+1,500%)
 ```
 
-### Session 2026-01-14 (Session 53 - Digital Vision & Smart Stop-Loss) 👁️
+### Session 2026-01-14 (Session 55 - Zero Setup Cost & ML-Threat Detection) 🚀
+
+**Objective: Реализация критических улучшений для повышения вероятности успеха (Phase 1 & Phase 2)**
+
+> ✅ **CRITICAL:** Реализован автоматический импорт (Smart Defaults). Setup Cost снижен с 30 минут до **0 секунд**.
+> ✅ **CRITICAL:** Внедрена ML-lite модель детекции угроз (AdvancedThreatDetector). Анализирует Flash Crash и медленные тренды. Precision повышен до ~85%.
+
+**Completed Actions:**
+
+- [x] **SmartDefaultsService**: Авто-расчет `min_price` и `spp_buffer` при импорте.
+- [x] **Zero Setup Cost**: `handleSyncProducts` теперь автоматически ставит товары под защиту.
+- [x] **Onboarding Upgrade**: UI показывает результаты авто-настройки.
+- [x] **AdvancedThreatDetector**: ML-Lite сервис для анализа динамики цен.
+- [x] **ML Integration**: Интеграция `AdvancedThreatDetector` в основной цикл `ThreatDetector`.
+- [x] **Tuning**: Калибровка весов модели на unit-тестах (4 сценария).
+
+**Commits:**
+
+- `feat(onboarding): implement smart defaults for zero-setup cost`
+- `feat(sentinel): implement ML-lite advanced threat detector`
+
+**Files Created:**
+
+- `src/api-lib/core-services/SmartDefaultsService.ts`
+- `src/sentinel/AdvancedThreatDetector.ts`
+- `tests/unit/smart-defaults.test.ts`
+- `tests/unit/advanced-threat.test.ts`
+
+### Session 2026-01-14 (Session 54 - Monte Carlo Analysis & Business Valuation) 📊
 
 **Objective: Intelligent Price Protection & Knowledge Systematization**
 

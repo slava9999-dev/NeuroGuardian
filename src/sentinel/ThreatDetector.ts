@@ -1,5 +1,6 @@
 import type { DBUser, DBProduct } from '../api-lib/lib/types.js';
 import { calculateUnitEconomics, estimateCostPrice } from '../api-lib/services/unit-economics.js';
+import { advancedThreatDetector } from './AdvancedThreatDetector.js';
 
 export const ThreatType = {
   OZON_CARD_EROSION: 'ozon_card_erosion',
@@ -7,6 +8,8 @@ export const ThreatType = {
   COMPETITOR_PRICE_DROP: 'competitor_price_drop',
   DB_PRICE_MISMATCH: 'db_price_mismatch',
   MARGIN_BELOW_ZERO: 'margin_below_zero',
+  FLASH_CRASH: 'flash_crash', // New
+  PRICE_DUMP: 'price_dump', // New
 } as const;
 
 export type ThreatType = (typeof ThreatType)[keyof typeof ThreatType];
@@ -64,6 +67,38 @@ export class ThreatDetector {
     marketplace: 'WB' | 'Ozon'
   ): ScanResult {
     const threats: Threat[] = [];
+
+    // 0. Advanced ML-Lite Analysis (Phase 2)
+    // Construct minimal history from DB state to detect immediate changes vs last sync
+    if (product.current_price && product.updated_at) {
+      const dbPricePoint = {
+        price: product.current_price,
+        timestamp:
+          typeof product.updated_at === 'string'
+            ? new Date(product.updated_at)
+            : product.updated_at,
+      };
+
+      const advancedResult = advancedThreatDetector.detectAdvancedThreats(
+        product,
+        livePrice,
+        [dbPricePoint] // Use DB state as "history"
+      );
+
+      if (advancedResult.isThreat) {
+        threats.push({
+          type:
+            advancedResult.threatType === 'flash_crash'
+              ? ThreatType.FLASH_CRASH
+              : ThreatType.PRICE_DUMP,
+          severity: advancedResult.confidence === 'high' ? 'critical' : 'high',
+          productId: product.product_id,
+          nmId: product.nm_id,
+          message: advancedResult.reasoning.join('. '),
+          data: advancedResult,
+        });
+      }
+    }
 
     // 1. DB Price Mismatch
     if (product.current_price && Math.abs(product.current_price - livePrice) / livePrice > 0.1) {
