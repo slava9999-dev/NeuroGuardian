@@ -29,6 +29,8 @@ export class StateManager {
           has_api_keys BOOLEAN NOT NULL DEFAULT false,
           products_count INTEGER NOT NULL DEFAULT 0,
           subscription_tier TEXT NOT NULL DEFAULT 'free',
+          gender TEXT,
+          user_name TEXT,
           current_intent TEXT,
           pending_action JSONB,
           awaiting_input JSONB,
@@ -71,6 +73,8 @@ export class StateManager {
           hasOzonKey: false,
           productsCount: row.products_count || 0,
           subscriptionTier: (row.subscription_tier as 'free' | 'basic' | 'pro') || 'free',
+          gender: (row.gender as 'male' | 'female' | 'unknown') || undefined,
+          userName: row.user_name || undefined,
           currentIntent: row.current_intent || undefined,
           pendingAction: row.pending_action
             ? (this.parseJsonWithDate(row.pending_action) as UserState['pendingAction'])
@@ -135,11 +139,13 @@ export class StateManager {
       await sql`
         INSERT INTO user_state (
           user_id, marketplace, has_api_keys, products_count, subscription_tier,
-          current_intent, pending_action, awaiting_input, last_mentioned_products,
-          last_query, last_active_at, session_started_at, total_queries, updated_at
+          gender, user_name, current_intent, pending_action, awaiting_input, 
+          last_mentioned_products, last_query, last_active_at, session_started_at, 
+          total_queries, updated_at
         ) VALUES (
           ${userId}, ${newState.marketplace}, ${newState.hasApiKeys}, ${newState.productsCount},
-          ${newState.subscriptionTier}, ${newState.currentIntent},
+          ${newState.subscriptionTier}, ${newState.gender || null}, ${newState.userName || null},
+          ${newState.currentIntent},
           ${newState.pendingAction ? JSON.stringify(newState.pendingAction) : null},
           ${newState.awaitingInput ? JSON.stringify(newState.awaitingInput) : null},
           ${JSON.stringify(newState.lastMentionedProducts)}, ${newState.lastQuery || null}, 
@@ -150,6 +156,8 @@ export class StateManager {
           has_api_keys = EXCLUDED.has_api_keys,
           products_count = EXCLUDED.products_count,
           subscription_tier = EXCLUDED.subscription_tier,
+          gender = EXCLUDED.gender,
+          user_name = EXCLUDED.user_name,
           current_intent = EXCLUDED.current_intent,
           pending_action = EXCLUDED.pending_action,
           awaiting_input = EXCLUDED.awaiting_input,

@@ -201,6 +201,11 @@ ${context}
   private buildUserContext(state: UserState): string {
     const lines: string[] = ['## КОНТЕКСТ ПОЛЬЗОВАТЕЛЯ'];
 
+    // Add name and gender for personalization
+    if (state.userName) {
+      lines.push(`- Имя: ${state.userName}`);
+    }
+
     lines.push(`- Маркетплейс: ${state.marketplace || 'не подключён'}`);
     lines.push(`- Товаров: ${state.productsCount}`);
     lines.push(`- Подписка: ${state.subscriptionTier}`);
@@ -213,6 +218,28 @@ ${context}
       lines.push(
         `- Недавно обсуждали товары: ${state.lastMentionedProducts.slice(0, 3).join(', ')}`
       );
+    }
+
+    // Add gender-based communication style
+    if (state.gender === 'female') {
+      lines.push('');
+      lines.push('## 💐 СТИЛЬ ОБЩЕНИЯ (для женщины)');
+      lines.push('Пользователь — женщина. Используй ГАЛАНТНЫЙ стиль:');
+      lines.push('- Обращайся уважительно и тепло');
+      lines.push('- Можешь сделать лёгкий комплимент за успехи ("Отлично справляетесь!")');
+      lines.push('- Подбадривай при трудностях ("Разберёмся вместе!")');
+      lines.push('- Используй более мягкие формулировки');
+      lines.push('- Будь внимателен к деталям и заботлив');
+      lines.push('Примеры: "Прекрасно!", "Замечательно, что обратились!", "Вместе решим!"');
+    } else if (state.gender === 'male') {
+      lines.push('');
+      lines.push('## 💼 СТИЛЬ ОБЩЕНИЯ (для мужчины)');
+      lines.push('Пользователь — мужчина. Используй ДЕЛОВОЙ стиль:');
+      lines.push('- Будь конкретен и прямолинеен');
+      lines.push('- Давай чёткие цифры и факты');
+      lines.push('- Меньше эмоций, больше дела');
+      lines.push('- Ориентируйся на результат');
+      lines.push('Примеры: "Готово.", "Вот данные.", "Рекомендую так."');
     }
 
     return lines.join('\n');

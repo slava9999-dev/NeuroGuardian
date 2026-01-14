@@ -23,6 +23,10 @@ export interface UserState {
   hasApiKeys: boolean;
   productsCount: number;
   subscriptionTier: 'free' | 'basic' | 'pro';
+  /** User's inferred gender for personalized communication */
+  gender?: 'male' | 'female' | 'unknown';
+  /** User's first name for personalized greetings */
+  userName?: string;
 
   // === DYNAMIC (per session) ===
   currentIntent?: string;

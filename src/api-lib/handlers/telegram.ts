@@ -8,6 +8,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql } from '@vercel/postgres';
 import { orchestrateV5 } from '../../agent/core/AgentOrchestratorV5.js';
 import { logger } from '../lib/index.js';
+import { inferGender } from '../../agent/utils/genderDetection.js';
+import { stateManager } from '../../agent/core/StateManager.js';
 
 // ============================================
 // TYPES
@@ -241,6 +243,19 @@ async function ensureUserExists(telegramUser: TelegramUser): Promise<number> {
       userId: telegramUser.id,
       username: telegramUser.username,
       trialEnds: trialEnd.toISOString(),
+    });
+
+    // Infer gender from first name and update state for personalized communication
+    const gender = inferGender(telegramUser.first_name);
+    await stateManager.updateState(telegramUser.id, {
+      gender,
+      userName: telegramUser.first_name,
+    });
+
+    logger.info('User gender inferred for personalization', {
+      userId: telegramUser.id,
+      firstName: telegramUser.first_name,
+      gender,
     });
 
     return telegramUser.id;
