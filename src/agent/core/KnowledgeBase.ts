@@ -33,7 +33,8 @@ export class KnowledgeBase {
   private itemsPath: string;
 
   constructor(itemsPath = 'docs/knowledge_base') {
-    this.itemsPath = itemsPath;
+    // Resolve to absolute path from project root (works on Vercel)
+    this.itemsPath = path.resolve(process.cwd(), itemsPath);
   }
 
   /**
