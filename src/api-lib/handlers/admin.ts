@@ -317,6 +317,19 @@ export async function handleRunMigration(
       console.log('✅ Migration 017 complete');
     }
 
+    if (migrationId === '021' || migrationId === 'all') {
+      // Migration 021: Gender personalization columns (Jan 2026)
+      console.log('🔄 Applying migration 021: gender personalization...');
+
+      await sql`ALTER TABLE user_state ADD COLUMN IF NOT EXISTS gender TEXT`;
+      results.push('user_state.gender added');
+
+      await sql`ALTER TABLE user_state ADD COLUMN IF NOT EXISTS user_name TEXT`;
+      results.push('user_state.user_name added');
+
+      console.log('✅ Migration 021 complete');
+    }
+
     return res.json({
       success: true,
       migration: migrationId,

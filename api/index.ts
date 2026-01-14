@@ -249,6 +249,9 @@ async function applyRateLimit(
 // MAIN HANDLER
 // ============================================
 
+// Kernel initialization state (cold start optimization)
+let kernelInitialized = false;
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS preflight
   if (req.method === 'OPTIONS') {
@@ -256,6 +259,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).end();
   }
   setCorsHeaders(req, res);
+
+  // Auto-initialize System Kernel on first request (cold start)
+  if (!kernelInitialized) {
+    try {
+      const { initializeKernel } = await import('../src/core/modules.js');
+      const result = await initializeKernel();
+      kernelInitialized = true;
+
+      // Alert if any modules failed
+      if (!result.success && result.errors.length > 0) {
+        console.warn('[API] Kernel initialized with errors:', result.errors);
+      }
+    } catch (error) {
+      // Non-blocking - system works without kernel, just less observable
+      console.warn('[API] Kernel init skipped:', error instanceof Error ? error.message : error);
+      kernelInitialized = true; // Don't retry on every request
+    }
+  }
 
   // Parse action
   const action = sanitizeInput((req.query.action as string) || req.body?.action);

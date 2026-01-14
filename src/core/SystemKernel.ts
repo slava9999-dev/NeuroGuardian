@@ -219,8 +219,11 @@ export class SystemKernel {
    */
   async checkAllHealth(): Promise<Map<string, ModuleHealth>> {
     const results = new Map<string, ModuleHealth>();
+    const newlyUnhealthy: string[] = [];
 
     for (const [name, module] of this.modules) {
+      const previousHealth = this.health.get(name);
+
       try {
         const start = Date.now();
         const health = await module.healthCheck();
@@ -229,6 +232,11 @@ export class SystemKernel {
 
         results.set(name, health);
         this.health.set(name, health);
+
+        // Track newly unhealthy modules (was healthy/unknown, now unhealthy)
+        if (health.status === 'unhealthy' && previousHealth?.status !== 'unhealthy') {
+          newlyUnhealthy.push(`${name}: ${health.error || 'Unknown error'}`);
+        }
       } catch (error) {
         const errorHealth: ModuleHealth = {
           status: 'unhealthy',
@@ -237,6 +245,10 @@ export class SystemKernel {
         };
         results.set(name, errorHealth);
         this.health.set(name, errorHealth);
+
+        if (previousHealth?.status !== 'unhealthy') {
+          newlyUnhealthy.push(`${name}: ${errorHealth.error}`);
+        }
       }
     }
 
@@ -247,7 +259,31 @@ export class SystemKernel {
       }
     }
 
+    // Send Telegram alert for newly unhealthy modules
+    if (newlyUnhealthy.length > 0) {
+      this.sendUnhealthyAlert(newlyUnhealthy).catch(err => {
+        logger.error('[Kernel] Failed to send unhealthy alert', { error: err });
+      });
+    }
+
     return results;
+  }
+
+  /**
+   * Send Telegram alert when modules become unhealthy
+   */
+  private async sendUnhealthyAlert(modules: string[]): Promise<void> {
+    try {
+      const { notificationService } = await import('../api-lib/services/notifications.js');
+      await notificationService.sendAlertToAdmin({
+        type: 'system_alert',
+        message: `🚨 *SYSTEM ALERT*\n\n❌ Модули в критическом состоянии:\n\n${modules.map(m => `• ${m}`).join('\n')}\n\n⏰ ${new Date().toLocaleString('ru-RU')}`,
+        urgency: 'critical',
+      });
+      logger.info('[Kernel] Unhealthy alert sent to admin');
+    } catch (error) {
+      logger.error('[Kernel] Failed to send unhealthy alert', { error });
+    }
   }
 
   /**

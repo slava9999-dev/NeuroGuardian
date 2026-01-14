@@ -20,6 +20,7 @@ export type AlertType =
   | 'margin_warning' // NEW: Low margin alert
   | 'stock_warning' // NEW: Low stock alert
   | 'competitor_alert' // NEW: Competitor price drop
+  | 'system_alert' // NEW: System health alerts from Kernel
   | 'system_error'
   | 'sync_completed'
   | 'daily_report'
@@ -523,6 +524,17 @@ function formatAlert(alert: Alert, smartMessage?: string | null): string {
       diff > 0 ? `📉 Разница: *${diff}₽* дороже` : `📈 Разница: *${Math.abs(diff)}₽* дешевле`,
       ``,
       `💡 ${alert.message || 'Проверьте, нужно ли скорректировать цену'}`,
+    ].join('\n');
+  }
+
+  // System alert (from Kernel health monitoring)
+  if (alert.type === 'system_alert') {
+    return [
+      `🚨 *СИСТЕМА — КРИТИЧЕСКАЯ СИТУАЦИЯ*`,
+      ``,
+      `${emoji} ${alert.message || 'Обнаружена проблема в системе'}`,
+      ``,
+      `💡 _Проверьте /api?action=health для диагностики_`,
     ].join('\n');
   }
 
