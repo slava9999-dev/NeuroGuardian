@@ -160,6 +160,42 @@ async function ensureUserExists(telegramUser: TelegramUser): Promise<number> {
             username = ${telegramUser.username || null}
         WHERE id = ${telegramUser.id}
       `;
+
+      // Check if user has subscription record, if not - create 7-day trial
+      const subCheck = await sql`
+        SELECT user_id FROM subscriptions WHERE user_id = ${telegramUser.id}
+      `;
+
+      if (subCheck.rows.length === 0) {
+        const trialEnd = new Date();
+        trialEnd.setDate(trialEnd.getDate() + 7);
+
+        await sql`
+          INSERT INTO subscriptions (
+            user_id, tier, status, max_products, max_accounts, trial_ends_at
+          ) VALUES (
+            ${telegramUser.id},
+            'pro',
+            'trial',
+            100,
+            3,
+            ${trialEnd.toISOString()}
+          )
+        `;
+
+        // Also update users table
+        await sql`
+          UPDATE users 
+          SET subscription_active = true, subscription_end = ${trialEnd.toISOString()}
+          WHERE id = ${telegramUser.id}
+        `;
+
+        logger.info('Trial subscription activated for existing user', {
+          userId: telegramUser.id,
+          trialEnds: trialEnd.toISOString(),
+        });
+      }
+
       return telegramUser.id;
     }
 
@@ -186,9 +222,25 @@ async function ensureUserExists(telegramUser: TelegramUser): Promise<number> {
       )
     `;
 
-    logger.info('New user created from Telegram', {
+    // Also create subscription record for proper subscription checks
+    await sql`
+      INSERT INTO subscriptions (
+        user_id, tier, status, max_products, max_accounts, trial_ends_at
+      ) VALUES (
+        ${telegramUser.id},
+        'pro',
+        'trial',
+        100,
+        3,
+        ${trialEnd.toISOString()}
+      )
+      ON CONFLICT (user_id) DO NOTHING
+    `;
+
+    logger.info('New user created from Telegram with 7-day trial', {
       userId: telegramUser.id,
       username: telegramUser.username,
+      trialEnds: trialEnd.toISOString(),
     });
 
     return telegramUser.id;
