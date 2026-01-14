@@ -1,7 +1,7 @@
 // ============================================
 // NeuroGUARDIAN — AI Agent Handler V5
 // Professional Architecture: Clean, Modular, Scalable
-// Version: 5.0.0 | Date: January 2026
+// Version: 5.1.0 | Date: January 2026
 // ============================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -17,6 +17,12 @@ import { createAgentMetrics, logAgentMetrics } from '../agent/metrics.js';
 import { agentOrchestratorV5 } from '../../agent/core/AgentOrchestratorV5.js';
 import { type OrchestratorContext } from '../../core/types/agent.types.js';
 import { registerAllTools } from '../../agent/execution/index.js'; // Register tools
+
+// Multi-Agent Architecture (V6)
+import { multiAgentOrchestrator } from '../../agent/specialists/MultiAgentOrchestrator.js';
+
+// Feature flag for gradual rollout
+const USE_MULTI_AGENT = process.env.USE_MULTI_AGENT === 'true';
 
 // Security
 import { securityMiddleware } from '@neuroguardian/security-agent';
@@ -137,18 +143,25 @@ export async function handleAgentV5(
     await getProductsByUserId(userId);
   }
 
-  // 6. Execute V5 Orchestrator
+  // 6. Execute Orchestrator (V5 or Multi-Agent based on feature flag)
   const context: OrchestratorContext = {
     userId,
     userName: user?.first_name || 'друг',
     isFirstContact: conversationHistory.length === 0,
   };
 
-  const result = await agentOrchestratorV5.orchestrate(
-    message,
-    context,
-    conversationHistory as any // Temporary cast for type alignment
-  );
+  // Choose orchestrator based on feature flag
+  const result = USE_MULTI_AGENT
+    ? await multiAgentOrchestrator.orchestrate(message, context)
+    : await agentOrchestratorV5.orchestrate(
+        message,
+        context,
+        conversationHistory as Array<{
+          role: 'user' | 'assistant' | 'system';
+          content: string;
+          timestamp: Date;
+        }>
+      );
 
   // 7. Save History & Pending Actions
   if (kv) {
@@ -318,9 +331,19 @@ export async function handleAgentV5Confirm(
 export async function handleAgentV5Status(_req: VercelRequest, res: VercelResponse) {
   return res.json({
     available: true,
-    version: 'v5.0.0',
-    architecture: 'Professional Agent V5',
+    version: USE_MULTI_AGENT ? 'v6.0.0-multiagent' : 'v5.1.0',
+    architecture: USE_MULTI_AGENT ? 'Multi-Agent (5 Specialists)' : 'Professional Agent V5',
     rag_enabled: true,
+    multiAgent: USE_MULTI_AGENT,
+    specialists: USE_MULTI_AGENT
+      ? [
+          'ProductsSpecialist',
+          'PricingSpecialist',
+          'SentinelSpecialist',
+          'AnalyticsSpecialist',
+          'ChatSpecialist',
+        ]
+      : undefined,
   });
 }
 
