@@ -574,12 +574,35 @@ export async function handleHealth(
     const dbResult = await sql`SELECT 1 as ok`;
     const dbOk = dbResult.rows[0]?.ok === 1;
 
-    return res.json({
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-      database: dbOk ? 'connected' : 'error',
-      version: '2.12.0',
-    });
+    // Get kernel health if available
+    let kernelHealth = null;
+    try {
+      const { getKernelHealth, getKernelManifest } = await import('../../core/modules.js');
+      kernelHealth = getKernelHealth();
+      const manifest = getKernelManifest();
+
+      return res.json({
+        status: kernelHealth?.status || (dbOk ? 'ok' : 'degraded'),
+        timestamp: new Date().toISOString(),
+        database: dbOk ? 'connected' : 'error',
+        version: '3.0.0',
+        kernel: {
+          initialized: manifest.kernel.initialized,
+          modulesCount: manifest.modules.length,
+          unhealthyModules: kernelHealth?.unhealthyCount || 0,
+          degradedModules: kernelHealth?.degradedCount || 0,
+        },
+      });
+    } catch {
+      // Kernel not initialized yet - return basic health
+      return res.json({
+        status: dbOk ? 'ok' : 'degraded',
+        timestamp: new Date().toISOString(),
+        database: dbOk ? 'connected' : 'error',
+        version: '3.0.0',
+        kernel: { initialized: false },
+      });
+    }
   } catch (error) {
     return res.json({
       status: 'degraded',
