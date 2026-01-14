@@ -5,7 +5,7 @@
 // ============================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { sql } from '@vercel/postgres';
+import { sql } from '../services/database.js';
 import { orchestrateV5 } from '../../agent/core/AgentOrchestratorV5.js';
 import { logger } from '../lib/index.js';
 import { inferGender } from '../../agent/utils/genderDetection.js';

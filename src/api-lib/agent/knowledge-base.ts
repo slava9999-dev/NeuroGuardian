@@ -3,7 +3,7 @@
 // AI Agent's long-term memory and documentation search
 // ============================================
 
-import { sql } from '@vercel/postgres';
+import { sql } from '../services/database.js';
 
 // ============================================
 // TYPES

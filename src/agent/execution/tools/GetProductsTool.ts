@@ -86,6 +86,7 @@ export const getProductsTool = defineTool<GetProductsArgs>({
         current_stock: p.current_stock,
         cost_price: p.cost_price,
         is_protected: !!p.min_price,
+        _note: 'current_price — это цена селлера (до вычета СПП). Цена на сайте может быть ниже.',
       }));
 
       return {

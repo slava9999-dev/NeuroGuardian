@@ -4,7 +4,7 @@
 // ============================================
 
 import { getSecurityAgent } from '@neuroguardian/security-agent';
-import { sql } from '@vercel/postgres';
+import { sql } from '../services/database.js';
 
 // In-memory cache for performance
 const secretsCache = new Map<string, { value: string; expiresAt: number }>();

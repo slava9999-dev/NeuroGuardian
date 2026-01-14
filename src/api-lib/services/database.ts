@@ -389,6 +389,57 @@ export async function initializeDatabase(): Promise<void> {
     )
   `;
 
+  // 10. Operations Events (Ops Logger)
+  await sql`
+    CREATE TABLE IF NOT EXISTS ops_events (
+      id SERIAL PRIMARY KEY,
+      event_type VARCHAR(50) NOT NULL,
+      event_source VARCHAR(50) NOT NULL,
+      user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+      product_id BIGINT,
+      payload JSONB DEFAULT '{}',
+      old_price INTEGER,
+      new_price INTEGER,
+      competitor_price INTEGER,
+      action_taken VARCHAR(50),
+      marketplace VARCHAR(20),
+      external_id VARCHAR(255),
+      severity VARCHAR(20) DEFAULT 'INFO',
+      entity_type VARCHAR(50),
+      entity_id VARCHAR(255),
+      processed_at TIMESTAMP,
+      processing_result JSONB,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+
+  // 11. Operations Audit (Immutable)
+  await sql`
+    CREATE TABLE IF NOT EXISTS ops_audit (
+      id SERIAL PRIMARY KEY,
+      actor_type VARCHAR(20) NOT NULL,
+      actor_id VARCHAR(255),
+      action VARCHAR(50) NOT NULL,
+      resource_type VARCHAR(50) NOT NULL,
+      resource_id VARCHAR(255),
+      old_value JSONB,
+      new_value JSONB,
+      metadata JSONB DEFAULT '{}',
+      ip_address VARCHAR(45),
+      user_agent TEXT,
+      request_id VARCHAR(255),
+      success BOOLEAN DEFAULT true,
+      error_message TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+
+  // Indexes for Ops Logs
+  await sql`CREATE INDEX IF NOT EXISTS idx_ops_events_user_id ON ops_events(user_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_ops_events_created_at ON ops_events(created_at)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_ops_events_type ON ops_events(event_type)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_ops_audit_resource ON ops_audit(resource_type, resource_id)`;
+
   logger.info('Database schema initialized');
 }
 

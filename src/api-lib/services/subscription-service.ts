@@ -1,7 +1,7 @@
 // NeuroGUARDIAN — Subscription Service
 // Business logic for subscription management
 
-import { sql } from '@vercel/postgres';
+import { sql } from './database.js';
 import type {
   Subscription,
   SubscriptionStatus,

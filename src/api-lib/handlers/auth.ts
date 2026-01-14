@@ -4,7 +4,7 @@
 // ============================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { sql } from '@vercel/postgres';
+import { sql } from '../services/database.js';
 
 // Import from modular library
 import { SUBSCRIPTION_PLANS } from '../lib/index.js';

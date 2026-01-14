@@ -4,7 +4,7 @@
 // ============================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { sql } from '@vercel/postgres';
+import { sql } from '../services/database.js';
 
 import { extractCronAuthAsync, extractAdminAuthAsync } from '../middleware/auth.js';
 

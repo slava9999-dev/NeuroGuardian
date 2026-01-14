@@ -4,7 +4,7 @@
 // ============================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { sql } from '@vercel/postgres';
+import { sql } from '../services/database.js';
 import { runPriceProtection } from '../agent/price-protection.js';
 import { getMarketplaceKeys } from '../services/marketplace-bridge.js';
 import {

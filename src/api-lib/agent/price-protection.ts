@@ -3,7 +3,7 @@
 // Automated price monitoring and protection
 // ============================================
 
-import { sql } from '@vercel/postgres';
+import { sql } from '../services/database.js';
 import {
   fetchWbProducts,
   fetchWbPrices,
