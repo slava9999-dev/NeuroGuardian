@@ -41,3 +41,5 @@ secrets/
 *.tsbuildinfo
 .vercel
 .env*.local
+
+scripts/_archive/
