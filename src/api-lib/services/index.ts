@@ -13,6 +13,8 @@ export {
   getUsersPaginated,
 } from './users.js';
 
+export { priceParserService } from '../core-services/PriceParserService.js';
+
 // Database
 export {
   initializeDatabase,

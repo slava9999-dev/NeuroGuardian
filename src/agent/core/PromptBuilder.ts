@@ -145,6 +145,9 @@ ${context}
     // 5. Tool descriptions
     sections.push(toolRegistry.generatePrompt({ includeExamples: true }));
 
+    // 5.1 Digital Vision Instructions
+    sections.push(DIGITAL_VISION_INSTRUCTIONS);
+
     // 6. Memory context (long-term facts)
     if (context.userId) {
       sections.push(await this.buildMemoryContext(context.userId, query));
@@ -437,6 +440,13 @@ const ANSWERER_OUTPUT_FORMAT = `## ФОРМАТ ОТВЕТА
   "links": [{ "title": "...", "url": "...", "source": "..." }],
   "actions": [{ "type": "...", "summary": "...", "details_json": "{}", "affected_count": 0 }]
 }`;
+
+const DIGITAL_VISION_INSTRUCTIONS = `## 👁️ ЦИФРОВОЕ ЗРЕНИЕ (ПРОВЕРКА РЕАЛЬНЫХ ЦЕН)
+Если пользователь просит "проверь реальную цену", "посмотри цену покупателя" или "почему цена такая низкая":
+1. Сначала используй инструмент **get_real_price** для маркетплейса.
+2. ⚠️ ВАЖНО: Если **get_real_price** вернул ошибку (например, "WB API Error: 404" или блок), это значит включилась анти-бот защита.
+3. В этом случае — НЕ СДАВАЙСЯ! Сразу используй инструмент **search_web** с запросом: "цена [товар] [артикул] [маркетплейс]".
+4. Объясни пользователю: "Прямой парсинг заблокирован защитой, но я нашёл цену через поиск..."`;
 
 // Singleton instance
 export const promptBuilder = new PromptBuilder();

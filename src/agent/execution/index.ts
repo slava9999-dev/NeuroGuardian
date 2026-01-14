@@ -40,6 +40,7 @@ import { updateProductSettingsTool } from './tools/UpdateProductSettingsTool.js'
 import { searchWebTool } from './tools/SearchWebTool.js';
 import { getMarketplaceInfoTool } from './tools/GetMarketplaceInfoTool.js';
 import { getCompetitorPriceTool } from './tools/GetCompetitorPriceTool.js';
+import { getRealPriceTool } from './tools/GetRealPriceTool.js';
 
 // Admin
 import { getSystemLogsTool } from './tools/GetSystemLogsTool.js';
@@ -62,6 +63,7 @@ export function registerAllTools(): void {
   toolRegistry.register(getAbcAnalysisTool);
   toolRegistry.register(getStockForecastTool);
   toolRegistry.register(getLowMarginProductsTool);
+  toolRegistry.register(getRealPriceTool); // Digital Vision
 
   // Write tools (require confirmation)
   toolRegistry.register(setStopLossTool);
@@ -104,3 +106,4 @@ export { getSystemLogsTool } from './tools/GetSystemLogsTool.js';
 export { getCompetitorPriceTool } from './tools/GetCompetitorPriceTool.js';
 export { getReviewsTool } from './tools/GetReviewsTool.js';
 export { getLowMarginProductsTool } from './tools/GetLowMarginProductsTool.js';
+export { getRealPriceTool } from './tools/GetRealPriceTool.js';
