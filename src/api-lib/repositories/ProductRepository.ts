@@ -26,13 +26,18 @@ export class ProductRepository {
         INSERT INTO products (
           user_id, product_id, nm_id, official_sku, offer_id, title, 
           image_url, current_price, estimated_buyer_price, marketplace_discount_percent,
-          current_stock, marketplace, account_id, updated_at
+          current_stock, marketplace, account_id, 
+          min_price, spp_buffer_percent, auto_adjust_min_price, is_monitored, status,
+          updated_at
         )
         VALUES (
           ${userId}, ${p.product_id}, ${p.nm_id || null}, ${p.official_sku || null}, 
           ${p.offer_id || null}, ${p.title}, ${p.image_url}, ${p.current_price}, 
           ${p.estimated_buyer_price || null}, ${p.marketplace_discount_percent || null},
-          ${p.current_stock}, ${p.marketplace}, ${p.account_id || null}, NOW()
+          ${p.current_stock}, ${p.marketplace}, ${p.account_id || null},
+          ${p.min_price || 0}, ${p.spp_buffer_percent || 25}, ${p.auto_adjust_min_price ?? false}, 
+          ${p.is_monitored ?? true}, ${p.status || 'active'},
+          NOW()
         )
         ON CONFLICT (user_id, product_id) DO UPDATE SET
           current_price = EXCLUDED.current_price,
@@ -42,6 +47,16 @@ export class ProductRepository {
           title = EXCLUDED.title,
           image_url = EXCLUDED.image_url,
           account_id = COALESCE(EXCLUDED.account_id, products.account_id),
+          -- Smart Defaults: Update min_price ONLY if product doesn't have one set already
+          min_price = CASE 
+            WHEN products.min_price = 0 OR products.min_price IS NULL 
+            THEN EXCLUDED.min_price 
+            ELSE products.min_price 
+          END,
+          -- Update SPP buffer only if not manually set
+          spp_buffer_percent = COALESCE(products.spp_buffer_percent, EXCLUDED.spp_buffer_percent),
+          -- Keep existing monitoring settings if already set
+          is_monitored = COALESCE(products.is_monitored, EXCLUDED.is_monitored),
           updated_at = NOW()
       `;
     }

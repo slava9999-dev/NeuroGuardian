@@ -205,7 +205,14 @@ export const productsApi = {
 
   syncProducts: async (
     marketplace: 'WB' | 'Ozon' = 'Ozon'
-  ): Promise<{ success: boolean; message: string; count: number }> => {
+  ): Promise<{
+    success: boolean;
+    message: string;
+    count: number;
+    smartDefaultsApplied?: number;
+    protectionEnabled?: boolean;
+    warning?: string;
+  }> => {
     const initData = getInitData();
     const response = await api.post('', {
       action: 'sync-products',

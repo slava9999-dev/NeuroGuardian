@@ -116,16 +116,20 @@ export async function handleProducts(
 
 import { marketplaceService } from '../core-services/MarketplaceService.js';
 import { productRepository } from '../repositories/ProductRepository.js';
+import { smartDefaultsService } from '../core-services/SmartDefaultsService.js';
 
 /**
  * Handle sync-products action — fetch products from WB/Ozon APIs
+ *
+ * Phase 1 Enhancement: Auto-calculates min_price (smart defaults) for all products
+ * This reduces Setup Cost from 3,000₽ → 0₽
  */
 export async function handleSyncProducts(
   req: VercelRequest,
   res: VercelResponse,
   userId: number
 ): Promise<VercelResponse> {
-  const { marketplace } = req.body || {};
+  const { marketplace, enableSmartDefaults = true } = req.body || {};
   const mp = (marketplace || 'Ozon') as 'WB' | 'Ozon';
 
   // Get user's subscription status
@@ -152,10 +156,11 @@ export async function handleSyncProducts(
   );
 
   console.log(
-    `DEBUG: handleSyncProducts userId=${userId} mp=${mp} accounts=${accounts.length} active=${activeAccounts.length}`
+    `DEBUG: handleSyncProducts userId=${userId} mp=${mp} accounts=${accounts.length} active=${activeAccounts.length} smartDefaults=${enableSmartDefaults}`
   );
 
   let totalSaved = 0;
+  let smartDefaultsApplied = 0;
   const summary: string[] = [];
   let limitReached = false;
 
@@ -176,23 +181,51 @@ export async function handleSyncProducts(
           if (productsToSave.length > productLimit) limitReached = true;
 
           if (limitedProducts.length > 0) {
-            // Need DBProduct type mapping here or ProductRepository should accept Partial<DBProduct>
-            // Ideally we need to map MarketplaceProduct to DBProduct shape
-            // Let's rely on type compatibility as much as possible, or map explicitly
-            const dbProducts = limitedProducts.map(p => ({
-              user_id: userId,
-              product_id: p.product_id,
-              nm_id: p.nm_id || null,
-              title: p.title,
-              image_url: p.image_url,
-              current_price: p.current_price,
-              estimated_buyer_price: p.current_price, // Fallback if not calculated
-              current_stock: p.current_stock,
-              marketplace: p.marketplace,
-              account_id: account.id,
-            }));
+            // Phase 1: Calculate smart defaults for each product
+            let smartDefaults: Map<
+              string,
+              ReturnType<typeof smartDefaultsService.calculateDefaults>
+            > | null = null;
+
+            if (enableSmartDefaults) {
+              const productsForDefaults = limitedProducts.map(p => ({
+                productId: p.product_id,
+                currentPrice: p.current_price,
+                marketplace: p.marketplace,
+                title: p.title,
+                category: undefined,
+                currentStock: p.current_stock,
+                costPrice: null,
+              }));
+              smartDefaults = smartDefaultsService.calculateBatch(productsForDefaults);
+            }
+
+            // Map to DBProduct shape with smart defaults
+            const dbProducts = limitedProducts.map(p => {
+              const defaults = smartDefaults?.get(p.product_id);
+              return {
+                user_id: userId,
+                product_id: p.product_id,
+                nm_id: p.nm_id || null,
+                title: p.title,
+                image_url: p.image_url,
+                current_price: p.current_price,
+                estimated_buyer_price: p.current_price,
+                current_stock: p.current_stock,
+                marketplace: p.marketplace,
+                account_id: account.id,
+                // Smart Defaults: Auto-calculated min_price
+                min_price: defaults?.minPrice || 0,
+                spp_buffer_percent: defaults?.sppBufferPercent || 25,
+                auto_adjust_min_price: true, // Enable auto-adjust by default
+                is_monitored: true, // Enable monitoring by default
+                status: defaults?.minPrice ? 'protected' : 'active',
+              };
+            });
+
             await productRepository.saveBatch(userId, dbProducts);
             totalSaved += limitedProducts.length;
+            smartDefaultsApplied += dbProducts.filter(p => p.min_price > 0).length;
             summary.push(`${account.name}: ${limitedProducts.length}`);
           }
         } catch (e) {
@@ -213,19 +246,49 @@ export async function handleSyncProducts(
         if (productsToSave.length > productLimit) limitReached = true;
 
         if (limitedProducts.length > 0) {
-          const dbProducts = limitedProducts.map(p => ({
-            user_id: userId,
-            product_id: p.product_id,
-            nm_id: p.nm_id || null,
-            title: p.title,
-            image_url: p.image_url,
-            current_price: p.current_price,
-            estimated_buyer_price: p.current_price, // Fallback if not calculated
-            current_stock: p.current_stock,
-            marketplace: p.marketplace,
-          }));
+          // Phase 1: Calculate smart defaults for each product
+          let smartDefaults: Map<
+            string,
+            ReturnType<typeof smartDefaultsService.calculateDefaults>
+          > | null = null;
+
+          if (enableSmartDefaults) {
+            const productsForDefaults = limitedProducts.map(p => ({
+              productId: p.product_id,
+              currentPrice: p.current_price,
+              marketplace: p.marketplace,
+              title: p.title,
+              category: undefined,
+              currentStock: p.current_stock,
+              costPrice: null,
+            }));
+            smartDefaults = smartDefaultsService.calculateBatch(productsForDefaults);
+          }
+
+          const dbProducts = limitedProducts.map(p => {
+            const defaults = smartDefaults?.get(p.product_id);
+            return {
+              user_id: userId,
+              product_id: p.product_id,
+              nm_id: p.nm_id || null,
+              title: p.title,
+              image_url: p.image_url,
+              current_price: p.current_price,
+              estimated_buyer_price: p.current_price,
+              current_stock: p.current_stock,
+              marketplace: p.marketplace,
+              // Smart Defaults: Auto-calculated min_price
+              min_price: defaults?.minPrice || 0,
+              spp_buffer_percent: defaults?.sppBufferPercent || 25,
+              auto_adjust_min_price: true,
+              is_monitored: true,
+              status: defaults?.minPrice ? 'protected' : 'active',
+            };
+          });
+
           await productRepository.saveBatch(userId, dbProducts);
           totalSaved += limitedProducts.length;
+          smartDefaultsApplied += dbProducts.filter(p => p.min_price > 0).length;
           summary.push(`Основной: ${limitedProducts.length}`);
         }
       } catch (e) {
@@ -234,14 +297,26 @@ export async function handleSyncProducts(
       }
     }
 
-    // Update user total
-    await sql`UPDATE users SET total_products = (SELECT COUNT(*) FROM products WHERE user_id = ${userId}), updated_at = CURRENT_TIMESTAMP WHERE id = ${userId}`;
+    // Update user total and enable protection by default
+    await sql`
+      UPDATE users SET 
+        total_products = (SELECT COUNT(*) FROM products WHERE user_id = ${userId}),
+        protection_enabled = true,
+        updated_at = CURRENT_TIMESTAMP 
+      WHERE id = ${userId}
+    `;
+
+    console.log(
+      `✅ Sync complete: userId=${userId}, saved=${totalSaved}, smartDefaults=${smartDefaultsApplied}`
+    );
 
     return res.json({
       success: true,
       message: `Синхронизировано ${totalSaved} товаров из ${mp} (${summary.join(', ')})`,
       count: totalSaved,
       marketplace: mp,
+      smartDefaultsApplied,
+      protectionEnabled: true,
       warning: limitReached
         ? `Достигнут лимит тарифа. Всего сохранено товаров: ${totalSaved}`
         : undefined,

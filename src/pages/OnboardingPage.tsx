@@ -19,6 +19,7 @@ export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [syncedCount, setSyncedCount] = useState(0);
+  const [protectedCount, setProtectedCount] = useState(0);
 
   const handleMarketplaceSelect = (mp: Marketplace) => {
     hapticFeedback('light');
@@ -50,10 +51,11 @@ export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
 
       setStep('sync');
 
-      // REAL: Sync products from marketplace
+      // REAL: Sync products from marketplace with Smart Defaults enabled
       const syncResult = await productsApi.syncProducts(selectedMarketplace!);
 
       setSyncedCount(syncResult.count || 0);
+      setProtectedCount(syncResult.smartDefaultsApplied || syncResult.count || 0);
       hapticFeedback('success');
       setStep('complete');
     } catch (err: unknown) {
@@ -412,9 +414,46 @@ export function OnboardingPage({ onComplete }: { onComplete: () => void }) {
             </motion.div>
 
             <h2 className="text-2xl font-bold text-white mb-2">Отлично! Я готов работать 🎉</h2>
+
+            {/* Smart Defaults Summary */}
+            {syncedCount > 0 && (
+              <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                    <svg
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      className="text-emerald-400"
+                    >
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                      <path d="m9 12 2 2 4-4" />
+                    </svg>
+                  </div>
+                  <div className="text-left">
+                    <p className="text-emerald-400 font-semibold">Защита настроена автоматически</p>
+                    <p className="text-sm text-stone-400">Setup Cost: 0₽ (обычно 3,000₽)</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 mt-3">
+                  <div className="text-center p-2 bg-stone-800/50 rounded-lg">
+                    <p className="text-2xl font-bold text-white">{syncedCount}</p>
+                    <p className="text-xs text-stone-400">Товаров загружено</p>
+                  </div>
+                  <div className="text-center p-2 bg-stone-800/50 rounded-lg">
+                    <p className="text-2xl font-bold text-emerald-400">{protectedCount}</p>
+                    <p className="text-xs text-stone-400">Под защитой</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <p className="text-stone-400 mb-8">
               {syncedCount > 0
-                ? `Загружено ${syncedCount} товаров. Теперь можете управлять магазином через чат!`
+                ? 'Все товары под защитой. Sentinel уже следит за ценами!'
                 : 'Товары загружены. Напишите мне в чат — я помогу настроить защиту!'}
             </p>
 
