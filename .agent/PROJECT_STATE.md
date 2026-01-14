@@ -1,6 +1,6 @@
 # 📊 Project State — NeuroGUARDIAN
 
-# Updated: 2026-01-14T18:22:00+03:00
+# Updated: 2026-01-15T01:55:00+03:00
 
 # This file tracks current progress and is updated at end of each session
 
@@ -8,14 +8,73 @@
 
 ## 🎯 Current Phase: RELEASE PREPARATION (Phase 12) 🚀 PREPARING FOR LAUNCH
 
-**Last Session:** 2026-01-14 (Session 54)
-**Focus:** 📊 Monte Carlo Analysis, Business Valuation, Critical Improvement Plan
+**Last Session:** 2026-01-15 (Session 56)
+**Focus:** 🏗️ Multi-Agent Architecture with 5 Specialists + Gemini via OpenRouter
 
 **📋 NEXT SESSION PRIORITY:**
 
-> **🚀 Реализация критических улучшений из IMPROVEMENT_PLAN.md**
-> Phase 1: Автоматический импорт товаров (Setup time: 2 часа → 3 минуты)
-> Phase 2: ML-детекция угроз (Precision: 53% → 85%)
+> **🧪 Включить Multi-Agent режим в production**
+>
+> 1. Добавить USE_MULTI_AGENT=true в Vercel Environment Variables
+> 2. Протестировать 5 специалистов в реальных сценариях
+> 3. Создать unit-тесты для IntentClassifier
+
+### Session 2026-01-15 (Session 56 - Multi-Agent Architecture) 🏗️
+
+**Objective: Разбить монолитного агента на 5 специалистов для повышения качества ответов**
+
+> ✅ **CRITICAL:** Создана Multi-Agent архитектура с 5 специалистами (Products, Pricing, Sentinel, Analytics, Chat)
+> ✅ **CRITICAL:** GeminiProvider переведён на OpenRouter (работает в России!)
+> ✅ **MAJOR:** Feature flag USE_MULTI_AGENT для постепенного rollout
+> ✅ **MAJOR:** IntentClassifier с 5 категориями и entity extraction
+
+**Completed Actions:**
+
+- [x] **GeminiProvider**: Маршрутизация через OpenRouter API
+- [x] **IntentClassifier**: 5 категорий (PRODUCTS, PRICING, SENTINEL, ANALYTICS, CHAT)
+- [x] **ProductsSpecialist**: 4 tools (get_products, settings, low_margin, real_price)
+- [x] **PricingSpecialist**: 3 tools с обязательным подтверждением
+- [x] **SentinelSpecialist**: 2 tools для защиты и конкурентов
+- [x] **AnalyticsSpecialist**: 5 tools с Gemini Pro для сложной аналитики
+- [x] **ChatSpecialist**: RAG-only, без tools (FAQ, onboarding)
+- [x] **MultiAgentOrchestrator**: Маршрутизатор запросов
+- [x] **API Integration**: agent-v5.ts с feature flag USE_MULTI_AGENT
+- [x] **Database Check**: 5 users, PostgreSQL 17.7, 365ms latency
+- [x] **KnowledgeBase Check**: 18 документов, поиск работает
+
+**Commits:**
+
+- `feat: Multi-Agent Architecture with 5 specialists`
+- `fix: Route Gemini through OpenRouter (works in Russia)`
+- `feat: Integrate MultiAgentOrchestrator with feature flag`
+
+**Files Created:**
+
+- `src/infrastructure/llm/GeminiProvider.ts` — Gemini через OpenRouter
+- `src/agent/specialists/BaseSpecialist.ts` — Базовый класс
+- `src/agent/specialists/IntentClassifier.ts` — 5 категорий intent
+- `src/agent/specialists/ProductsSpecialist.ts`
+- `src/agent/specialists/PricingSpecialist.ts`
+- `src/agent/specialists/SentinelSpecialist.ts`
+- `src/agent/specialists/AnalyticsSpecialist.ts`
+- `src/agent/specialists/ChatSpecialist.ts`
+- `src/agent/specialists/MultiAgentOrchestrator.ts`
+- `src/agent/specialists/index.ts`
+
+**Key Architecture:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    MULTI-AGENT ARCHITECTURE                      │
+├─────────────────────────────────────────────────────────────────┤
+│  🎯 Intent Classifier (Gemini Flash via OpenRouter)             │
+│  ├── PRODUCTS → ProductsSpecialist (4 tools)                    │
+│  ├── PRICING → PricingSpecialist (3 tools, confirmation)        │
+│  ├── SENTINEL → SentinelSpecialist (2 tools)                    │
+│  ├── ANALYTICS → AnalyticsSpecialist (5 tools, Gemini Pro)      │
+│  └── CHAT → ChatSpecialist (RAG only)                           │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ### Session 2026-01-14 (Session 54 - Monte Carlo Analysis & Business Valuation) 📊
 
