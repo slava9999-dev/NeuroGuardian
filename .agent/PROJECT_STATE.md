@@ -209,11 +209,13 @@
 
 ## 🟡 Important TODO (P1)
 
-| #   | Feature                 | Status  | Notes                      |
-| --- | ----------------------- | ------- | -------------------------- |
-| 1   | Креативы для TG рекламы | ✅ DONE | Strategy: Utility & Safety |
-| 2   | Выбор TG каналов        | ⏳ TODO | бюджет 10,000₽             |
-| 3   | A/B тестирование        | ⏳ TODO | UTM метки                  |
+| #   | Feature                   | Status     | Notes                                         |
+| --- | ------------------------- | ---------- | --------------------------------------------- |
+| 1   | Креативы для TG рекламы   | ✅ DONE    | Strategy: Utility & Safety                    |
+| 2   | Технические посты (VK/TG) | ✅ DONE    | `docs/marketing/LAUNCH_STRATEGY_TECHNICAL.md` |
+| 3   | Загрузить аватар бота     | ⏳ PENDING | viktor_avatar.png                             |
+| 4   | Выбор TG каналов          | ⏳ TODO    | бюджет 10,000₽                                |
+| 5   | Тест YooKassa в проде     | ✅ DONE    | logic simulation passed                       |
 
 ---
 
