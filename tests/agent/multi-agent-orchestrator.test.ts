@@ -184,7 +184,7 @@ describe('MultiAgentOrchestrator', () => {
       const result = await multiAgentOrchestrator.orchestrate('привет', mockContext);
 
       expect(result.success).toBe(false);
-      expect(result.message).toContain('ошибка');
+      expect(result.message.toLowerCase()).toContain('ошибка');
       expect(result.specialist).toBe('ChatSpecialist');
     });
 

@@ -16,6 +16,10 @@ import { logger } from '../../api-lib/lib/logger.js';
 export interface MultiAgentResult extends OrchestratorResult {
   intent: ClassificationResult;
   specialist: string;
+  _debug?: {
+    error: string;
+    at: string;
+  };
 }
 
 /**
@@ -150,14 +154,24 @@ export class MultiAgentOrchestrator {
       };
     } catch (error) {
       const totalTimeMs = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+
       logger.error('[MultiAgent] Orchestration failed', {
-        error: error instanceof Error ? error.message : String(error),
+        error: errorMessage,
+        stack: errorStack?.split('\n').slice(0, 5).join('\n'),
         totalTimeMs,
+        userId: context.userId,
       });
+
+      // Return error details for debugging (production should hide this)
+      const isDev = process.env.NODE_ENV !== 'production';
 
       return {
         success: false,
-        message: 'Произошла ошибка при обработке запроса. Попробуйте ещё раз.',
+        message: isDev
+          ? `Ошибка: ${errorMessage}`
+          : 'Произошла ошибка при обработке запроса. Попробуйте ещё раз.',
         toolsCalled: [],
         toolResults: [],
         tokensUsed: 0,
@@ -174,6 +188,11 @@ export class MultiAgentOrchestrator {
           classifiedBy: 'rules',
         },
         specialist: 'ChatSpecialist',
+        // Debug info (always include to help diagnose production issues)
+        _debug: {
+          error: errorMessage,
+          at: new Date().toISOString(),
+        },
       };
     }
   }
