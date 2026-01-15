@@ -17,9 +17,9 @@ async function runCycle() {
 
   try {
     // Dynamic import ensures modules allow database.ts to see the updated process.env
-    const { sentinelService } = await import('../src/api-lib/services/sentinel-service.js');
+    const { sentinelOrchestrator } = await import('../src/sentinel/SentinelOrchestrator.js');
 
-    const result = await sentinelService.runCycle();
+    const result = await sentinelOrchestrator.runCycle();
 
     console.log('\n✅ Цикл завершен успешно!');
     console.log(`👥 Обработано пользователей: ${result.usersProcessed}`);

@@ -109,11 +109,13 @@ function classifyByRules(query: string): ClassificationResult {
     classifiedBy: 'rules' as const,
   };
 
-  // CHAT patterns (greetings, help)
+  // CHAT patterns (greetings, help, FAQ)
   const chatPatterns = [
-    /^(привет|здравствуй|хай|hello|hi|hey|добр)/i,
-    /^(кто ты|что умеешь|help|помощь|помоги|как работает)/i,
-    /^(как дела|спасибо|пока|bye)/i,
+    /^(привет|здравствуй|хай|hello|hi|hey|добр|салют|дарова)/i,
+    /^(кто ты|что умеешь|help|помощь|помоги|как работает|что это|зачем)/i,
+    /^(как дела|спасибо|пока|bye|благодар|круто|супер|отлично)/i,
+    /^(как подключить|как настроить|инструкция|обучение|начать)/i,
+    /^(подписка|тариф|стоимость|сколько стоит|цена услуг)/i,
   ];
 
   for (const pattern of chatPatterns) {
@@ -127,13 +129,15 @@ function classifyByRules(query: string): ClassificationResult {
     }
   }
 
-  // PRICING patterns
+  // PRICING patterns (price changes, stop-loss, protection)
   const pricingPatterns = [
-    /(стоп.?лосс|stop.?loss)/i,
-    /(измен|обнов|устанор|поставь|сделай).*(цен|price)/i,
-    /(защит[иь]).*(товар|все|массов)/i,
+    /(стоп.?лосс|stop.?loss|стоплосс)/i,
+    /(измен|обнов|устанор|поставь|сделай|подним|сниз).*(цен|price)/i,
+    /(защит[иь]|защита).*(товар|все|массов|цен)/i,
     /(минимальн|мин).*(цен|порог)/i,
     /bulk.?protect/i,
+    /(установ|задай|выстав).*(защит|лимит|порог|мин)/i,
+    /(включ|активир).*(защит|sentinel)/i,
   ];
 
   for (const pattern of pricingPatterns) {
@@ -147,13 +151,16 @@ function classifyByRules(query: string): ClassificationResult {
     }
   }
 
-  // SENTINEL patterns
+  // SENTINEL patterns (threats, competitors, monitoring)
   const sentinelPatterns = [
-    /(угроз|threat)/i,
-    /(конкурент|competitor)/i,
-    /(sentinel|сентинел|страж|защита)/i,
-    /(статус защит)/i,
-    /(мониторинг цен)/i,
+    /(угроз|threat|опасност|атак)/i,
+    /(конкурент|competitor|соперник)/i,
+    /(sentinel|сентинел|страж)/i,
+    /(статус защит|как защита|работает защита)/i,
+    /(мониторинг цен|слеж|отслежива)/i,
+    /(лог|история|журнал).*(защит|sentinel|срабатыван)/i,
+    /(цен).*(конкурент|сопорник)/i,
+    /(сравн|анализ).*(конкурент)/i,
   ];
 
   for (const pattern of sentinelPatterns) {
@@ -167,15 +174,18 @@ function classifyByRules(query: string): ClassificationResult {
     }
   }
 
-  // ANALYTICS patterns
+  // ANALYTICS patterns (economics, analysis, forecasts)
   const analyticsPatterns = [
     /(юнит|unit).*(эконом|econom)/i,
-    /(abc|абс).*(анализ|analysis)/i,
-    /(прогноз|forecast)/i,
-    /(статистик|stats)/i,
-    /(заработ|прибыл|доход|revenue|profit)/i,
-    /(рентабельн|margin|маржа)/i,
-    /(продаж|sales).*(за|анализ|статистик)/i,
+    /(abc|абс|абц).*(анализ|analysis)/i,
+    /(прогноз|forecast|предсказ)/i,
+    /(статистик|stats|отчёт|отчет)/i,
+    /(заработ|прибыл|доход|revenue|profit|выручк)/i,
+    /(рентабельн|margin|маржа|маржинальн)/i,
+    /(продаж|sales).*(за|анализ|статистик|отчёт)/i,
+    /(себестоимост|расход|затрат)/i,
+    /(сколько|какой|какая).*(прибыл|доход|заработ|маржа)/i,
+    /(посчита|рассчита|калькул).*(эконом|прибыл|маржа)/i,
   ];
 
   for (const pattern of analyticsPatterns) {
@@ -189,13 +199,16 @@ function classifyByRules(query: string): ClassificationResult {
     }
   }
 
-  // PRODUCTS patterns
+  // PRODUCTS patterns (products, search, sync)
   const productsPatterns = [
-    /(товар|product|артикул|sku)/i,
-    /(покажи|список|найди|поиск).*(товар)/i,
-    /(синхронизир|sync)/i,
-    /(низк).*(марж)/i,
-    /(реальн).*(цен)/i,
+    /(товар|product|артикул|sku|позиц)/i,
+    /(покажи|список|найди|поиск|где).*(товар)/i,
+    /(синхронизир|sync|обнов|импорт).*(товар|каталог)/i,
+    /(низк|мал).*(марж|маржинальн)/i,
+    /(реальн|итогов|финальн).*(цен)/i,
+    /(мои|мой|все).*(товар|позиц)/i,
+    /(сколько|количество).*(товар|позиц)/i,
+    /(настро|измен).*(товар|позиц)/i,
   ];
 
   for (const pattern of productsPatterns) {
