@@ -12,10 +12,9 @@ if (process.env.GEMINI_API_KEY) {
 
 async function runQA() {
   // Import dependencies AFTER env modification
-  const { MultiAgentOrchestrator, multiAgentOrchestrator } =
+  const { multiAgentOrchestrator } =
     await import('../src/agent/specialists/MultiAgentOrchestrator.js');
   const { stateManager } = await import('../src/agent/core/StateManager.js');
-  const { logger } = await import('../src/api-lib/lib/logger.js');
 
   // Setup Mock User State
   const MOCK_USER_ID = 999;
@@ -41,13 +40,8 @@ async function runQA() {
   console.log('🤖 INITIALIZING AGENT QA SESSION...');
   console.log('====================================');
 
-  // Test Questions
-  const QUESTIONS = [
-    'Как работает защита цен NeuroGUARDIAN?',
-    'Какие комиссии сейчас на WB для одежды?',
-    'Где взять API ключ для Озон?',
-    'Что такое стоп-лосс и как его настроить?',
-  ];
+  // Specific RAG Check Question
+  const QUESTIONS = ['Что такое Saved Amount в логах Sentinel?', 'Где взять API ключ для Ozon?'];
 
   for (const question of QUESTIONS) {
     console.log(`\n❓ ВОПРОС: "${question}"`);

@@ -13,11 +13,47 @@
 
 **📋 NEXT SESSION PRIORITY:**
 
-> **🧪 Включить Multi-Agent режим в production**
+> **🧪 REAL-TIME TESTING & RAG IMPROVEMENT**
 >
-> 1. Добавить USE_MULTI_AGENT=true в Vercel Environment Variables
-> 2. Протестировать 5 специалистов в реальных сценариях
-> 3. Создать unit-тесты для IntentClassifier
+> 1. Включить агента в реальном времени (Telegram)
+> 2. Протестировать ответы на сложные вопросы (Long Context Fallback)
+> 3. Реализовать Hybrid Search (ключевые слова + векторы)
+
+### Session 2026-01-15 (Session 57 - RAG Verification & Architecture Analysis) 🧠
+
+**Objective: Проверка работы RAG и анализ архитектуры**
+
+> ✅ **CRITICAL:** Система RAG полностью верифицирована. Агент находит специфические факты ("Saved Amount") в базе знаний.
+> ✅ **CRITICAL:** Реализован прямой доступ к Google Gemini API (через VPN) в обход OpenRouter.
+> ✅ **DECISION:** Отказ от миграции на Google File Search API в пользу текущего PgVector (контроль, скорость, цена).
+
+**Completed Actions:**
+
+- [x] **RAG Verification**: Скрипт `qa-agent.ts` подтвердил, что агент использует Context из `sentinel_instruction.md`.
+- [x] **GeminiProvider Hardening**:
+  - Жесткая привязка к модели `gemini-2.5-flash` (доступна и быстрая).
+  - Поддержка `Direct Google API` (если нет OpenRouter ключа).
+  - Корректная обработка `system_instruction`.
+- [x] **Architecture Review**: Создан документ `docs/RAG_ARCHITECTURE_REVIEW.md` с анализом решений.
+- [x] **QA Tooling**: Улучшен скрипт `scripts/qa-agent.ts` с динамическими импортами для тестирования окружения.
+
+**Commits:**
+
+- `fix(llm): cement gemini-2.5-flash and add direct google api support`
+- `docs: add RAG architecture review`
+
+**Files Created:**
+
+- `docs/RAG_ARCHITECTURE_REVIEW.md` — Анализ архитектуры RAG
+- `scripts/qa-agent.ts` — (Обновлен) Инструмент QA тестирования
+
+**Key Insights:**
+
+```
+RAG работает отлично. Агент знает внутренние термины ("Saved Amount").
+Прямой доступ к Google API (v1beta) стабильнее и бесплатнее OpenRouter для тестов.
+PgVector остается основным движком знаний.
+```
 
 ### Session 2026-01-15 (Session 56 - Multi-Agent Architecture) 🏗️
 
