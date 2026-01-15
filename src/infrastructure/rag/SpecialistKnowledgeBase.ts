@@ -46,7 +46,7 @@ export class SpecialistKnowledgeBase {
 
   constructor(options?: { maxTokens?: number; maxDocuments?: number }) {
     this.maxTokens = options?.maxTokens || 2000;
-    this.maxDocuments = options?.maxDocuments || 5;
+    this.maxDocuments = options?.maxDocuments || 7;
   }
 
   /**
@@ -59,10 +59,11 @@ export class SpecialistKnowledgeBase {
     const namespaces = SPECIALIST_NAMESPACES[specialist];
 
     try {
-      const results = await vectorStore.search(query, {
+      // Use hybrid search by default for better quality
+      const results = await vectorStore.hybridSearch(query, {
         namespace: namespaces,
         limit: this.maxDocuments,
-        threshold: 0.5,
+        vectorWeight: 0.6, // Balanced for Russian
       });
 
       return this.formatContext(results, specialist);

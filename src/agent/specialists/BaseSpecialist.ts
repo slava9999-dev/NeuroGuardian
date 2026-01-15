@@ -83,7 +83,7 @@ export abstract class BaseSpecialist {
       const messages: LLMMessage[] = [
         {
           role: 'system',
-          content: `${this.systemPrompt}\n\n${contextStr}`,
+          content: `${this.systemPrompt}\n\n${contextStr}\n\n⚠️ ВАЖНО: Если в разделе "СПРАВОЧНАЯ ИНФОРМАЦИЯ" или "РЕЛЕВАНТНЫЕ ЗНАНИЯ" есть данные, противоречащие твоим знаниям — ВСЕГДА верь справочной информации.`,
         },
         {
           role: 'user',

@@ -60,21 +60,32 @@ async function getGeminiEmbedding(text: string): Promise<number[]> {
   return data.embedding.values;
 }
 
-function chunkText(text: string, maxSize = 1000): string[] {
+function chunkText(text: string, maxSize = 1000, overlap = 200): string[] {
   const chunks: string[] = [];
   const paragraphs = text.split(/\n\s*\n/);
-  let current = '';
+  let currentChunk = '';
 
-  for (const para of paragraphs) {
-    if (current.length + para.length > maxSize && current.length > 100) {
-      chunks.push(current.trim());
-      current = para;
+  for (let i = 0; i < paragraphs.length; i++) {
+    const para = paragraphs[i];
+
+    if (currentChunk.length + para.length > maxSize) {
+      if (currentChunk) chunks.push(currentChunk.trim());
+
+      // Overlap: add some context from previous chunk if it fits
+      let overlapContent = '';
+      let j = i - 1;
+      while (j >= 0 && overlapContent.length + paragraphs[j].length < overlap) {
+        overlapContent = paragraphs[j] + '\n\n' + overlapContent;
+        j--;
+      }
+      currentChunk = overlapContent + para;
     } else {
-      current += '\n\n' + para;
+      currentChunk += (currentChunk ? '\n\n' : '') + para;
     }
   }
-  if (current.trim().length > 50) {
-    chunks.push(current.trim());
+
+  if (currentChunk.trim().length > 50) {
+    chunks.push(currentChunk.trim());
   }
 
   return chunks.length > 0 ? chunks : [text];
@@ -182,7 +193,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // 3. Create HNSW Index
+    // 3. Create HNSW and FTS Indexes
     try {
       await sql`
         CREATE INDEX IF NOT EXISTS idx_embeddings_hnsw 
@@ -190,7 +201,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         USING hnsw (embedding vector_cosine_ops)
         WITH (m = 16, ef_construction = 64)
       `;
-      log('HNSW index created/verified.');
+
+      // Add GIN index for full-text search (Russian)
+      log('Creating GIN index for full-text search...');
+      await sql`
+        CREATE INDEX IF NOT EXISTS idx_embeddings_fts 
+        ON knowledge_embeddings 
+        USING GIN (to_tsvector('russian', content))
+      `;
+      log('HNSW and GIN indexes created/verified.');
     } catch (e) {
       log(`Index warning: ${e}`);
     }
