@@ -11,13 +11,40 @@
 **Last Session:** 2026-01-15 (Session 56)
 **Focus:** 🏗️ Multi-Agent Architecture with 5 Specialists + Gemini via OpenRouter
 
+### Session 2026-01-15 (Session 58 - Full Multi-Agent Rollout) 🚀
+
+**Objective: Активация мультиагентной архитектуры и исправление поведения агента**
+
+> ✅ **CRITICAL:** Мультиагентная архитектура (5 специалистов) активирована по умолчанию (`USE_MULTI_AGENT = true`).
+> ✅ **MAJOR:** Исправлен баг "залипания" контекста — теперь агент корректно переключается между задачами.
+> ✅ **MAJOR:** Улучшена идентификация модели — Виктор знает, что работает на Gemini 2.5 Flash.
+
+**Completed Actions:**
+
+- [x] **Feature Flag**: `USE_MULTI_AGENT` включен в `agent-v5.ts`.
+- [x] **IntentClassifier Upgrade**: Добавлены правила для классификации вопросов об архитектуре и модели.
+- [x] **ChatSpecialist Upgrade**: Обновлен системный промпт с информацией о технической базе (Gemini 2.5 Flash).
+- [x] **Verification**: Тесты `multi-agent-orchestrator.test.ts` и `typecheck` пройдены успешно.
+
+**Commits:**
+
+- `feat: enable multi-agent architecture v6 by default`
+- `fix(agent): improve intent classification for model identity queries`
+
+**Key Insights:**
+
+```
+Разделение на специалистов решило проблему "fixation" (повторов из старого контекста).
+Аналитика теперь работает на Gemini Pro, а чат и поиск — на Gemini Flash (оптимально по цене/качеству).
+```
+
 **📋 NEXT SESSION PRIORITY:**
 
 > **🧪 REAL-TIME TESTING & RAG IMPROVEMENT**
 >
-> 1. Включить агента в реальном времени (Telegram)
-> 2. Протестировать ответы на сложные вопросы (Long Context Fallback)
-> 3. Реализовать Hybrid Search (ключевые слова + векторы)
+> 1. Включить агента в реальном времени (Telegram) — ПРОВЕРИТЬ ВЫПОЛНЕННОЕ
+> 2. Реализовать Hybrid Search (ключевые слова + векторы)
+> 3. Добавить визуализацию аналитики (графики в ответах через ASCII или ссылки)
 
 ### Session 2026-01-15 (Session 57 - RAG Verification & Architecture Analysis) 🧠
 

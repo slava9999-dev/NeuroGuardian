@@ -22,7 +22,7 @@ import { registerAllTools } from '../../agent/execution/index.js'; // Register t
 import { multiAgentOrchestrator } from '../../agent/specialists/MultiAgentOrchestrator.js';
 
 // Feature flag for gradual rollout
-const USE_MULTI_AGENT = process.env.USE_MULTI_AGENT === 'true';
+const USE_MULTI_AGENT = true; // process.env.USE_MULTI_AGENT === 'true';
 
 // Security
 import { securityMiddleware } from '@neuroguardian/security-agent';
