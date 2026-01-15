@@ -12,7 +12,7 @@ import { hapticFeedback } from '../../lib/telegram';
 
 interface ProductMediaManagerProps {
   product: Product;
-  onUpdate: () => void;
+  onUpdate: (newAsset?: MediaAsset) => void;
 }
 
 export function ProductMediaManager({ product, onUpdate }: ProductMediaManagerProps) {
@@ -67,8 +67,11 @@ export function ProductMediaManager({ product, onUpdate }: ProductMediaManagerPr
         if (data.success) {
           hapticFeedback('success');
           // In a real app, we'd add the optimistic asset or poll for update
-          // For now, call onUpdate to refresh parent if possible
-          onUpdate();
+          if (data.asset) {
+            onUpdate(data.asset);
+          } else {
+            onUpdate();
+          }
         } else {
           throw new Error(data.error || 'Upload failed');
         }
@@ -114,7 +117,11 @@ export function ProductMediaManager({ product, onUpdate }: ProductMediaManagerPr
       const data = await response.json();
       if (data.success) {
         hapticFeedback('success');
-        onUpdate();
+        if (data.asset) {
+          onUpdate(data.asset);
+        } else {
+          onUpdate();
+        }
       } else {
         throw new Error(data.error || 'Import failed');
       }

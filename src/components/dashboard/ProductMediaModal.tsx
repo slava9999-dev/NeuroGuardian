@@ -6,14 +6,14 @@
 
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { Product } from '../../types';
+import type { Product, MediaAsset } from '../../types';
 import { ProductMediaManager } from './ProductMediaManager';
 
 interface ProductMediaModalProps {
   isOpen: boolean;
   onClose: () => void;
   product: Product;
-  onUpdate: () => void;
+  onUpdate: (newAsset?: MediaAsset) => void;
 }
 
 export function ProductMediaModal({ isOpen, onClose, product, onUpdate }: ProductMediaModalProps) {

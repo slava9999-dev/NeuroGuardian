@@ -14,6 +14,7 @@ import {
   updateProductMinPrice,
   updateProductCostPrice,
 } from '../services/index.js';
+import { mediaQueue } from '../../vision/index.js';
 
 // fetchWithRetry moved to api-lib/lib/index.js
 
@@ -226,6 +227,25 @@ export async function handleSyncProducts(
             });
 
             await productRepository.saveBatch(userId, dbProducts);
+
+            // Auto-Ingest Media (Fire-and-forget-ish, but await safely)
+            if (enableSmartDefaults) {
+              const ingestPromises = dbProducts
+                .filter(p => p.image_url)
+                .map(p =>
+                  mediaQueue
+                    .enqueue('ingest_marketplace_image', p.image_url!, {
+                      productId: p.product_id,
+                      metadata: { userId, productId: p.product_id },
+                    })
+                    .catch(err =>
+                      console.error(`Failed to enqueue media ingest for ${p.product_id}`, err)
+                    )
+                );
+
+              await Promise.all(ingestPromises);
+            }
+
             totalSaved += limitedProducts.length;
             smartDefaultsApplied += dbProducts.filter(p => p.min_price > 0).length;
             summary.push(`${account.name}: ${limitedProducts.length}`);
@@ -289,6 +309,25 @@ export async function handleSyncProducts(
           });
 
           await productRepository.saveBatch(userId, dbProducts);
+
+          // Auto-Ingest Media (Legacy Branch)
+          if (enableSmartDefaults) {
+            const ingestPromises = dbProducts
+              .filter(p => p.image_url)
+              .map(p =>
+                mediaQueue
+                  .enqueue('ingest_marketplace_image', p.image_url!, {
+                    productId: p.product_id,
+                    metadata: { userId, productId: p.product_id },
+                  })
+                  .catch(err =>
+                    console.error(`Failed to enqueue media ingest for ${p.product_id}`, err)
+                  )
+              );
+
+            await Promise.all(ingestPromises);
+          }
+
           totalSaved += limitedProducts.length;
           smartDefaultsApplied += dbProducts.filter(p => p.min_price > 0).length;
           summary.push(`Основной: ${limitedProducts.length}`);

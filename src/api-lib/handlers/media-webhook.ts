@@ -6,8 +6,9 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { logger } from '../lib/logger.js';
-import { visionService, renderFactory, mediaQueue } from '../../vision/index.js';
+import { visionService, renderFactory, mediaQueue, storageService } from '../../vision/index.js';
 import { sql } from '../services/database.js';
+import { toProductId, toUserId } from '../../vision/types.js';
 
 // QStash verification (optional for logic, required for prod security)
 // import { Receiver } from "@upstash/qstash";
@@ -66,6 +67,11 @@ export default async function handleMediaWebhook(req: VercelRequest, res: Vercel
         break;
       }
 
+      case 'ingest_marketplace_image': {
+        await processIngestion(sourceImageUrl, metadata);
+        break;
+      }
+
       default:
         throw new Error(`Unknown job type: ${type}`);
     }
@@ -118,4 +124,52 @@ async function processVisionAnalysis(imageUrl: string, assetId?: string) {
   `;
 
   logger.info(`[MediaWebhook] Analysis saved for asset ${assetId}`);
+}
+
+async function processIngestion(imageUrl: string, metadata: any) {
+  const { productId, userId } = metadata || {};
+  if (!productId || !userId) {
+    logger.warn('[MediaWebhook] Missing metadata for ingestion', metadata);
+    return;
+  }
+
+  // Check existence
+  const existing = await sql`
+     SELECT id FROM media_assets 
+     WHERE product_id = ${productId} AND type = 'original' 
+     LIMIT 1
+  `;
+
+  if (existing.rows.length > 0) {
+    logger.info(`[MediaWebhook] Asset already exists for ${productId}, skipping ingestion`);
+    return;
+  }
+
+  // Upload
+  const assetId = `asset_ingest_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  const storageUrl = await storageService.uploadFromUrl(imageUrl, 'originals');
+
+  // Create Record
+  await sql`
+      INSERT INTO media_assets (
+        id, product_id, user_id, type, status, original_url
+      ) VALUES (
+        ${assetId}, 
+        ${toProductId(productId)}, 
+        ${toUserId(userId)}, 
+        'original', 
+        'uploading', -- Will be ready after analysis? or just ready now?
+        ${storageUrl}
+      )
+  `;
+
+  // Trigger Analysis immediately
+  await mediaQueue.enqueue('vision_analyze', storageUrl, {
+    productId,
+    metadata: { assetId },
+  });
+
+  // Mark ready
+  await sql`UPDATE media_assets SET status = 'ready' WHERE id = ${assetId}`;
+  logger.info(`[MediaWebhook] Ingested asset ${assetId} for product ${productId}`);
 }

@@ -22,7 +22,8 @@ export type JobType =
   | 'vision_analyze'
   | 'render_white_bg'
   | 'render_lifestyle'
-  | 'render_watermark';
+  | 'render_watermark'
+  | 'ingest_marketplace_image';
 
 export type JobStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
 

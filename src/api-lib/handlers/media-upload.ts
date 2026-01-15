@@ -85,10 +85,27 @@ export default async function handleMediaUpload(req: VercelRequest, res: VercelR
 
     logger.info(`[MediaUpload] Success ${assetId}`, { analysisJobId, processingJobId });
 
+    const newAsset = {
+      id: assetId,
+      productId: productId || '',
+      userId: userId.toString(),
+      type: 'original',
+      status: 'uploading',
+      originalUrl: storageUrl,
+      // Default/Empty values for new asset
+      processedUrl: undefined,
+      thumbnailUrl: undefined,
+      visionMetadata: undefined,
+      width: 0,
+      height: 0,
+      mimeType: 'image/jpeg',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
     return res.status(202).json({
       success: true,
-      assetId,
-      url: storageUrl,
+      asset: newAsset,
       jobs: {
         analysis: analysisJobId,
         processing: processingJobId,

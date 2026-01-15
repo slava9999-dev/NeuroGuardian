@@ -515,11 +515,18 @@ export function ProductCard({ product }: ProductCardProps) {
         isOpen={showMedia}
         onClose={() => setShowMedia(false)}
         product={product}
-        onUpdate={() => {
-          // Basic refresh trigger - in real app, fetch fresh data
-          console.log('Media updated for', product.productId);
-          // Force update timestamp to verify reactivity
-          updateProduct(product.id, { updatedAt: new Date() });
+        onUpdate={newAsset => {
+          if (newAsset) {
+            // Optimistically add new asset
+            const currentAssets = product.mediaAssets || [];
+            updateProduct(product.id, {
+              mediaAssets: [...currentAssets, newAsset],
+              updatedAt: new Date(),
+            });
+          } else {
+            // Just trigger re-render
+            updateProduct(product.id, { updatedAt: new Date() });
+          }
         }}
       />
     </div>

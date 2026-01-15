@@ -118,6 +118,32 @@ PgVector остается основным движком знаний.
   - **Database**: Created `media_assets` and `media_jobs` tables; fixed `products` table schema (duplicates removed, UNIQUE constraint added).
   - **Verified**: Vision analysis pipeline tested via `scripts/test-vision.ts` (using Picsum stable source).
 
+### ✅ Completed
+
+- [x] **Product Media Manager UI**
+  - created `ProductMediaManager` component with drag-and-drop
+  - created `ProductMediaModal` for seamless integration
+  - integrated into `ProductCard` with optimistic updates
+- [x] **Automated Media Pipeline**
+  - Updated `handleSyncProducts` to auto-trigger ingestion for new products
+  - Updated `media-webhook` to handle `ingest_marketplace_image`
+  - Implemented logic to return full asset object from upload API
+- [x] **Project Scaffolding & Setup**
+  - Configured `npm` scripts and `tsconfig` paths
+  - Set up `tests/setup.ts` and mock environment
+
+### 🚧 In Progress
+
+- [ ] **Real Cloud Storage Integration** (Currently Mocked)
+- [ ] **Advanced Vision Features** (Object removal, AI replacement)
+- [ ] **E2E Testing for Media Flow**
+
+### 📋 Next Steps
+
+1.  Implement **Cloudflare R2 / AWS S3** in `StorageService.ts`
+2.  Add **Vision Analysis Visualization** in Dashboard (display tags, compliance score)
+3.  Deploy and verify QStash webhook connectivity
+
 ### ✅ Completed Actions
 
 - [x] Enable Multi-Agent architecture v6 by default
