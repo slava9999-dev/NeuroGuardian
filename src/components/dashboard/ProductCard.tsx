@@ -10,6 +10,7 @@ import { useProductsStore } from '../../stores';
 import { hapticFeedback } from '../../lib/telegram';
 import { LazyImage } from '../ui/LazyImage';
 import { PriceCalculator } from './PriceCalculator';
+import { ProductMediaModal } from './ProductMediaModal';
 
 interface ProductCardProps {
   product: Product;
@@ -52,6 +53,7 @@ export function ProductCard({ product }: ProductCardProps) {
   const [showCalculator, setShowCalculator] = useState(false);
   const [minPriceInput, setMinPriceInput] = useState(product.minPrice.toString());
   const [costPriceInput, setCostPriceInput] = useState((product.costPrice || 0).toString());
+  const [showMedia, setShowMedia] = useState(false);
 
   const status = STATUS_CONFIG[product.status] || STATUS_CONFIG.active;
 
@@ -169,8 +171,18 @@ export function ProductCard({ product }: ProductCardProps) {
 
       {/* Header: Image + Title + Status */}
       <div className="flex gap-3 mb-3">
-        {/* Product image */}
-        <div className="w-16 h-16 rounded-xl bg-stone-800 overflow-hidden shrink-0">
+        {/* Product image - Click to open media */}
+        <div
+          className="w-16 h-16 rounded-xl bg-stone-800 overflow-hidden shrink-0 cursor-pointer hover:opacity-80 transition-opacity relative group"
+          onClick={() => setShowMedia(true)}
+        >
+          {/* Vision Badge */}
+          {(product.mediaAssets?.length ?? 0) > 0 && (
+            <div className="absolute bottom-0 right-0 bg-black/60 text-[8px] text-white px-1 rounded-tl-md backdrop-blur-sm z-10">
+              📸 {product.mediaAssets?.length}
+            </div>
+          )}
+
           {product.imageUrl ? (
             <LazyImage src={product.imageUrl} alt={product.title} className="w-full h-full" />
           ) : (
@@ -497,6 +509,19 @@ export function ProductCard({ product }: ProductCardProps) {
           onClose={() => setShowCalculator(false)}
         />
       )}
+
+      {/* Media Manager Modal */}
+      <ProductMediaModal
+        isOpen={showMedia}
+        onClose={() => setShowMedia(false)}
+        product={product}
+        onUpdate={() => {
+          // Basic refresh trigger - in real app, fetch fresh data
+          console.log('Media updated for', product.productId);
+          // Force update timestamp to verify reactivity
+          updateProduct(product.id, { updatedAt: new Date() });
+        }}
+      />
     </div>
   );
 }

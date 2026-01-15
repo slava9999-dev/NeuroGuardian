@@ -99,11 +99,56 @@ export interface Product {
   status: ProductStatus;
   isMonitored: boolean;
 
+  // Media
+  mediaAssets?: MediaAsset[];
+
   // Timestamps
   lastCheckedAt: Date;
   lastTriggeredAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+// ============================================
+// Media Asset Types
+// ============================================
+
+export type MediaAssetStatus = 'uploading' | 'analyzing' | 'processing' | 'ready' | 'failed';
+export type MediaAssetType = 'original' | 'white_bg' | 'lifestyle' | 'thumbnail' | 'watermarked';
+
+export interface MediaAsset {
+  id: string; // UUID
+  productId: string; // Reference to product
+  userId: string; // Owner (string for BIGINT compatibility)
+
+  // Asset type and status
+  type: MediaAssetType;
+  status: MediaAssetStatus;
+
+  // URLs
+  originalUrl: string; // Original upload (from цех)
+  processedUrl?: string; // Processed version
+  thumbnailUrl?: string; // 200x200 thumbnail
+
+  // Metadata from Vision analysis
+  visionMetadata?: Record<string, any>; // Relaxed type for frontend to avoid circular deps
+
+  // Dimensions
+  width?: number;
+  height?: number;
+  fileSizeBytes?: number;
+  mimeType?: string;
+
+  // Processing info
+  sourceAssetId?: string; // Parent asset (for derivatives)
+  processingJobId?: string; // Active job ID
+  processingError?: string;
+
+  // Timestamps
+  createdAt: Date;
+  updatedAt: Date;
+  analyzedAt?: Date;
+  processedAt?: Date;
 }
 
 export interface WarehouseStock {
