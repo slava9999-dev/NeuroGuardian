@@ -4,29 +4,21 @@
 // Version: 1.0.0 | Date: January 2026
 // ============================================
 
-import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { logger } from '../lib/logger.js';
 import { storageService, mediaQueue } from '../../vision/index.js';
 import { sql } from '../services/database.js';
 import { toProductId, toUserId } from '../../vision/types.js';
+import { withAuth } from '../middleware/auth.js';
+import { quotaService } from '../services/QuotaService.js';
 
-export default async function handleMediaUpload(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
+export default withAuth(async function handleMediaUpload(req, res, { userId }) {
   const {
-    userId, // Required: Owner ID
     productId, // Optional: Link to product
     imageUrl, // Source: URL
     imageBase64, // Source: Base64
     autoAnalyze, // Run VisionCore?
     autoProcess, // Run RenderFactory (WB)?
   } = req.body;
-
-  if (!userId) {
-    return res.status(400).json({ error: 'userId is required' });
-  }
 
   if (!imageUrl && !imageBase64) {
     return res.status(400).json({ error: 'imageUrl or imageBase64 is required' });
@@ -66,18 +58,32 @@ export default async function handleMediaUpload(req: VercelRequest, res: VercelR
     let processingJobId: string | undefined;
 
     if (autoAnalyze !== false) {
-      // Default: Always analyze
-      analysisJobId = await mediaQueue.enqueue('vision_analyze', storageUrl, {
-        productId,
-        metadata: { assetId },
-      });
-      // Update asset status
-      await sql`UPDATE media_assets SET status = 'analyzing' WHERE id = ${assetId}`;
+      // 3.1 Check Quota for AI Vision
+      const quota = await quotaService.checkQuota(userId, 'vision_analyze');
+
+      if (!quota.allowed) {
+        logger.warn(`[MediaUpload] Quota exceeded for user ${userId}`);
+        await sql`UPDATE media_assets SET status = 'failed', vision_metadata = '{"error": "Quota exceeded"}' WHERE id = ${assetId}`;
+      } else {
+        // Default: Always analyze
+        analysisJobId = await mediaQueue.enqueue('vision_analyze', storageUrl, {
+          userId,
+          productId,
+          metadata: { assetId },
+        });
+
+        // Log usage
+        await quotaService.logUsage(userId, 'vision_analyze', 1, { assetId, productId });
+
+        // Update asset status
+        await sql`UPDATE media_assets SET status = 'analyzing' WHERE id = ${assetId}`;
+      }
     }
 
     if (autoProcess) {
       // Render WB
       processingJobId = await mediaQueue.enqueue('render_white_bg', storageUrl, {
+        userId,
         productId,
         metadata: { assetId, source: 'upload' },
       });
@@ -120,4 +126,4 @@ export default async function handleMediaUpload(req: VercelRequest, res: VercelR
       details: error instanceof Error ? error.message : String(error),
     });
   }
-}
+});

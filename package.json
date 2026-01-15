@@ -47,6 +47,8 @@
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.46",
+    "@aws-sdk/client-s3": "^3.969.0",
+    "@aws-sdk/lib-storage": "^3.969.0",
     "@langchain/community": "^0.3.28",
     "@langchain/core": "^0.3.37",
     "@langchain/langgraph": "^0.2.45",

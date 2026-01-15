@@ -75,8 +75,10 @@ export class ProductRepository {
           image_url, current_price, estimated_buyer_price, marketplace_discount_percent,
           current_stock, marketplace, account_id, 
           min_price, spp_buffer_percent, auto_adjust_min_price, is_monitored, status,
+          min_margin, barcode,
           updated_at
         )
+
         VALUES (
           ${userId}, ${p.product_id}, ${p.nm_id || null}, ${p.official_sku || null}, 
           ${p.offer_id || null}, ${p.title}, ${p.image_url}, ${p.current_price}, 
@@ -84,8 +86,10 @@ export class ProductRepository {
           ${p.current_stock}, ${p.marketplace}, ${p.account_id || null},
           ${p.min_price || 0}, ${p.spp_buffer_percent || 25}, ${p.auto_adjust_min_price ?? false}, 
           ${p.is_monitored ?? true}, ${p.status || 'active'},
+          ${p.min_margin || 0}, ${p.barcode || null},
           NOW()
         )
+
         ON CONFLICT (user_id, product_id) DO UPDATE SET
           current_price = EXCLUDED.current_price,
           estimated_buyer_price = EXCLUDED.estimated_buyer_price,
@@ -104,6 +108,8 @@ export class ProductRepository {
           spp_buffer_percent = COALESCE(products.spp_buffer_percent, EXCLUDED.spp_buffer_percent),
           -- Keep existing monitoring settings if already set
           is_monitored = COALESCE(products.is_monitored, EXCLUDED.is_monitored),
+          barcode = COALESCE(products.barcode, EXCLUDED.barcode),
+          min_margin = COALESCE(products.min_margin, EXCLUDED.min_margin),
           updated_at = NOW()
       `;
     }

@@ -235,6 +235,7 @@ export async function handleSyncProducts(
                 .map(p =>
                   mediaQueue
                     .enqueue('ingest_marketplace_image', p.image_url!, {
+                      userId,
                       productId: p.product_id,
                       metadata: { userId, productId: p.product_id },
                     })
@@ -249,6 +250,14 @@ export async function handleSyncProducts(
             totalSaved += limitedProducts.length;
             smartDefaultsApplied += dbProducts.filter(p => p.min_price > 0).length;
             summary.push(`${account.name}: ${limitedProducts.length}`);
+
+            // TRIGGER ONBOARDING ANALYSIS (Sales Hook)
+            await mediaQueue
+              .enqueue('onboarding_analysis', account.marketplace, {
+                userId,
+                metadata: { userId },
+              })
+              .catch(e => console.error('Failed to trigger onboarding analysis', e));
           }
         } catch (e) {
           console.error(`Error syncing account ${account.name}:`, e);
@@ -317,9 +326,11 @@ export async function handleSyncProducts(
               .map(p =>
                 mediaQueue
                   .enqueue('ingest_marketplace_image', p.image_url!, {
+                    userId,
                     productId: p.product_id,
                     metadata: { userId, productId: p.product_id },
                   })
+
                   .catch(err =>
                     console.error(`Failed to enqueue media ingest for ${p.product_id}`, err)
                   )
@@ -331,6 +342,14 @@ export async function handleSyncProducts(
           totalSaved += limitedProducts.length;
           smartDefaultsApplied += dbProducts.filter(p => p.min_price > 0).length;
           summary.push(`Основной: ${limitedProducts.length}`);
+
+          // TRIGGER ONBOARDING ANALYSIS (Sales Hook)
+          await mediaQueue
+            .enqueue('onboarding_analysis', mp, {
+              userId,
+              metadata: { userId },
+            })
+            .catch(e => console.error('Failed to trigger onboarding analysis (legacy)', e));
         }
       } catch (e) {
         // If legacy sync fails, it might be due to missing keys, which is expected for new users
@@ -607,36 +626,54 @@ export async function handleBatchUpdateCosts(
     const userProductIds = new Set(ownershipCheck.rows.map(r => r.product_id));
 
     // 2. Process updates
-    // Using individual updates for safety and explicit error handling per item
-    // For 100 items, parallel Promise.all is acceptable
     interface UpdateItem {
-      productId: string;
+      productId?: string;
+      barcode?: string;
       costPrice: number;
+      minMargin?: number;
     }
 
-    const updatePromises = updates.map(async (item: UpdateItem) => {
-      const { productId, costPrice } = item;
+    const updatePromises = (updates as UpdateItem[]).map(async item => {
+      const { productId, barcode, costPrice, minMargin } = item;
       const cost = Number(costPrice);
 
-      if (!productId || isNaN(cost) || cost < 0) {
+      let targetId = productId;
+
+      // Try matching by barcode if productId is missing
+      if (!targetId && barcode) {
+        const match =
+          await sql`SELECT product_id FROM products WHERE user_id = ${userId} AND barcode = ${barcode} LIMIT 1`;
+        if (match.rows.length > 0) {
+          targetId = match.rows[0].product_id;
+        }
+      }
+
+      if (!targetId || isNaN(cost) || cost < 0) {
         results.failed++;
-        results.errors.push(`Invalid data for ${productId}: cost must be >= 0`);
+        results.errors.push(`Invalid data for ${productId || barcode}: cost must be >= 0`);
         return;
       }
 
-      if (!userProductIds.has(productId)) {
+      if (!userProductIds.has(targetId)) {
         results.failed++;
-        results.errors.push(`Access denied for ${productId}`);
+        results.errors.push(`Access denied for ${targetId}`);
         return;
       }
 
       try {
-        await updateProductCostPrice(userId, productId, cost);
+        await sql`
+          UPDATE products
+          SET 
+            cost_price = ${cost},
+            min_margin = ${minMargin !== undefined ? Number(minMargin) : sql`min_margin`},
+            updated_at = NOW()
+          WHERE user_id = ${userId} AND product_id = ${targetId}
+        `;
         results.success++;
       } catch (e) {
         const error = e as Error;
         results.failed++;
-        results.errors.push(`DB Error ${productId}: ${error.message}`);
+        results.errors.push(`DB Error ${targetId}: ${error.message}`);
       }
     });
 

@@ -578,7 +578,7 @@ export async function sendAlertToAdmin(alert: Alert): Promise<boolean> {
       message = alert.message;
     } else {
       // Standard flow
-      let smartMsg = null;
+      let smartMsg: string | null = null;
       try {
         // Try getting smart message (skip for simple status updates)
         smartMsg = await generateSmartMessage(alert);

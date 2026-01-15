@@ -16,11 +16,21 @@ import { logOpsEvent } from '../services/ops-logger.js';
 export interface AuthContext {
   userId: number;
   authMethod: 'telegram' | 'admin' | 'cron';
+  user?: any; // Full user record including plan
 }
 
 export type AuthResult =
   | { success: true; context: AuthContext }
   | { success: false; error: string; statusCode: number };
+
+/**
+ * SaaS Handler Type
+ */
+export type SaaSHandler = (
+  req: VercelRequest,
+  res: VercelResponse,
+  context: AuthContext
+) => Promise<any>;
 
 // ============================================
 // AUTH EXTRACTORS
@@ -178,75 +188,84 @@ export function extractCronAuth(req: VercelRequest): AuthResult {
 /**
  * Try all auth methods in order: Telegram → Admin → Cron (async version)
  */
+import { sql } from '../services/database.js';
+
 export async function extractAnyAuthAsync(req: VercelRequest): Promise<AuthResult> {
-  try {
-    // Admin Key Bypass: Allow testing/admin access with valid admin key
-    // This is safe because ADMIN_API_KEY itself is secret
-    const adminKey = ((req.headers['x-admin-key'] as string) || '').trim();
-    const telegramId = req.query?.telegramId || req.body?.telegramId;
+  let userId: number | undefined;
+  let authMethod: 'telegram' | 'admin' | 'cron' = 'telegram';
 
-    if (adminKey && telegramId) {
-      // Get expected key with multiple fallbacks
-      let expectedAdminKey: string | undefined;
-
-      // Try Security Agent first
-      try {
-        expectedAdminKey = await getSecret('admin_api_key', 'admin_auth');
-      } catch (secretError) {
-        console.warn('[AUTH] getSecret failed:', secretError);
-      }
-
-      // Always check process.env as final fallback (most reliable on Vercel)
-      const envKey = process.env.ADMIN_API_KEY?.trim();
-      if (!expectedAdminKey && envKey) {
-        expectedAdminKey = envKey;
-        console.log('[AUTH] Using process.env.ADMIN_API_KEY fallback');
-      }
-
-      // Clean the expected key (remove quotes and whitespace)
-      const cleanExpectedKey = expectedAdminKey?.replace(/['"]/g, '').trim();
-
-      // Debug logging (safe - only shows first 8 chars)
-      console.log('[AUTH] Key check:', {
-        receivedKeyPrefix: adminKey.substring(0, 8) + '...',
-        expectedKeyPrefix: cleanExpectedKey?.substring(0, 8) + '...',
-        match: adminKey === cleanExpectedKey,
-        telegramId,
-      });
-
-      if (cleanExpectedKey && adminKey === cleanExpectedKey) {
-        console.log(`🔧 [AUTH] Admin-key bypass for user ${telegramId}`);
-        return {
-          success: true,
-          context: {
-            userId: parseInt(telegramId as string),
-            authMethod: 'admin',
-          },
-        };
+  // Try Telegram
+  const telegramAuth = extractTelegramAuth(req);
+  if (telegramAuth.success) {
+    userId = telegramAuth.context.userId;
+    authMethod = 'telegram';
+  } else {
+    // Try Admin
+    const adminAuthRes = await extractAdminAuthAsync(req);
+    if (adminAuthRes.success) {
+      userId = adminAuthRes.context.userId;
+      authMethod = 'admin';
+    } else {
+      // Try Cron
+      const cronAuth = await extractCronAuthAsync(req);
+      if (cronAuth.success) {
+        userId = cronAuth.context.userId;
+        authMethod = 'cron';
       }
     }
-  } catch (err) {
-    console.error('⚠️ Auth bypass error:', err);
   }
 
-  // Try Telegram first (most common, sync)
-  const telegramAuth = extractTelegramAuth(req);
-  if (telegramAuth.success) return telegramAuth;
+  if (userId === undefined) {
+    return { success: false, error: 'Unauthorized', statusCode: 401 };
+  }
 
-  // Try Admin key (async)
-  const adminAuthRes = await extractAdminAuthAsync(req);
-  if (adminAuthRes.success) return adminAuthRes;
-
-  // Try Cron token (async)
-  const cronAuth = await extractCronAuthAsync(req);
-  if (cronAuth.success) return cronAuth;
+  // ENRICH WITH USER DATA (SaaS Isolation Layer)
+  const userRes = await sql`SELECT * FROM users WHERE id = ${userId}`;
+  if (userRes.rows.length === 0) {
+    // Auto-onboarding: Create user if they don't exist yet but have valid Telegram IDs
+    // (Actual logic would be in UserRepository, but for SaaS we want consistency)
+    return { success: false, error: 'User registration required', statusCode: 403 };
+  }
 
   return {
-    success: false,
-    error: 'Unauthorized',
-    statusCode: 401,
+    success: true,
+    context: {
+      userId,
+      authMethod,
+      user: userRes.rows[0],
+    },
   };
 }
+
+/**
+ * withAuth HOF: Strictly enforces multi-tenancy rules
+ */
+// ...
+export function withAuth(handler: SaaSHandler) {
+  return async (req: VercelRequest, res: VercelResponse) => {
+    const auth = await extractAnyAuthAsync(req);
+
+    if (auth.success === false) {
+      return sendAuthError(res, auth.error, auth.statusCode, req);
+    }
+
+    // SaaS Isolation: User must be active
+    if (!auth.context.user?.is_active) {
+      return res.status(403).json({ error: 'Account frozen. Please update subscription.' });
+    }
+
+    try {
+      return await handler(req, res, auth.context);
+    } catch (error) {
+      console.error(`[withAuth] Error in handler ${req.url}:`, error);
+      return res.status(500).json({
+        error: 'Internal Server Error',
+        requestId: req.headers['x-vercel-id'],
+      });
+    }
+  };
+}
+// ...
 
 /**
  * Try all auth methods in order: Telegram → Admin → Cron (sync fallback)

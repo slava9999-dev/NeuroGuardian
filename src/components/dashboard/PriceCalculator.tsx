@@ -41,6 +41,8 @@ export function PriceCalculator({
   const [useOzonCard, setUseOzonCard] = useState<boolean>(true);
   const [category] = useState<string>('default');
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
+  const [taxRate, setTaxRate] = useState<string>('7');
+  const [marketingRate, setMarketingRate] = useState<string>('10');
 
   // Lock body scroll when modal is open
   useEffect(() => {
@@ -98,7 +100,9 @@ export function PriceCalculator({
         : 0);
 
     const bankCommission = 0.01; // ~1% withdrawal
-    const totalVariableRate = variableRate + bankCommission;
+    const tax = (parseFloat(taxRate) || 0) / 100;
+    const marketing = (parseFloat(marketingRate) || 0) / 100;
+    const totalVariableRate = variableRate + bankCommission + tax + marketing;
 
     // Target Margin Rate
     const targetMarginRate = margin / 100;
@@ -156,6 +160,8 @@ export function PriceCalculator({
     marketplace,
     useOzonCard,
     category,
+    taxRate,
+    marketingRate,
   ]);
 
   const handleApply = useCallback(() => {
@@ -320,9 +326,32 @@ export function PriceCalculator({
                     >
                       <div className="pt-4 grid grid-cols-2 gap-4">
                         <div>
+                          <label className="text-xs text-stone-500 mb-1 block">Налог (%)</label>
+                          <input
+                            type="number"
+                            value={taxRate}
+                            onChange={e => setTaxRate(e.target.value)}
+                            className="w-full bg-stone-900 border border-stone-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-amber-500 outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-stone-500 mb-1 block">
+                            Маркетинг % (ДРР)
+                          </label>
+                          <input
+                            type="number"
+                            value={marketingRate}
+                            onChange={e => setMarketingRate(e.target.value)}
+                            className="w-full bg-stone-900 border border-stone-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-amber-500 outline-none"
+                          />
+                        </div>
+                      </div>
+                      <div className="pt-2 grid grid-cols-2 gap-4">
+                        <div>
                           <label className="text-xs text-stone-500 mb-1 block">
                             Реклама (на 1 шт)
                           </label>
+
                           <div className="relative">
                             <input
                               type="number"

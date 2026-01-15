@@ -47,8 +47,8 @@ export const updatePricesTool = defineTool<UpdatePricesArgs>({
         await import('../../../api-lib/services/database.js');
 
       const products = await getProductsByUserId(userId);
-      const results = [];
-      const errors = [];
+      const results: any[] = [];
+      const errors: string[] = [];
 
       for (const update of args.updates) {
         // Find product

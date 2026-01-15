@@ -154,6 +154,7 @@ export class SentinelDefenseExecutor {
         externalId: product.nm_id ? String(product.nm_id) : product.product_id,
         userId: user.id,
       },
+      message: `🛡 <b>Sentinel спас вашу маржу!</b>\n\nЦена на "${product.title}" упала до ${livePrice}₽, я автоматически вернул ${minPrice}₽.\n\nПопытка пробития дна успешно отражена. ⚔️`,
       analysis: {
         currentPrice: livePrice,
         recommendedPrice: minPrice,

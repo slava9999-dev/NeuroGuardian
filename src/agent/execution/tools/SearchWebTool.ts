@@ -75,13 +75,13 @@ export const searchWebTool = defineTool<SearchWebArgs>({
       const data = (await response.json()) as SerperResponse;
 
       // Extract answer box if available
-      let directAnswer = null;
+      let directAnswer: string | null = null;
       if (data.answerBox) {
-        directAnswer = data.answerBox.answer || data.answerBox.snippet;
+        directAnswer = data.answerBox.answer || data.answerBox.snippet || null;
       }
 
       // Extract knowledge graph if available
-      let knowledgeGraph = null;
+      let knowledgeGraph: SerperResponse['knowledgeGraph'] | null = null;
       if (data.knowledgeGraph) {
         knowledgeGraph = {
           title: data.knowledgeGraph.title,

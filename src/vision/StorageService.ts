@@ -4,17 +4,38 @@
 // Version: 1.0.0 | Date: January 2026
 // ============================================
 
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { logger } from '../api-lib/lib/logger.js';
 
 export class StorageService {
-  private _bucket: string;
-  // private s3Client: S3Client; // TODO: Add AWS SDK when needed
+  private s3Client: S3Client | null = null;
+  private bucket: string;
+  private publicUrl: string;
 
   constructor() {
-    this._bucket =
-      process.env.CLOUDFLARE_R2_BUCKET || process.env.AWS_S3_BUCKET || 'neuroguardian-media';
-    logger.info(`[Storage] Initialized with bucket: ${this._bucket}`);
-    // Initialize S3 client here
+    this.bucket = process.env.STORAGE_BUCKET || 'neuroguardian-media';
+    this.publicUrl = process.env.STORAGE_PUBLIC_URL || '';
+
+    const accessKeyId = process.env.STORAGE_ACCESS_KEY_ID;
+    const secretAccessKey = process.env.STORAGE_SECRET_ACCESS_KEY;
+    const endpoint = process.env.STORAGE_ENDPOINT;
+    const region = process.env.STORAGE_REGION || 'auto';
+
+    if (accessKeyId && secretAccessKey && endpoint) {
+      this.s3Client = new S3Client({
+        region,
+        endpoint,
+        credentials: {
+          accessKeyId,
+          secretAccessKey,
+        },
+        // For Cloudflare R2 and some S3 providers
+        forcePathStyle: true,
+      });
+      logger.info(`[Storage] Initialized with real S3 client. Bucket: ${this.bucket}`);
+    } else {
+      logger.warn('[Storage] Missing credentials, using mock mode');
+    }
   }
 
   /**
@@ -28,13 +49,34 @@ export class StorageService {
   ): Promise<string> {
     const key = `${folder}/${fileName}`;
 
-    // Placeholder implementation
-    // In production, this would upload to R2/S3
-    logger.info(`[Storage] Mock uploading ${key} (${fileBuffer.length} bytes, ${mimeType})`);
+    if (!this.s3Client) {
+      logger.info(`[Storage] Mock uploading ${key} (${fileBuffer.length} bytes, ${mimeType})`);
+      return `https://cdn.example.com/${key}`;
+    }
 
-    // Return a mock URL
-    // In dev, we might return a local blob URL or just the key
-    return `https://cdn.example.com/${key}`;
+    try {
+      const command = new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        Body: fileBuffer,
+        ContentType: mimeType,
+      });
+
+      await this.s3Client.send(command);
+
+      const resultUrl = this.publicUrl
+        ? `${this.publicUrl}/${key}`
+        : `${process.env.STORAGE_ENDPOINT}/${this.bucket}/${key}`;
+
+      logger.info(`[Storage] Uploaded ${key} to S3`, { url: resultUrl });
+      return resultUrl;
+    } catch (error) {
+      logger.error('[Storage] Upload failed', {
+        key,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   }
 
   /**
@@ -49,14 +91,14 @@ export class StorageService {
 
       const arrayBuffer = await response.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
-      const contentType = response.headers.get('content-type') || 'application/octet-stream';
+      const contentType = response.headers.get('content-type') || 'image/jpeg';
 
-      const ext = contentType.split('/')[1] || 'bin';
-      const fileName = `import_${Date.now()}.${ext}`;
+      const ext = contentType.split('/')[1]?.split('+')[0] || 'jpg';
+      const fileName = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}.${ext}`;
 
       return this.upload(buffer, fileName, contentType, folder);
     } catch (error) {
-      logger.error('[Storage] Upload from URL failed', { error });
+      logger.error('[Storage] Upload from URL failed', { url, error });
       throw error;
     }
   }

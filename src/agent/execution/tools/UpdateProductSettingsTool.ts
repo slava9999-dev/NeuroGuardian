@@ -22,7 +22,7 @@ export const updateProductSettingsTool = defineTool({
 
     if (filtered.length === 0) return { success: false, error: 'Товар не найден' };
     const p = filtered[0];
-    const changes = [];
+    const changes: string[] = [];
 
     if (args.cost_price !== undefined) {
       await updateProductCostPrice(userId, p.product_id, args.cost_price);

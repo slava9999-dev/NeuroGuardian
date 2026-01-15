@@ -62,7 +62,7 @@ export interface VisionCheckRequest {
 // Gemini Vision Provider
 // ============================================
 
-const GEMINI_VISION_MODEL = 'gemini-flash-latest'; // Vendor alias for latest stable Flash model
+const GEMINI_VISION_MODEL = 'gemini-1.5-pro'; // Vendor alias for latest stable model
 
 const VISION_ANALYSIS_PROMPT = `Ты — экспертная система контроля качества для товаров из дерева и эпоксидной смолы.
 

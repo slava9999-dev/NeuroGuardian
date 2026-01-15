@@ -108,8 +108,9 @@ export class SubscriptionService {
       return {
         is_active,
         status: subscription.status,
-        tier: subscription.tier,
+        tier: subscription.plan_id as SubscriptionTier,
         days_remaining,
+
         limits,
         upgrade_required: !limits.can_add_product || !limits.can_add_account,
         upgrade_reason: !limits.can_add_product
@@ -171,11 +172,12 @@ export class SubscriptionService {
         const result = await sql`
           UPDATE subscriptions
           SET 
-            tier = ${tier},
+            plan_id = ${tier},
             status = ${status},
             max_products = ${tierConfig.max_products},
             max_accounts = ${tierConfig.max_accounts},
             updated_at = NOW()
+
           WHERE user_id = ${userId}
           RETURNING *
         `;
@@ -185,10 +187,11 @@ export class SubscriptionService {
         // Create new
         const result = await sql`
           INSERT INTO subscriptions (
-            user_id, tier, status, max_products, max_accounts
+            user_id, plan_id, status, max_products, max_accounts
           ) VALUES (
             ${userId}, ${tier}, ${status}, ${tierConfig.max_products}, ${tierConfig.max_accounts}
           )
+
           RETURNING *
         `;
 
@@ -227,16 +230,26 @@ export class SubscriptionService {
       const result = await sql`
         UPDATE subscriptions
         SET 
-          tier = ${newTier},
+          plan_id = ${newTier},
           status = 'active',
           max_products = ${tierConfig.max_products},
           max_accounts = ${tierConfig.max_accounts},
           current_period_start = NOW(),
           current_period_end = ${periodEnd.toISOString()},
-          next_billing_date = ${periodEnd.toISOString()},
           updated_at = NOW()
         WHERE user_id = ${userId}
         RETURNING *
+      `;
+
+      // Sync with users table for backward compatibility
+      await sql`
+        UPDATE users
+        SET 
+          subscription_plan = ${newTier},
+          subscription_end = ${periodEnd.toISOString()},
+          subscription_active = true,
+          updated_at = NOW()
+        WHERE id = ${userId}
       `;
 
       if (result.rows.length === 0) {

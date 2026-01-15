@@ -200,6 +200,9 @@ export interface UnitEconomicsInput {
   useOzonCard?: boolean; // Whether to account for Ozon Card 5% discount
   packagingCost?: number; // Cost of packaging per unit (default 15 RUB)
   targetMarginPercent?: number; // Desired margin for recommended price (default 20%)
+  taxRate?: number; // Tax rate (e.g. 0.06 or 0.07)
+  marketingRate?: number; // Marketing cost / DRR (e.g. 0.10 for 10%)
+  minProfit?: number; // Minimum acceptable profit in RUB (e.g. 500)
 }
 
 export interface EconomicsWarning {
@@ -222,6 +225,8 @@ export interface UnitEconomicsResult {
   cancelCosts: number;
   ozonCardCosts: number;
   packagingCost: number; // NEW
+  tax: number;
+  marketing: number;
   totalCosts: number;
 
   profit: number;
@@ -244,6 +249,8 @@ export interface UnitEconomicsResult {
     cancelCosts: number;
     ozonCardCosts: number;
     packagingCost: number;
+    tax: number;
+    marketing: number;
     profit: number;
   };
 }
@@ -288,6 +295,9 @@ export function calculateUnitEconomics(input: UnitEconomicsInput): UnitEconomics
     useOzonCard = true,
     packagingCost = 15, // Default 15 RUB
     targetMarginPercent = 20, // Default 20%
+    taxRate = 0.07, // Default 7% (USN)
+    marketingRate = 0.1, // Default 10% (DRR)
+    minProfit = 0,
   } = input;
 
   const warnings: EconomicsWarning[] = [];
@@ -343,7 +353,6 @@ export function calculateUnitEconomics(input: UnitEconomicsInput): UnitEconomics
     const fullDiscount = price * OZON_CARD_CONFIG.discountPercent;
     ozonCardCosts = Math.round(fullDiscount * OZON_CARD_CONFIG.adoptionRate);
 
-    // Warning if Ozon Card impact is significant (>1.5% of price)
     const impactPercent = (ozonCardCosts / price) * 100;
 
     if (ozonCardCosts > price * 0.015) {
@@ -361,6 +370,10 @@ export function calculateUnitEconomics(input: UnitEconomicsInput): UnitEconomics
     }
   }
 
+  // Tax & Marketing
+  const tax = Math.round(price * taxRate);
+  const marketing = Math.round(price * marketingRate);
+
   // Total costs
   const totalCosts =
     costPrice +
@@ -372,7 +385,9 @@ export function calculateUnitEconomics(input: UnitEconomicsInput): UnitEconomics
     returnCosts +
     cancelCosts +
     ozonCardCosts +
-    packagingCost;
+    packagingCost +
+    tax +
+    marketing;
 
   // Profit
   const profit = revenue - totalCosts;
@@ -383,13 +398,16 @@ export function calculateUnitEconomics(input: UnitEconomicsInput): UnitEconomics
   // ROI (% of investment)
   const roi = costPrice > 0 ? Math.round((profit / costPrice) * 100) : 0;
 
-  // Check Negative Profit
-  if (profit < 0) {
+  // Check Negative Profit or Min Margin
+  if (profit < minProfit) {
     warnings.push({
-      type: 'critical',
-      code: 'NEGATIVE_PROFIT',
-      message: 'Товар продается в убыток (отрицательная прибыль)',
-      impact: profit,
+      type: profit < 0 ? 'critical' : 'warning',
+      code: profit < 0 ? 'NEGATIVE_PROFIT' : 'LOW_MARGIN',
+      message:
+        profit < 0
+          ? 'Товар продается в убыток (отрицательная прибыль)'
+          : `Прибыль (${profit}₽) ниже минимально допустимой (${minProfit}₽)`,
+      impact: profit - minProfit,
     });
   }
 
@@ -435,6 +453,8 @@ export function calculateUnitEconomics(input: UnitEconomicsInput): UnitEconomics
     commissionRate +
     sppRate +
     acquiringRate +
+    taxRate +
+    marketingRate +
     (marketplace === 'Ozon' && useOzonCard
       ? OZON_CARD_CONFIG.discountPercent * OZON_CARD_CONFIG.adoptionRate
       : 0);
@@ -465,6 +485,8 @@ export function calculateUnitEconomics(input: UnitEconomicsInput): UnitEconomics
     cancelCosts,
     ozonCardCosts,
     packagingCost,
+    tax,
+    marketing,
     totalCosts,
 
     profit,
@@ -486,6 +508,8 @@ export function calculateUnitEconomics(input: UnitEconomicsInput): UnitEconomics
       cancelCosts: revenue > 0 ? Math.round((cancelCosts / revenue) * 100) : 0,
       ozonCardCosts: revenue > 0 ? Math.round((ozonCardCosts / revenue) * 100) : 0,
       packagingCost: revenue > 0 ? Math.round((packagingCost / revenue) * 100) : 0,
+      tax: revenue > 0 ? Math.round((tax / revenue) * 100) : 0,
+      marketing: revenue > 0 ? Math.round((marketing / revenue) * 100) : 0,
       profit: margin,
     },
   };

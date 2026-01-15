@@ -14,6 +14,7 @@ export interface Subscription {
   user_id: number;
   status: SubscriptionStatus;
   tier: SubscriptionTier;
+  plan_id?: string;
 
   // Trial
   trial_started_at: Date;

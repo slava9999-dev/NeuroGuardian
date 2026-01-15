@@ -123,6 +123,10 @@ export async function handleResetDb(
 
   await sql`DROP TABLE IF EXISTS sentinel_logs CASCADE`;
   await sql`DROP TABLE IF EXISTS transactions CASCADE`;
+  await sql`DROP TABLE IF EXISTS usage_logs CASCADE`;
+  await sql`DROP TABLE IF EXISTS subscriptions CASCADE`;
+  await sql`DROP TABLE IF EXISTS subscription_plans CASCADE`;
+  await sql`DROP TABLE IF EXISTS marketplace_orders CASCADE`;
   await sql`DROP TABLE IF EXISTS products CASCADE`;
   await sql`DROP TABLE IF EXISTS users CASCADE`;
 
@@ -588,7 +592,7 @@ export async function handleHealth(
     const dbOk = dbResult.rows[0]?.ok === 1;
 
     // Get kernel health if available
-    let kernelHealth = null;
+    let kernelHealth: any = null;
     try {
       const { getKernelHealth, getKernelManifest } = await import('../../core/modules.js');
       kernelHealth = getKernelHealth();
@@ -740,7 +744,7 @@ export async function handleAdminTestTelegram(
 
     // 3. RAW TEST (Bypass service, hit API directly to see error)
     let rawResult = null;
-    let rawError = null;
+    let rawError: string | null = null;
     try {
       if (botToken && adminChatId) {
         // Use native fetch (Node 18+)

@@ -9,6 +9,7 @@ import { logger } from '../lib/logger.js';
 import { visionService, renderFactory, mediaQueue, storageService } from '../../vision/index.js';
 import { sql } from '../services/database.js';
 import { toProductId, toUserId } from '../../vision/types.js';
+import { notificationService } from '../services/notifications.js';
 
 // QStash verification (optional for logic, required for prod security)
 // import { Receiver } from "@upstash/qstash";
@@ -69,6 +70,11 @@ export default async function handleMediaWebhook(req: VercelRequest, res: Vercel
 
       case 'ingest_marketplace_image': {
         await processIngestion(sourceImageUrl, metadata);
+        break;
+      }
+
+      case 'onboarding_analysis': {
+        await processOnboardingAnalysis(metadata?.userId as number);
         break;
       }
 
@@ -165,6 +171,7 @@ async function processIngestion(imageUrl: string, metadata: any) {
 
   // Trigger Analysis immediately
   await mediaQueue.enqueue('vision_analyze', storageUrl, {
+    userId,
     productId,
     metadata: { assetId },
   });
@@ -172,4 +179,39 @@ async function processIngestion(imageUrl: string, metadata: any) {
   // Mark ready
   await sql`UPDATE media_assets SET status = 'ready' WHERE id = ${assetId}`;
   logger.info(`[MediaWebhook] Ingested asset ${assetId} for product ${productId}`);
+}
+
+async function processOnboardingAnalysis(userId: number) {
+  if (!userId) return;
+
+  // 1. Get stats
+  const statsRes = await sql`
+    SELECT 
+      COUNT(*) as total,
+      COUNT(*) FILTER (WHERE image_url IS NULL) as missing_images,
+      COUNT(*) FILTER (WHERE current_price < 500) as low_price -- Example heuristic
+    FROM products 
+    WHERE user_id = ${userId}
+  `;
+
+  const { total, missing_images, low_price } = statsRes.rows[0];
+  const totalCount = parseInt(total);
+  const issuesFound = parseInt(missing_images) + parseInt(low_price);
+
+  if (totalCount === 0) return;
+
+  // 2. Send "Sales Hook" notification
+  await notificationService.sendAlertToUser(userId, {
+    type: 'sentinel_alert', // Using existing template or custom
+    urgency: 'high',
+    message: `👋 Я проанализировал ${totalCount} ваших товаров. 
+    Найдено ${issuesFound} потенциальных точек роста (SEO / Фото). 
+    Показать подробный отчет?`,
+    data: {
+      totalCount,
+      issuesFound,
+    },
+  });
+
+  logger.info(`[Onboarding] Sales hook sent to user ${userId}`);
 }

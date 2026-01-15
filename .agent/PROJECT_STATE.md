@@ -8,10 +8,50 @@
 
 ## 🎯 Current Phase: RELEASE PREPARATION (Phase 12) 🚀 PREPARING FOR LAUNCH
 
-**Last Session:** 2026-01-15 (Session 59)
-**Focus:** 🦾 Active Support, Hybrid Search & Safety Guards
+**Last Session:** 2026-01-15 (Session 60)
+**Focus:** 🦾 Vision, Media & Industrial Automation
 
-### Session 2026-01-15 (Session 59 - Active Support & Onboarding) 🦾
+### Session 2026-01-15 (Session 62 - Emergency Readiness Protocol) 🚑
+
+**Objective: Устранение критических уязвимостей перед запуском (SaaS Readiness)**
+
+> ✅ **CRITICAL:** Внедрена строгая типизация (`strict: true`) в `tsconfig.api.json`. Устранены 20+ типизационных ошибок.
+> ✅ **CRITICAL:** Реализован "Billing Guard" — `withSubscription` middleware блокирует доступ к API без активной подписки.
+> ✅ **MAJOR:** Добавлена поддержка габаритов и веса (Logistics) в базу данных и WB интеграцию.
+> ✅ **MAJOR:** Обновление Vision до `gemini-1.5-pro` для повышения точности анализа брака.
+
+**Completed Actions:**
+
+- [x] **Strict API**: `tsconfig.api.json` -> `strict: true`, fixed `noImplicitAny`, `null` checks.
+- [x] **SaaS Guard**: Middleware `withSubscription.ts` интегрирован в `api/index.ts`.
+- [x] **Logistics**: Добавлены `width_cm`, `height_cm`, `depth_cm`, `weight_kg` в Postgres и WbService.
+- [x] **Vision Upgrade**: Переход с `gemini-flash` на `gemini-1.5-pro`.
+
+### Session 2026-01-15 (Session 61 - Unit Economics & Sentinel Hard-Mode) 🛡️
+
+**Objective: Внедрение системы защиты маржи и «Цифрового зрения» для Sentinel**
+
+> ✅ **CRITICAL:** Реализован **EconomicsCalculator** с учетом налогов (7%), маркетинга (10%), логистики и скрытых скидок (Ozon Card/SPP).
+> ✅ **CRITICAL:** Sentinel переведен в **Hard-Mode**: автоматическое восстановление цены до Stop-Loss при демпинге конкурентов.
+> ✅ **MAJOR:** Внедрено «Цифровое зрение»: парсинг реальной цены покупателя с полки для финансового анализа.
+> ✅ **MAJOR:** Добавлен API эндпоинт **bulk-costs** для массовой загрузки себестоимости по штрих-коду (barcode).
+
+**Completed Actions:**
+
+- [x] **Profit Engine**: Учёт Tax(7%) и Marketing(10%) в `calculateUnitEconomics`.
+- [x] **Sentinel Industrial**: Интеграция `estimated_buyer_price` в цикл анализа угроз.
+- [x] **Stop-Loss Protection**: Автоматический реверт цены к `min_price` с уведомлением в Telegram.
+- [x] **Bulk Update**: Эндпоинт `bulk-costs` с поддержкой `barcode` и `min_margin`.
+- [x] **UI Calculator**: Обновлены поля налогов и маркетинга в Dashbord.
+
+**Key Insights:**
+
+```
+Чистая маржа теперь считается "честно" — после всех комиссий, налогов и DRR.
+Sentinel Hard-Mode — это "красная линия", которую система не дает пересечь роботам маркетплейсов.
+```
+
+### Session 2026-01-15 (Session 60 - Industrial Upgrade V3.1 - Vision & Media) 🦾
 
 **Objective: Внедрение «Активной поддержки» и безопасности мультиагентной системы**
 
@@ -122,27 +162,29 @@ PgVector остается основным движком знаний.
 
 - [x] **Product Media Manager UI**
   - created `ProductMediaManager` component with drag-and-drop
-  - created `ProductMediaModal` for seamless integration
+  - Improved Vision visualization (Quality Scores, Compliance Badges, Detail Overlays)
   - integrated into `ProductCard` with optimistic updates
 - [x] **Automated Media Pipeline**
   - Updated `handleSyncProducts` to auto-trigger ingestion for new products
   - Updated `media-webhook` to handle `ingest_marketplace_image`
-  - Implemented logic to return full asset object from upload API
+  - Verified full pipeline (Upload -> DB -> Webhook -> Vision -> DB) via `test-media-pipeline.ts`
+- [x] **Real Cloud Storage Integration**
+  - Implemented `StorageService` using AWS SDK v3 (S3/R2 compatible)
+  - Added support for both Buffer and URL uploads
 - [x] **Project Scaffolding & Setup**
   - Configured `npm` scripts and `tsconfig` paths
   - Set up `tests/setup.ts` and mock environment
 
 ### 🚧 In Progress
 
-- [ ] **Real Cloud Storage Integration** (Currently Mocked)
 - [ ] **Advanced Vision Features** (Object removal, AI replacement)
-- [ ] **E2E Testing for Media Flow**
+- [ ] **E2E Testing for Media Flow** (Playwright)
 
 ### 📋 Next Steps
 
-1.  Implement **Cloudflare R2 / AWS S3** in `StorageService.ts`
-2.  Add **Vision Analysis Visualization** in Dashboard (display tags, compliance score)
-3.  Deploy and verify QStash webhook connectivity
+1.  **Deployment Verification**: Deploy and verify QStash webhook connectivity in production environment.
+2.  **Dashboard Polish**: Final check of the new UI on mobile devices (Telegram WebApp).
+3.  **Analytics Integration**: Link Vision tags to SEO recommendations in the Analytics Specialist.
 
 ### ✅ Completed Actions
 

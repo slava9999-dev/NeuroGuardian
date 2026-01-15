@@ -300,8 +300,56 @@ export async function initializeDatabase(): Promise<void> {
   await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS spp_buffer_percent INTEGER DEFAULT 25`;
   await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS auto_adjust_min_price BOOLEAN DEFAULT false`;
   await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS cost_price INTEGER DEFAULT 0`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS estimated_buyer_price INTEGER`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS marketplace_discount_percent DECIMAL(5,2)`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS min_margin INTEGER DEFAULT 0`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS barcode VARCHAR(255)`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS width_cm INTEGER`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS height_cm INTEGER`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS depth_cm INTEGER`;
+  await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS weight_kg DECIMAL(10,3)`;
 
   // 4. Transactions
+  // 4. Transactions & Subscriptions
+  await sql`
+    CREATE TABLE IF NOT EXISTS subscription_plans (
+      id VARCHAR(50) PRIMARY KEY,
+      name VARCHAR(100) NOT NULL,
+      monthly_price DECIMAL(12, 2) NOT NULL,
+      products_limit INTEGER NOT NULL,
+      ai_tokens_limit INTEGER NOT NULL,
+      features JSONB DEFAULT '{}',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS subscriptions (
+      id SERIAL PRIMARY KEY,
+      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      plan_id VARCHAR(50) NOT NULL REFERENCES subscription_plans(id),
+      status VARCHAR(50) NOT NULL DEFAULT 'active',
+      current_period_start TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      current_period_end TIMESTAMP NOT NULL,
+      cancel_at_period_end BOOLEAN DEFAULT false,
+      yookassa_sub_id VARCHAR(255),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id)
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS usage_logs (
+      id SERIAL PRIMARY KEY,
+      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      service_type VARCHAR(50) NOT NULL,
+      amount INTEGER NOT NULL DEFAULT 1,
+      metadata JSONB DEFAULT '{}',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+
   await sql`
     CREATE TABLE IF NOT EXISTS transactions (
       id VARCHAR(255) PRIMARY KEY,
@@ -314,6 +362,31 @@ export async function initializeDatabase(): Promise<void> {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       paid_at TIMESTAMP
     )
+  `;
+
+  // Seed default plans if not exists
+  await sql`
+    INSERT INTO subscription_plans (id, name, monthly_price, products_limit, ai_tokens_limit, features)
+    VALUES 
+    ('trial', 'Пробный', 0, 10, 50, '{"sentinel": true, "vision": false}'),
+    ('standard', 'Стандарт', 999, 100, 500, '{"sentinel": true, "vision": true}'),
+    ('premium', 'Премиум', 2999, 1000, 5000, '{"sentinel": true, "vision": true, "priority_support": true}')
+    ON CONFLICT (id) DO NOTHING
+  `;
+
+  // Helper function for subscription check
+  await sql`
+    CREATE OR REPLACE FUNCTION is_subscription_active(target_user_id BIGINT) 
+    RETURNS BOOLEAN AS $$
+    BEGIN
+      RETURN EXISTS (
+        SELECT 1 FROM subscriptions 
+        WHERE user_id = target_user_id 
+        AND status IN ('active', 'trial') 
+        AND current_period_end > NOW()
+      );
+    END;
+    $$ LANGUAGE plpgsql;
   `;
 
   // 5. Sentinel Logs
@@ -706,13 +779,15 @@ export async function saveProducts(userId: number, products: Partial<DBProduct>[
       INSERT INTO products (
         user_id, product_id, nm_id, official_sku, offer_id, title, 
         image_url, current_price, estimated_buyer_price, marketplace_discount_percent,
-        current_stock, marketplace, account_id, updated_at
+        current_stock, marketplace, account_id, 
+        width_cm, height_cm, depth_cm, weight_kg, updated_at
       )
       VALUES (
         ${userId}, ${p.product_id}, ${p.nm_id || null}, ${p.official_sku || null}, 
         ${p.offer_id || null}, ${p.title}, ${p.image_url}, ${p.current_price}, 
         ${p.estimated_buyer_price || null}, ${p.marketplace_discount_percent || null},
-        ${p.current_stock}, ${p.marketplace}, ${p.account_id || null}, NOW()
+        ${p.current_stock}, ${p.marketplace}, ${p.account_id || null}, 
+        ${p.width_cm || null}, ${p.height_cm || null}, ${p.depth_cm || null}, ${p.weight_kg || null}, NOW()
       )
       ON CONFLICT (user_id, product_id) DO UPDATE SET
         current_price = EXCLUDED.current_price,
@@ -722,6 +797,10 @@ export async function saveProducts(userId: number, products: Partial<DBProduct>[
         title = EXCLUDED.title,
         image_url = EXCLUDED.image_url,
         account_id = COALESCE(EXCLUDED.account_id, products.account_id),
+        width_cm = EXCLUDED.width_cm,
+        height_cm = EXCLUDED.height_cm,
+        depth_cm = EXCLUDED.depth_cm,
+        weight_kg = EXCLUDED.weight_kg,
         updated_at = NOW()
     `;
   }

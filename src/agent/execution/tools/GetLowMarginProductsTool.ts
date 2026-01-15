@@ -17,7 +17,7 @@ export const getLowMarginProductsTool = defineTool({
 
     const { calculateUnitEconomics, estimateCostPrice } =
       await import('../../../api-lib/services/unit-economics.js');
-    const results = [];
+    const results: any[] = []; // Explicitly typed to avoid 'never' inference
 
     for (const p of filtered) {
       let costPrice = p.cost_price || 0;

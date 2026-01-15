@@ -11,7 +11,13 @@ export class PricingSpecialist extends BaseSpecialist {
   readonly name = 'PricingSpecialist';
   readonly description = 'Handles price updates, stop-loss settings, and bulk protection';
 
-  readonly tools = ['set_stop_loss', 'update_prices', 'bulk_protect_products'];
+  readonly tools = [
+    'set_stop_loss',
+    'update_prices',
+    'bulk_protect_products',
+    'calculate_unit_economics',
+    'get_real_price',
+  ];
 
   readonly systemPrompt = `# 💰 ВИКТОР — СПЕЦИАЛИСТ ПО ЦЕНАМ
 
@@ -40,7 +46,17 @@ export class PricingSpecialist extends BaseSpecialist {
 - "защити все товары"
 ⚠️ Затрагивает ВСЕ товары!
 
+### calculate_unit_economics
+Рассчитывает чистую прибыль с учётом всех комиссий, логистики и налогов.
+- "посчитай прибыль для товара X"
+- "какая маржа при цене 1500"
+
+### get_real_price
+Парсит цену "для покупателя" через Цифровое Зрение (Real Buyer Price).
+- "какая реальная цена на WB для артикула Y"
+
 ## 🔴 ПРОТОКОЛ ПОДТВЕРЖДЕНИЯ:
+
 
 1. Показать текущее состояние
 2. Показать предлагаемое изменение  
@@ -79,6 +95,14 @@ export class PricingSpecialist extends BaseSpecialist {
    */
   async execute(query: string, context: SpecialistContext): Promise<SpecialistResult> {
     return super.execute(query, context);
+  }
+
+  /**
+   * Calculate Net Profit for a product (API for internal use/visualization)
+   */
+  async calculateNetProfit(productId: string | number, userId: number) {
+    const { economicsCalculator } = await import('../../api-lib/services/EconomicsCalculator.js');
+    return economicsCalculator.calculateNetProfit(productId, userId);
   }
 }
 

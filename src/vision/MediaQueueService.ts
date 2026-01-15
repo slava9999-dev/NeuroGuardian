@@ -23,7 +23,8 @@ export type JobType =
   | 'render_white_bg'
   | 'render_lifestyle'
   | 'render_watermark'
-  | 'ingest_marketplace_image';
+  | 'ingest_marketplace_image'
+  | 'onboarding_analysis';
 
 export type JobStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
 
@@ -31,7 +32,9 @@ export interface MediaJob {
   id: string;
   type: JobType;
   status: JobStatus;
+  user_id: number;
   productId?: string;
+
   sourceImageUrl: string;
   resultImageUrl?: string;
   metadata?: Record<string, unknown>;
@@ -79,10 +82,12 @@ export class MediaQueueService {
           id VARCHAR(100) PRIMARY KEY,
           type VARCHAR(50) NOT NULL,
           status VARCHAR(20) NOT NULL DEFAULT 'pending',
+          user_id BIGINT NOT NULL,
           product_id VARCHAR(100),
           source_image_url TEXT NOT NULL,
           result_image_url TEXT,
           metadata JSONB,
+
           error TEXT,
           attempts INTEGER DEFAULT 0,
           max_attempts INTEGER DEFAULT 3,
@@ -95,6 +100,10 @@ export class MediaQueueService {
 
       await sql`CREATE INDEX IF NOT EXISTS idx_media_jobs_status ON media_jobs(status)`;
       await sql`CREATE INDEX IF NOT EXISTS idx_media_jobs_product ON media_jobs(product_id)`;
+      await sql`CREATE INDEX IF NOT EXISTS idx_media_jobs_user_id ON media_jobs(user_id)`;
+
+      // Migration: Add user_id if missing from existing table
+      await sql`ALTER TABLE media_jobs ADD COLUMN IF NOT EXISTS user_id BIGINT DEFAULT 0`;
 
       logger.info('[MediaQueue] Database initialized');
     } catch (error) {
@@ -110,7 +119,8 @@ export class MediaQueueService {
   async enqueue(
     type: JobType,
     sourceImageUrl: string,
-    options?: {
+    options: {
+      userId: number;
       productId?: string;
       metadata?: Record<string, unknown>;
       priority?: 'high' | 'normal' | 'low';
@@ -120,14 +130,15 @@ export class MediaQueueService {
 
     // Save to database
     await sql`
-      INSERT INTO media_jobs (id, type, status, product_id, source_image_url, metadata)
+      INSERT INTO media_jobs (id, type, status, user_id, product_id, source_image_url, metadata)
       VALUES (
         ${jobId},
         ${type},
         'pending',
-        ${options?.productId || null},
+        ${options.userId},
+        ${options.productId || null},
         ${sourceImageUrl},
-        ${JSON.stringify(options?.metadata || {})}
+        ${JSON.stringify(options.metadata || {})}
       )
     `;
 
@@ -336,7 +347,9 @@ export class MediaQueueService {
       id: row.id as string,
       type: row.type as JobType,
       status: row.status as JobStatus,
+      user_id: parseInt(row.user_id as string),
       productId: row.product_id as string | undefined,
+
       sourceImageUrl: row.source_image_url as string,
       resultImageUrl: row.result_image_url as string | undefined,
       metadata: row.metadata as Record<string, unknown> | undefined,

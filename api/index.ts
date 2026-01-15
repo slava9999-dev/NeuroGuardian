@@ -15,6 +15,8 @@ import {
   sendMethodNotAllowed,
 } from '../src/api-lib/middleware/auth.js';
 
+import { withSubscription } from '../src/api-lib/middleware/withSubscription.js';
+
 // Route registry
 import { AVAILABLE_ACTIONS } from '../src/api-lib/utils/routes.js';
 
@@ -347,6 +349,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'batch-set-stop-loss':
       case 'apply-min-prices':
       case 'batch-update-costs':
+      case 'bulk-costs':
       case 'sentinel-logs': {
         const auth = await extractAnyAuthAsync(req);
         if (auth.success === false) {
@@ -366,7 +369,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           'batch-update-costs': handleBatchUpdateCosts,
           'sentinel-logs': handleSentinelLogs,
         };
-        return handlers[action](req, res, auth.context.userId);
+        // ENFORCE SUBSCRIPTION
+        return withSubscription(req, res, handlers[action], auth.context.userId);
       }
 
       case 'sync-products': {
@@ -375,7 +379,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (auth.success === false) {
           return sendAuthError(res, auth.error, auth.statusCode);
         }
-        return handleSyncProducts(req, res, auth.context.userId);
+        // ENFORCE SUBSCRIPTION
+        return withSubscription(req, res, handleSyncProducts, auth.context.userId);
       }
 
       // ========== SUBSCRIPTION ENDPOINTS ==========
@@ -432,9 +437,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return sendAuthError(res, auth.error, auth.statusCode);
         }
         if (action === 'sentinel-stats') {
-          return handleSentinelStats(req, res, auth.context.userId);
+          return withSubscription(req, res, handleSentinelStats, auth.context.userId);
         }
-        return handleSentinelDashboard(req, res, auth.context.userId);
+        return withSubscription(req, res, handleSentinelDashboard, auth.context.userId);
       }
 
       // ========== AI AGENT ENDPOINTS ==========

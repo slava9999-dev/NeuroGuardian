@@ -8,6 +8,7 @@ import { SentinelAlertSender } from './AlertSender.js';
 import type { SentinelRunResult, UserCycleResult } from './types.js';
 import { priceShield, type PriceRule } from './PriceShield.js';
 import { getCompetitorPrice } from '../api-lib/services/competitor-monitor.js';
+import { priceParserService } from '../api-lib/core-services/PriceParserService.js';
 import { logger } from '../api-lib/lib/logger.js';
 
 export class SentinelOrchestrator {
@@ -218,6 +219,52 @@ export class SentinelOrchestrator {
       const livePrice = priceMap.get(key);
 
       if (!livePrice) continue;
+
+      // --- Digital Vision Update (Real Buyer Price) ---
+      // Regularly refresh the "red tag" price from public site
+      // Only refresh if never fetched or older than 12 hours to avoid rate limits
+      const lastUpdate = product.updated_at ? new Date(product.updated_at).getTime() : 0;
+      const shouldRefreshRealPrice =
+        !product.estimated_buyer_price || Date.now() - lastUpdate > 12 * 60 * 60 * 1000;
+
+      if (shouldRefreshRealPrice) {
+        try {
+          const sku =
+            marketplace === 'WB' ? String(product.nm_id) : product.product_id.replace('ozon-', '');
+          const realPriceInfo =
+            marketplace === 'WB'
+              ? await priceParserService.getWbRealPrice(sku)
+              : await priceParserService.getOzonRealPrice(sku);
+
+          if (realPriceInfo.buyerPrice > 0) {
+            const discountPercent =
+              realPriceInfo.sellerPrice > 0
+                ? ((realPriceInfo.sellerPrice - realPriceInfo.buyerPrice) /
+                    realPriceInfo.sellerPrice) *
+                  100
+                : 0;
+
+            await sql`
+              UPDATE products 
+              SET estimated_buyer_price = ${realPriceInfo.buyerPrice},
+                  marketplace_discount_percent = ${discountPercent},
+                  updated_at = NOW()
+              WHERE id = ${product.id}
+            `;
+            product.estimated_buyer_price = realPriceInfo.buyerPrice;
+            product.marketplace_discount_percent = discountPercent;
+            logger.debug('Real price updated via Digital Vision', {
+              productId: product.product_id,
+              buyerPrice: realPriceInfo.buyerPrice,
+            });
+          }
+        } catch (e) {
+          logger.warn('Failed to refresh real buyer price', {
+            productId: product.product_id,
+            error: e,
+          });
+        }
+      }
 
       // A. Smart Repricing
       const rule = rulesMap.get(product.product_id);

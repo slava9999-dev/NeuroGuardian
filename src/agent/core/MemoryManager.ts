@@ -433,7 +433,7 @@ export class MemoryManager {
       }
     });
 
-    const parts = [];
+    const parts: string[] = [];
     if (userPrefs.length > 0) parts.push(`Предпочтения: ${userPrefs.slice(0, 3).join(', ')}`);
     if (productInfo.length > 0) parts.push(`Товары: ${productInfo.slice(0, 3).join(', ')}`);
     if (businessRules.length > 0) parts.push(`Правила: ${businessRules.slice(0, 3).join(', ')}`);

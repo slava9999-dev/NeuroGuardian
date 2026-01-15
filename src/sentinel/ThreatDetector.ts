@@ -123,11 +123,12 @@ export class ThreatDetector {
     }
 
     const economics = calculateUnitEconomics({
-      price: livePrice,
+      price: product.estimated_buyer_price || livePrice, // Use Buyer Price for financial analysis if available
       costPrice: analyzedCostPrice,
       category: product.category || 'Other',
       marketplace,
       useOzonCard: true,
+      minProfit: product.min_margin || 0, // Target min profit (RUB)
     });
 
     if (!isEstimated) {
@@ -152,13 +153,16 @@ export class ThreatDetector {
           data: { ...economics, warningDetails: warning },
         });
       }
-    } else if (economics.profit < 0) {
+    } else if (economics.profit < (product.min_margin || 0)) {
       threats.push({
         type: ThreatType.MARGIN_BELOW_ZERO,
-        severity: 'high',
+        severity: economics.profit < 0 ? 'high' : 'medium',
         productId: product.product_id,
         nmId: product.nm_id,
-        message: `Потенциальный убыток (${economics.profit}₽) — проверьте себестоимость!`,
+        message:
+          economics.profit < 0
+            ? `Убыток (${economics.profit}₽) — проверьте себестоимость!`
+            : `Маржа ниже установленного минимума (${economics.profit}₽ < ${product.min_margin}₽)`,
         data: economics,
       });
     }
