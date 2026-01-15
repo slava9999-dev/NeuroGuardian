@@ -78,18 +78,7 @@ export class PricingSpecialist extends BaseSpecialist {
    * Override execute to add confirmation requirement
    */
   async execute(query: string, context: SpecialistContext): Promise<SpecialistResult> {
-    const result = await super.execute(query, context);
-
-    // If tools were called that modify data, require confirmation
-    const modifyingTools = ['set_stop_loss', 'update_prices', 'bulk_protect_products'];
-    const calledModifyingTool = result.toolsCalled.some(t => modifyingTools.includes(t));
-
-    if (calledModifyingTool) {
-      result.requiresConfirmation = true;
-      result.message += '\n\n⚠️ **Подтвердите действие**, чтобы применить изменения.';
-    }
-
-    return result;
+    return super.execute(query, context);
   }
 }
 

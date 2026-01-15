@@ -35,6 +35,7 @@ import { bulkProtectProductsTool } from './tools/BulkProtectTool.js';
 import { updatePricesTool } from './tools/UpdatePricesTool.js';
 import { updateStocksTool } from './tools/UpdateStocksTool.js';
 import { updateProductSettingsTool } from './tools/UpdateProductSettingsTool.js';
+import { syncCatalogTool } from './tools/SyncCatalogTool.js';
 
 // Search tools
 import { searchWebTool } from './tools/SearchWebTool.js';
@@ -71,6 +72,7 @@ export function registerAllTools(): void {
   toolRegistry.register(updatePricesTool);
   toolRegistry.register(updateStocksTool);
   toolRegistry.register(updateProductSettingsTool);
+  toolRegistry.register(syncCatalogTool);
 
   // Search tools
   toolRegistry.register(searchWebTool);
@@ -107,3 +109,4 @@ export { getCompetitorPriceTool } from './tools/GetCompetitorPriceTool.js';
 export { getReviewsTool } from './tools/GetReviewsTool.js';
 export { getLowMarginProductsTool } from './tools/GetLowMarginProductsTool.js';
 export { getRealPriceTool } from './tools/GetRealPriceTool.js';
+export { syncCatalogTool } from './tools/SyncCatalogTool.js';

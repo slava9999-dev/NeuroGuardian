@@ -93,23 +93,50 @@ PgVector остается основным движком знаний.
 
 **Completed Actions:**
 
-- [x] **GeminiProvider**: Маршрутизация через OpenRouter API
-- [x] **IntentClassifier**: 5 категорий (PRODUCTS, PRICING, SENTINEL, ANALYTICS, CHAT)
-- [x] **ProductsSpecialist**: 4 tools (get_products, settings, low_margin, real_price)
-- [x] **PricingSpecialist**: 3 tools с обязательным подтверждением
-- [x] **SentinelSpecialist**: 2 tools для защиты и конкурентов
-- [x] **AnalyticsSpecialist**: 5 tools с Gemini Pro для сложной аналитики
-- [x] **ChatSpecialist**: RAG-only, без tools (FAQ, onboarding)
-- [x] **MultiAgentOrchestrator**: Маршрутизатор запросов
-- [x] **API Integration**: agent-v5.ts с feature flag USE_MULTI_AGENT
-- [x] **Database Check**: 5 users, PostgreSQL 17.7, 365ms latency
-- [x] **KnowledgeBase Check**: 18 документов, поиск работает
+- **Session 58: Enable Multi-Agent V6 & RAG Improvements**
+  - Enabled `USE_MULTI_AGENT` by default in `agent-v5.ts`.
+  - Implemented **Hybrid Search** in `SpecialistKnowledgeBase` for better Russian retrieval.
+  - Added **GIN Index** for full-text search in `rag-setup.ts`.
+  - Improved chunking with **Overlaps (200 chars)** to preserve context.
+  - Added **RAG Context Prioritization** instruction to `BaseSpecialist`.
+  - Verified with `qa-agent.ts` script.
 
-**Commits:**
+- **Session 59: Active Support & Proactive Onboarding**
+  - Integrated `ResponseValidator`, `ExperienceLearning`, and `MemoryManager` into `MultiAgentOrchestrator`.
+  - Implemented `SyncCatalogTool` for automated/manual product synchronization.
+  - Enhanced `ChatSpecialist` and `ProductsSpecialist` with step-by-step setup guidance.
+  - Resolved circular dependencies and type errors in Multi-Agent system.
+  - Verified "Active Support" via `test-active-support.ts`.
 
-- `feat: Multi-Agent Architecture with 5 specialists`
-- `fix: Route Gemini through OpenRouter (works in Russia)`
-- `feat: Integrate MultiAgentOrchestrator with feature flag`
+### ✅ Completed Actions
+
+- [x] Enable Multi-Agent architecture v6 by default
+- [x] Fix IntentClassifier for identity/model queries
+- [x] Implement Hybrid Search (Vector + Full-Text)
+- [x] Add GIN Index for Russian language search
+- [x] Implement overlapping text chunks (200 characters)
+- [x] Optimize context retrieval (7 documents)
+- [x] Add Active Support (Validation, Learning, Memory) to Multi-Agent
+- [x] Create `SyncCatalogTool` and Setup Guide for onboarding
+
+### 📦 Latest Commits
+
+- `feat(rag): implement hybrid search, GIN index and overlapping chunks`
+- `feat(agent): integrate active support (guardrails, learning, memory) into multi-agent`
+- `feat(onboarding): add SyncCatalogTool and proactive setup guidance`
+
+### 💡 Key Insights
+
+- **Hybrid Search** significantly improves accuracy for Russian queries compared to pure vector search.
+- **Active Support** integration makes the Multi-Agent system more resilient and capable of learning from user feedback.
+- **Proactive Guidance** is essential for new users who often struggle with the first steps of API integration.
+
+### 📅 Next Session Priorities
+
+1.  **Dashboard Integration:** Ensure the UI reflects the sync status and new agent capabilities.
+2.  **Sentinel Polish:** Verify Sentinel's interaction with the new product data format.
+3.  **Analytics Visualization:** Implement rich visualization for the Analytics specialist.
+4.  **Production Canary:** Deploy to a small group of users to monitor orchestrator performance.
 
 **Files Created:**
 

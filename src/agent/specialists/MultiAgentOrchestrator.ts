@@ -8,6 +8,9 @@ import type { OrchestratorContext, OrchestratorResult } from '../../core/types/a
 import { classifyIntent, type ClassificationResult } from './IntentClassifier.js';
 import { getSpecialist, type SpecialistContext } from './index.js';
 import { stateManager } from '../core/StateManager.js';
+import { memoryManager } from '../core/MemoryManager.js';
+import { experienceLearning } from '../core/ExperienceLearning.js';
+import { responseValidator } from '../core/ResponseValidator.js';
 import { logger } from '../../api-lib/lib/logger.js';
 
 export interface MultiAgentResult extends OrchestratorResult {
@@ -69,22 +72,71 @@ export class MultiAgentOrchestrator {
       const result = await specialist.execute(message, specialistContext);
       const executionTimeMs = Date.now() - execStart;
 
-      // 6. Build response
+      // 6. Validate Response (Guardrails)
+      let finalMessage = result.message;
+      try {
+        const validation = await responseValidator.validate(result.message, {
+          userQuery: message,
+          toolResults: result.toolResults?.map((t, i) => ({
+            tool: result.toolsCalled[i] || 'unknown',
+            success: t.success,
+            data: t.data,
+          })),
+          marketplace:
+            userState.marketplace === 'WB'
+              ? 'wb'
+              : userState.marketplace === 'Ozon'
+                ? 'ozon'
+                : undefined,
+        });
+
+        if (!validation.isValid && validation.correctedResponse) {
+          finalMessage = validation.correctedResponse;
+          logger.info('[MultiAgent] Response corrected by validator', { score: validation.score });
+        }
+      } catch (valError) {
+        logger.warn('[MultiAgent] Validation skipped due to error', { error: valError });
+      }
+
+      // 7. Extract Links
+      const links = this.extractLinks(finalMessage);
+
+      // 8. Experience Learning & Memory
+      try {
+        // Save to memory
+        await memoryManager.saveMessage(context.userId, 'user', message);
+        await memoryManager.saveMessage(context.userId, 'assistant', finalMessage);
+
+        // Analyze for learning (Active Support)
+        const history = await memoryManager.getRecentHistory(context.userId, 2);
+        const previousAgentMessage = history.find(m => m.role === 'assistant')?.content;
+
+        await experienceLearning.analyzeInteraction(
+          context.userId,
+          message,
+          finalMessage,
+          previousAgentMessage
+        );
+      } catch (memError) {
+        logger.warn('[MultiAgent] Memory/Learning failed', { error: memError });
+      }
+
+      // 9. Build final result
       const totalTimeMs = Date.now() - startTime;
 
       return {
         success: result.success,
-        message: result.message,
+        message: finalMessage,
         toolsCalled: result.toolsCalled,
         toolResults: result.toolResults,
-        tokensUsed: result.tokensUsed + (intent.classifiedBy === 'llm' ? 500 : 0), // Estimate
+        tokensUsed: result.tokensUsed + (intent.classifiedBy === 'llm' ? 500 : 0),
         planningTimeMs,
         executionTimeMs,
         answeringTimeMs: 0,
         totalTimeMs,
         intent,
         specialist: specialist.name,
-        links: this.extractLinks(result.message),
+        links,
         actions: result.requiresConfirmation
           ? [
               {

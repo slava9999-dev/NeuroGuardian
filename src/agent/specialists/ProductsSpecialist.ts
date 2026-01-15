@@ -14,6 +14,7 @@ export class ProductsSpecialist extends BaseSpecialist {
 
   readonly tools = [
     'get_products',
+    'sync_catalog',
     'update_product_settings',
     'get_low_margin_products',
     'get_real_price',
@@ -37,6 +38,14 @@ export class ProductsSpecialist extends BaseSpecialist {
 - "найди товар кроссовки" → get_products с search="кроссовки"
 - "товар 123456789" → get_products с search="123456789"
 - "товары на WB" → get_products с marketplace="WB"
+  
+### sync_catalog
+Когда использовать:
+- "синхронизируй товары"
+- "настрой всё с нуля"
+- "обнови каталог из ЛК"
+- "почему нет товаров?" → предложи синхронизировать
+📍 Очень важно для новых пользователей! Если у пользователя 0 товаров, первым делом предлагай sync_catalog.
 
 ### get_low_margin_products  
 Когда использовать:

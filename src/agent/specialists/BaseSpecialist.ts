@@ -109,8 +109,10 @@ export abstract class BaseSpecialist {
 
       tokensUsed += response.tokensUsed;
 
-      // 5. Execute tools if called
+      // 5. Execute tools if called (Safety Check!)
       const toolResults: (ToolResult & { tool: string })[] = [];
+      let requiresConfirmation = false;
+      const pendingActions: any[] = [];
 
       if (response.toolCalls && response.toolCalls.length > 0) {
         for (const toolCall of response.toolCalls) {
@@ -118,6 +120,20 @@ export abstract class BaseSpecialist {
           const toolArgs = JSON.parse(toolCall.function?.arguments || '{}');
 
           if (toolName && this.tools.includes(toolName)) {
+            const toolDef = toolRegistry.get(toolName);
+
+            // Safety: Stall if confirmation required
+            if (toolDef?.requiresConfirmation) {
+              requiresConfirmation = true;
+              pendingActions.push({
+                tool: toolName,
+                args: toolArgs,
+                reason: 'Awaiting confirmation',
+              });
+              logger.info(`[${this.name}] Tool ${toolName} stalled for confirmation`);
+              continue;
+            }
+
             try {
               const result = await toolRegistry.execute(toolName, context.userId, toolArgs);
               toolResults.push({ ...result, tool: toolName });
@@ -163,10 +179,18 @@ export abstract class BaseSpecialist {
       return {
         success: true,
         message: finalMessage,
-        toolsCalled: toolResults.map(r => r.tool),
+        toolsCalled: [...toolResults.map(r => r.tool), ...pendingActions.map(a => a.tool)],
         toolResults,
         tokensUsed,
         latencyMs,
+        requiresConfirmation,
+        pendingAction:
+          pendingActions.length > 0
+            ? {
+                type: pendingActions[0].tool,
+                params: pendingActions[0].args,
+              }
+            : undefined,
       };
     } catch (error) {
       const latencyMs = Date.now() - startTime;
