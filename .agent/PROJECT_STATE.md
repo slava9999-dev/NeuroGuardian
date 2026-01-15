@@ -1,6 +1,6 @@
 # 📊 Project State — NeuroGUARDIAN
 
-# Updated: 2026-01-15T01:55:00+03:00
+# Updated: 2026-01-15T12:55:00+03:00
 
 # This file tracks current progress and is updated at end of each session
 
@@ -8,43 +8,46 @@
 
 ## 🎯 Current Phase: RELEASE PREPARATION (Phase 12) 🚀 PREPARING FOR LAUNCH
 
-**Last Session:** 2026-01-15 (Session 56)
-**Focus:** 🏗️ Multi-Agent Architecture with 5 Specialists + Gemini via OpenRouter
+**Last Session:** 2026-01-15 (Session 59)
+**Focus:** 🦾 Active Support, Hybrid Search & Safety Guards
 
-### Session 2026-01-15 (Session 58 - Full Multi-Agent Rollout) 🚀
+### Session 2026-01-15 (Session 59 - Active Support & Onboarding) 🦾
 
-**Objective: Активация мультиагентной архитектуры и исправление поведения агента**
+**Objective: Внедрение «Активной поддержки» и безопасности мультиагентной системы**
 
-> ✅ **CRITICAL:** Мультиагентная архитектура (5 специалистов) активирована по умолчанию (`USE_MULTI_AGENT = true`).
-> ✅ **MAJOR:** Исправлен баг "залипания" контекста — теперь агент корректно переключается между задачами.
-> ✅ **MAJOR:** Улучшена идентификация модели — Виктор знает, что работает на Gemini 2.5 Flash.
+> ✅ **CRITICAL:** Интегрированы системы **Guardrails**, **Experience Learning** и **Memory Manager** в Multi-Agent архитектуру.
+> ✅ **CRITICAL:** Реализован **Hybrid Search** (Векторный + Полнотекстовый через GIN-индекс) для идеального поиска на русском.
+> ✅ **MAJOR:** Внедрен механизм **безопасного выполнения инструментов** с принудительным подтверждением для изменения цен.
+> ✅ **MAJOR:** Создан инструмент **sync_catalog** и пошаговый онбординг для новых пользователей.
 
 **Completed Actions:**
 
-- [x] **Feature Flag**: `USE_MULTI_AGENT` включен в `agent-v5.ts`.
-- [x] **IntentClassifier Upgrade**: Добавлены правила для классификации вопросов об архитектуре и модели.
-- [x] **ChatSpecialist Upgrade**: Обновлен системный промпт с информацией о технической базе (Gemini 2.5 Flash).
-- [x] **Verification**: Тесты `multi-agent-orchestrator.test.ts` и `typecheck` пройдены успешно.
+- [x] **Hybrid Search**: Реализован в `SpecialistKnowledgeBase` с использованием GIN-индекса.
+- [x] **Safety Guards**: `BaseSpecialist` теперь блокирует автоматическое выполнение `requiresConfirmation` инструментов.
+- [x] **Active Support**: Оркестратор использует `ResponseValidator` для проверки галлюцинаций.
+- [x] **Onboarding**: `ChatSpecialist` ведет пользователя по шагам «Ключи -> Синхронизация -> Параметры».
+- [x] **Verification**: Тесты `specialists.test.ts` и интеграция верифицированы.
 
-**Commits:**
+**Latest Commits:**
 
-- `feat: enable multi-agent architecture v6 by default`
-- `fix(agent): improve intent classification for model identity queries`
+- `feat(rag): implement hybrid search, GIN index and overlapping chunks`
+- `feat(agent): integrate active support (guardrails, learning, memory) into multi-agent`
+- `feat(onboarding): add SyncCatalogTool and proactive setup guidance`
 
 **Key Insights:**
 
 ```
-Разделение на специалистов решило проблему "fixation" (повторов из старого контекста).
-Аналитика теперь работает на Gemini Pro, а чат и поиск — на Gemini Flash (оптимально по цене/качеству).
+Безопасность прежде всего — блокировка инструментов на уровне BaseSpecialist предотвращает случайные траты.
+Hybrid Search критичен для русского языка, так как только векторы часто ошибаются в морфологии.
 ```
 
 **📋 NEXT SESSION PRIORITY:**
 
-> **🧪 REAL-TIME TESTING & RAG IMPROVEMENT**
+> **📊 DASHBOARD & ANALYTICS VISUALIZATION**
 >
-> 1. Включить агента в реальном времени (Telegram) — ПРОВЕРИТЬ ВЫПОЛНЕННОЕ
-> 2. Реализовать Hybrid Search (ключевые слова + векторы)
-> 3. Добавить визуализацию аналитики (графики в ответах через ASCII или ссылки)
+> 1. Интеграция онбординга в Dashboard (UI-подсказки).
+> 2. Активация ABC-анализа в Analytics Specialist и визуализация в чате.
+> 3. Полевое тестирование Sentinel на реальных атаках конкурентов.
 
 ### Session 2026-01-15 (Session 57 - RAG Verification & Architecture Analysis) 🧠
 
