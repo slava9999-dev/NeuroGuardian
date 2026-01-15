@@ -166,12 +166,22 @@ export class VectorStore {
   private initialized = false;
 
   constructor(provider?: EmbeddingProvider) {
-    // Default to OpenAI, fallback to Gemini
     if (provider) {
       this.embeddingProvider = provider;
-    } else if (process.env.OPENAI_API_KEY) {
+      return;
+    }
+
+    // Allow explicit override via env var
+    const envProvider = process.env.RAG_PROVIDER?.toLowerCase();
+
+    if (envProvider === 'gemini') {
+      this.embeddingProvider = new GeminiEmbeddingProvider();
+      logger.info('[VectorStore] Using Gemini embeddings (768 dims, enforced by RAG_PROVIDER)');
+    } else if (process.env.OPENAI_API_KEY && envProvider !== 'gemini') {
+      // Default to OpenAI only if available and not explicitly set to gemini
       this.embeddingProvider = new OpenAIEmbeddingProvider();
     } else {
+      // Fallback to Gemini
       this.embeddingProvider = new GeminiEmbeddingProvider();
       logger.info('[VectorStore] Using Gemini embeddings (768 dims)');
     }

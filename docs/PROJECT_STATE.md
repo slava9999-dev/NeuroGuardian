@@ -28,6 +28,7 @@
 | **Viktor AI Agent**       | ✅ Готов    | Memory интегрирована |
 | **Subscription System**   | ✅ Готов    | Tiers настроены      |
 | **YooKassa Integration**  | ✅ Готов    | Ключи в Vercel       |
+| **RAG Knowledge Base**    | ✅ Готов    | Gemini (768 dims)    |
 | **288 Unit Tests**        | ✅ Passing  | 0 failures           |
 | **TypeScript**            | ✅ Passing  | No errors            |
 

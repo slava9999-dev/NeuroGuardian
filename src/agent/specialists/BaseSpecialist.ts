@@ -33,6 +33,7 @@ export interface SpecialistContext {
     subscriptionTier: 'free' | 'basic' | 'pro';
   };
   relevantData?: string; // Pre-fetched data context
+  query?: string; // Current user query for RAG
 }
 
 /**
@@ -72,6 +73,7 @@ export abstract class BaseSpecialist {
 
     try {
       // 1. Build compact context
+      context.query = query;
       const contextStr = await this.buildContext(context);
 
       // 2. Build tool definitions for LLM

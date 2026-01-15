@@ -5,6 +5,7 @@
 // ============================================
 
 import { BaseSpecialist, type SpecialistContext, type SpecialistResult } from './BaseSpecialist.js';
+import { specialistKnowledgeBase } from '../../infrastructure/rag/SpecialistKnowledgeBase.js';
 
 export class PricingSpecialist extends BaseSpecialist {
   readonly name = 'PricingSpecialist';
@@ -56,6 +57,19 @@ export class PricingSpecialist extends BaseSpecialist {
     lines.push(`- Маркетплейс: ${context.userState.marketplace || 'не выбран'}`);
     lines.push(`- Товаров: ${context.userState.productsCount}`);
     lines.push(`- Подписка: ${context.userState.subscriptionTier}`);
+
+    // RAG: Retrieve knowledge base context
+    if (context.query) {
+      const ragContext = await specialistKnowledgeBase.retrieveForSpecialist(
+        context.query,
+        'PricingSpecialist'
+      );
+
+      if (ragContext.formattedContext) {
+        lines.push('\n## СПРАВОЧНАЯ ИНФОРМАЦИЯ (RAG):');
+        lines.push(ragContext.formattedContext);
+      }
+    }
 
     return lines.join('\n');
   }

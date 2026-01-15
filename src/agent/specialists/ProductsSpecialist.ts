@@ -6,6 +6,7 @@
 
 import { BaseSpecialist, type SpecialistContext } from './BaseSpecialist.js';
 import { sql } from '../../api-lib/services/database.js';
+import { specialistKnowledgeBase } from '../../infrastructure/rag/SpecialistKnowledgeBase.js';
 
 export class ProductsSpecialist extends BaseSpecialist {
   readonly name = 'ProductsSpecialist';
@@ -108,6 +109,19 @@ export class ProductsSpecialist extends BaseSpecialist {
         }
       } catch (_e) {
         // Ignore DB errors, continue with minimal context
+      }
+    }
+
+    // RAG: Retrieve knowledge base context
+    if (context.query) {
+      const ragContext = await specialistKnowledgeBase.retrieveForSpecialist(
+        context.query,
+        'ProductsSpecialist'
+      );
+
+      if (ragContext.formattedContext) {
+        lines.push('\n## СПРАВОЧНАЯ ИНФОРМАЦИЯ (RAG):');
+        lines.push(ragContext.formattedContext);
       }
     }
 

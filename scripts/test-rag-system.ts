@@ -246,28 +246,37 @@ async function main() {
 
     if (count === 0) {
       console.log(`  ${YELLOW}⚠️  No embeddings in database${RESET}`);
-      console.log(`  ${YELLOW}💡 Run ingestion first: see next steps${RESET}`);
+      console.log(`  ${YELLOW}💡 Run ingestion first${RESET}`);
     } else {
       console.log(`  ${GREEN}✅ ${count} embeddings available${RESET}`);
 
-      // Try a sample search
-      console.log(`  ${BLUE}🔍 Testing sample search...${RESET}`);
+      // Try a real vector search
+      console.log(`  ${BLUE}🔍 Testing vector search logic...${RESET}`);
 
-      // Get a random embedding to test similarity
-      const sampleResult = await sql`
-        SELECT id, namespace, title, 
-               LEFT(content, 100) as preview
-        FROM knowledge_embeddings 
-        WHERE embedding IS NOT NULL
-        LIMIT 3
-      `;
+      // We need to use "unsafe" provider or the vectorStore instance correctly configured
+      // Since VectorStore now respects RAG_PROVIDER env var, let's use it
+      const { vectorStore } = await import('../src/infrastructure/rag/VectorStore.js'); // Dynamic import to pick up env vars if changed
 
-      if (sampleResult.rows.length > 0) {
-        console.log(`  ${GREEN}✅ Sample documents:${RESET}`);
-        for (const row of sampleResult.rows) {
-          console.log(`     • [${row.namespace}] ${row.title || 'Untitled'}`);
-          console.log(`       ${row.preview}...`);
+      try {
+        const results = await vectorStore.search('как установить цены', { limit: 1 });
+
+        if (results.length > 0) {
+          console.log(`  ${GREEN}✅ Search successful!${RESET}`);
+          console.log(`     Query: "как установить цены"`);
+          console.log(
+            `     Found: "${results[0].title || 'Untitled'}" (Similarity: ${results[0].similarity.toFixed(4)})`
+          );
+        } else {
+          console.log(
+            `  ${YELLOW}⚠️  Search returned 0 results (threshold might be too strict)${RESET}`
+          );
         }
+      } catch (searchError) {
+        console.log(
+          `  ${RED}❌ Search failed: ${searchError instanceof Error ? searchError.message : searchError}${RESET}`
+        );
+        console.log(`  ${YELLOW}💡 Check if embedding dimensions match database Schema${RESET}`);
+        // Try raw SQL debug
       }
     }
   } catch (error) {

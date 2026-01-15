@@ -5,7 +5,7 @@
 // ============================================
 
 import { BaseSpecialist, type SpecialistContext, type SpecialistResult } from './BaseSpecialist.js';
-import { knowledgeBase } from '../core/KnowledgeBase.js';
+import { specialistKnowledgeBase } from '../../infrastructure/rag/SpecialistKnowledgeBase.js';
 
 export class ChatSpecialist extends BaseSpecialist {
   readonly name = 'ChatSpecialist';
@@ -111,14 +111,14 @@ export class ChatSpecialist extends BaseSpecialist {
       const contextStr = await this.buildContext(context);
 
       // 2. Search knowledge base for relevant info
-      const kbDocs = await knowledgeBase.search(query, 3);
+      const ragContext = await specialistKnowledgeBase.retrieveForSpecialist(
+        query,
+        'ChatSpecialist'
+      );
       let kbContext = '';
 
-      if (kbDocs.length > 0) {
-        kbContext = '\n\n## РЕЛЕВАНТНЫЕ ЗНАНИЯ:\n';
-        for (const doc of kbDocs) {
-          kbContext += `### ${doc.title}\n${doc.content.slice(0, 500)}\n\n`;
-        }
+      if (ragContext.formattedContext) {
+        kbContext = `\n\n## РЕЛЕВАНТНЫЕ ЗНАНИЯ (RAG):\n${ragContext.formattedContext}`;
       }
 
       // 3. Call LLM (no tools)
