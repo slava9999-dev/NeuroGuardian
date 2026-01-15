@@ -154,11 +154,31 @@ export const marketplaceAccountsApi = {
     isActive?: boolean;
   }) => {
     const initData = getInitData();
-    const response = await api.post('', {
-      action: 'marketplace-accounts',
-      initData,
-      ...account,
+
+    // Debug logging for troubleshooting
+    console.log('[API] saveAccount called:', {
+      hasInitData: !!initData,
+      initDataLength: initData?.length || 0,
+      accountName: account.name,
+      marketplace: account.marketplace,
+      hasWbKey: !!account.wbApiKey,
+      hasOzonKey: !!account.ozonApiKey,
     });
+
+    const response = await api.post(
+      '',
+      {
+        action: 'marketplace-accounts',
+        ...account,
+      },
+      {
+        headers: {
+          'X-Init-Data': initData || '',
+        },
+      }
+    );
+
+    console.log('[API] saveAccount response:', response.data);
     return response.data;
   },
 

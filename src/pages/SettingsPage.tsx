@@ -57,28 +57,42 @@ export function SettingsPage({
       alert('Заполните обязательные поля');
       return;
     }
+
+    // Debug: log what we're about to send
+    const payload = {
+      id: editingAccount.id,
+      name: editingAccount.name,
+      marketplace: editingAccount.marketplace,
+      wbApiKey: editingAccount.wb_token, // Mapping from UI state to API payload
+      ozonClientId: editingAccount.ozon_client_id,
+      ozonApiKey: editingAccount.ozon_api_key,
+      isActive: editingAccount.is_active,
+    };
+
+    console.log('[SettingsPage] Saving account, payload:', {
+      ...payload,
+      wbApiKey: payload.wbApiKey ? '***SET***' : 'EMPTY',
+      ozonApiKey: payload.ozonApiKey ? '***SET***' : 'EMPTY',
+    });
+
     setIsSaving(true);
     try {
-      const res = await marketplaceAccountsApi.saveAccount({
-        id: editingAccount.id,
-        name: editingAccount.name,
-        marketplace: editingAccount.marketplace,
-        wbApiKey: editingAccount.wb_token, // Mapping from UI state to API payload
-        ozonClientId: editingAccount.ozon_client_id,
-        ozonApiKey: editingAccount.ozon_api_key,
-        isActive: editingAccount.is_active,
-      });
+      const res = await marketplaceAccountsApi.saveAccount(payload);
+
+      console.log('[SettingsPage] Save response:', res);
+
       if (res.success) {
         hapticFeedback('success');
         setShowAccountModal(false);
         setEditingAccount({});
         loadAccounts();
       } else {
+        console.error('[SettingsPage] Save failed:', res.error);
         alert('Ошибка: ' + res.error);
       }
     } catch (e) {
-      console.error(e);
-      alert('Ошибка сохранения');
+      console.error('[SettingsPage] Save exception:', e);
+      alert('Ошибка сохранения: ' + (e instanceof Error ? e.message : 'Неизвестная ошибка'));
     } finally {
       setIsSaving(false);
     }
