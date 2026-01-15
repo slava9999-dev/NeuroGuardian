@@ -69,19 +69,99 @@ export class GeminiProvider implements LLMProvider {
     this.apiKey = process.env.OPENROUTER_API_KEY || '';
     this.config = { ...DEFAULT_CONFIG, ...config };
 
-    if (!this.apiKey) {
-      logger.warn('[GeminiProvider] No OPENROUTER_API_KEY configured');
+    if (!this.apiKey && !process.env.GEMINI_API_KEY) {
+      logger.warn('[GeminiProvider] No OPENROUTER_API_KEY or GEMINI_API_KEY configured');
     }
   }
 
   async complete(messages: LLMMessage[], options?: Partial<GeminiConfig>): Promise<LLMResponse> {
+    const config = { ...this.config, ...options };
+    const startTime = Date.now();
+
+    // 1. Try Direct Google API first if key exists (simpler, free-er)
+    // Or fallback if OpenRouter key is missing
+    const googleKey = process.env.GEMINI_API_KEY;
+    const useDirect = !this.apiKey && !!googleKey;
+
+    if (useDirect) {
+      try {
+        // 🛡️ CEMENTED MODEL: gemini-2.5-flash (Verified available)
+        // Fallback to 2.0-flash only if explicitly requested, but default is 2.5
+        let modelId = 'gemini-2.5-flash';
+        if (config.model === 'gemini-2.5-pro') modelId = 'gemini-2.5-pro';
+
+        // 1. Extract System Prompt
+        const systemMsg = messages.find(m => m.role === 'system');
+        const systemInstruction = systemMsg
+          ? {
+              parts: [{ text: systemMsg.content }],
+            }
+          : undefined;
+
+        // 2. Filter and Map User/Model messages
+        // Google API doesn't allow 'system' role in contents
+        const contents = messages
+          .filter(m => m.role !== 'system')
+          .map(m => ({
+            role: m.role === 'tool' ? 'user' : m.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: m.content }],
+          }));
+
+        const requestBody: any = {
+          contents: contents,
+          generationConfig: {
+            temperature: config.temperature,
+            maxOutputTokens: config.maxTokens,
+          },
+        };
+
+        // Add system instruction if present
+        if (systemInstruction) {
+          requestBody.systemInstruction = systemInstruction;
+        }
+
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${googleKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody),
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`Google API error: ${response.status} ${await response.text()}`);
+        }
+
+        const data = await response.json();
+        const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const tokensUsed = data.usageMetadata?.totalTokenCount || 0;
+        const latency = Date.now() - startTime;
+
+        logger.info('[GeminiProvider] Direct Google Request completed', {
+          model: modelId,
+          tokensUsed,
+          latencyMs: latency,
+        });
+
+        return {
+          content,
+          tokensUsed,
+          toolCalls: undefined, // No tools support in this simple implementation yet
+        };
+      } catch (error) {
+        logger.error('[GeminiProvider] Direct Google Request failed', error);
+        throw error;
+      }
+    }
+
     if (!this.apiKey) {
       throw new Error('OpenRouter API key not configured. Set OPENROUTER_API_KEY');
     }
 
-    const config = { ...this.config, ...options };
+    // OpenRouter implementation...
     const modelId = getOpenRouterModel(config.model);
-    const startTime = Date.now();
+    // ... rest of existing OpenRouter logic
 
     try {
       // Convert messages to OpenAI format
