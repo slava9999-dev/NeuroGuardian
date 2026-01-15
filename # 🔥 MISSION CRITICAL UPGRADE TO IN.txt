@@ -1,0 +1,108 @@
+# 🔥 MISSION CRITICAL: UPGRADE TO INDUSTRIAL ARCHITECTURE (V3.1)
+
+Мы меняем подход. Система NeuroGUARDIAN переводится в статус "Industrial Business Tool".
+Вводится два новых модуля: **VisionCore** (Анализ) и **RenderFactory** (Генерация).
+
+Твоя задача — спроектировать и внедрить следующие архитектурные узлы.
+
+## 1. МОДУЛЬ ЦИФРОВОГО ЗРЕНИЯ (VisionCore)
+**Цель:** Автоматический контроль качества и анализ контента перед публикацией.
+
+* **Technology:** Google Gemini 2.0 Pro Vision (Multimodal).
+* **Pipeline анализа:**
+    1.  Принимаем RAW-фото от мастера.
+    2.  **Visual QA Check:** Агент должен вернуть JSON с оценкой:
+        - `lighting_score`: (0-10)
+        - `blur_detected`: boolean
+        - `material_detected`: "oak" | "ash" | "resin" | "unknown"
+        - `wb_compliant`: boolean (проходит ли по правилам WB)
+    3.  **Auto-Tagging:** Генерация тегов для SEO на основе изображения (например, "текстура сучков", "живой край").
+
+## 2. КОНВЕЙЕР ГЕНЕРАЦИИ (RenderFactory)
+**Цель:** Превращение фото "из цеха" в продающую карточку (Rich Content).
+
+* **Интеграция:** Подключи API для генерации (рекомендую Replicate с Flux.1 или Google Vertex Imagen).
+* **Сценарии (Workflows):**
+    * **Workflow A (Main Card):** Remove Background -> Place on Pure White (#FFFFFF) -> Add Soft Shadow -> Upscale.
+    * **Workflow B (Lifestyle):** Remove Background -> Generate Prompt ("Luxury loft interior, concrete walls, warm lighting") -> Composite Product -> Harmonize Lighting.
+* **Требование:** Сохранение геометрии товара. Дерево нельзя искажать. Использовать ControlNet или аналогичные техники фиксации контуров.
+
+## 3. АСИНХРОННАЯ АРХИТЕКТУРА (Industrial Reliability)
+Обработка фото занимает время (10-40 сек). Синхронный запрос "убьет" сервер.
+
+* **Queue System:** Внедрить `Upstash QStash` или `BullMQ` (Redis).
+* **Flow:**
+    1.  User Upload -> API (200 OK, Job ID).
+    2.  Worker Process -> Vision Check -> Generation -> Upload to Cloud Storage.
+    3.  Webhook/Polling -> Обновление статуса в UI ("Готово").
+
+## 4. БАЗА ДАННЫХ И ТИПЫ (FIX PRIORITY)
+Как указывал Архитектор Arborius ранее, исправить критическую уязвимость:
+* **Strict ID Typing:** Все `nm_id`, `order_id`, `user_id` перевести в `String` на уровне приложения.
+* **Media Assets Table:** Создать таблицу для хранения версий изображений:
+    ```typescript
+    interface MediaAsset {
+      id: string;
+      product_id: string;
+      original_url: string; // Фото из цеха
+      processed_white_url: string; // Для WB
+      processed_lifestyle_url: string; // Для маркетинга
+      vision_metadata: JSON; // Теги и скоринг от Gemini
+      status: 'processing' | 'ready' | 'failed';
+    }
+    ```
+
+## 5. БЕЗОПАСНОСТЬ (Safety)
+* **Watermarking:** Добавить функционал автоматического наложения водяного знака "Arbarea" (полупрозрачного) на Lifestyle-фото, чтобы конкуренты не украли контент.
+
+---
+**Ожидаемый результат:**
+Предоставь обновленную структуру проекта (folder structure), список новых зависимостей (package.json) и пример кода для `VisionService.ts`, который реализует логику "Посмотрел на фото -> Оценил качество".# ⚡ MISSION: MARKET DOMINANCE ARCHITECTURE (Combat Ready)
+
+Ситуация критическая. Нам не нужен просто "рабочий" софт. Нам нужна машина для подавления конкурентов через превосходство в Визуале и SEO.
+
+[cite_start]Внедряем три новых спец-модуля в `src/agent/specialists` поверх существующей архитектуры[cite: 60].
+
+## 1. МОДУЛЬ "CTR PREDICTOR" (NEURO-VISION)
+**Задача:** Мы не публикуем фото, пока не будем уверены, что на него кликнут.
+**Логика:**
+1.  Агент берет сгенерированное фото (из RenderFactory).
+2.  Сравнивает его с ТОП-10 конкурентов по запросу "журнальный столик".
+3.  Использует Gemini Vision Pro для анализа:
+    * **Contrast Score:** Выделяется ли наш товар на фоне выдачи?
+    * **Focus Map:** Куда падает взгляд? (Должен на текстуру дерева, а не в угол).
+4.  **Output:** Если оценка ниже 8/10 -> Автоматический перерендеринг с другим светом/ракурсом.
+
+## 2. МОДУЛЬ "SEMANTIC MINER" (SEO-AGRESSOR)
+**Задача:** Забрать 100% поискового трафика, включая низкочастотные запросы.
+[cite_start]**Интеграция:** Расширяем `ProductsSpecialist`[cite: 61].
+**Алгоритм:**
+1.  **Competitor Review Parsing:** Скачать последние 1000 отзывов конкурентов.
+2.  **Pain Point Extraction:** Найти, на что жалуются люди (пример: "шатается", "дешевый лак", "сложная сборка").
+3.  **Weaponized Description:**
+    * Если у конкурентов "шатается" -> Наш Агент пишет в H1/Description: "Монолитная устойчивость", "Стальной каркас", "Никакого люфта".
+    * Внедрение LSI-ключей (синонимов), которые конкуренты упускают (например, не просто "стол", а "кофейная станция", "подставка под ноутбук").
+4.  [cite_start]**Auto-Update:** Если появляется новый трендовый ключ в Analytics API[cite: 52], агент сам добавляет его в скрытые поля карточки.
+
+## 3. МОДУЛЬ "DYNAMIC PRICING SNIPER"
+**Задача:** Найти цену, при которой продажи максимальны, не убивая маржу.
+[cite_start]**Интеграция:** Усиление `PricingSpecialist`[cite: 70].
+**Логика:**
+1.  Мониторинг не раз в сутки, а раз в час (для FBS).
+2.  **Strategy "Under radar":** Держать цену на 1% ниже главного конкурента в часы пик (18:00 - 23:00) и поднимать ночью для сохранения средней маржи.
+3.  [cite_start]**Auto-Participation:** Авто-вход в акции WB [cite: 40][cite_start], если они дают буст к ранжированию[cite: 7], но с автоматическим выходом, если сток падает слишком быстро (защита от вымывания товара).
+
+## 4. ТЕХНИЧЕСКИЕ ТРЕБОВАНИЯ (STACK UPGRADE)
+* **Database:** Добавить таблицу `competitor_insights` (хранение "болей" клиентов и успешных фото конкурентов).
+* **Queue:** Обязательно `BullMQ` для тяжелых задач анализа 1000+ отзывов.
+* **Dependencies:**
+    * `puppeteer` или аналог для парсинга визуальной выдачи WB (если API не дает картинки конкурентов).
+    * `sharp` для агрессивной цветокоррекции (повышение насыщенности для мобильных экранов).
+
+---
+**ПРИОРИТЕТ ВЫПОЛНЕНИЯ:**
+1.  Сначала **Semantic Miner** (текст продает).
+2.  Затем **CTR Predictor** (картинка привлекает).
+3.  В конце **Pricing Sniper** (цена добивает).
+
+Жду структуру классов для модуля `SemanticMiner.ts`.

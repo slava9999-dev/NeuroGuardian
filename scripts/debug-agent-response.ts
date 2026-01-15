@@ -6,7 +6,7 @@
 import { config } from 'dotenv';
 config({ path: '.env.local' });
 
-const API_BASE = 'https://neuro-guardian.vercel.app/api';
+const API_BASE = 'https://neuro-guardian-ochre.vercel.app/api';
 const ADMIN_KEY = process.env.ADMIN_API_KEY!;
 const TEST_USER_ID = 7548070478;
 

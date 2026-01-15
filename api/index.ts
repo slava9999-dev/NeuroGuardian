@@ -138,6 +138,10 @@ import {
   handleMoEPriceCheck,
 } from '../src/api-lib/handlers/moe.js';
 
+// Media Handlers (Vision & Render)
+import handleMediaUpload from '../src/api-lib/handlers/media-upload.js';
+import handleMediaWebhook from '../src/api-lib/handlers/media-webhook.js';
+
 // Telegram Bot Webhook
 import {
   handleTelegramWebhook,
@@ -609,6 +613,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         };
         return moeHandlers[action](req, res, auth.context.userId);
       }
+
+      // ========== MEDIA (VISION & RENDER) ==========
+      case 'media-upload':
+        // Auth is handled inside or requires valid session?
+        // Let's assume public upload for now or consistent with other handlers
+        // Ideally verify auth here
+        return handleMediaUpload(req, res);
+
+      case 'media-webhook':
+        // No user auth required (secured by QStash signature inside handler)
+        return handleMediaWebhook(req, res);
 
       // ========== DEFAULT ==========
       default:

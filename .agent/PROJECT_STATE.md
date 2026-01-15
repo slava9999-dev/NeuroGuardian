@@ -111,6 +111,13 @@ PgVector остается основным движком знаний.
   - Resolved circular dependencies and type errors in Multi-Agent system.
   - Verified "Active Support" via `test-active-support.ts`.
 
+- **Session 60 [CURRENT]: Industrial Upgrade V3.1 - Vision & Media**
+  - **VisionCore**: Implemented `VisionService` with dynamic MIME detection and Gemini 1.5 Flash integration.
+  - **RenderFactory**: Created generation pipelines (White BG, Lifestyle) using Replicate API and `WatermarkService`.
+  - **Async Architecture**: Deployed `MediaQueueService` (Upstash QStash) and Webhook handlers.
+  - **Database**: Created `media_assets` and `media_jobs` tables; fixed `products` table schema (duplicates removed, UNIQUE constraint added).
+  - **Verified**: Vision analysis pipeline tested via `scripts/test-vision.ts` (using Picsum stable source).
+
 ### ✅ Completed Actions
 
 - [x] Enable Multi-Agent architecture v6 by default
@@ -121,12 +128,18 @@ PgVector остается основным движком знаний.
 - [x] Optimize context retrieval (7 documents)
 - [x] Add Active Support (Validation, Learning, Memory) to Multi-Agent
 - [x] Create `SyncCatalogTool` and Setup Guide for onboarding
+- [x] **Implement VisionCore (Gemini 1.5 Flash)**
+- [x] **Implement RenderFactory (Replicate + Watermark)**
+- [x] **Setup Media Queue (Upstash QStash)**
+- [x] **Deploy Media Database Schema (Assets + Jobs)**
 
 ### 📦 Latest Commits
 
 - `feat(rag): implement hybrid search, GIN index and overlapping chunks`
 - `feat(agent): integrate active support (guardrails, learning, memory) into multi-agent`
 - `feat(onboarding): add SyncCatalogTool and proactive setup guidance`
+- `feat(vision): implement VisionCore, RenderFactory, and Async Media Queue`
+- `fix(db): repair products schema and add media tables migration`
 
 ### 💡 Key Insights
 
