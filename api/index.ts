@@ -45,6 +45,8 @@ import {
   handleReferral,
 } from '../src/api-lib/handlers/admin.js';
 
+import handleRagSetup from '../src/api-lib/handlers/rag-setup.js';
+
 // Auth handlers
 import { handleAuth, handleSettings, handlePlans } from '../src/api-lib/handlers/auth.js';
 
@@ -487,6 +489,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       case 'run-migration':
         return handleRunMigration(req, res);
+
+      case 'rag-setup':
+        return handleRagSetup(req, res);
 
       case 'admin-activate-trial':
         return handleAdminActivateTrial(req, res);

@@ -25,8 +25,8 @@ CREATE TABLE knowledge_embeddings (
   title VARCHAR(500),
   content TEXT NOT NULL,
   
-  -- Vector embedding (1536 dimensions for OpenAI ada-002, 768 for multilingual-e5)
-  embedding vector(1536),
+  -- Vector embedding (768 dimensions for Gemini text-embedding-004)
+  embedding vector(768),
   
   -- Metadata (tags, version, etc.)
   metadata JSONB DEFAULT '{}',
@@ -58,7 +58,7 @@ CREATE INDEX idx_embeddings_content_fts ON knowledge_embeddings
 -- Comment for documentation
 COMMENT ON TABLE knowledge_embeddings IS 'RAG vector store for NeuroGUARDIAN knowledge base';
 COMMENT ON COLUMN knowledge_embeddings.namespace IS 'Category: wb_api, ozon_api, sentinel, pricing, analytics, faq';
-COMMENT ON COLUMN knowledge_embeddings.embedding IS 'OpenAI text-embedding-3-small (1536 dims) or multilingual-e5 (768 dims)';
+COMMENT ON COLUMN knowledge_embeddings.embedding IS 'Gemini text-embedding-004 (768 dims)';
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_embeddings_timestamp()
@@ -82,7 +82,7 @@ CREATE TRIGGER embeddings_updated_at
 
 -- Function: Search similar vectors with namespace filter
 CREATE OR REPLACE FUNCTION search_embeddings(
-  query_embedding vector(1536),
+  query_embedding vector(768),
   search_namespace VARCHAR(50) DEFAULT NULL,
   match_count INT DEFAULT 5,
   match_threshold FLOAT DEFAULT 0.7
@@ -115,7 +115,7 @@ $$ LANGUAGE plpgsql;
 
 -- Function: Hybrid search (vector + full-text)
 CREATE OR REPLACE FUNCTION hybrid_search_embeddings(
-  query_embedding vector(1536),
+  query_embedding vector(768),
   query_text TEXT,
   search_namespace VARCHAR(50) DEFAULT NULL,
   match_count INT DEFAULT 5,

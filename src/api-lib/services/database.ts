@@ -117,17 +117,23 @@ async function executeWithRetry(text: string, values: unknown[]): Promise<QueryR
 /**
  * Tagged template literal for SQL queries (compatible with @vercel/postgres)
  */
-export const sql = (strings: TemplateStringsArray, ...values: unknown[]): Promise<QueryResult> => {
-  let text = strings[0];
-  const queryValues: unknown[] = [];
+export const sql = Object.assign(
+  (strings: TemplateStringsArray, ...values: unknown[]): Promise<QueryResult> => {
+    let text = strings[0];
+    const queryValues: unknown[] = [];
 
-  for (let i = 0; i < values.length; i++) {
-    queryValues.push(values[i]);
-    text += `$${queryValues.length}${strings[i + 1]}`;
+    for (let i = 0; i < values.length; i++) {
+      queryValues.push(values[i]);
+      text += `$${queryValues.length}${strings[i + 1]}`;
+    }
+
+    return executeWithRetry(text, queryValues);
+  },
+  {
+    unsafe: (text: string, values: unknown[] = []): Promise<QueryResult> =>
+      executeWithRetry(text, values),
   }
-
-  return executeWithRetry(text, queryValues);
-};
+);
 
 import { logger, decryptApiKey } from '../lib/index.js';
 import type { DBProduct, PendingPriceUpdate } from '../lib/types.js';

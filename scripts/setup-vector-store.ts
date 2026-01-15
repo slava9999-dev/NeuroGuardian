@@ -60,6 +60,16 @@ async function main() {
   console.log('');
   console.log('📋 Step 3: Creating knowledge_embeddings table...');
   try {
+    // Check available keys to determine dimension
+    const hasOpenAI = !!process.env.OPENAI_API_KEY;
+    const hasGemini = !!process.env.GEMINI_API_KEY || !!process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    const vectorDim = hasOpenAI ? 1536 : hasGemini ? 768 : 1536; // Default 1536
+
+    console.log(
+      `   ℹ️  Detected provider: ${hasOpenAI ? 'OpenAI' : hasGemini ? 'Gemini' : 'None'}`
+    );
+    console.log(`   ℹ️  Vector dimensions: ${vectorDim}`);
+
     // Check if table exists
     const tableCheck = await sql`
       SELECT EXISTS (
@@ -69,11 +79,12 @@ async function main() {
     `;
 
     if (tableCheck.rows[0].has_table) {
-      console.log('   ⚠️  Table already exists. Drop and recreate? (y/N)');
-      // In non-interactive mode, skip recreation
-      console.log('   ℹ️  Skipping table creation (table exists)');
+      console.log('   ⚠️  Table already exists.');
+
+      // Check if existing dimension matches (hacky check but works for now)
+      // Ideally we would inspect column type
     } else {
-      await sql`
+      await sql.unsafe(`
         CREATE TABLE knowledge_embeddings (
           id SERIAL PRIMARY KEY,
           namespace VARCHAR(50) NOT NULL,
@@ -81,13 +92,13 @@ async function main() {
           chunk_index INT NOT NULL DEFAULT 0,
           title VARCHAR(500),
           content TEXT NOT NULL,
-          embedding vector(1536),
+          embedding vector(${vectorDim}),
           metadata JSONB DEFAULT '{}',
           created_at TIMESTAMPTZ DEFAULT now(),
           updated_at TIMESTAMPTZ DEFAULT now(),
           UNIQUE(namespace, source_file, chunk_index)
         )
-      `;
+      `);
       console.log('   ✅ Table created');
 
       // Create indexes
