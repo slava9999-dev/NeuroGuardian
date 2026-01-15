@@ -10,17 +10,28 @@ async function testSupport() {
     await import('../src/agent/specialists/MultiAgentOrchestrator.js');
   const { stateManager } = await import('../src/agent/core/StateManager.js');
   const { experienceLearning } = await import('../src/agent/core/ExperienceLearning.js');
-  const { sql } = await import('../src/api-lib/services/database.js');
-  const { responseValidator } = await import('../src/agent/core/ResponseValidator.js');
   const { memoryManager } = await import('../src/agent/core/MemoryManager.js');
 
   // Mock SQL is tricky since it's a constant export.
   // We'll rely on mocking the managers instead.
 
   // Mock Managers to avoid actual DB calls
-  (memoryManager as any).saveMessage = async () => {};
-  (memoryManager as any).getRecentHistory = async () => [];
-  (experienceLearning as any).analyzeInteraction = async () => {};
+  // Mock Managers to avoid actual DB calls
+  (
+    memoryManager as unknown as {
+      saveMessage: (userId: number, role: string, content: string) => Promise<void>;
+    }
+  ).saveMessage = async () => {};
+  (
+    memoryManager as unknown as {
+      getRecentHistory: (userId: number, limit: number) => Promise<unknown[]>;
+    }
+  ).getRecentHistory = async () => [];
+  (
+    experienceLearning as unknown as {
+      analyzeInteraction: (userId: number, q: string, r: string, p?: string) => Promise<void>;
+    }
+  ).analyzeInteraction = async () => {};
 
   const MOCK_USER_ID = 888;
 
@@ -51,7 +62,7 @@ async function testSupport() {
     updatedAt: new Date(),
   };
 
-  (stateManager.getState as any) = async () => MOCK_STATE;
+  (stateManager.getState as unknown as (u: number) => Promise<MockState>) = async () => MOCK_STATE;
 
   console.log('🧪 TESTING ACTIVE SUPPORT SYSTEM...');
   console.log('====================================');

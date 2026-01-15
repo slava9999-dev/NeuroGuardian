@@ -81,12 +81,13 @@ describe('Specialists', () => {
       expect(productsSpecialist.description).toContain('product');
     });
 
-    it('should have 4 tools', () => {
-      expect(productsSpecialist.tools).toHaveLength(4);
+    it('should have 5 tools', () => {
+      expect(productsSpecialist.tools).toHaveLength(5);
       expect(productsSpecialist.tools).toContain('get_products');
       expect(productsSpecialist.tools).toContain('update_product_settings');
       expect(productsSpecialist.tools).toContain('get_low_margin_products');
       expect(productsSpecialist.tools).toContain('get_real_price');
+      expect(productsSpecialist.tools).toContain('sync_catalog');
     });
 
     it('should have systemPrompt with key sections', () => {
@@ -226,20 +227,20 @@ describe('Specialists', () => {
 
     it('should have friendly systemPrompt', () => {
       const prompt = chatSpecialist.systemPrompt;
+      expect(prompt).toContain('ВИКТОР');
       expect(prompt).toContain('ПОМОЩНИК');
-      expect(prompt).toContain('Дружелюбн');
-      expect(prompt).toContain('😊');
+      expect(prompt).toContain('🫡');
     });
 
     it('should have onboarding scenarios', () => {
       const prompt = chatSpecialist.systemPrompt;
-      expect(prompt).toContain('Начнём');
-      expect(prompt).toContain('подключить');
+      expect(prompt).toContain('настрой');
+      expect(prompt).toContain('Шаг 1');
     });
 
-    it('should have FAQ responses', () => {
+    it('should have setup scenarios', () => {
       const prompt = chatSpecialist.systemPrompt;
-      expect(prompt).toContain('умеешь');
+      expect(prompt).toContain('синхрониз');
       expect(prompt).toContain('товары');
     });
 
