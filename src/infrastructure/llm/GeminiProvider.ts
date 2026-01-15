@@ -222,7 +222,6 @@ export class GeminiProvider implements LLMProvider {
       throw error;
     }
   }
-
   /**
    * Complete with function/tool calling support
    */
@@ -238,13 +237,125 @@ export class GeminiProvider implements LLMProvider {
     }>,
     options?: Partial<GeminiConfig>
   ): Promise<LLMResponse> {
-    if (!this.apiKey) {
-      throw new Error('OpenRouter API key not configured');
+    const config = { ...this.config, ...options };
+    const startTime = Date.now();
+
+    // Try Direct Google API first if no OpenRouter key
+    const googleKey = process.env.GEMINI_API_KEY;
+    const useDirect = !this.apiKey && !!googleKey;
+
+    if (useDirect) {
+      try {
+        let modelId = 'gemini-2.5-flash';
+        if (config.model === 'gemini-2.5-pro') modelId = 'gemini-2.5-pro';
+
+        // Extract System Prompt
+        const systemMsg = messages.find(m => m.role === 'system');
+        const systemInstruction = systemMsg ? { parts: [{ text: systemMsg.content }] } : undefined;
+
+        // Convert messages to Google format
+        const contents = messages
+          .filter(m => m.role !== 'system')
+          .map(m => ({
+            role: m.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: m.content }],
+          }));
+
+        // Convert OpenAI tools format to Google format
+        const googleTools =
+          tools.length > 0
+            ? [
+                {
+                  function_declarations: tools.map(t => ({
+                    name: t.function.name,
+                    description: t.function.description,
+                    parameters: t.function.parameters,
+                  })),
+                },
+              ]
+            : undefined;
+
+        const requestBody: Record<string, unknown> = {
+          contents,
+          generationConfig: {
+            temperature: config.temperature,
+            maxOutputTokens: config.maxTokens,
+          },
+        };
+
+        if (systemInstruction) {
+          requestBody.systemInstruction = systemInstruction;
+        }
+        if (googleTools) {
+          requestBody.tools = googleTools;
+        }
+
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${googleKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody),
+          }
+        );
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Google API error: ${response.status} ${errorText.slice(0, 200)}`);
+        }
+
+        const data = await response.json();
+        const latency = Date.now() - startTime;
+
+        // Parse response
+        const candidate = data.candidates?.[0];
+        const parts = candidate?.content?.parts || [];
+
+        // Extract text content
+        const textPart = parts.find((p: { text?: string }) => p.text);
+        const content = textPart?.text || '';
+
+        // Extract function calls (Google format)
+        const functionCallParts = parts.filter((p: { functionCall?: unknown }) => p.functionCall);
+        const toolCalls = functionCallParts.map(
+          (p: { functionCall: { name: string; args: object } }, idx: number) => ({
+            id: `call_${idx}`,
+            type: 'function' as const,
+            function: {
+              name: p.functionCall.name,
+              arguments: JSON.stringify(p.functionCall.args || {}),
+            },
+          })
+        );
+
+        const tokensUsed = data.usageMetadata?.totalTokenCount || 0;
+
+        logger.info('[GeminiProvider] Direct Google Tool call completed', {
+          model: modelId,
+          tokensUsed,
+          toolCalls: toolCalls.length,
+          latencyMs: latency,
+        });
+
+        return {
+          content,
+          tokensUsed,
+          toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+        };
+      } catch (error) {
+        logger.error('[GeminiProvider] Direct Google Tool call failed', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw error;
+      }
     }
 
-    const config = { ...this.config, ...options };
+    // Fallback to OpenRouter
+    if (!this.apiKey) {
+      throw new Error('No LLM API key configured. Set OPENROUTER_API_KEY or GEMINI_API_KEY');
+    }
+
     const modelId = getOpenRouterModel(config.model);
-    const startTime = Date.now();
 
     try {
       const openaiMessages = messages.map(m => ({
