@@ -13,8 +13,8 @@ const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1';
 
 // Model names on OpenRouter
 const MODELS = {
-  flash: 'google/gemini-2.5-flash-preview-04-17', // Fast, cheap
-  pro: 'google/gemini-2.5-pro-preview', // Advanced reasoning
+  flash: 'google/gemini-2.0-flash-001', // Fast, cheap (stable version)
+  pro: 'google/gemini-2.0-pro-exp-02-05', // Advanced reasoning
   // Fallbacks if Gemini unavailable
   claudeHaiku: 'anthropic/claude-3-haiku', // Fast alternative
   claudeSonnet: 'anthropic/claude-3.5-sonnet', // Pro alternative
