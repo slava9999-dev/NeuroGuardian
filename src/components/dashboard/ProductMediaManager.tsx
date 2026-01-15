@@ -82,6 +82,51 @@ export function ProductMediaManager({ product, onUpdate }: ProductMediaManagerPr
     }
   };
 
+  const handleImportFromUrl = async () => {
+    if (!product.imageUrl) return;
+
+    setIsUploading(true);
+    hapticFeedback('medium');
+
+    try {
+      interface TelegramWebApp {
+        initData?: string;
+      }
+      const tg = (window as unknown as { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp;
+      const initData = tg?.initData || 'demo';
+
+      const response = await fetch('/api?action=media-upload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Init-Data': initData,
+        },
+        body: JSON.stringify({
+          action: 'media-upload',
+          userId: product.userId,
+          productId: product.productId,
+          imageUrl: product.imageUrl,
+          autoAnalyze: true,
+          autoProcess: false,
+        }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        hapticFeedback('success');
+        onUpdate();
+      } else {
+        throw new Error(data.error || 'Import failed');
+      }
+    } catch (error) {
+      console.error('Import failed:', error);
+      hapticFeedback('error');
+      alert('Ошибка импорта: ' + (error instanceof Error ? error.message : String(error)));
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -124,6 +169,20 @@ export function ProductMediaManager({ product, onUpdate }: ProductMediaManagerPr
           </p>
         </div>
       </div>
+
+      {/* Import Suggestion if no assets but marketplace image exists */}
+      {originalAssets.length === 0 && product.imageUrl && (
+        <button
+          onClick={handleImportFromUrl}
+          disabled={isUploading}
+          className="w-full py-3 bg-stone-800 hover:bg-stone-700 border border-stone-700 rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+        >
+          <span>☁️</span>
+          <span className="text-sm text-stone-300">Импортировать из маркетплейса</span>
+        </button>
+      )}
+
+      {/* Gallery Grid */}
 
       {/* Gallery Grid */}
       <div className="grid grid-cols-3 gap-2">

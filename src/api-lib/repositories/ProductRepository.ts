@@ -5,17 +5,64 @@ export class ProductRepository {
   async getByUserId(userId: number, accountId?: number): Promise<DBProduct[]> {
     if (accountId) {
       const result = await sql`
-        SELECT * FROM products 
-        WHERE user_id = ${userId} AND account_id = ${accountId}
-        ORDER BY created_at DESC
+        SELECT p.*,
+          COALESCE(
+             json_agg(
+               json_build_object(
+                 'id', m.id,
+                 'productId', m.product_id,
+                 'userId', m.user_id,
+                 'type', m.type,
+                 'status', m.status,
+                 'originalUrl', m.original_url,
+                 'processedUrl', m.processed_url,
+                 'thumbnailUrl', m.thumbnail_url,
+                 'visionMetadata', m.vision_metadata,
+                 'width', m.width,
+                 'height', m.height,
+                 'mimeType', m.mime_type,
+                 'createdAt', m.created_at
+               )
+             ) FILTER (WHERE m.id IS NOT NULL),
+             '[]'
+          ) as media_assets
+        FROM products p
+        LEFT JOIN media_assets m ON p.product_id = m.product_id
+        WHERE p.user_id = ${userId} AND p.account_id = ${accountId}
+        GROUP BY p.id
+        ORDER BY p.created_at DESC
       `;
+      // Returned media_assets are now uniformly camelCase arrays
       return result.rows as DBProduct[];
     }
 
     const result = await sql`
-      SELECT * FROM products 
-      WHERE user_id = ${userId} 
-      ORDER BY created_at DESC
+      SELECT p.*,
+        COALESCE(
+           json_agg(
+             json_build_object(
+               'id', m.id,
+               'productId', m.product_id,
+               'userId', m.user_id,
+               'type', m.type,
+               'status', m.status,
+               'originalUrl', m.original_url,
+               'processedUrl', m.processed_url,
+               'thumbnailUrl', m.thumbnail_url,
+               'visionMetadata', m.vision_metadata,
+               'width', m.width,
+               'height', m.height,
+               'mimeType', m.mime_type,
+               'createdAt', m.created_at
+             )
+           ) FILTER (WHERE m.id IS NOT NULL),
+           '[]'
+        ) as media_assets
+      FROM products p
+      LEFT JOIN media_assets m ON p.product_id = m.product_id
+      WHERE p.user_id = ${userId}
+      GROUP BY p.id
+      ORDER BY p.created_at DESC
     `;
     return result.rows as DBProduct[];
   }

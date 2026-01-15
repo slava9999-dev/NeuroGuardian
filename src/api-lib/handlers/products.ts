@@ -45,6 +45,7 @@ export async function handleProducts(
       marketplace: string;
       status: string;
       is_monitored: boolean;
+      media_assets: any[];
     }
 
     const formatted = (products as unknown as DbProduct[]).map(p => ({
@@ -63,6 +64,7 @@ export async function handleProducts(
       marketplace: p.marketplace,
       status: p.status,
       isMonitored: p.is_monitored,
+      mediaAssets: p.media_assets || [],
     }));
 
     return res.json({ products: formatted, total: formatted.length });
