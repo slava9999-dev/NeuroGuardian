@@ -2,6 +2,9 @@
 // NeuroGUARDIAN — Library Index
 // Re-export all utilities
 // ============================================
+import { logger } from './logger.js';
+
+// Types
 
 // Types
 export * from './types.js';
@@ -26,7 +29,8 @@ export {
 } from './validation.js';
 
 /**
- * Fetch with retry for marketplace APIs
+ * Fetch with retry for marketplace APIs (Industrial Grade)
+ * Handles: 429 (Rate Limit) with exponential backoff, Network timeouts, Transient errors
  * @param url Request URL
  * @param options Request options
  * @param retries Number of retries (default: 3)
@@ -37,14 +41,39 @@ export async function fetchWithRetry(
   retries = 3
 ): Promise<Response> {
   let lastError: Error | null = null;
+  const initialDelay = 1000;
 
   for (let i = 0; i < retries; i++) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // Increased to 30s for professional stability
+
       try {
         const response = await fetch(url, { ...options, signal: controller.signal });
         clearTimeout(timeoutId);
+
+        // Professional Status Handling
+        if (response.status === 429) {
+          const retryAfter = response.headers.get('Retry-After');
+          const delay = retryAfter ? parseInt(retryAfter) * 1000 : initialDelay * Math.pow(2, i);
+
+          logger.warn(
+            `[Resilience] 🚦 Rate limited (429) for ${url}. Waiting ${delay}ms before retry ${i + 1}/${retries}`
+          );
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+
+        // Handle other transient server errors (502, 503, 504)
+        if (response.status >= 502 && response.status <= 504) {
+          const delay = initialDelay * Math.pow(2, i);
+          logger.warn(
+            `[Resilience] ⚠️ Server error (${response.status}) for ${url}. Retrying in ${delay}ms...`
+          );
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+
         return response;
       } catch (err) {
         clearTimeout(timeoutId);
@@ -52,13 +81,21 @@ export async function fetchWithRetry(
       }
     } catch (error) {
       lastError = error as Error;
+
+      const isAbort = lastError.name === 'AbortError';
+      const delay = initialDelay * Math.pow(2, i);
+
+      logger.warn(
+        `[Resilience] ❌ Fetch attempt ${i + 1} failed: ${isAbort ? 'Timeout' : lastError.message}. Retrying in ${delay}ms...`
+      );
+
       if (i < retries - 1) {
-        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
   }
 
-  throw lastError || new Error('Fetch failed');
+  throw lastError || new Error(`Fetch failed after ${retries} attempts`);
 }
 
 /**

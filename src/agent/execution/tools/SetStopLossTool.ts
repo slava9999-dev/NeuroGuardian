@@ -3,10 +3,8 @@
 // Version: 5.0.0 | Date: January 2026
 // ============================================
 
-import { z } from 'zod';
-import { SetStopLossArgsSchema, type SetStopLossArgs } from '../../../api-lib/agent/validators.js';
 import { defineTool } from '../ToolRegistry.js';
-import type { DBProduct } from '../../../api-lib/lib/types.js';
+import { SetStopLossArgsSchema, type SetStopLossArgs } from '../../../api-lib/agent/validators.js';
 
 /**
  * Set Stop Loss Tool
@@ -28,35 +26,21 @@ export const setStopLossTool = defineTool<SetStopLossArgs>({
 
   async execute(userId, args) {
     try {
-      // Validate arguments first
-      const validation = SetStopLossArgsSchema.safeParse(args);
-      if (!validation.success) {
-        const errorMessages = validation.error.issues
-          .map((err: z.ZodIssue) => `${err.path.join('.')}: ${err.message}`)
-          .join('; ');
-
-        return {
-          success: false,
-          error: `Неверные параметры: ${errorMessages}`,
-        };
-      }
-
-      const validatedArgs = validation.data;
-
-      const { getProductsByUserId, updateProductMinPrice } =
+      const { getFilteredProducts, updateProductMinPrice } =
         await import('../../../api-lib/services/database.js');
 
-      // Find the product
-      const products = await getProductsByUserId(userId);
-      const product = products.find(
-        (p: DBProduct) =>
-          p.product_id === validatedArgs.product_id || String(p.nm_id) === validatedArgs.product_id
-      );
+      // Find the product directly via SQL
+      const products = await getFilteredProducts(userId, {
+        search: args.product_id,
+        limit: 1,
+      });
+
+      const product = products[0];
 
       if (!product) {
         return {
           success: false,
-          error: `Товар с ID ${validatedArgs.product_id} не найден. Проверьте ID или используйте get_products для поиска.`,
+          error: `Товар с артикулом/ID «${args.product_id}» не найден.`,
         };
       }
 

@@ -1,12 +1,11 @@
 import { defineTool } from '../ToolRegistry.js';
 import { UpdateProductSettingsArgsSchema } from '../../../api-lib/agent/validators.js';
 import {
-  getProductsByUserId,
   updateProductCostPrice,
   updateProductCategory,
   updateProductMonitoring,
 } from '../../../api-lib/services/index.js';
-import { filterProducts } from '../../../api-lib/utils/product-matcher.js';
+import { getFilteredProducts } from '../../../api-lib/services/database.js';
 
 export const updateProductSettingsTool = defineTool({
   name: 'update_product_settings',
@@ -17,11 +16,15 @@ export const updateProductSettingsTool = defineTool({
   schema: UpdateProductSettingsArgsSchema,
   examples: ['Установи себестоимость 500 для товара X', 'Измени категорию товара на "Одежда"'],
   execute: async (userId, args) => {
-    const products = await getProductsByUserId(userId);
-    const filtered = filterProducts(products, undefined, args.product_id);
+    // Industrial check: directly fetch one product
+    const products = await getFilteredProducts(userId, {
+      search: args.product_id,
+      limit: 1,
+      accountId: args.account_id,
+    });
 
-    if (filtered.length === 0) return { success: false, error: 'Товар не найден' };
-    const p = filtered[0];
+    if (products.length === 0) return { success: false, error: 'Товар не найден' };
+    const p = products[0];
     const changes: string[] = [];
 
     if (args.cost_price !== undefined) {

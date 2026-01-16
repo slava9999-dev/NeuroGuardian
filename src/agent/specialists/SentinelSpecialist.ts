@@ -11,7 +11,12 @@ export class SentinelSpecialist extends BaseSpecialist {
   readonly name = 'SentinelSpecialist';
   readonly description = 'Handles price protection threats, competitors, and Sentinel status';
 
-  readonly tools = ['get_competitor_price', 'get_system_logs'];
+  readonly tools = [
+    'get_competitor_price',
+    'get_system_logs',
+    'set_stop_loss',
+    'bulk_protect_products',
+  ];
 
   readonly systemPrompt = `# 🛡️ ВИКТОР — СТРАЖ МАРЖИ (SENTINEL HARD-MODE)
 
@@ -75,16 +80,16 @@ export class SentinelSpecialist extends BaseSpecialist {
         // Recent threats
         const threats = await sql`
           SELECT COUNT(*) as count
-          FROM system_logs
+          FROM sentinel_logs
           WHERE user_id = ${context.userId}
-            AND action LIKE '%threat%'
+            AND (threat_type IS NOT NULL OR defense_action != 'none')
             AND created_at > NOW() - INTERVAL '24 hours'
         `;
 
         if (threats.rows[0]?.count > 0) {
           lines.push(`\n⚠️ Угроз за 24ч: ${threats.rows[0].count}`);
         }
-      } catch (_e) {
+      } catch {
         // Ignore DB errors
       }
     }

@@ -149,6 +149,7 @@ export interface TelegramUser {
   last_reminder_sent?: Date;
   price_buffer_percent: number;
   warning_threshold_percent: number;
+  tax_rate: number;
   created_at: Date;
   updated_at: Date;
 }
@@ -544,6 +545,21 @@ export async function getProductsByUserId(userId: number, accountId?: number) {
   return productRepository.getByUserId(userId, accountId);
 }
 
+export async function getFilteredProducts(
+  userId: number,
+  filters: {
+    search?: string;
+    marketplace?: string;
+    limit?: number;
+    offset?: number;
+    lowStockOnly?: boolean;
+    unprotectedOnly?: boolean;
+    accountId?: number;
+  }
+) {
+  return productRepository.getFiltered(userId, filters);
+}
+
 export async function updateProductMinPrice(
   userId: number,
   productId: string,
@@ -585,6 +601,14 @@ export async function updateProductPrice(
   price: number
 ): Promise<void> {
   return productRepository.updatePrice(userId, productId, price);
+}
+
+export async function bulkUpdateMinPrice(
+  userId: number,
+  percentage: number,
+  filters: { marketplace?: string; onlyUnprotected?: boolean }
+) {
+  return productRepository.bulkUpdateMinPrice(userId, percentage, filters);
 }
 
 export async function batchUpdateWbPrices(_userId: number, _updates: unknown[]): Promise<void> {
@@ -761,36 +785,7 @@ export async function clearChatHistory(userId: number): Promise<void> {
  * Save products (bulk upsert)
  */
 export async function saveProducts(userId: number, products: Partial<DBProduct>[]): Promise<void> {
-  for (const p of products) {
-    await sql`
-      INSERT INTO products (
-        user_id, product_id, nm_id, official_sku, offer_id, title, 
-        image_url, current_price, estimated_buyer_price, marketplace_discount_percent,
-        current_stock, marketplace, account_id, 
-        width_cm, height_cm, depth_cm, weight_kg, updated_at
-      )
-      VALUES (
-        ${userId}, ${p.product_id}, ${p.nm_id || null}, ${p.official_sku || null}, 
-        ${p.offer_id || null}, ${p.title}, ${p.image_url}, ${p.current_price}, 
-        ${p.estimated_buyer_price || null}, ${p.marketplace_discount_percent || null},
-        ${p.current_stock}, ${p.marketplace}, ${p.account_id || null}, 
-        ${p.width_cm || null}, ${p.height_cm || null}, ${p.depth_cm || null}, ${p.weight_kg || null}, NOW()
-      )
-      ON CONFLICT (user_id, product_id) DO UPDATE SET
-        current_price = EXCLUDED.current_price,
-        estimated_buyer_price = EXCLUDED.estimated_buyer_price,
-        marketplace_discount_percent = EXCLUDED.marketplace_discount_percent,
-        current_stock = EXCLUDED.current_stock,
-        title = EXCLUDED.title,
-        image_url = EXCLUDED.image_url,
-        account_id = COALESCE(EXCLUDED.account_id, products.account_id),
-        width_cm = EXCLUDED.width_cm,
-        height_cm = EXCLUDED.height_cm,
-        depth_cm = EXCLUDED.depth_cm,
-        weight_kg = EXCLUDED.weight_kg,
-        updated_at = NOW()
-    `;
-  }
+  return productRepository.saveBatch(userId, products);
 }
 
 /**

@@ -12,12 +12,19 @@ import { z } from 'zod';
 
 // === READ-ONLY TOOLS ===
 
+export const SyncCatalogArgsSchema = z.object({
+  marketplace: z.enum(['WB', 'Ozon', 'all']).optional().default('all'),
+  account_id: z.number().optional().describe('Filter by specific account ID'),
+});
+
 export const GetProductsArgsSchema = z.object({
   marketplace: z.enum(['WB', 'Ozon', 'all']).optional().default('all'),
   limit: z.number().int().min(1).max(100).optional().default(20),
   sort_by: z.enum(['price', 'stock', 'name']).optional().default('price'),
   search: z.string().optional(), // Search by product title (partial match)
   account_id: z.number().optional(),
+  lowStockOnly: z.boolean().optional().describe('Only show low stock items'),
+  unprotectedOnly: z.boolean().optional().describe('Only show items without min_price'),
 });
 
 export const GetSalesStatsArgsSchema = z.object({
@@ -35,6 +42,7 @@ export const CalculateUnitEconomicsArgsSchema = z.object({
 
 export const GetAbcAnalysisArgsSchema = z.object({
   period: z.enum(['week', 'month', '3months']).optional().default('month'),
+  marketplace: z.enum(['WB', 'Ozon']).optional(),
   account_id: z.number().optional(),
 });
 
@@ -87,6 +95,7 @@ export const GetReviewsArgsSchema = z.object({
   is_replied: z.boolean().optional(),
   marketplace: z.enum(['WB', 'Ozon', 'all']).optional().default('all'),
   product_id: z.string().optional(),
+  account_id: z.number().optional().describe('Account ID filter'),
 });
 
 export const GetLowMarginProductsArgsSchema = z.object({
@@ -100,6 +109,7 @@ export const GenerateReviewReplyArgsSchema = z.object({
   marketplace: z.enum(['WB', 'Ozon']),
   tone: z.enum(['polite', 'friendly', 'official']).optional().default('polite'),
   text: z.string().optional(), // If provided, use this text
+  account_id: z.number().optional().describe('Account ID filter'),
 });
 
 // === WRITE TOOLS (REQUIRE CONFIRMATION) ===
@@ -116,11 +126,10 @@ export const SetStopLossArgsSchema = z.object({
 });
 
 export const BulkProtectProductsArgsSchema = z.object({
-  percentage: z
-    .number()
-    .min(5, 'Percentage must be at least 5%')
-    .max(50, 'Percentage cannot exceed 50%'),
+  percentage: z.number().int().min(1).max(50).default(10),
+  marketplace: z.enum(['WB', 'Ozon', 'all']).optional().default('all'),
   only_unprotected: z.boolean().optional().default(true),
+  account_id: z.number().optional().describe('Filter by specific account ID'),
 });
 
 export const UpdatePricesArgsSchema = z.object({
@@ -158,6 +167,7 @@ export const UpdateProductSettingsArgsSchema = z.object({
   category: z.string().optional(),
   min_price: z.number().int().min(0).optional(),
   is_monitored: z.boolean().optional(),
+  account_id: z.number().optional().describe('Account ID filter'),
 });
 
 // === CONFIRMATION DETAILS SCHEMAS (for handleConfirmation) ===
@@ -203,18 +213,11 @@ export const SetStopLossDetailsSchema = z.object({
 export const BulkProtectDetailsSchema = z.object({
   percentage: z.number().min(1).max(50),
   only_unprotected: z.boolean().optional(),
-  products: z
-    .array(
-      z.object({
-        product_id: z.string(),
-        min_price: z.number().positive(),
-      })
-    )
-    .optional(),
 });
 
 // === TYPE EXPORTS ===
 
+export type SyncCatalogArgs = z.infer<typeof SyncCatalogArgsSchema>;
 export type GetProductsArgs = z.infer<typeof GetProductsArgsSchema>;
 export type GetSalesStatsArgs = z.infer<typeof GetSalesStatsArgsSchema>;
 export type CalculateUnitEconomicsArgs = z.infer<typeof CalculateUnitEconomicsArgsSchema>;

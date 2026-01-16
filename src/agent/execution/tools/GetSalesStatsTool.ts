@@ -3,27 +3,10 @@
 // Version: 5.0.0 | Date: January 2026
 // ============================================
 
-import { z } from 'zod';
-import { defineTool } from '../ToolRegistry.js';
-import { marketplaceService } from '../../../api-lib/core-services/MarketplaceService.js';
-
-/**
- * Arguments schema for get_sales_stats tool
- */
-const GetSalesStatsArgsSchema = z.object({
-  period: z
-    .enum(['today', 'yesterday', 'week', 'month', 'year'])
-    .optional()
-    .describe('Time period for statistics'),
-  marketplace: z.enum(['WB', 'Ozon']).optional().describe('Filter by marketplace'),
-  compareWithPrevious: z
-    .boolean()
-    .optional()
-    .default(false)
-    .describe('Include comparison with previous period'),
-});
-
-type GetSalesStatsArgs = z.infer<typeof GetSalesStatsArgsSchema>;
+import {
+  GetSalesStatsArgsSchema,
+  type GetSalesStatsArgs,
+} from '../../../api-lib/agent/validators.js';
 
 /**
  * Get Sales Stats Tool
@@ -46,62 +29,95 @@ export const getSalesStatsTool = defineTool<GetSalesStatsArgs>({
 
   async execute(userId, args) {
     try {
-      // Calculate date range based on period
+      const { sql } = await import('../../../api-lib/services/database.js');
       const { from, to } = calculateDateRange(args.period || 'week');
 
-      interface ToolSalesStats {
-        marketplace: 'WB' | 'Ozon';
-        orders: number;
-        revenue: number;
-        returns: number;
-        avgOrderValue: number;
-      }
+      // 1. Try to fetch from LOCAL database first (FAST & RESILIENT)
+      const localStatsQuery = `
+        SELECT 
+          marketplace,
+          COUNT(*) as orders_count,
+          SUM(price_total) as revenue_sum,
+          COUNT(*) FILTER (WHERE status = 'returned' OR status = 'cancelled') as returns_count
+        FROM marketplace_orders
+        WHERE user_id = $1
+          AND order_date >= $2
+          AND order_date <= $3
+          ${args.marketplace ? `AND UPPER(marketplace) = $4` : ''}
+          ${args.account_id ? `AND account_id = $${args.marketplace ? 5 : 4}` : ''}
+        GROUP BY marketplace
+      `;
 
-      let wbStats: ToolSalesStats | null = null;
-      let ozonStats: ToolSalesStats | null = null;
+      const params = [userId, from.toISOString(), to.toISOString()];
+      if (args.marketplace) params.push(args.marketplace.toUpperCase());
+      if (args.account_id) params.push(args.account_id);
+
+      const localResult = await sql.unsafe(localStatsQuery, params);
+
       let totalOrders = 0;
       let totalRevenue = 0;
+      const byMarketplace: any[] = [];
 
-      // Fetch WB statistics
-      if (!args.marketplace || args.marketplace === 'WB') {
-        const stats = await marketplaceService.fetchSalesStats(userId, 'WB', from, to);
-        if (stats) {
-          wbStats = {
-            marketplace: 'WB',
-            orders: stats.orders,
-            revenue: stats.revenue,
-            returns: stats.returns,
-            avgOrderValue: stats.orders > 0 ? Math.round(stats.revenue / stats.orders) : 0,
-          };
-          totalOrders += stats.orders;
-          totalRevenue += stats.revenue;
+      if (localResult.rows.length > 0) {
+        for (const row of localResult.rows) {
+          const revenue = Number(row.revenue_sum || 0);
+          const orders = Number(row.orders_count || 0);
+
+          byMarketplace.push({
+            marketplace: row.marketplace,
+            orders: orders,
+            revenue: Math.round(revenue),
+            returns: Number(row.returns_count || 0),
+            avgOrderValue: orders > 0 ? Math.round(revenue / orders) : 0,
+          });
+
+          totalOrders += orders;
+          totalRevenue += revenue;
+        }
+      } else {
+        // 2. Fallback to API if no local data (or for real-time fresh snapshot)
+        // This ensures the tool works even if sync hasn't run yet
+        const { marketplaceService } =
+          await import('../../../api-lib/core-services/MarketplaceService.js');
+
+        if (!args.marketplace || args.marketplace === 'WB') {
+          const stats = await marketplaceService.fetchSalesStats(userId, 'WB', from, to);
+          if (stats) {
+            byMarketplace.push({
+              marketplace: 'WB',
+              orders: stats.orders,
+              revenue: stats.revenue,
+              returns: stats.returns,
+              avgOrderValue: stats.orders > 0 ? Math.round(stats.revenue / stats.orders) : 0,
+            });
+            totalOrders += stats.orders;
+            totalRevenue += stats.revenue;
+          }
+        }
+
+        if (!args.marketplace || args.marketplace === 'Ozon') {
+          const stats = await marketplaceService.fetchSalesStats(userId, 'Ozon', from, to);
+          if (stats) {
+            byMarketplace.push({
+              marketplace: 'Ozon',
+              orders: stats.orders,
+              revenue: stats.revenue,
+              returns: stats.returns,
+              avgOrderValue: stats.orders > 0 ? Math.round(stats.revenue / stats.orders) : 0,
+            });
+            totalOrders += stats.orders;
+            totalRevenue += stats.revenue;
+          }
         }
       }
 
-      // Fetch Ozon statistics
-      if (!args.marketplace || args.marketplace === 'Ozon') {
-        const stats = await marketplaceService.fetchSalesStats(userId, 'Ozon', from, to);
-        if (stats) {
-          ozonStats = {
-            marketplace: 'Ozon',
-            orders: stats.orders,
-            revenue: stats.revenue,
-            returns: stats.returns,
-            avgOrderValue: stats.orders > 0 ? Math.round(stats.revenue / stats.orders) : 0,
-          };
-          totalOrders += stats.orders;
-          totalRevenue += stats.revenue;
-        }
-      }
-
-      if (!wbStats && !ozonStats) {
+      if (byMarketplace.length === 0) {
         return {
           success: false,
-          error: 'Нет данных или нет подключенных API ключей.',
+          error: 'Данные за этот период еще не синхронизированы. Запустите синхронизацию каталога.',
         };
       }
 
-      // Calculate trends
       const trend = calculateTrend(totalOrders, args.period || 'week');
 
       return {
@@ -115,9 +131,10 @@ export const getSalesStatsTool = defineTool<GetSalesStatsArgs>({
             revenue: Math.round(totalRevenue),
             avgOrderValue: totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0,
           },
-          byMarketplace: [wbStats, ozonStats].filter(Boolean),
-          trend: trend,
+          byMarketplace,
+          trend,
           recommendation: generateRecommendation(totalOrders, totalRevenue, trend),
+          dataSource: localResult.rows.length > 0 ? 'local_db' : 'marketplace_api',
         },
       };
     } catch (error) {

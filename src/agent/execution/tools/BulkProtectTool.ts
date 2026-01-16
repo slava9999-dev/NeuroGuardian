@@ -5,7 +5,6 @@
 
 import { z } from 'zod';
 import { defineTool } from '../ToolRegistry.js';
-import type { DBProduct } from '../../../api-lib/lib/types.js';
 
 /**
  * Arguments schema for bulk_protect_products tool
@@ -50,66 +49,30 @@ export const bulkProtectProductsTool = defineTool<BulkProtectProductsArgs>({
 
   async execute(userId, args) {
     try {
-      const { getProductsByUserId, updateProductMinPrice } =
-        await import('../../../api-lib/services/database.js');
+      const { bulkUpdateMinPrice } = await import('../../../api-lib/services/database.js');
 
-      // Get all products
-      let products = await getProductsByUserId(userId);
+      // Execute bulk update directly in DB (Industrial Grade Performance)
+      const totalProtected = await bulkUpdateMinPrice(userId, args.percentage, {
+        marketplace: args.marketplace,
+        onlyUnprotected: args.only_unprotected,
+      });
 
-      // Filter by marketplace if specified
-      if (args.marketplace) {
-        products = products.filter(
-          (p: DBProduct) => p.marketplace?.toUpperCase() === args.marketplace
-        );
-      }
-
-      // Filter to only unprotected if specified
-      if (args.only_unprotected) {
-        products = products.filter((p: DBProduct) => !p.min_price);
-      }
-
-      // Filter products with valid prices
-      products = products.filter((p: DBProduct) => p.current_price && p.current_price > 0);
-
-      if (products.length === 0) {
+      if (totalProtected === 0) {
         return {
           success: false,
-          error: args.only_unprotected ? 'Все товары уже защищены!' : 'Нет товаров для защиты.',
+          error: args.only_unprotected
+            ? 'Все подходящие товары уже защищены!'
+            : 'Нет товаров для защиты.',
         };
-      }
-
-      // Calculate and apply protection
-      const protected_products: Array<{
-        product_id: string;
-        title: string;
-        current_price: number;
-        min_price: number;
-      }> = [];
-
-      for (const product of products) {
-        const minPrice = Math.round(product.current_price * (1 - args.percentage / 100));
-
-        if (minPrice > 0) {
-          await updateProductMinPrice(userId, product.product_id, minPrice);
-
-          protected_products.push({
-            product_id: product.product_id,
-            title: product.title || 'Без названия',
-            current_price: product.current_price,
-            min_price: minPrice,
-          });
-        }
       }
 
       return {
         success: true,
         data: {
-          total_protected: protected_products.length,
+          total_protected: totalProtected,
           percentage_used: args.percentage,
           marketplace: args.marketplace || 'all',
-          products: protected_products.slice(0, 10), // First 10 for display
-          has_more: protected_products.length > 10,
-          message: `Защита установлена на ${protected_products.length} товаров! Минималка = текущая цена -${args.percentage}%`,
+          message: `🛡️ Защита установлена на ${totalProtected} товаров! Минималка = текущая цена -${args.percentage}%`,
         },
       };
     } catch (error) {

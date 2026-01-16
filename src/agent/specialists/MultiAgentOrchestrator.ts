@@ -60,6 +60,8 @@ export class MultiAgentOrchestrator {
           marketplace: userState.marketplace,
           hasApiKeys: userState.hasApiKeys,
           productsCount: userState.productsCount || 0,
+          reviewsCount: userState.reviewsCount || 0,
+          defenseMode: userState.defense_mode,
           subscriptionTier: userState.subscriptionTier || 'free',
         },
       };

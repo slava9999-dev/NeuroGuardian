@@ -22,6 +22,8 @@ export interface UserState {
   hasOzonKey: boolean;
   hasApiKeys: boolean;
   productsCount: number;
+  reviewsCount?: number;
+  defense_mode?: string;
   subscriptionTier: 'free' | 'basic' | 'pro';
   /** User's inferred gender for personalized communication */
   gender?: 'male' | 'female' | 'unknown';

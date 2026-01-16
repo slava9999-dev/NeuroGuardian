@@ -18,8 +18,8 @@ export class WbService {
    * Fetch products from WB Content API with REAL stocks
    */
   async fetchProducts(apiKey: string, limit = 100): Promise<MarketplaceProduct[]> {
-    // Step 1: Get product cards from Content API
-    const cardsResponse = await fetch(`${this.CONTENT_API_URL}/get/cards/list`, {
+    // Step 1: Get product cards from Content API (Resilient)
+    const cardsResponse = await fetchWithRetry(`${this.CONTENT_API_URL}/get/cards/list`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -80,7 +80,7 @@ export class WbService {
       url.searchParams.set('limit', '1000');
       url.searchParams.set('offset', '0');
 
-      const response = await fetch(url.toString(), {
+      const response = await fetchWithRetry(url.toString(), {
         method: 'GET',
         headers: { Authorization: apiKey },
       });
@@ -115,7 +115,7 @@ export class WbService {
         dateFrom.setDate(today.getDate() - 30); // Last 30 days
 
         try {
-          const salesRes = await fetch(
+          const salesRes = await fetchWithRetry(
             `${this.STATISTICS_API_URL}/supplier/sales?dateFrom=${dateFrom.toISOString().split('T')[0]}`,
             {
               method: 'GET',
@@ -162,7 +162,7 @@ export class WbService {
 
     try {
       // Step 1: Try FBS warehouses first
-      const warehousesRes = await fetch(`${this.WAREHOUSES_API_URL}/warehouses`, {
+      const warehousesRes = await fetchWithRetry(`${this.WAREHOUSES_API_URL}/warehouses`, {
         method: 'GET',
         headers: { Authorization: apiKey },
       });
@@ -175,7 +175,7 @@ export class WbService {
 
           for (const wh of warehouses) {
             try {
-              const stocksRes = await fetch(`${this.WAREHOUSES_API_URL}/stocks/${wh.id}`, {
+              const stocksRes = await fetchWithRetry(`${this.WAREHOUSES_API_URL}/stocks/${wh.id}`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -209,7 +209,7 @@ export class WbService {
         const dateFrom = new Date(today);
         dateFrom.setDate(today.getDate() - 1);
 
-        const fboRes = await fetch(
+        const fboRes = await fetchWithRetry(
           `${this.STATISTICS_API_URL}/supplier/stocks?dateFrom=${dateFrom.toISOString().split('T')[0]}`,
           {
             method: 'GET',
@@ -584,7 +584,7 @@ export class WbService {
           body.settings.cursor.nmID = nmID;
         }
 
-        const response = await fetch(`${this.CONTENT_API_URL}/get/cards/list`, {
+        const response = await fetchWithRetry(`${this.CONTENT_API_URL}/get/cards/list`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

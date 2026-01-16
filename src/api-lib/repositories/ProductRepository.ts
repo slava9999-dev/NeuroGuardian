@@ -3,40 +3,32 @@ import type { DBProduct, PendingPriceUpdate } from '../lib/types.js';
 
 export class ProductRepository {
   async getByUserId(userId: number, accountId?: number): Promise<DBProduct[]> {
-    if (accountId) {
-      const result = await sql`
-        SELECT p.*,
-          COALESCE(
-             json_agg(
-               json_build_object(
-                 'id', m.id,
-                 'productId', m.product_id,
-                 'userId', m.user_id,
-                 'type', m.type,
-                 'status', m.status,
-                 'originalUrl', m.original_url,
-                 'processedUrl', m.processed_url,
-                 'thumbnailUrl', m.thumbnail_url,
-                 'visionMetadata', m.vision_metadata,
-                 'width', m.width,
-                 'height', m.height,
-                 'mimeType', m.mime_type,
-                 'createdAt', m.created_at
-               )
-             ) FILTER (WHERE m.id IS NOT NULL),
-             '[]'
-          ) as media_assets
-        FROM products p
-        LEFT JOIN media_assets m ON p.product_id = m.product_id
-        WHERE p.user_id = ${userId} AND p.account_id = ${accountId}
-        GROUP BY p.id
-        ORDER BY p.created_at DESC
-      `;
-      // Returned media_assets are now uniformly camelCase arrays
-      return result.rows as DBProduct[];
-    }
+    return this.getFiltered(userId, { accountId });
+  }
 
-    const result = await sql`
+  async getFiltered(
+    userId: number,
+    filters: {
+      search?: string;
+      marketplace?: string;
+      accountId?: number;
+      limit?: number;
+      offset?: number;
+      lowStockOnly?: boolean;
+      unprotectedOnly?: boolean;
+    }
+  ): Promise<DBProduct[]> {
+    const {
+      search,
+      marketplace,
+      accountId,
+      limit = 50,
+      offset = 0,
+      lowStockOnly,
+      unprotectedOnly,
+    } = filters;
+
+    let query = `
       SELECT p.*,
         COALESCE(
            json_agg(
@@ -60,10 +52,40 @@ export class ProductRepository {
         ) as media_assets
       FROM products p
       LEFT JOIN media_assets m ON p.product_id = m.product_id
-      WHERE p.user_id = ${userId}
-      GROUP BY p.id
-      ORDER BY p.created_at DESC
+      WHERE p.user_id = $1
     `;
+
+    const params: (string | number | boolean)[] = [userId];
+    let paramIndex = 2;
+
+    if (accountId) {
+      query += ` AND p.account_id = $${paramIndex++}`;
+      params.push(accountId);
+    }
+
+    if (marketplace) {
+      query += ` AND UPPER(p.marketplace) = $${paramIndex++}`;
+      params.push(marketplace.toUpperCase());
+    }
+
+    if (search) {
+      query += ` AND (p.title ILIKE $${paramIndex} OR p.product_id ILIKE $${paramIndex} OR p.nm_id::text ILIKE $${paramIndex})`;
+      params.push(`%${search}%`);
+      paramIndex++;
+    }
+
+    if (lowStockOnly) {
+      query += ` AND p.current_stock < 10`;
+    }
+
+    if (unprotectedOnly) {
+      query += ` AND (p.min_price IS NULL OR p.min_price = 0)`;
+    }
+
+    query += ` GROUP BY p.id ORDER BY p.created_at DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
+    params.push(limit, offset);
+
+    const result = await sql.unsafe(query, params);
     return result.rows as DBProduct[];
   }
 
@@ -194,6 +216,36 @@ export class ProductRepository {
           pending_price = NULL, pending_task_id = NULL, pending_status = 'completed', pending_since = NULL
       WHERE user_id = ${userId} AND pending_task_id = ${taskId}
     `;
+  }
+  async bulkUpdateMinPrice(
+    userId: number,
+    percentage: number,
+    filters: { marketplace?: string; onlyUnprotected?: boolean }
+  ): Promise<number> {
+    const factor = (100 - percentage) / 100;
+
+    let whereClause = `WHERE user_id = $1 AND current_price > 0`;
+    const params: (string | number | boolean)[] = [userId];
+    let paramIndex = 2;
+
+    if (filters.marketplace) {
+      whereClause += ` AND UPPER(marketplace) = $${paramIndex++}`;
+      params.push(filters.marketplace.toUpperCase());
+    }
+
+    if (filters.onlyUnprotected) {
+      whereClause += ` AND (min_price IS NULL OR min_price = 0)`;
+    }
+
+    const query = `
+      UPDATE products 
+      SET min_price = ROUND(current_price * ${factor}), updated_at = NOW()
+      ${whereClause}
+      RETURNING id
+    `;
+
+    const result = await sql.unsafe(query, params);
+    return result.rowCount || 0;
   }
 }
 

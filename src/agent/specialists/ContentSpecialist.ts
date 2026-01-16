@@ -1,7 +1,7 @@
 // ============================================
 // NeuroGUARDIAN — Content Specialist (SMM Agent)
 // AI-powered content generation for marketplaces
-// Version: 1.0.0 | Date: January 2026
+// Version: 1.1.0 | Date: January 2026
 // ============================================
 
 import { BaseSpecialist, type SpecialistContext } from './BaseSpecialist.js';
@@ -49,14 +49,16 @@ async function checkAndDecrementQuota(
   userId: number
 ): Promise<{ allowed: boolean; remaining: number; tier: string }> {
   try {
-    // Get current quota
-    const result = await sql`
+    const result = await sql.unsafe(
+      `
       SELECT 
         subscription_plan,
         COALESCE(generated_content_count, 0) as used_count
       FROM users
-      WHERE id = ${userId}
-    `;
+      WHERE id = $1
+    `,
+      [userId]
+    );
 
     if (result.rows.length === 0) {
       return { allowed: false, remaining: 0, tier: 'free' };
@@ -71,12 +73,14 @@ async function checkAndDecrementQuota(
       return { allowed: false, remaining: 0, tier };
     }
 
-    // Increment counter
-    await sql`
+    await sql.unsafe(
+      `
       UPDATE users 
       SET generated_content_count = COALESCE(generated_content_count, 0) + 1
-      WHERE id = ${userId}
-    `;
+      WHERE id = $1
+    `,
+      [userId]
+    );
 
     return { allowed: true, remaining: remaining - 1, tier };
   } catch (error) {
@@ -92,31 +96,28 @@ async function checkAndDecrementQuota(
 export class ContentSpecialist extends BaseSpecialist {
   readonly name = 'ContentSpecialist';
   readonly description = 'Генерация контента для соцсетей и описаний товаров';
-  readonly tools: string[] = []; // Не использует standard tools, custom pipeline
+  readonly tools: string[] = [];
 
-  readonly systemPrompt = `# 📸 КОНТЕНТ-СПЕЦИАЛИСТ
+  readonly systemPrompt = `# 📸 КОНТЕНТ-СПЕЦИАЛИСТ (GEN-V5)
 
-Ты — SMM-эксперт для маркетплейсов. Генерируешь продающий контент.
+Ты — SMM-эксперт и SEO-оптимизатор высшего уровня для маркетплейсов. Ты создаешь контент, который не просто описывает товар, а ПРОДАЕТ его и ведет в ТОП поиска.
 
-## ПЛАТФОРМЫ:
-- instagram: Короткий, вовлекающий пост с эмодзи
-- telegram: Информативный пост с призывом к действию
-- wb_desc: SEO-оптимизированное описание для Wildberries
-- ozon_desc: Описание для Ozon с ключевыми характеристиками
+## 🚀 СТРАТЕГИЯ SEO 2026:
+- **WB (Wildberries)**: Заголовок до 60 символов. Описание до 5000 символов. 
+- **Ozon**: Акцент на преимуществах и структуре. Используй формат Rich-контента.
+- **Инстаграм/ТГ**: Используй опыт успешных кейсов — не грузи теорией, пиши про ВЫГОДУ для покупателя.
 
-## СТИЛЬ:
-- Professional: Деловой тон, факты
-- Friendly: Дружелюбный, живой
-- Luxury: Премиальный, статусный
-- Casual: Простой, разговорный`;
+## 🎨 СТИЛЬ (TONE OF VOICE):
+- Professional, Friendly, Luxury, Casual. Избегай клише "лучшее качество" и "доступная цена".
+
+## ⚠️ ВАЖНО:
+- Если Vision AI нашел дефекты — делай акцент на качестве товара.
+- НИКОГДА не упоминай, что ты ИИ.`;
 
   async buildContext(context: SpecialistContext): Promise<string> {
-    return `Пользователь: ${context.userId}, Маркетплейс: ${context.userState.marketplace || 'N/A'}`;
+    return `User: ${context.userId}, Marketplace: ${context.userState.marketplace || 'any'}`;
   }
 
-  /**
-   * Generate content for a product
-   */
   async generateContent(
     userId: number,
     request: ContentGenerationRequest
@@ -124,7 +125,6 @@ export class ContentSpecialist extends BaseSpecialist {
     const startTime = Date.now();
 
     try {
-      // 1. Check Quota
       const quota = await checkAndDecrementQuota(userId);
       if (!quota.allowed) {
         return {
@@ -133,17 +133,19 @@ export class ContentSpecialist extends BaseSpecialist {
           hashtags: '',
           platform: request.platform,
           quotaRemaining: 0,
-          error: `Лимит генераций исчерпан (${quota.tier}). Обновите тариф до PRO для увеличения лимита.`,
+          error: 'Лимит генераций исчерпан.',
         };
       }
 
-      // 2. Get product data from DB
-      const productResult = await sql`
-        SELECT product_id, nm_id, title, image_url, current_price, marketplace, cost_price
+      const productResult = await sql.unsafe(
+        `
+        SELECT product_id, nm_id, title, image_url, current_price, marketplace
         FROM products
-        WHERE user_id = ${userId} AND product_id = ${request.productId}
+        WHERE user_id = $1 AND product_id = $2
         LIMIT 1
-      `;
+      `,
+        [userId, request.productId]
+      );
 
       if (productResult.rows.length === 0) {
         return {
@@ -158,34 +160,22 @@ export class ContentSpecialist extends BaseSpecialist {
 
       const product = productResult.rows[0];
 
-      // 3. Analyze image with Vision (if available)
+      // Vision analysis
       let visionData = '';
       if (product.image_url) {
         try {
-          // VisionService expects VisionCheckRequest and returns VisionAnalysisResult directly
           const visionResult = await visionService.analyzeImage({
             imageUrl: product.image_url as string,
             checkType: 'full',
-            targetMarketplace: product.marketplace === 'WB' ? 'WB' : 'Ozon',
-            mode: 'fast', // Use fast mode for cost savings
+            mode: 'fast',
           });
-
-          // visionResult is VisionAnalysisResult directly (not wrapped)
-          if (visionResult && visionResult.detected_colors) {
-            visionData = JSON.stringify({
-              colors: visionResult.detected_colors,
-              category: visionResult.product_category,
-              seo_tags: visionResult.seo_tags_ru,
-              quality_score: visionResult.overall_quality,
-            });
-          }
+          visionData = JSON.stringify(visionResult);
         } catch (visionError) {
-          logger.warn('[ContentSpecialist] Vision analysis failed', { error: visionError });
+          logger.warn('[ContentSpecialist] Vision failed', { visionError });
         }
       }
 
-      // 4. Generate Text Content using Gemini Flash (cheap & fast)
-      const prompt = this.buildContentPrompt(product, request.platform, request.style, visionData);
+      const prompt = this.buildContentPrompt(product, request as any, visionData);
 
       const textResponse = await geminiFlash.complete(
         [
@@ -195,40 +185,20 @@ export class ContentSpecialist extends BaseSpecialist {
         { temperature: 0.7 }
       );
 
-      // 5. Parse response
       const { postText, hashtags } = this.parseContentResponse(
         textResponse.content,
         request.platform
       );
 
-      // 6. Generate Image (optional, uses quota)
       let imageUrl: string | undefined;
       if (request.includeImage && product.image_url) {
         try {
-          const renderResult = await renderFactory.workflowWhiteBackground(product.image_url, {
-            shadowIntensity: 0.3,
-            upscale: false, // Save costs with schnell
-          });
-
-          if (renderResult.success && renderResult.resultUrl) {
-            imageUrl = renderResult.resultUrl;
-          }
-        } catch (renderError) {
-          logger.warn('[ContentSpecialist] Image generation failed', { error: renderError });
+          const renderResult = await renderFactory.workflowWhiteBackground(product.image_url);
+          imageUrl = renderResult.resultUrl;
+        } catch (e) {
+          logger.warn('[ContentSpecialist] Render failed', { e });
         }
       }
-
-      // 7. Cache result
-      await this.cacheContent(userId, request.productId, request.platform, postText, hashtags);
-
-      const latencyMs = Date.now() - startTime;
-      logger.info('[ContentSpecialist] Content generated', {
-        userId,
-        productId: request.productId,
-        platform: request.platform,
-        latencyMs,
-        hasImage: !!imageUrl,
-      });
 
       return {
         success: true,
@@ -239,153 +209,35 @@ export class ContentSpecialist extends BaseSpecialist {
         quotaRemaining: quota.remaining,
       };
     } catch (error) {
-      logger.error('[ContentSpecialist] Generation failed', { error, userId, request });
       return {
         success: false,
         postText: '',
         hashtags: '',
         platform: request.platform,
         quotaRemaining: 0,
-        error: error instanceof Error ? error.message : 'Unknown error',
+        error: String(error),
       };
     }
   }
 
-  /**
-   * Build content generation prompt
-   */
-  private buildContentPrompt(
-    product: Record<string, unknown>,
-    platform: ContentPlatform,
-    style: string = 'professional',
-    visionData: string
-  ): string {
-    const platformInstructions: Record<ContentPlatform, string> = {
-      instagram:
-        'Напиши короткий вовлекающий пост для Instagram (до 150 слов). Используй эмодзи. Добавь призыв к действию.',
-      telegram:
-        'Напиши информативный пост для Telegram-канала (до 200 слов). Добавь ссылку-плейсхолдер [ССЫЛКА].',
-      wb_desc:
-        'Напиши SEO-оптимизированное описание для Wildberries (до 300 слов). Включи ключевые характеристики и преимущества.',
-      ozon_desc:
-        'Напиши описание товара для Ozon (до 300 слов). Структурируй по разделам: Описание, Характеристики, Преимущества.',
-    };
-
-    const styleInstructions: Record<string, string> = {
-      professional: 'Тон: Деловой, экспертный, с фактами.',
-      friendly: 'Тон: Дружелюбный, живой, с юмором.',
-      luxury: 'Тон: Премиальный, элегантный, статусный.',
-      casual: 'Тон: Простой, разговорный, как с другом.',
-    };
-
-    return `${platformInstructions[platform]}
-
-${styleInstructions[style] || styleInstructions.professional}
-
-ТОВАР:
-- Название: ${product.title}
-- Цена: ${product.current_price}₽
-- Маркетплейс: ${product.marketplace}
-
-${visionData ? `ДАННЫЕ VISION AI:\n${visionData}` : ''}
-
-ФОРМАТ ОТВЕТА:
----POST---
-[Текст поста здесь]
----HASHTAGS---
-[Хештеги через пробел]
----END---`;
+  private buildContentPrompt(product: any, request: any, visionData: string): string {
+    return `Generate ${request.platform} post for ${product.title} in ${request.style || 'professional'} style.
+    Price: ${product.current_price} RUB. Marketplace: ${product.marketplace}.
+    Vision AI Data: ${visionData}
+    Format: ---POST--- [Text] ---HASHTAGS--- [Hashtags] ---END---`;
   }
 
-  /**
-   * Parse LLM response into text and hashtags
-   */
   private parseContentResponse(
     response: string,
     platform: ContentPlatform
   ): { postText: string; hashtags: string } {
-    try {
-      const postMatch = response.match(/---POST---\s*([\s\S]*?)\s*---HASHTAGS---/);
-      const hashtagsMatch = response.match(/---HASHTAGS---\s*([\s\S]*?)\s*---END---/);
-
-      if (postMatch && hashtagsMatch) {
-        return {
-          postText: postMatch[1].trim(),
-          hashtags: hashtagsMatch[1].trim(),
-        };
-      }
-    } catch (e) {
-      logger.warn('[ContentSpecialist] Failed to parse response', { error: e });
-    }
-
-    // Fallback: use entire response
-    const defaultHashtags: Record<ContentPlatform, string> = {
-      instagram: '#wildberries #ozon #товары #распродажа',
-      telegram: '#маркетплейс #товары #скидки',
-      wb_desc: '',
-      ozon_desc: '',
-    };
-
+    const postMatch = response.match(/---POST---\s*([\s\S]*?)\s*---HASHTAGS---/);
+    const hashtagsMatch = response.match(/---HASHTAGS---\s*([\s\S]*?)\s*---END---/);
     return {
-      postText: response.replace(/---\w+---/g, '').trim(),
-      hashtags: defaultHashtags[platform],
+      postText: postMatch ? postMatch[1].trim() : response,
+      hashtags: hashtagsMatch ? hashtagsMatch[1].trim() : '#wb #ozon',
     };
-  }
-
-  /**
-   * Cache generated content for reuse
-   */
-  private async cacheContent(
-    userId: number,
-    productId: string,
-    platform: ContentPlatform,
-    postText: string,
-    hashtags: string
-  ): Promise<void> {
-    try {
-      await sql`
-        INSERT INTO content_cache (user_id, product_id, platform, post_text, hashtags, created_at)
-        VALUES (${userId}, ${productId}, ${platform}, ${postText}, ${hashtags}, NOW())
-        ON CONFLICT (user_id, product_id, platform) 
-        DO UPDATE SET post_text = EXCLUDED.post_text, hashtags = EXCLUDED.hashtags, created_at = NOW()
-      `;
-    } catch (error) {
-      logger.warn('[ContentSpecialist] Cache insert failed (table may not exist)', { error });
-    }
-  }
-
-  /**
-   * Get cached content if available
-   */
-  async getCachedContent(
-    userId: number,
-    productId: string,
-    platform: ContentPlatform
-  ): Promise<{ postText: string; hashtags: string } | null> {
-    try {
-      const result = await sql`
-        SELECT post_text, hashtags
-        FROM content_cache
-        WHERE user_id = ${userId} 
-          AND product_id = ${productId} 
-          AND platform = ${platform}
-          AND created_at > NOW() - INTERVAL '7 days'
-        LIMIT 1
-      `;
-
-      if (result.rows.length > 0) {
-        return {
-          postText: result.rows[0].post_text,
-          hashtags: result.rows[0].hashtags,
-        };
-      }
-    } catch (error) {
-      logger.debug('[ContentSpecialist] Cache lookup failed', { error });
-    }
-
-    return null;
   }
 }
 
-// Export singleton
 export const contentSpecialist = new ContentSpecialist();

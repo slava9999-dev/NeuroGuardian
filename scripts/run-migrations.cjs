@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { Client } = require('pg');
-require('dotenv').config({ path: path.join(__dirname, '../.env.master') });
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
 // Load other envs if needed
 // ...
@@ -12,10 +12,16 @@ const connectionString =
   process.env.POSTGRES_URL || 
   process.env.DATABASE_URL;
 
+if (!connectionString) {
+  console.error('❌ Error: No database connection string found in environment variables (POSTGRES_URL, DATABASE_URL).');
+  process.exit(1);
+}
+
 async function runMigrationFile(file) {
+  const isLocal = connectionString.includes('localhost') || connectionString.includes('127.0.0.1');
   const client = new Client({
     connectionString,
-    ssl: process.env.DB_NO_SSL === 'true' ? false : { rejectUnauthorized: false }
+    ssl: (process.env.DB_NO_SSL === 'true' || isLocal) ? false : { rejectUnauthorized: false }
   });
 
   try {

@@ -10,7 +10,7 @@ import { logger } from '../api-lib/lib/logger.js';
 // Types
 // ============================================
 
-export type MaterialType = 'oak' | 'ash' | 'walnut' | 'beech' | 'resin' | 'epoxy' | 'unknown';
+export type ProductStatus = 'active' | 'out_of_stock' | 'discontinued';
 
 export interface VisionAnalysisResult {
   // Quality Scores (0-10)
@@ -26,9 +26,9 @@ export interface VisionAnalysisResult {
   noise_level: 'low' | 'medium' | 'high';
 
   // Material Analysis
-  material_detected: MaterialType;
+  material_detected: string;
   material_confidence: number;
-  texture_tags: string[]; // "живой край", "сучки", "эпоксидная река"
+  texture_tags: string[];
 
   // Marketplace Compliance
   wb_compliant: boolean;
@@ -139,6 +139,45 @@ export class VisionService {
     const model = request.mode === 'deep_scan' ? GEMINI_VISION_MODEL_PRO : GEMINI_VISION_MODEL_FAST;
 
     try {
+      // 1. Check CACHE
+      const { createHash } = await import('crypto');
+      const { sql } = await import('../api-lib/services/database.js');
+
+      // Create a unique hash for the image request
+      // If URL provided, hash the URL. If Base64, hash the first 100 chars + length (for speed)
+      let imageHash = '';
+      if (request.imageUrl) {
+        imageHash = createHash('md5').update(request.imageUrl).digest('hex');
+      } else if (request.imageBase64) {
+        // Hash content for deduplication
+        imageHash = createHash('md5').update(request.imageBase64).digest('hex');
+      }
+
+      // Try to find in cache
+      if (imageHash) {
+        try {
+          const cached =
+            await sql`SELECT * FROM vision_cache WHERE image_hash = ${imageHash} AND model_version = ${model} LIMIT 1`;
+
+          if (cached.rows.length > 0) {
+            const cachedResult = cached.rows[0].analysis_result as VisionAnalysisResult;
+            logger.info('[VisionService] Cache HIT', { imageHash });
+
+            // Update last accessed
+            await sql`UPDATE vision_cache SET last_accessed_at = NOW() WHERE id = ${cached.rows[0].id}`;
+
+            return {
+              ...cachedResult,
+              processing_time_ms: 0, // Instant
+              analyzed_at: new Date().toISOString(), // Show current retrieval time
+            };
+          }
+        } catch (dbErr) {
+          logger.warn('[VisionService] Cache lookup failed', { error: dbErr });
+          // Proceed to analysis if cache fails
+        }
+      }
+
       // Prepare image data
       const imagePart = request.imageBase64
         ? {
@@ -184,8 +223,10 @@ export class VisionService {
 
       logger.info(`[VisionService] Sending request to model: ${model}`);
 
-      // Call Gemini Vision API
-      const response = await fetch(
+      const { fetchWithRetry } = await import('../api-lib/lib/index.js');
+
+      // Call Gemini Vision API with industrial retry logic
+      const responseBody = await fetchWithRetry(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`,
         {
           method: 'POST',
@@ -204,12 +245,7 @@ export class VisionService {
         }
       );
 
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Gemini Vision API error: ${response.status} - ${error}`);
-      }
-
-      const data = await response.json();
+      const data = responseBody as any;
       const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
       // Parse JSON response
@@ -251,6 +287,20 @@ export class VisionService {
         model_version: model,
         processing_time_ms: processingTime,
       };
+
+      // Save to CACHE
+      if (imageHash) {
+        try {
+          await sql`
+            INSERT INTO vision_cache (image_hash, image_url, analysis_result, model_version)
+            VALUES (${imageHash}, ${request.imageUrl || 'base64'}, ${JSON.stringify(result)}, ${model})
+            ON CONFLICT DO NOTHING
+            `;
+          logger.info('[VisionService] Saved to cache');
+        } catch (cacheErr) {
+          logger.warn('[VisionService] Failed to save cache', { error: cacheErr });
+        }
+      }
 
       logger.info('[VisionService] Analysis completed', {
         quality: overallQuality,
@@ -336,39 +386,22 @@ export class VisionService {
       checkType: 'full',
     });
 
+    const category = result.product_category || 'товар';
+    const material = result.material_detected !== 'unknown' ? result.material_detected : '';
+
     // Build SEO-optimized title
-    const material =
-      result.material_detected !== 'unknown'
-        ? this.translateMaterial(result.material_detected)
-        : '';
-    const category = result.product_category || 'изделие';
-    const texture = result.texture_tags[0] || '';
+    const title = [category, material].filter(Boolean).join(' ').trim();
 
-    const title = [material, category, texture].filter(Boolean).join(' ').trim();
-
-    // Build description
-    const description = `${title} из натурального дерева. ${
+    // Build description accurately from vision selling points
+    const description = `Качественный ${title}. ${
       result.texture_tags.length > 0 ? `Особенности: ${result.texture_tags.join(', ')}.` : ''
-    } Ручная работа.`;
+    }`;
 
     return {
-      title_ru: title || 'Изделие из дерева',
+      title_ru: title,
       description_ru: description,
       tags: [...result.seo_tags_ru, ...result.texture_tags],
     };
-  }
-
-  private translateMaterial(material: MaterialType): string {
-    const translations: Record<MaterialType, string> = {
-      oak: 'Дуб',
-      ash: 'Ясень',
-      walnut: 'Орех',
-      beech: 'Бук',
-      resin: 'Смола',
-      epoxy: 'Эпоксидная смола',
-      unknown: '',
-    };
-    return translations[material];
   }
 }
 

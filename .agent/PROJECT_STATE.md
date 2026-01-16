@@ -311,7 +311,23 @@ PgVector остается основным движком знаний.
 
 - `src/infrastructure/llm/GeminiProvider.ts` — Gemini через OpenRouter
 - `src/agent/specialists/BaseSpecialist.ts` — Базовый класс
-- `src/agent/specialists/IntentClassifier.ts` — 5 категорий intent
+- `src/agent/specialists/IntentClassifier.ts` — 5 категорий
+
+### 🚧 Current Status
+
+- **Architecture**: Multi-Agent System (v5) with Hardened Specialists.
+- **Core Agents**:
+  - `ProductsSpecialist`: Full CRUD + Search.
+  - `AnalyticsSpecialist`: Sales stats, Unit Economics (Live Tax Rates).
+  - `ContentSpecialist`: AI content generation (Vision Cached).
+  - `SupportSpecialist`: Review management (Implemented & Integrated).
+  - `SentinelAgent`: Price protection & monitoring.
+- **Infrastructure**:
+  - database: PostgreSQL (Neon) with connection resilience.
+  - caching: Vision API results cached in `vision_cache`.
+  - security: API Keys encrypted (AES-256-GCM), migration completed.
+  - observability: Basic logging.
+- **Frontend**: React + Vite (Dashboard & Admin support).
 - `src/agent/specialists/ProductsSpecialist.ts`
 - `src/agent/specialists/PricingSpecialist.ts`
 - `src/agent/specialists/SentinelSpecialist.ts`

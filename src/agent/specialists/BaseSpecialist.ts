@@ -30,6 +30,8 @@ export interface SpecialistContext {
     marketplace: 'WB' | 'Ozon' | 'both' | null;
     hasApiKeys: boolean;
     productsCount: number;
+    reviewsCount?: number;
+    defenseMode?: string;
     subscriptionTier: 'free' | 'basic' | 'pro';
   };
   relevantData?: string; // Pre-fetched data context

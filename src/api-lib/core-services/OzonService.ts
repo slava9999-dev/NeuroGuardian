@@ -26,8 +26,8 @@ export class OzonService {
     apiKey: string,
     limit = 100
   ): Promise<MarketplaceProduct[]> {
-    // Step 1: Get product list
-    const listResponse = await fetch(this.PRODUCT_LIST_API, {
+    // Step 1: Get product list (Resilient)
+    const listResponse = await fetchWithRetry(this.PRODUCT_LIST_API, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -50,7 +50,7 @@ export class OzonService {
     // Step 2: Get product details
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const productIds = items.map((item: any) => item.product_id);
-    const detailResponse = await fetch(this.PRODUCT_INFO_API, {
+    const detailResponse = await fetchWithRetry(this.PRODUCT_INFO_API, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

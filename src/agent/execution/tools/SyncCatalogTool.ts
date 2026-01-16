@@ -4,18 +4,13 @@
 // Version: 1.0.0 | Date: January 2026
 // ============================================
 
-import { z } from 'zod';
 import { defineTool } from '../ToolRegistry.js';
 import { marketplaceService } from '../../../api-lib/core-services/MarketplaceService.js';
 import { saveProducts } from '../../../api-lib/services/database.js';
 import { logger } from '../../../api-lib/lib/logger.js';
 import type { DBProduct } from '../../../api-lib/lib/types.js';
 
-const SyncCatalogArgsSchema = z.object({
-  marketplace: z.enum(['WB', 'Ozon']).optional().describe('Sync specific marketplace'),
-});
-
-type SyncCatalogArgs = z.infer<typeof SyncCatalogArgsSchema>;
+import { SyncCatalogArgsSchema, type SyncCatalogArgs } from '../../../api-lib/agent/validators.js';
 
 export const syncCatalogTool = defineTool<SyncCatalogArgs>({
   name: 'sync_catalog',
@@ -31,17 +26,21 @@ export const syncCatalogTool = defineTool<SyncCatalogArgs>({
 
   async execute(userId, args) {
     try {
-      const marketplaces: ('WB' | 'Ozon')[] = args.marketplace
-        ? [args.marketplace]
-        : ['WB', 'Ozon'];
-
-      let totalImported = 0;
       const summaries: string[] = [];
+      let totalImported = 0;
+
+      const marketplaces: ('WB' | 'Ozon')[] =
+        !args.marketplace || args.marketplace === 'all'
+          ? ['WB', 'Ozon']
+          : [args.marketplace as 'WB' | 'Ozon'];
 
       for (const mp of marketplaces) {
         try {
-          logger.info(`[SyncCatalog] Starting sync for ${mp}`, { userId });
-          const products = await marketplaceService.fetchProducts(userId, mp);
+          logger.info(`[SyncCatalog] Starting sync for ${mp}`, {
+            userId,
+            accountId: args.account_id,
+          });
+          const products = await marketplaceService.fetchProducts(userId, mp, 100, args.account_id);
 
           if (products && products.length > 0) {
             // Map MarketplaceProduct to DBProduct partial

@@ -50,7 +50,6 @@ export const calculateUnitEconomicsTool = defineTool<CalculateUnitEconomicsArgs>
     try {
       const { calculateUnitEconomics } =
         await import('../../../api-lib/services/unit-economics.js');
-      const { getProductsByUserId } = await import('../../../api-lib/services/database.js');
 
       let product: DBProduct | undefined;
       let costPrice = args.cost_price;
@@ -59,10 +58,9 @@ export const calculateUnitEconomicsTool = defineTool<CalculateUnitEconomicsArgs>
 
       // Find product if product_id provided
       if (args.product_id) {
-        const products = await getProductsByUserId(userId);
-        product = products.find(
-          (p: DBProduct) => p.product_id === args.product_id || String(p.nm_id) === args.product_id
-        );
+        const { getFilteredProducts } = await import('../../../api-lib/services/database.js');
+        const results = await getFilteredProducts(userId, { search: args.product_id, limit: 1 });
+        product = results[0];
 
         if (!product) {
           return {
@@ -96,6 +94,11 @@ export const calculateUnitEconomicsTool = defineTool<CalculateUnitEconomicsArgs>
         };
       }
 
+      // Fetch tax rate from user settings
+      const { sql } = await import('../../../api-lib/services/database.js');
+      const userResult = await sql`SELECT tax_rate FROM users WHERE id = ${userId}`;
+      const userTaxRate = userResult.rows.length > 0 ? Number(userResult.rows[0].tax_rate) : 7.0;
+
       // Calculate using REAL service
       // This ensures 2025 rates, Ozon Card logic, and category-specific commissions are used
       const result = calculateUnitEconomics({
@@ -106,6 +109,7 @@ export const calculateUnitEconomicsTool = defineTool<CalculateUnitEconomicsArgs>
         // Defaults from service will be used for logistics/storage if not specific
         fulfillmentType: 'fbo',
         useOzonCard: true, // Always calculate hidden Ozon Card costs
+        taxRate: userTaxRate / 100, // Convert percentage (e.g. 6.0) to decimal (0.06)
       });
 
       // Determine profitability status

@@ -1,5 +1,6 @@
-import axios from 'axios';
+import { fetchWithRetry } from '../lib/index.js';
 import { getMarketplaceKeys } from './marketplace-bridge.js';
+import { logger } from '../lib/logger.js';
 
 // Types
 export interface Review {
@@ -20,6 +21,7 @@ export interface GetReviewsParams {
   limit?: number;
   is_replied?: boolean; // true = answered, false = new, undefined = all
   marketplace?: 'WB' | 'Ozon';
+  accountId?: number;
 }
 
 /**
@@ -28,23 +30,27 @@ export interface GetReviewsParams {
  */
 async function fetchWbReviews(apiKey: string, params: GetReviewsParams): Promise<Review[]> {
   try {
-    const response = await axios.get('https://feedbacks-api.wildberries.ru/api/v1/feedbacks', {
-      headers: { Authorization: apiKey },
-      params: {
-        isAnswered: params.is_replied ?? false,
-        take: params.limit || 20,
-        skip: 0,
-        order: 'dateDesc',
-      },
+    const queryParams = new URLSearchParams({
+      isAnswered: String(params.is_replied ?? false),
+      take: String(params.limit || 20),
+      skip: '0',
+      order: 'dateDesc',
     });
 
-    const items = response.data?.data?.feedbacks || [];
+    const response = (await fetchWithRetry(
+      `https://feedbacks-api.wildberries.ru/api/v1/feedbacks?${queryParams}`,
+      {
+        headers: { Authorization: apiKey },
+      }
+    )) as any;
+
+    const items = response.data?.feedbacks || [];
 
     return items.map((item: any) => ({
       id: item.id,
       marketplace: 'WB',
       product_id: String(item.nmId),
-      product_title: item.productValuation, // Sometimes title is here
+      product_title: item.productName || item.productValuation,
       rating: item.productValuation,
       text: item.text,
       created_at: item.createdDate,
@@ -53,7 +59,7 @@ async function fetchWbReviews(apiKey: string, params: GetReviewsParams): Promise
       answer: item.answer ? item.answer.text : undefined,
     }));
   } catch (error) {
-    console.error('WB Reviews Error:', error);
+    logger.error('WB Reviews Error:', error);
     return [];
   }
 }
@@ -69,33 +75,24 @@ async function fetchOzonReviews(
   apiKey: string,
   params: GetReviewsParams
 ): Promise<Review[]> {
-  // Ozon doesn't have a simple public API for listing ALL reviews easily without interaction_id.
-  // However, /v1/review/list is common.
-  // Documentation: https://docs.ozon.ru/api/seller/#tag/Review-API
-
-  // We will use a mock implementation if real API fails or is too complex for this MVP step,
-  // but let's try the correct endpoint structure.
-
-  // Endpoint: POST /v1/review/list
   try {
-    const response = await axios.post(
-      'https://api-seller.ozon.ru/v1/review/list',
-      {
+    const response = (await fetchWithRetry('https://api-seller.ozon.ru/v1/review/list', {
+      method: 'POST',
+      body: JSON.stringify({
         page: 1,
         page_size: params.limit || 20,
         sort_dir: 'DESC',
         status:
           params.is_replied === true ? 'PROCESSED' : params.is_replied === false ? 'NEW' : 'ALL',
+      }),
+      headers: {
+        'Client-Id': clientId,
+        'Api-Key': apiKey,
+        'Content-Type': 'application/json',
       },
-      {
-        headers: {
-          'Client-Id': clientId,
-          'Api-Key': apiKey,
-        },
-      }
-    );
+    })) as any;
 
-    const items = response.data?.result || [];
+    const items = response.result || [];
 
     return items.map((item: any) => ({
       id: item.id,
@@ -104,13 +101,11 @@ async function fetchOzonReviews(
       rating: item.rating,
       text: item.text,
       created_at: item.created_at,
-      author_name: 'Покупатель Ozon', // Privacy
+      author_name: 'Покупатель Ozon',
       status: item.interaction_status === 'PROCESSED' ? 'replied' : 'new',
-      // answers are complex structure in Ozon
     }));
-  } catch (error) {
-    // Graceful degradation / Mock for dev if keys invalid
-    console.warn('Ozon Reviews API Error (might need specific permissions):', error);
+  } catch (error: any) {
+    logger.warn('Ozon Reviews API Error:', { error: error.message });
     return [];
   }
 }
@@ -122,7 +117,7 @@ export async function getUserReviews(
   userId: number,
   params: GetReviewsParams = {}
 ): Promise<Review[]> {
-  const keys = await getMarketplaceKeys(userId);
+  const keys = await getMarketplaceKeys(userId, params.accountId);
   const reviews: Review[] = [];
 
   if (keys.wb && (!params.marketplace || params.marketplace === 'WB')) {
@@ -135,7 +130,6 @@ export async function getUserReviews(
     reviews.push(...ozonReviews);
   }
 
-  // Sort combined
   return reviews.sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
