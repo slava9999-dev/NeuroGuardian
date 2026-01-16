@@ -1,9 +1,19 @@
 // ============================================
-// NeuroGUARDIAN — ProductCard Component
-// Individual product card with status and controls
+// NeuroGUARDIAN — ProductCard Component V3.1
+// NEURO-UI: Compact, Data-First, Premium Design
 // ============================================
 
 import { useState, useCallback } from 'react';
+import { motion } from 'framer-motion';
+import {
+  Wand2,
+  Shield,
+  Package,
+  TrendingUp,
+  TrendingDown,
+  Calculator,
+  Image as ImageIcon,
+} from 'lucide-react';
 
 import type { Product } from '../../types';
 import { useProductsStore } from '../../stores';
@@ -16,60 +26,71 @@ interface ProductCardProps {
   product: Product;
 }
 
-interface StatusConfig {
-  color: string;
-  label: string;
-  glow: boolean;
-  pulse?: boolean;
-}
-
-const STATUS_CONFIG: Record<string, StatusConfig> = {
-  active: {
-    color: 'bg-stone-500',
-    label: 'Активен',
-    glow: false,
-  },
+// Status colors for left neon bar
+const STATUS_COLORS = {
   protected: {
-    color: 'bg-emerald-500',
-    label: 'Защищен',
-    glow: true,
+    bar: 'bg-emerald-500',
+    shadow: 'shadow-[0_0_10px_rgba(16,185,129,0.5)]',
+    text: 'text-emerald-400',
   },
+  active: { bar: 'bg-slate-600', shadow: '', text: 'text-slate-400' },
   triggered: {
-    color: 'bg-red-500',
-    label: 'АТАКА',
-    glow: true,
-    pulse: true,
+    bar: 'bg-rose-500',
+    shadow: 'shadow-[0_0_10px_rgba(244,63,94,0.5)]',
+    text: 'text-rose-400',
   },
-  disabled: {
-    color: 'bg-stone-600',
-    label: 'Отключен',
-    glow: false,
-  },
-};
+  disabled: { bar: 'bg-slate-700', shadow: '', text: 'text-slate-500' },
+} as const;
 
 export function ProductCard({ product }: ProductCardProps) {
   const updateProduct = useProductsStore(s => s.updateProduct);
-  const [isEditing, setIsEditing] = useState(false);
   const [showCalculator, setShowCalculator] = useState(false);
+  const [showMedia, setShowMedia] = useState(false);
   const [minPriceInput, setMinPriceInput] = useState(product.minPrice.toString());
   const [costPriceInput, setCostPriceInput] = useState((product.costPrice || 0).toString());
-  const [showMedia, setShowMedia] = useState(false);
+  const [editingField, setEditingField] = useState<'min' | 'cost' | null>(null);
 
-  const status = STATUS_CONFIG[product.status] || STATUS_CONFIG.active;
+  const statusConfig =
+    STATUS_COLORS[product.status as keyof typeof STATUS_COLORS] || STATUS_COLORS.active;
 
-  const handleCostPriceBlur = useCallback(async () => {
-    // Keep editing mode if we clicked another field (simplified logic)
-    // setIsEditing(false); // Let the specific field click handler manage this if needed, or just close it.
-    // For now, let's not close standard editing mode immediately if we want to edit multiple fields,
-    // but the original code closed it. Let's stick to original behavior but we might have conflict.
-    // Actually, distinct handlers are better.
+  // Calculate margin if we have cost price
+  const margin =
+    product.costPrice && product.costPrice > 0
+      ? Math.round(((product.currentPrice - product.costPrice) / product.currentPrice) * 100)
+      : null;
 
-    // We only close editing if we are blurring out of the card context?
-    // Let's simplified: each blur saves.
+  const isProtected = product.minPrice > 0;
+  const isSafe = product.currentPrice >= product.minPrice;
 
-    // NOTE: This shared `isEditing` state for both inputs is problematic if we want to edit one without closing.
-    // However, usually we edit one by one.
+  // Save handlers
+  const handleSaveMinPrice = useCallback(async () => {
+    setEditingField(null);
+    const newMinPrice = parseFloat(minPriceInput) || 0;
 
+    if (newMinPrice !== product.minPrice) {
+      hapticFeedback('light');
+      updateProduct(product.id, {
+        minPrice: newMinPrice,
+        status: newMinPrice > 0 ? 'protected' : 'active',
+      });
+
+      try {
+        const tg = (window as unknown as { Telegram?: { WebApp?: { initData?: string } } }).Telegram
+          ?.WebApp;
+        const initData = tg?.initData || 'demo';
+        await fetch('/api?action=products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Init-Data': initData },
+          body: JSON.stringify({ productId: product.productId, minPrice: newMinPrice }),
+        });
+      } catch (error) {
+        console.error('Failed to save min price:', error);
+      }
+    }
+  }, [minPriceInput, product.id, product.productId, product.minPrice, updateProduct]);
+
+  const handleSaveCostPrice = useCallback(async () => {
+    setEditingField(null);
     const newCostPrice = parseFloat(costPriceInput) || 0;
 
     if (newCostPrice !== (product.costPrice || 0)) {
@@ -77,386 +98,219 @@ export function ProductCard({ product }: ProductCardProps) {
       updateProduct(product.id, { costPrice: newCostPrice });
 
       try {
-        interface TelegramWebApp {
-          initData?: string;
-        }
-        const tg = (window as unknown as { Telegram?: { WebApp?: TelegramWebApp } }).Telegram
+        const tg = (window as unknown as { Telegram?: { WebApp?: { initData?: string } } }).Telegram
           ?.WebApp;
         const initData = tg?.initData || 'demo';
-
         await fetch('/api?action=products', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-Init-Data': initData },
-          body: JSON.stringify({
-            action: 'products',
-            initData,
-            productId: product.productId,
-            costPrice: newCostPrice,
-          }),
+          body: JSON.stringify({ productId: product.productId, costPrice: newCostPrice }),
         });
-        console.log(`✅ Cost Price saved: ${product.productId} → ${newCostPrice}`);
       } catch (error) {
-        console.error('❌ Failed to save cost price:', error);
+        console.error('Failed to save cost price:', error);
       }
     }
   }, [costPriceInput, product.id, product.productId, product.costPrice, updateProduct]);
 
-  const handleCostPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/[^0-9.]/g, '');
-    setCostPriceInput(value);
-  };
-
-  const handleMinPriceBlur = useCallback(async () => {
-    setIsEditing(false);
-    const newMinPrice = parseFloat(minPriceInput) || 0;
-
-    // ... existing logic ...
-
-    if (newMinPrice !== product.minPrice) {
-      hapticFeedback('light');
-
-      // Update local store
-      updateProduct(product.id, {
-        minPrice: newMinPrice,
-        status: newMinPrice > 0 ? 'protected' : 'active',
-      });
-
-      // IMPORTANT: Save to server!
-      try {
-        interface TelegramWebApp {
-          initData?: string;
-        }
-        const tg = (window as unknown as { Telegram?: { WebApp?: TelegramWebApp } }).Telegram
-          ?.WebApp;
-        const initData = tg?.initData || 'demo';
-
-        await fetch('/api?action=products', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Init-Data': initData,
-          },
-          body: JSON.stringify({
-            action: 'products',
-            initData,
-            productId: product.productId,
-            minPrice: newMinPrice,
-          }),
-        });
-        console.log(`✅ Минимальная цена saved: ${product.productId} → ${newMinPrice}`);
-      } catch (error) {
-        console.error('❌ Failed to save минимальная цена:', error);
-      }
-    }
-  }, [minPriceInput, product.id, product.productId, product.minPrice, updateProduct]);
-
-  const handleMinPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Only allow numbers and one decimal point
-    const value = e.target.value.replace(/[^0-9.]/g, '');
-    setMinPriceInput(value);
-  };
-
-  const priceDiff = product.currentPrice - product.minPrice;
-  const pricePercent =
-    product.minPrice > 0
-      ? ((product.currentPrice / product.minPrice) * 100 - 100).toFixed(1)
-      : null;
-
   return (
-    <div className="glass-panel glass-panel-hover p-4 relative overflow-hidden transition-all duration-300 transform hover:-translate-y-1">
-      {/* Triggered animation overlay */}
+    <motion.div
+      className="product-card group"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{ scale: 1.01 }}
+      transition={{ duration: 0.2 }}
+    >
+      {/* Left Neon Status Bar */}
+      <div
+        className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-xl ${statusConfig.bar} ${statusConfig.shadow}`}
+      />
+
+      {/* Triggered overlay */}
       {product.status === 'triggered' && (
-        <div className="absolute inset-0 bg-red-500/10 pointer-events-none animate-pulse" />
+        <motion.div
+          className="absolute inset-0 bg-rose-500/5 pointer-events-none rounded-xl"
+          animate={{ opacity: [0.3, 0.6, 0.3] }}
+          transition={{ duration: 1.5, repeat: Infinity }}
+        />
       )}
 
-      {/* Header: Image + Title + Status */}
-      <div className="flex gap-3 mb-3">
-        {/* Product image - Click to open media */}
+      <div className="flex gap-4 pl-3">
+        {/* Product Image - Compact Square */}
         <div
-          className="w-16 h-16 rounded-xl bg-stone-800 overflow-hidden shrink-0 cursor-pointer hover:opacity-80 transition-opacity relative group"
+          className="w-20 h-20 rounded-lg bg-slate-800/80 overflow-hidden shrink-0 cursor-pointer relative group/img"
           onClick={() => setShowMedia(true)}
         >
-          {/* Vision Badge */}
+          {/* Media count badge */}
           {(product.mediaAssets?.length ?? 0) > 0 && (
-            <div className="absolute bottom-0 right-0 bg-black/60 text-[8px] text-white px-1 rounded-tl-md backdrop-blur-sm z-10">
-              📸 {product.mediaAssets?.length}
+            <div className="absolute bottom-1 right-1 bg-black/70 backdrop-blur-sm text-[9px] text-white px-1.5 py-0.5 rounded flex items-center gap-0.5 z-10">
+              <ImageIcon className="w-2.5 h-2.5" />
+              {product.mediaAssets?.length}
             </div>
           )}
 
           {product.imageUrl ? (
             <LazyImage src={product.imageUrl} alt={product.title} className="w-full h-full" />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-stone-600">
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                <circle cx="8.5" cy="8.5" r="1.5" />
-                <path d="m21 15-5-5L5 21" />
-              </svg>
+            <div className="w-full h-full flex items-center justify-center text-slate-600">
+              <Package className="w-6 h-6" />
             </div>
           )}
+
+          {/* Hover overlay */}
+          <div className="absolute inset-0 bg-violet-500/0 group-hover/img:bg-violet-500/20 transition-colors flex items-center justify-center">
+            <ImageIcon className="w-5 h-5 text-white opacity-0 group-hover/img:opacity-100 transition-opacity" />
+          </div>
         </div>
 
-        {/* Title and meta */}
+        {/* Main Content */}
         <div className="flex-1 min-w-0">
-          <h3 className="font-medium text-white text-sm truncate" title={product.title}>
-            {product.title}
-          </h3>
-          <p className="text-xs text-stone-400 font-mono">{product.vendorCode}</p>
-
-          {/* Status badge */}
-          <div className="flex items-center gap-2 mt-1">
-            <div
-              className={`
-              flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium
-              ${status.color} ${status.glow ? 'shadow-lg' : ''}
-            `}
-            >
-              <span
-                className={`
-                w-1.5 h-1.5 rounded-full bg-current
-                ${status.pulse ? 'animate-pulse' : ''}
-              `}
-              />
-              {status.label}
+          {/* Title + Badges Row */}
+          <div className="flex items-start justify-between gap-2 mb-2">
+            <div className="min-w-0">
+              <h3 className="text-sm font-medium text-white truncate pr-2" title={product.title}>
+                {product.title}
+              </h3>
+              <p className="text-[11px] text-slate-500 font-mono">{product.vendorCode}</p>
             </div>
 
-            {/* Marketplace badge */}
+            {/* Marketplace Badge */}
             <span
-              className={`
-              px-2 py-0.5 rounded-full text-xs font-medium
-              ${
-                product.marketplace === 'WB'
-                  ? 'bg-purple-500/20 text-purple-400'
-                  : 'bg-blue-500/20 text-blue-400'
-              }
-            `}
+              className={`shrink-0 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide ${
+                product.marketplace === 'WB' ? 'badge-wb' : 'badge-ozon'
+              }`}
             >
               {product.marketplace}
             </span>
           </div>
-        </div>
-      </div>
 
-      {/* Price info */}
-      <div className="grid grid-cols-2 gap-3 mb-3">
-        {/* Current price with buyer estimate */}
-        <div className="bg-stone-800/50 rounded-xl p-3 col-span-2">
-          <p className="text-xs text-stone-400 mb-1 flex items-center gap-1">
-            Ваша цена
-            {product.marketplaceDiscountPercent && product.marketplaceDiscountPercent > 0 && (
-              <span className="text-amber-400/70 ml-auto" title="Примерная скидка маркетплейса">
-                ↓{product.marketplaceDiscountPercent}%
+          {/* Price Row - Hero */}
+          <div className="flex items-baseline gap-3 mb-3">
+            <span className="text-2xl font-bold font-mono text-white tracking-tight">
+              {product.currentPrice.toLocaleString('ru-RU')}
+              <span className="text-base text-slate-400 ml-0.5">₽</span>
+            </span>
+
+            {/* Margin indicator */}
+            {margin !== null && (
+              <span
+                className={`text-xs font-mono flex items-center gap-0.5 ${margin >= 20 ? 'text-emerald-400' : margin >= 10 ? 'text-amber-400' : 'text-rose-400'}`}
+              >
+                {margin >= 0 ? (
+                  <TrendingUp className="w-3 h-3" />
+                ) : (
+                  <TrendingDown className="w-3 h-3" />
+                )}
+                {margin}%
               </span>
             )}
-          </p>
-          <p className="text-lg font-bold text-white">
-            {product.currentPrice.toLocaleString('ru-RU')} ₽
-          </p>
-          {/* Show estimated buyer price if different */}
-          {product.estimatedBuyerPrice && product.estimatedBuyerPrice < product.currentPrice && (
-            <p className="text-xs text-stone-400 mt-1 flex items-center gap-1">
+
+            {/* Protection status */}
+            {isProtected && (
               <span
-                className={`${product.marketplace === 'Ozon' ? 'text-blue-400' : 'text-purple-400'} font-medium`}
-                title={
-                  product.marketplace === 'Ozon'
-                    ? 'Цена для покупателей с Ozon Card (скидка 5%)'
-                    : 'Цена с учётом кэшбэка WB Pay (~3%)'
-                }
+                className={`text-[10px] flex items-center gap-1 ${isSafe ? 'text-emerald-400' : 'text-rose-400'}`}
               >
-                {product.marketplace === 'Ozon' ? '💳 с Ozon Card:' : '💳 с WB Pay:'}
+                <Shield className="w-3 h-3" />
+                {isSafe ? 'OK' : '!'}
               </span>
-              <span
-                className={`${product.marketplace === 'Ozon' ? 'text-blue-300' : 'text-purple-300'} font-bold`}
-              >
-                {product.estimatedBuyerPrice.toLocaleString('ru-RU')} ₽
-              </span>
-            </p>
-          )}
-        </div>
+            )}
+          </div>
 
-        {/* Cost Price (Unit Economics) */}
-        <div
-          className={`
-            bg-stone-800/50 rounded-xl p-3 transition-all
-            ${isEditing ? 'ring-2 ring-amber-500' : ''}
-          `}
-        >
-          <p className="text-xs text-stone-400 mb-1 flex items-center gap-1">
-            Себестоимость
-            <span
-              className="text-stone-500"
-              title="Включая закупку, упаковку и логистику до склада"
+          {/* Editable Fields Row */}
+          <div className="flex gap-2 mb-3">
+            {/* Cost Price */}
+            <div
+              className={`flex-1 bg-slate-800/50 rounded-lg px-3 py-2 cursor-pointer transition-all ${
+                editingField === 'cost' ? 'ring-1 ring-violet-500' : 'hover:bg-slate-800'
+              }`}
+              onClick={() => !editingField && setEditingField('cost')}
             >
-              📦
-            </span>
-          </p>
-          {isEditing ? (
-            <input
-              type="text"
-              inputMode="decimal"
-              value={costPriceInput}
-              onChange={handleCostPriceChange}
-              onBlur={handleCostPriceBlur}
-              onKeyDown={e => e.key === 'Enter' && handleCostPriceBlur()}
-              className="w-full bg-transparent text-lg font-bold text-blue-400 outline-none"
-              placeholder="0"
-            />
-          ) : (
-            <p
-              className="text-lg font-bold text-blue-400 cursor-pointer hover:text-blue-300"
-              onClick={() => {
-                setIsEditing(true);
-                setCostPriceInput(product.costPrice?.toString() || '0');
-              }}
-            >
-              {(product.costPrice || 0) > 0
-                ? `${product.costPrice?.toLocaleString('ru-RU')} ₽`
-                : 'Указать'}
-            </p>
-          )}
-        </div>
+              <p className="text-[10px] text-slate-500 mb-0.5">Себестоимость</p>
+              {editingField === 'cost' ? (
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={costPriceInput}
+                  onChange={e => setCostPriceInput(e.target.value.replace(/[^0-9.]/g, ''))}
+                  onBlur={handleSaveCostPrice}
+                  onKeyDown={e => e.key === 'Enter' && handleSaveCostPrice()}
+                  autoFocus
+                  className="w-full bg-transparent text-sm font-bold font-mono text-violet-400 outline-none"
+                  placeholder="0"
+                />
+              ) : (
+                <p className="text-sm font-bold font-mono text-violet-400">
+                  {(product.costPrice || 0) > 0
+                    ? `${product.costPrice?.toLocaleString('ru-RU')} ₽`
+                    : '—'}
+                </p>
+              )}
+            </div>
 
-        {/* Min price (editable) */}
-        <div
-          className={`
-            bg-stone-800/50 rounded-xl p-3 transition-all
-            ${isEditing ? 'ring-2 ring-amber-500' : ''}
-          `}
-        >
-          <p className="text-xs text-stone-400 mb-1 flex items-center gap-1">
-            Минимальная цена
-            <span className="text-stone-500" title="Цена, ниже которой товар продавать невыгодно">
-              ℹ️
-            </span>
-          </p>
-          {isEditing ? (
-            <input
-              type="text"
-              inputMode="decimal"
-              value={minPriceInput}
-              onChange={handleMinPriceChange}
-              onBlur={handleMinPriceBlur}
-              onKeyDown={e => e.key === 'Enter' && handleMinPriceBlur()}
-              autoFocus
-              className="w-full bg-transparent text-lg font-bold text-amber-400 outline-none"
-            />
-          ) : (
-            <p
-              className="text-lg font-bold text-amber-400 cursor-pointer hover:text-amber-300"
-              onClick={() => {
-                setIsEditing(true);
-                setMinPriceInput(product.minPrice.toString());
-              }}
+            {/* Min Price (Stop-Loss) */}
+            <div
+              className={`flex-1 bg-slate-800/50 rounded-lg px-3 py-2 cursor-pointer transition-all ${
+                editingField === 'min' ? 'ring-1 ring-violet-500' : 'hover:bg-slate-800'
+              }`}
+              onClick={() => !editingField && setEditingField('min')}
             >
-              {product.minPrice > 0
-                ? `${product.minPrice.toLocaleString('ru-RU')} ₽`
-                : 'Установить'}
-            </p>
-          )}
+              <p className="text-[10px] text-slate-500 mb-0.5 flex items-center gap-1">
+                Stop-Loss
+                <Shield className="w-2.5 h-2.5" />
+              </p>
+              {editingField === 'min' ? (
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={minPriceInput}
+                  onChange={e => setMinPriceInput(e.target.value.replace(/[^0-9.]/g, ''))}
+                  onBlur={handleSaveMinPrice}
+                  onKeyDown={e => e.key === 'Enter' && handleSaveMinPrice()}
+                  autoFocus
+                  className="w-full bg-transparent text-sm font-bold font-mono text-emerald-400 outline-none"
+                  placeholder="0"
+                />
+              ) : (
+                <p
+                  className={`text-sm font-bold font-mono ${isProtected ? 'text-emerald-400' : 'text-slate-500'}`}
+                >
+                  {product.minPrice > 0
+                    ? `${product.minPrice.toLocaleString('ru-RU')} ₽`
+                    : 'Установить'}
+                </p>
+              )}
+            </div>
+          </div>
 
-          {/* Calculator button */}
-          {!isEditing && (
+          {/* Action Buttons Row */}
+          <div className="flex gap-2">
+            {/* SMM Button */}
             <button
-              onClick={() => setShowCalculator(true)}
-              className="mt-2 w-full text-xs text-stone-400 hover:text-amber-400 transition-colors flex items-center justify-center gap-1"
-            >
-              🧮 Рассчитать
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Price Protection Indicator */}
-      {product.minPrice > 0 && (
-        <div className="mb-3 bg-stone-800/30 rounded-xl p-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-stone-400">🛡️ Защита цены</span>
-            <span
-              className={`text-xs font-medium ${
-                product.currentPrice >= product.minPrice ? 'text-emerald-400' : 'text-red-400'
-              }`}
-            >
-              {product.currentPrice >= product.minPrice ? '✅ Безопасно' : '⚠️ Ниже минимума!'}
-            </span>
-          </div>
-
-          {/* Visual price bar */}
-          <div className="relative h-2 bg-stone-700 rounded-full overflow-hidden">
-            {/* Minimum price marker */}
-            <div
-              className="absolute top-0 bottom-0 w-0.5 bg-amber-500 z-10"
-              style={{ left: '50%' }}
-              title={`Минимум: ${product.minPrice}₽`}
-            />
-
-            {/* Current price fill */}
-            <div
-              className={`absolute top-0 bottom-0 left-0 transition-all duration-500 ${
-                product.currentPrice >= product.minPrice
-                  ? 'bg-linear-to-r from-emerald-500 to-emerald-400'
-                  : 'bg-linear-to-r from-red-500 to-red-400'
-              }`}
-              style={{
-                width: `${Math.min(100, (product.currentPrice / (product.minPrice * 2)) * 100)}%`,
+              className="btn-smm"
+              onClick={() => {
+                hapticFeedback('light');
+                // TODO: Integrate with ContentSpecialist
+                console.log('SMM for product:', product.productId);
               }}
-            />
-          </div>
-
-          <div className="flex items-center justify-between mt-1 text-xs text-stone-500">
-            <span>0₽</span>
-            <span className="text-amber-400">{product.minPrice}₽</span>
-            <span>{(product.minPrice * 2).toLocaleString('ru-RU')}₽</span>
-          </div>
-        </div>
-      )}
-
-      {/* Footer: Price diff + Stock */}
-      <div className="flex items-center justify-between text-xs">
-        {/* Price difference */}
-        {product.minPrice > 0 && (
-          <div
-            className={`
-            flex items-center gap-1
-            ${priceDiff >= 0 ? 'text-emerald-400' : 'text-red-400'}
-          `}
-          >
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
             >
-              {priceDiff >= 0 ? <path d="m18 15-6-6-6 6" /> : <path d="m6 9 6 6 6-6" />}
-            </svg>
-            <span>
-              {priceDiff >= 0 ? '+' : ''}
-              {priceDiff.toLocaleString('ru-RU')} ₽{pricePercent && ` (${pricePercent}%)`}
-            </span>
-          </div>
-        )}
+              <Wand2 className="w-3 h-3" />
+              SMM-Пост
+            </button>
 
-        {/* Stock */}
-        <div className="flex items-center gap-1 text-stone-400">
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-          </svg>
-          <span>{product.stock} шт</span>
+            {/* Calculator Button */}
+            <button
+              className="text-[11px] bg-slate-800/50 text-slate-400 px-3 py-1.5 rounded-lg hover:bg-slate-700 hover:text-white transition-all flex items-center gap-1"
+              onClick={() => setShowCalculator(true)}
+            >
+              <Calculator className="w-3 h-3" />
+              Калькулятор
+            </button>
+
+            {/* Stock */}
+            <div className="ml-auto text-[11px] text-slate-500 flex items-center gap-1">
+              <Package className="w-3 h-3" />
+              {product.stock} шт
+            </div>
+          </div>
         </div>
       </div>
 
@@ -466,43 +320,25 @@ export function ProductCard({ product }: ProductCardProps) {
           marketplace={product.marketplace}
           initialCostPrice={product.costPrice}
           onCalculated={calculatedPrice => {
-            // Update input and trigger save
             setMinPriceInput(calculatedPrice.toString());
-            setIsEditing(false);
-
-            // Save to store and server
             hapticFeedback('light');
             updateProduct(product.id, {
               minPrice: calculatedPrice,
               status: calculatedPrice > 0 ? 'protected' : 'active',
             });
 
-            // Save to server
             (async () => {
               try {
-                interface TelegramWebApp {
-                  initData?: string;
-                }
-                const tg = (window as unknown as { Telegram?: { WebApp?: TelegramWebApp } })
+                const tg = (window as unknown as { Telegram?: { WebApp?: { initData?: string } } })
                   .Telegram?.WebApp;
                 const initData = tg?.initData || 'demo';
-
                 await fetch('/api?action=products', {
                   method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'X-Init-Data': initData,
-                  },
-                  body: JSON.stringify({
-                    action: 'products',
-                    initData,
-                    productId: product.productId,
-                    minPrice: calculatedPrice,
-                  }),
+                  headers: { 'Content-Type': 'application/json', 'X-Init-Data': initData },
+                  body: JSON.stringify({ productId: product.productId, minPrice: calculatedPrice }),
                 });
-                console.log(`✅ Минимальная цена saved: ${product.productId} → ${calculatedPrice}`);
               } catch (error) {
-                console.error('❌ Failed to save минимальная цена:', error);
+                console.error('Failed to save:', error);
               }
             })();
           }}
@@ -510,25 +346,23 @@ export function ProductCard({ product }: ProductCardProps) {
         />
       )}
 
-      {/* Media Manager Modal */}
+      {/* Media Modal */}
       <ProductMediaModal
         isOpen={showMedia}
         onClose={() => setShowMedia(false)}
         product={product}
         onUpdate={newAsset => {
           if (newAsset) {
-            // Optimistically add new asset
             const currentAssets = product.mediaAssets || [];
             updateProduct(product.id, {
               mediaAssets: [...currentAssets, newAsset],
               updatedAt: new Date(),
             });
           } else {
-            // Just trigger re-render
             updateProduct(product.id, { updatedAt: new Date() });
           }
         }}
       />
-    </div>
+    </motion.div>
   );
 }

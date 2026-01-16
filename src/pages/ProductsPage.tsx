@@ -1,10 +1,11 @@
 // ============================================
-// NeuroAgent — Products & Metrics Page
-// Clean, organized view for products
+// NeuroGUARDIAN — Products Page V3.1
+// NEURO-UI: Premium Obsidian Design
 // ============================================
 
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
+import { Shield, Package, History, Upload, Search, Filter, Zap, AlertTriangle } from 'lucide-react';
 import { useAppStore, useProductsStore } from '../stores';
 import { GlobalSwitch } from '../components/controls/GlobalSwitch';
 import { DashboardGrid } from '../components/dashboard/DashboardGrid';
@@ -13,17 +14,11 @@ import { BulkUpdateCostsModal } from '../components/dashboard/BulkUpdateCostsMod
 import { LogHistory } from '../components/dashboard/LogHistory';
 import { hapticFeedback } from '../lib/telegram';
 
-// NOTE: Mock data removed for production safety (AUDIT-2025-12-28)
-
 // Format money
 function formatMoney(amount: number): string {
-  if (amount >= 1000000) {
-    return `₽${(amount / 1000000).toFixed(1)}M`;
-  }
-  if (amount >= 1000) {
-    return `₽${(amount / 1000).toFixed(0)}k`;
-  }
-  return `₽${amount}`;
+  if (amount >= 1000000) return `${(amount / 1000000).toFixed(1)}M ₽`;
+  if (amount >= 1000) return `${(amount / 1000).toFixed(0)}K ₽`;
+  return `${amount} ₽`;
 }
 
 interface ProductsPageProps {
@@ -37,132 +32,212 @@ export function ProductsPage({ onBack }: ProductsPageProps) {
   const [showBulkStopLoss, setShowBulkStopLoss] = useState(false);
   const [showBulkCosts, setShowBulkCosts] = useState(false);
   const [showLogHistory, setShowLogHistory] = useState(false);
-
-  // NOTE: Mock data loading removed for production safety (AUDIT-2025-12-28)
-  // Products are loaded from the API via App.tsx on authentication
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
 
   // Calculate stats
   const stats = useMemo(() => {
     const protectedCount = products.filter(p => p.minPrice > 0).length;
     const triggeredCount = products.filter(p => p.status === 'triggered').length;
+    const lossCount = products.filter(p => p.costPrice && p.currentPrice < p.costPrice).length;
     return {
       total: products.length,
       protected: protectedCount,
       unprotected: products.length - protectedCount,
       triggered: triggeredCount,
+      lossCount,
       savedAmount: user?.savedAmount ?? 0,
     };
   }, [products, user]);
 
-  return (
-    <div className="min-h-screen bg-linear-to-b from-stone-900 to-stone-800 pb-24">
-      {/* Header - Compact Mobile Version */}
-      <header className="sticky top-0 z-10 bg-stone-900/95 backdrop-blur-md border-b border-stone-800 px-3 py-2">
-        <div className="flex items-center justify-between gap-2">
-          {/* Back button + Title */}
-          <div className="flex items-center gap-2 min-w-0">
-            <button
-              onClick={onBack}
-              className="p-1.5 rounded-lg hover:bg-stone-800 transition-colors text-stone-400 shrink-0"
-            >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path d="M19 12H5M12 19l-7-7 7-7" />
-              </svg>
-            </button>
-            <div className="min-w-0">
-              <h1 className="text-lg font-bold text-white truncate">Товары</h1>
-              <p className="text-[10px] text-stone-500">
-                {stats.total} • {stats.protected} защищено
-              </p>
-            </div>
-          </div>
+  // Filter products by search - TODO: connect to DashboardGrid
+  // const filteredProducts = useMemo(() => {
+  //   if (!searchQuery.trim()) return products;
+  //   const q = searchQuery.toLowerCase();
+  //   return products.filter(p =>
+  //     p.title.toLowerCase().includes(q) ||
+  //     p.vendorCode?.toLowerCase().includes(q) ||
+  //     p.productId.toLowerCase().includes(q)
+  //   );
+  // }, [products, searchQuery]);
 
-          {/* Global Switch - Compact */}
-          <div className="shrink-0">
-            <GlobalSwitch compact />
+  return (
+    <div className="min-h-screen bg-[#020617] pb-24">
+      {/* Cosmic Background Glow */}
+      <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,rgba(124,58,237,0.08)_0%,transparent_50%)] pointer-events-none" />
+
+      {/* Header */}
+      <header className="sticky top-0 z-30 bg-[#020617]/90 backdrop-blur-xl border-b border-white/5">
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
+            {/* Back + Title */}
+            <div className="flex items-center gap-3 min-w-0">
+              <button
+                onClick={onBack}
+                className="p-2 rounded-lg hover:bg-slate-800 transition-colors text-slate-400 shrink-0"
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M19 12H5M12 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <div className="min-w-0">
+                <h1 className="text-lg font-bold text-white">Товары</h1>
+                <p className="text-[11px] text-slate-500">
+                  {stats.total} • {stats.protected} защищено
+                </p>
+              </div>
+            </div>
+
+            {/* Global Switch */}
+            <div className="shrink-0">
+              <GlobalSwitch compact />
+            </div>
           </div>
         </div>
       </header>
 
-      <div className="px-4 py-4 space-y-4">
-        {/* Stats Cards - Compact Row */}
+      <div className="relative z-10 px-4 py-4 space-y-4">
+        {/* Loss Products Alert */}
+        {stats.lossCount > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center gap-3"
+          >
+            <div className="w-10 h-10 rounded-full bg-rose-500/20 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-5 h-5 text-rose-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-rose-400">
+                {stats.lossCount} товаров в убытке
+              </p>
+              <p className="text-xs text-slate-400">Цена ниже себестоимости</p>
+            </div>
+            <button className="text-xs text-rose-400 hover:text-rose-300 font-medium">
+              Показать
+            </button>
+          </motion.div>
+        )}
+
+        {/* Stats Row - Minimal & Unified */}
         <div className="grid grid-cols-4 gap-2">
-          <motion.div
-            className="p-3 rounded-xl bg-stone-800/50 border border-stone-700/50 text-center"
-            whileHover={{ scale: 1.02 }}
-          >
-            <p className="text-xl font-bold text-white">{stats.total}</p>
-            <p className="text-[10px] text-stone-500 uppercase tracking-wide">Всего</p>
+          <motion.div className="surface-card p-3 text-center" whileHover={{ scale: 1.02 }}>
+            <p className="text-xl font-bold font-mono text-white">{stats.total}</p>
+            <p className="text-[9px] text-slate-500 uppercase tracking-wider">Всего</p>
           </motion.div>
           <motion.div
-            className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-center"
+            className="surface-card p-3 text-center border-emerald-500/20"
             whileHover={{ scale: 1.02 }}
           >
-            <p className="text-xl font-bold text-emerald-400">{stats.protected}</p>
-            <p className="text-[10px] text-stone-500 uppercase tracking-wide">Защита</p>
+            <p className="text-xl font-bold font-mono text-emerald-400">{stats.protected}</p>
+            <p className="text-[9px] text-slate-500 uppercase tracking-wider">Защита</p>
+          </motion.div>
+          <motion.div className="surface-card p-3 text-center" whileHover={{ scale: 1.02 }}>
+            <p className="text-xl font-bold font-mono text-slate-400">{stats.unprotected}</p>
+            <p className="text-[9px] text-slate-500 uppercase tracking-wider">Без</p>
           </motion.div>
           <motion.div
-            className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-center"
+            className={`surface-card p-3 text-center ${stats.triggered > 0 ? 'border-rose-500/30' : ''}`}
             whileHover={{ scale: 1.02 }}
           >
-            <p className="text-xl font-bold text-amber-400">{stats.unprotected}</p>
-            <p className="text-[10px] text-stone-500 uppercase tracking-wide">Без</p>
-          </motion.div>
-          <motion.div
-            className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-center"
-            whileHover={{ scale: 1.02 }}
-          >
-            <p className="text-xl font-bold text-red-400">{stats.triggered}</p>
-            <p className="text-[10px] text-stone-500 uppercase tracking-wide">Триггер</p>
+            <p
+              className={`text-xl font-bold font-mono ${stats.triggered > 0 ? 'text-rose-400' : 'text-slate-500'}`}
+            >
+              {stats.triggered}
+            </p>
+            <p className="text-[9px] text-slate-500 uppercase tracking-wider">Триггер</p>
           </motion.div>
         </div>
 
-        {/* Saved Amount - Only if > 0 */}
+        {/* Saved Amount */}
         {stats.savedAmount > 0 && (
           <motion.div
-            className="p-4 rounded-xl bg-linear-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/30"
+            className="p-4 rounded-xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20"
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-stone-400">Сэкономлено благодаря защите</p>
-                <p className="text-2xl font-bold text-emerald-400">
+                <p className="text-xs text-slate-400 mb-1">Сэкономлено благодаря защите</p>
+                <p className="text-2xl font-bold font-mono text-emerald-400">
                   {formatMoney(stats.savedAmount)}
                 </p>
               </div>
-              <span className="text-3xl">💰</span>
+              <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                <Zap className="w-6 h-6 text-emerald-400" />
+              </div>
             </div>
           </motion.div>
         )}
 
-        {/* Action Buttons - Clean Row */}
+        {/* Search + Filter Bar */}
+        <div className="flex gap-2">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Поиск по названию или артикулу..."
+              className="w-full bg-slate-900/50 border border-white/5 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-slate-500 focus:border-violet-500/50 focus:outline-none transition-colors"
+            />
+          </div>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`p-3 rounded-xl border transition-colors ${
+              showFilters
+                ? 'bg-violet-500/20 border-violet-500/30 text-violet-400'
+                : 'bg-slate-900/50 border-white/5 text-slate-400 hover:text-white'
+            }`}
+          >
+            <Filter className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Filter Panel (collapsed by default) */}
+        {showFilters && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="p-4 rounded-xl bg-slate-900/50 border border-white/5 space-y-3"
+          >
+            <p className="text-xs text-slate-500 uppercase tracking-wider">Фильтры</p>
+            <div className="flex flex-wrap gap-2">
+              <button className="px-3 py-1.5 rounded-lg bg-violet-500/20 border border-violet-500/30 text-violet-400 text-xs">
+                Все
+              </button>
+              <button className="px-3 py-1.5 rounded-lg bg-slate-800 border border-white/5 text-slate-400 text-xs hover:text-white">
+                Защищённые
+              </button>
+              <button className="px-3 py-1.5 rounded-lg bg-slate-800 border border-white/5 text-slate-400 text-xs hover:text-white">
+                Без защиты
+              </button>
+              <button className="px-3 py-1.5 rounded-lg bg-slate-800 border border-white/5 text-slate-400 text-xs hover:text-white">
+                В убытке
+              </button>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Action Buttons Row */}
         <div className="flex gap-2">
           <button
             onClick={() => {
               hapticFeedback('light');
               setShowBulkStopLoss(true);
             }}
-            className="flex-1 py-3 px-4 rounded-xl bg-violet-500/20 border border-violet-500/30 text-violet-400 font-medium hover:bg-violet-500/30 transition-all flex items-center justify-center gap-2"
+            className="flex-1 py-3 px-4 rounded-xl bg-violet-500/10 border border-violet-500/30 text-violet-400 font-medium hover:bg-violet-500/20 transition-all flex items-center justify-center gap-2"
           >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-            </svg>
-            <span className="text-sm">Включить Сторожа</span>
+            <Shield className="w-4 h-4" />
+            <span className="text-sm">Включить Защиту</span>
           </button>
 
           <button
@@ -170,10 +245,10 @@ export function ProductsPage({ onBack }: ProductsPageProps) {
               hapticFeedback('light');
               setShowBulkCosts(true);
             }}
-            className="py-3 px-4 rounded-xl bg-blue-500/20 border border-blue-500/30 text-blue-400 hover:bg-blue-500/30 transition-all"
+            className="p-3 rounded-xl bg-slate-800/50 border border-white/5 text-slate-400 hover:bg-slate-800 hover:text-white transition-all"
             title="Загрузить себестоимость"
           >
-            📦
+            <Upload className="w-5 h-5" />
           </button>
 
           <button
@@ -181,19 +256,10 @@ export function ProductsPage({ onBack }: ProductsPageProps) {
               hapticFeedback('light');
               setShowLogHistory(true);
             }}
-            className="py-3 px-4 rounded-xl bg-stone-800 border border-stone-700 text-stone-400 hover:bg-stone-700 hover:text-stone-300 transition-all"
+            className="p-3 rounded-xl bg-slate-800/50 border border-white/5 text-slate-400 hover:bg-slate-800 hover:text-white transition-all"
             title="История защиты"
           >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            <History className="w-5 h-5" />
           </button>
         </div>
 
@@ -205,29 +271,36 @@ export function ProductsPage({ onBack }: ProductsPageProps) {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center py-12"
+            className="text-center py-16"
           >
-            <div className="text-5xl mb-4">📦</div>
+            <div className="w-20 h-20 rounded-full bg-slate-800/50 flex items-center justify-center mx-auto mb-4">
+              <Package className="w-10 h-10 text-slate-600" />
+            </div>
             <h3 className="text-lg font-bold text-white mb-2">Нет товаров</h3>
-            <p className="text-stone-400 text-sm max-w-xs mx-auto">
+            <p className="text-slate-400 text-sm max-w-xs mx-auto mb-6">
               Подключите API маркетплейса в настройках, чтобы синхронизировать товары
             </p>
+            <button onClick={onBack} className="btn-primary px-6 py-3">
+              Перейти в настройки
+            </button>
           </motion.div>
         )}
 
-        {/* Hint for Agent */}
+        {/* Agent Hint */}
         {products.length > 0 && (
-          <div className="p-3 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center gap-3">
-            <img
-              src="/agent-avatar.png"
-              alt="Agent"
-              className="w-8 h-8 rounded-full object-cover border border-violet-400/50"
-            />
-            <p className="text-sm text-stone-300 flex-1">
-              💡 Напишите мне «защити все товары» во вкладке{' '}
-              <span className="text-violet-400 font-medium">Агент</span>!
+          <motion.div
+            className="p-4 rounded-xl bg-violet-500/5 border border-violet-500/20 flex items-center gap-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+          >
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-violet-600 shadow-[0_0_20px_rgba(124,58,237,0.3)] shrink-0" />
+            <p className="text-sm text-slate-300 flex-1">
+              💡 Напишите мне{' '}
+              <span className="text-violet-400 font-medium">«защити все товары»</span> во вкладке
+              Агент
             </p>
-          </div>
+          </motion.div>
         )}
       </div>
 

@@ -1,42 +1,59 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 /* ============================================
-   NeuroGUARDIAN — Arborius Design System
-   Dark Stone + Amber + Glassmorphism
+   NeuroGUARDIAN — NEURO-UI V3.1 Design System
+   Obsidian Theme: Cosmic Slate + Electric Violet
+   Inspired by: Linear, Vercel, Binance Pro
    ============================================ */
 
-/* CSS Variables for Arborius Theme */
+/* ============================================
+   🎨 THEME CONFIGURATION
+   ============================================ */
 @theme {
-  /* Stone palette (background) */
-  --color-stone-900: #0c0c0e;
-  --color-stone-800: #151518;
-  --color-stone-700: #1e1e23;
-  --color-stone-600: #2a2a32;
-  --color-stone-500: #3d3d47;
+  /* Background: Deep Space (replacing Stone) */
+  --color-background: #020617; /* Slate-950 - main background */
+  --color-surface: #0f172a; /* Slate-900 - cards */
+  --color-surface-hl: #1e293b; /* Slate-800 - hover states */
+  --color-surface-dim: #0c111c; /* Darker surface for depth */
 
-  /* Amber accent (primary) */
-  --color-amber-500: #f59e0b;
-  --color-amber-400: #fbbf24;
-  --color-amber-300: #fcd34d;
-  --color-amber-600: #d97706;
+  /* Primary: Electric Violet (Intelligence) */
+  --color-primary: #7c3aed; /* Violet-600 */
+  --color-primary-glow: #8b5cf6; /* Violet-500 */
+  --color-primary-dim: rgba(124, 58, 237, 0.1);
+  --color-primary-border: rgba(124, 58, 237, 0.3);
 
-  /* Status colors */
-  --color-safe: #22c55e;
-  --color-danger: #ef4444;
-  --color-warning: #eab308;
+  /* Status Colors (Neon) */
+  --color-success: #10b981; /* Emerald-500 - Profit */
+  --color-warning: #f59e0b; /* Amber-500 - Alerts only */
+  --color-danger: #f43f5e; /* Rose-500 - Loss/Stop-Loss */
+  --color-info: #3b82f6; /* Blue-500 */
 
-  /* Glass effect */
-  --glass-bg: rgba(30, 30, 35, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  /* Text Colors */
+  --color-text-main: #f8fafc; /* Slate-50 */
+  --color-text-dim: #94a3b8; /* Slate-400 */
+  --color-text-muted: #64748b; /* Slate-500 */
+
+  /* Glass Effect */
+  --glass-bg: rgba(15, 23, 42, 0.7);
+  --glass-bg-light: rgba(30, 41, 59, 0.5);
+  --glass-border: rgba(255, 255, 255, 0.05);
+  --glass-border-hover: rgba(124, 58, 237, 0.3);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+
+  /* Neon Shadows */
+  --shadow-neon: 0 0 20px rgba(124, 58, 237, 0.3);
+  --shadow-neon-strong: 0 0 40px rgba(124, 58, 237, 0.5);
+  --shadow-success: 0 0 20px rgba(16, 185, 129, 0.3);
+  --shadow-danger: 0 0 20px rgba(244, 63, 94, 0.3);
 
   /* Typography */
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
-  --font-mono: "JetBrains Mono", "Fira Code", monospace;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Menlo', monospace;
 }
 
-/* Base styles */
+/* ============================================
+   🎯 BASE STYLES
+   ============================================ */
 * {
   box-sizing: border-box;
 }
@@ -50,61 +67,76 @@ html {
 body {
   margin: 0;
   padding: 0;
-  background: linear-gradient(
-    180deg,
-    var(--color-stone-900) 0%,
-    var(--color-stone-800) 100%
-  );
-  color: #e5e5e5;
+  background: var(--color-background);
+  color: var(--color-text-main);
   min-height: 100vh;
   min-height: 100dvh;
 }
 
-/* Scrollbar styling */
+/* Cosmic Background Gradient */
+.bg-cosmic {
+  background:
+    radial-gradient(ellipse at top, rgba(124, 58, 237, 0.15) 0%, transparent 50%),
+    var(--color-background);
+}
+
+/* ============================================
+   📜 SCROLLBAR
+   ============================================ */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--color-stone-800);
+  background: var(--color-surface-dim);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--color-stone-500);
+  background: var(--color-surface-hl);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-amber-500);
+  background: var(--color-primary);
 }
 
 /* ============================================
-   Glassmorphism Components
+   🪟 GLASSMORPHISM COMPONENTS
    ============================================ */
-
 .glass-panel {
   background: var(--glass-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--glass-border);
   border-radius: 16px;
   box-shadow: var(--glass-shadow);
 }
 
 .glass-panel-hover {
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .glass-panel-hover:hover {
-  border-color: rgba(245, 158, 11, 0.3);
-  box-shadow: 0 8px 32px rgba(245, 158, 11, 0.15);
+  border-color: var(--glass-border-hover);
+  box-shadow: var(--shadow-neon);
+}
+
+/* Surface Card */
+.surface-card {
+  background: var(--color-surface);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.surface-card:hover {
+  border-color: var(--color-primary-border);
 }
 
 /* ============================================
-   Status Indicators
+   💡 STATUS INDICATORS
    ============================================ */
-
 .status-dot {
   width: 10px;
   height: 10px;
@@ -112,19 +144,24 @@ body {
 }
 
 .status-safe {
-  background: var(--color-safe);
-  box-shadow: 0 0 8px var(--color-safe);
+  background: var(--color-success);
+  box-shadow: var(--shadow-success);
 }
 
 .status-danger {
   background: var(--color-danger);
-  box-shadow: 0 0 8px var(--color-danger);
+  box-shadow: var(--shadow-danger);
   animation: pulse-danger 1.5s infinite;
 }
 
 .status-warning {
   background: var(--color-warning);
   box-shadow: 0 0 8px var(--color-warning);
+}
+
+.status-primary {
+  background: var(--color-primary);
+  box-shadow: var(--shadow-neon);
 }
 
 @keyframes pulse-danger {
@@ -139,16 +176,34 @@ body {
   }
 }
 
-/* ============================================
-   Typography Utilities
-   ============================================ */
+/* Neon Status Bar (Left Edge) */
+.neon-bar-success {
+  background: var(--color-success);
+  box-shadow: 0 0 10px var(--color-success);
+}
 
-.text-gradient-amber {
-  background: linear-gradient(
-    135deg,
-    var(--color-amber-400),
-    var(--color-amber-600)
-  );
+.neon-bar-danger {
+  background: var(--color-danger);
+  box-shadow: 0 0 10px var(--color-danger);
+}
+
+.neon-bar-primary {
+  background: var(--color-primary);
+  box-shadow: 0 0 10px var(--color-primary);
+}
+
+/* ============================================
+   ✨ TYPOGRAPHY
+   ============================================ */
+.text-gradient-primary {
+  background: linear-gradient(135deg, var(--color-primary-glow), var(--color-primary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.text-gradient-cosmic {
+  background: linear-gradient(135deg, #a78bfa, #7c3aed, #6366f1);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -158,61 +213,112 @@ body {
   font-family: var(--font-mono);
 }
 
-/* ============================================
-   Button Styles
-   ============================================ */
+.text-price {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
 
+/* ============================================
+   🔘 BUTTON STYLES
+   ============================================ */
 .btn-primary {
-  background: linear-gradient(
-    135deg,
-    var(--color-amber-500),
-    var(--color-amber-600)
-  );
-  color: var(--color-stone-900);
+  background: linear-gradient(135deg, var(--color-primary-glow), var(--color-primary));
+  color: white;
   font-weight: 600;
   padding: 12px 24px;
   border-radius: 12px;
   border: none;
   cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-neon);
 }
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
+  box-shadow: var(--shadow-neon-strong);
 }
 
 .btn-primary:active {
   transform: translateY(0);
 }
 
+/* Glow Animation for CTA */
+.btn-glow {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+@keyframes glow-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(124, 58, 237, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(124, 58, 237, 0.6);
+  }
+}
+
 .btn-secondary {
-  background: var(--glass-bg);
-  color: #e5e5e5;
+  background: var(--color-primary-dim);
+  color: var(--color-primary-glow);
   font-weight: 500;
   padding: 12px 24px;
   border-radius: 12px;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--color-primary-border);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .btn-secondary:hover {
-  border-color: var(--color-amber-500);
-  color: var(--color-amber-400);
+  background: rgba(124, 58, 237, 0.2);
+  border-color: var(--color-primary);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--color-text-dim);
+  font-weight: 500;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-ghost:hover {
+  background: var(--color-surface-hl);
+  color: var(--color-text-main);
+}
+
+/* SMM Button Style */
+.btn-smm {
+  background: var(--color-primary-dim);
+  color: var(--color-primary-glow);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-smm:hover {
+  background: rgba(124, 58, 237, 0.2);
 }
 
 /* ============================================
-   Input Styles
+   📝 INPUT STYLES
    ============================================ */
-
 .input-field {
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--color-surface-dim);
   border: 1px solid var(--glass-border);
   border-radius: 12px;
   padding: 14px 16px;
-  color: #e5e5e5;
+  color: var(--color-text-main);
   font-size: 16px;
   width: 100%;
   transition: all 0.2s ease;
@@ -220,18 +326,125 @@ body {
 }
 
 .input-field:focus {
-  border-color: var(--color-amber-500);
-  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-dim);
 }
 
 .input-field::placeholder {
-  color: #666;
+  color: var(--color-text-muted);
 }
 
 /* ============================================
-   Animation Utilities
+   🎭 BADGES
    ============================================ */
+.badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
 
+.badge-primary {
+  background: var(--color-primary-dim);
+  color: var(--color-primary-glow);
+  border: 1px solid var(--color-primary-border);
+}
+
+.badge-success {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--color-success);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.badge-danger {
+  background: rgba(244, 63, 94, 0.1);
+  color: var(--color-danger);
+  border: 1px solid rgba(244, 63, 94, 0.3);
+}
+
+.badge-hit {
+  background: linear-gradient(135deg, var(--color-primary-glow), var(--color-primary));
+  color: white;
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+/* Marketplace Badges */
+.badge-wb {
+  background: rgba(138, 43, 226, 0.1);
+  color: #a855f7;
+  border: 1px solid rgba(138, 43, 226, 0.3);
+}
+
+.badge-ozon {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+/* ============================================
+   🃏 CARD STYLES
+   ============================================ */
+.product-card {
+  position: relative;
+  background: var(--color-surface);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  padding: 16px;
+  overflow: hidden;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.product-card:hover {
+  border-color: var(--color-primary-border);
+  box-shadow: var(--shadow-neon);
+}
+
+/* Status Bar on Left Edge */
+.product-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--card-status-color, var(--color-surface-hl));
+}
+
+.product-card.safe::before {
+  --card-status-color: var(--color-success);
+  box-shadow: 0 0 8px var(--color-success);
+}
+
+.product-card.danger::before {
+  --card-status-color: var(--color-danger);
+  box-shadow: 0 0 8px var(--color-danger);
+}
+
+/* Subscription Tier Card */
+.tier-card {
+  background: var(--color-surface);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 24px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tier-card:hover {
+  border-color: var(--color-primary-border);
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-neon);
+}
+
+.tier-card.popular {
+  border-color: var(--color-primary);
+  background: linear-gradient(180deg, rgba(124, 58, 237, 0.1) 0%, var(--color-surface) 100%);
+}
+
+/* ============================================
+   ⚡ ANIMATIONS
+   ============================================ */
 .animate-fade-in {
   animation: fadeIn 0.3s ease-out;
 }
@@ -260,4 +473,129 @@ body {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Neon Sphere Animation (for Agent Avatar) */
+.neon-sphere {
+  position: relative;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 30% 30%,
+    var(--color-primary-glow),
+    var(--color-primary),
+    #4c1d95
+  );
+  box-shadow:
+    0 0 60px rgba(124, 58, 237, 0.5),
+    inset 0 0 40px rgba(255, 255, 255, 0.1);
+  animation: sphere-pulse 3s ease-in-out infinite;
+}
+
+@keyframes sphere-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 60px rgba(124, 58, 237, 0.4),
+      inset 0 0 40px rgba(255, 255, 255, 0.1);
+  }
+  50% {
+    box-shadow:
+      0 0 80px rgba(124, 58, 237, 0.6),
+      inset 0 0 50px rgba(255, 255, 255, 0.2);
+  }
+}
+
+/* Avatar Ring Glow */
+.avatar-ring {
+  position: relative;
+}
+
+.avatar-ring::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--color-primary-glow), var(--color-primary));
+  z-index: -1;
+  opacity: 0.7;
+}
+
+/* ============================================
+   🏷️ TAB BAR
+   ============================================ */
+.tab-bar {
+  background: rgba(2, 6, 23, 0.95);
+  backdrop-filter: blur(16px);
+  border-top: 1px solid var(--glass-border);
+}
+
+.tab-item {
+  color: var(--color-text-dim);
+  transition: all 0.2s ease;
+}
+
+.tab-item.active {
+  color: var(--color-primary-glow);
+}
+
+.tab-item.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40%;
+  height: 2px;
+  background: var(--color-primary);
+  border-radius: 1px;
+}
+
+/* ============================================
+   🌌 BENTO GRID
+   ============================================ */
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.bento-item {
+  background: var(--glass-bg-light);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 16px;
+  backdrop-filter: blur(8px);
+  transition: all 0.2s ease;
+}
+
+.bento-item:hover {
+  border-color: var(--color-primary-border);
+  background: rgba(30, 41, 59, 0.7);
+}
+
+/* ============================================
+   ✅ CHECKMARK STYLES
+   ============================================ */
+.check-success {
+  color: var(--color-success);
+}
+
+.check-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  color: var(--color-text-dim);
+}
+
+.check-list li svg {
+  color: var(--color-success);
+  flex-shrink: 0;
+}
+
+/* ============================================
+   📱 SAFE AREA (iOS)
+   ============================================ */
+.safe-area-inset-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }

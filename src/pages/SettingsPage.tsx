@@ -621,7 +621,7 @@ export function SettingsPage({
       {/* Price Guard Buffer Settings */}
       <section className="mb-6">
         <h3 className="text-sm font-medium text-stone-400 uppercase tracking-wider mb-3">
-          🛡️ Настройки Сторожа
+          🛡️ Настройки Sentinel
         </h3>
 
         <div className="glass-panel p-4 space-y-5">
@@ -702,7 +702,7 @@ export function SettingsPage({
               <span>25%</span>
             </div>
             <p className="text-xs text-stone-500 mt-2">
-              ⚠️ Получите предупреждение, когда цена приблизится к лимиту (до срабатывания Сторожа)
+              ⚠️ Получите предупреждение, когда цена приблизится к лимиту (до срабатывания Sentinel)
             </p>
           </div>
 
@@ -716,7 +716,7 @@ export function SettingsPage({
               <strong>{Math.round(1000 * (1 + (user?.priceBufferPercent ?? 5) / 100))}₽</strong>
             </p>
             <p className="text-xs text-stone-500 mt-1">
-              Сторож сработает, если цена упадёт ниже этого значения
+              Sentinel сработает, если цена упадёт ниже этого значения
             </p>
           </div>
         </div>

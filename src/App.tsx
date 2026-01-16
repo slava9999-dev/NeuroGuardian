@@ -30,41 +30,51 @@ const GodModePage = lazy(() =>
   import('./pages/GodModePage').then(m => ({ default: m.GodModePage }))
 );
 
-// Loading screen with agent branding
+// Loading screen with NEURO-UI V3.1 branding
 function LoadingScreen() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-linear-to-b from-stone-900 to-stone-800">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#020617]">
+      {/* Cosmic Background Glow */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(124,58,237,0.15)_0%,transparent_50%)]" />
+
       <motion.div
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="text-center"
+        className="text-center relative z-10"
       >
-        {/* Agent Avatar */}
+        {/* Neon Sphere (Agent Brain) */}
         <motion.div
-          className="relative mx-auto mb-6"
+          className="relative mx-auto mb-8"
           animate={{
-            scale: [1, 1.02, 1],
+            scale: [1, 1.05, 1],
           }}
-          transition={{ duration: 2, repeat: Infinity }}
+          transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
         >
-          <div className="absolute inset-0 rounded-full bg-linear-to-r from-violet-500 to-purple-500 blur-xl opacity-50" />
-          <img
-            src="/agent-avatar.png"
-            alt="NeuroAgent"
-            className="relative w-24 h-24 rounded-full object-cover border-2 border-violet-400/50"
+          <div className="w-24 h-24 neon-sphere" />
+          <motion.div
+            className="absolute inset-0 rounded-full"
+            animate={{ opacity: [0.3, 0.6, 0.3] }}
+            transition={{ duration: 2, repeat: Infinity }}
+            style={{
+              background: 'radial-gradient(circle, rgba(139,92,246,0.4) 0%, transparent 70%)',
+              filter: 'blur(20px)',
+            }}
           />
         </motion.div>
 
         {/* Title */}
-        <h1 className="text-2xl font-bold text-white mb-2">NeuroAgent</h1>
-        <p className="text-stone-400 text-sm mb-6">Загрузка вашего помощника...</p>
+        <h1 className="text-2xl font-bold text-white mb-2">NeuroGuardian</h1>
+        <p className="text-slate-400 text-sm mb-6">Инициализация системы защиты...</p>
 
-        {/* Loading spinner */}
-        <motion.div
-          className="w-8 h-8 border-3 border-violet-500 border-t-transparent rounded-full mx-auto"
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-        />
+        {/* Loading bar */}
+        <div className="w-48 h-1 bg-slate-800 rounded-full overflow-hidden mx-auto">
+          <motion.div
+            className="h-full bg-gradient-to-r from-violet-600 to-violet-500 rounded-full"
+            initial={{ width: '0%' }}
+            animate={{ width: '100%' }}
+            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+          />
+        </div>
       </motion.div>
     </div>
   );
@@ -281,29 +291,28 @@ function App() {
         {currentPage === 'god-mode' && <GodModePage />}
       </Suspense>
 
-      {/* Bottom Tab Bar - Simplified */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-stone-900/95 backdrop-blur-md border-t border-stone-800 safe-area-inset-bottom z-40">
+      {/* Bottom Tab Bar - NEURO-UI V3.1 */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-[#020617]/95 backdrop-blur-xl border-t border-white/5 safe-area-inset-bottom z-40">
         <div className="flex justify-around py-2">
           {/* Agent Tab - Primary */}
           <button
             onClick={goToAgent}
             className={`flex flex-col items-center gap-1 px-5 py-2 transition-all relative ${
-              currentPage === 'agent' ? 'text-violet-400' : 'text-stone-400 hover:text-stone-200'
+              currentPage === 'agent' ? 'text-violet-400' : 'text-slate-500 hover:text-slate-300'
             }`}
           >
             {currentPage === 'agent' && (
               <motion.div
                 layoutId="tab-indicator"
-                className="absolute inset-0 rounded-xl bg-violet-500/15"
+                className="absolute inset-0 rounded-xl bg-violet-500/10"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
               />
             )}
             <div className="relative">
-              <img
-                src="/agent-avatar.png"
-                alt="Agent"
-                className="w-6 h-6 rounded-full object-cover"
+              {/* Neon sphere mini icon */}
+              <div
+                className={`w-6 h-6 rounded-full ${currentPage === 'agent' ? 'bg-gradient-to-br from-violet-500 to-violet-600 shadow-[0_0_12px_rgba(124,58,237,0.5)]' : 'bg-slate-700'}`}
               />
               {currentPage !== 'agent' && (
                 <motion.span
@@ -320,13 +329,13 @@ function App() {
           <button
             onClick={goToProducts}
             className={`flex flex-col items-center gap-1 px-5 py-2 transition-all relative ${
-              currentPage === 'products' ? 'text-amber-400' : 'text-stone-400 hover:text-stone-200'
+              currentPage === 'products' ? 'text-violet-400' : 'text-slate-500 hover:text-slate-300'
             }`}
           >
             {currentPage === 'products' && (
               <motion.div
                 layoutId="tab-indicator"
-                className="absolute inset-0 rounded-xl bg-amber-500/15"
+                className="absolute inset-0 rounded-xl bg-violet-500/10"
               />
             )}
             <svg
@@ -335,7 +344,7 @@ function App() {
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth="2"
+              strokeWidth="1.5"
               className="relative"
             >
               <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
@@ -349,13 +358,13 @@ function App() {
           <button
             onClick={goToSettings}
             className={`flex flex-col items-center gap-1 px-5 py-2 transition-all relative ${
-              currentPage === 'settings' ? 'text-amber-400' : 'text-stone-400 hover:text-stone-200'
+              currentPage === 'settings' ? 'text-violet-400' : 'text-slate-500 hover:text-slate-300'
             }`}
           >
             {currentPage === 'settings' && (
               <motion.div
                 layoutId="tab-indicator"
-                className="absolute inset-0 rounded-xl bg-amber-500/15"
+                className="absolute inset-0 rounded-xl bg-violet-500/10"
               />
             )}
             <svg
@@ -364,7 +373,7 @@ function App() {
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth="2"
+              strokeWidth="1.5"
               className="relative"
             >
               <circle cx="12" cy="12" r="3" />
@@ -377,13 +386,13 @@ function App() {
           <button
             onClick={goToInfo}
             className={`flex flex-col items-center gap-1 px-5 py-2 transition-all relative ${
-              currentPage === 'info' ? 'text-amber-400' : 'text-stone-400 hover:text-stone-200'
+              currentPage === 'info' ? 'text-violet-400' : 'text-slate-500 hover:text-slate-300'
             }`}
           >
             {currentPage === 'info' && (
               <motion.div
                 layoutId="tab-indicator"
-                className="absolute inset-0 rounded-xl bg-amber-500/15"
+                className="absolute inset-0 rounded-xl bg-violet-500/10"
               />
             )}
             <svg
@@ -392,7 +401,7 @@ function App() {
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth="2"
+              strokeWidth="1.5"
               className="relative"
             >
               <circle cx="12" cy="12" r="10" />

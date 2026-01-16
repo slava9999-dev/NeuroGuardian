@@ -224,7 +224,7 @@ export function LogHistory({ isOpen, onClose }: LogHistoryProps) {
                   <span className="text-4xl mb-4 block">🛡️</span>
                   <p className="text-stone-400 font-medium">Пока нет срабатываний</p>
                   <p className="text-stone-500 text-sm mt-2">
-                    Виктор ИИ отслеживает цены ваших товаров
+                    NeuroGuardian AI отслеживает цены ваших товаров
                   </p>
                 </div>
               ) : (
