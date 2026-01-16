@@ -124,6 +124,9 @@ import {
 // Marketplace Accounts
 import { handleMarketplaceAccounts } from '../src/api-lib/handlers/marketplace-accounts.js';
 
+// Content Generation (SMM Module)
+import { handleGenerateContent, handleContentQuota } from '../src/api-lib/handlers/content.js';
+
 // // n8n Webhooks (DISABLED)
 // import {
 //   handleN8nPriceCheck,
@@ -370,6 +373,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           'batch-update-costs': handleBatchUpdateCosts,
           'sentinel-logs': handleSentinelLogs,
           'loss-products': handleLossProducts,
+          'generate-content': handleGenerateContent,
+          'content-quota': handleContentQuota,
         };
         // ENFORCE SUBSCRIPTION
         return withSubscription(req, res, handlers[action], auth.context.userId);
