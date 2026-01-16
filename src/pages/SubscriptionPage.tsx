@@ -5,7 +5,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, ArrowLeft, Zap, Crown, Package, Shield } from 'lucide-react';
+import { Check, ArrowLeft, Zap, Crown, Package } from 'lucide-react';
 import { useAppStore } from '../stores';
 import { paymentApi } from '../lib/api';
 import { hapticFeedback } from '../lib/telegram';
@@ -94,7 +94,7 @@ export function SubscriptionPage({ onBack }: SubscriptionPageProps) {
       } else {
         setError(result.error || 'Ошибка инициализации шлюза');
       }
-    } catch (err) {
+    } catch (_) {
       setError('Сервис оплаты временно недоступен');
     } finally {
       setLoading(false);

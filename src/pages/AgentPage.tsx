@@ -6,21 +6,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAppStore, useChatStore, type ChatMessage } from '../stores';
-import { hapticFeedback, openExternalLink } from '../lib/telegram';
+import { hapticFeedback } from '../lib/telegram';
 import { agentApi, type AgentMessage, type AgentResponse } from '../lib/agentApi';
-import { HelpModal } from '../components/ui/HelpModal';
-import {
-  Send,
-  Mic,
-  Paperclip,
-  Plus,
-  Zap,
-  Shield,
-  TrendingUp,
-  Calculator,
-  MoreVertical,
-  MinusCircle,
-} from 'lucide-react';
+
+import { Send, Mic, Paperclip, Zap, TrendingUp, Calculator } from 'lucide-react';
 import DOMPurify from 'dompurify';
 
 export function AgentPage() {
@@ -35,8 +24,8 @@ export function AgentPage() {
   const isSynced = useChatStore(state => state.isSynced);
 
   const [inputValue, setInputValue] = useState('');
-  const [isListening, setIsListening] = useState(false);
-  const [showTutorial, setShowTutorial] = useState(false);
+  const [isListening] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -94,9 +83,11 @@ export function AgentPage() {
         actionRequired: response.actionRequired,
         metadata: response.metadata,
       });
-      if (response.showTutorial) setShowTutorial(true);
+      if (response.showTutorial) {
+        // Tutorial trigger logic here if needed
+      }
       hapticFeedback('success');
-    } catch (error) {
+    } catch (_) {
       removeLoadingMessages();
       addMessage({
         id: `error-${Date.now()}`,
@@ -233,7 +224,7 @@ export function AgentPage() {
 
       {/* Messages Scroll Area */}
       <div className="flex-1 overflow-y-auto px-5 py-24 space-y-8 scroll-smooth no-scrollbar">
-        {messages.map((m, idx) => (
+        {messages.map(m => (
           <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             {m.isLoading ? <LoadingDots /> : <MessageUI message={m} />}
           </div>
