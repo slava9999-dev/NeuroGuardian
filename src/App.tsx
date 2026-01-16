@@ -4,7 +4,7 @@
 // ============================================
 
 import React, { useEffect, useState, useRef, lazy, Suspense } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useAppStore, useProductsStore } from './stores';
 import { initTelegramWebApp, isTelegramWebApp, getInitData, hapticFeedback } from './lib/telegram';
 import { authApi, productsApi } from './lib/api';

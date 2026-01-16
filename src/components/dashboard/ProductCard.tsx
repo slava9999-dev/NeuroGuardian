@@ -4,7 +4,7 @@
 // Interaction: Tactile Physical Response
 // ============================================
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Shield,
@@ -59,7 +59,7 @@ export function ProductCard({
     }
   };
 
-  const isProtected = product.protectionEnabled;
+  const isProtected = product.status === 'protected';
   const isProfitable = product.currentPrice - (product.costPrice || 0) > 0;
   const profitColor = isProfitable ? 'text-lime-400' : 'text-red-500';
 
@@ -116,14 +116,14 @@ export function ProductCard({
                 {product.title}
               </h3>
               <p className="text-[9px] mono-data text-zinc-600 mt-0.5">
-                ID: {product.nm_id || product.id}
+                ID: {product.nmId || product.productId || product.id}
               </p>
             </div>
             <motion.button
               whileTap={{ scale: 0.9 }}
               onClick={() => {
                 hapticFeedback('light');
-                openExternalLink(product.url || '');
+                openExternalLink((product as any).url || '#');
               }}
               className="p-1.5 hover:text-indigo-400 transition-colors"
             >

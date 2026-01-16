@@ -26,7 +26,7 @@ export class SentinelAlertSender {
         await notificationService.sendTelegramNotification(member.id, message);
         notifiedIds.add(member.id);
       } catch (e) {
-        logger.warn(`Failed to send report to team member ${member.id}`, e);
+        logger.warn(`Failed to send report to team member ${member.id}`, e as any);
       }
     }
   }
@@ -60,7 +60,7 @@ export class SentinelAlertSender {
         });
         notifiedIds.add(member.id);
       } catch (e) {
-        logger.warn(`Failed to send threat alert to team member ${member.id}`, e);
+        logger.warn(`Failed to send threat alert to team member ${member.id}`, e as any);
       }
     }
   }

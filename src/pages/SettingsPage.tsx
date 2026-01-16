@@ -7,31 +7,22 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
-  User,
   Plus,
   Trash2,
   Edit3,
   Shield,
-  Zap,
   CreditCard,
   RefreshCcw,
   Store,
   CheckCircle2,
-  AlertTriangle,
-  Settings,
-  Target,
+  MinusCircle,
+  Crown,
 } from 'lucide-react';
-import { useAppStore, useProductsStore } from '../stores';
+import { useAppStore } from '../stores';
 import { hapticFeedback } from '../lib/telegram';
-import { PaymentModal } from '../components/ui/PaymentModal';
-import {
-  settingsApi,
-  productsApi,
-  marketplaceAccountsApi,
-  type MarketplaceAccount,
-} from '../lib/api';
+import { settingsApi, marketplaceAccountsApi, type MarketplaceAccount } from '../lib/api';
 import { SecurityBadge } from '../components/ui/SecurityBadge';
-import type { DefenseMode, Product } from '../types';
+import type { DefenseMode } from '../types';
 
 export function SettingsPage({
   onBack,
@@ -41,10 +32,8 @@ export function SettingsPage({
   onNavigate?: (page: string) => void;
 }) {
   const { user, defenseMode, setDefenseMode, setUser } = useAppStore();
-  const { setProducts } = useProductsStore();
   const [isSaving, setIsSaving] = useState(false);
-  const [showPayment, setShowPayment] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<string | null>(null);
+  const [syncStatus] = useState<string | null>(null);
 
   // Multi-account state
   const [accounts, setAccounts] = useState<MarketplaceAccount[]>([]);

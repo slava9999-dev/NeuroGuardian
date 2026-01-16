@@ -25,10 +25,6 @@ function getPool(): pkg.Pool {
     throw new Error('DATABASE_URL or POSTGRES_URL is not configured');
   }
 
-  const isLocalhost =
-    connectionString.includes('localhost') || connectionString.includes('127.0.0.1');
-  const hasSslMode = connectionString.includes('sslmode=');
-
   // Force SSL settings for stability on Node 25+ / Neon
   const poolConfig: PoolConfig = {
     connectionString,
