@@ -20,9 +20,10 @@ export class MarketplaceAccountRepository {
       const account = result.rows[0];
       if (!account) return keys;
 
-      if (account.marketplace === 'wb' && account.wb_token) {
+      const mkt = account.marketplace?.toLowerCase();
+      if (mkt === 'wb' && account.wb_token) {
         keys.wb = decryptApiKey(account.wb_token);
-      } else if (account.marketplace === 'ozon' && account.ozon_client_id && account.ozon_api_key) {
+      } else if (mkt === 'ozon' && account.ozon_client_id && account.ozon_api_key) {
         const clientId = decryptApiKey(account.ozon_client_id);
         const apiKey = decryptApiKey(account.ozon_api_key);
         if (clientId && apiKey) {

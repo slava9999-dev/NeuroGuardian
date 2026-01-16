@@ -630,7 +630,7 @@ export class OzonService {
           dir: 'ASC',
           filter: {
             since: dateFrom.toISOString(),
-            status: 'delivered',
+            to: new Date().toISOString(),
           },
           limit: 1000,
         }),
@@ -653,7 +653,7 @@ export class OzonService {
           dir: 'ASC',
           filter: {
             since: dateFrom.toISOString(),
-            status: 'delivered',
+            to: new Date().toISOString(),
           },
           limit: 1000,
         }),

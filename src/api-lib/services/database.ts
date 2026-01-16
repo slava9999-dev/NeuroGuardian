@@ -29,15 +29,14 @@ function getPool(): pkg.Pool {
     connectionString.includes('localhost') || connectionString.includes('127.0.0.1');
   const hasSslMode = connectionString.includes('sslmode=');
 
+  // Force SSL settings for stability on Node 25+ / Neon
   const poolConfig: PoolConfig = {
     connectionString,
-    // Vercel Postgres/Neon requires SSL in production, but localhost doesn't
-    ssl: isLocalhost || hasSslMode ? undefined : { rejectUnauthorized: false },
-    max: 20,
-    idleTimeoutMillis: 60000, // Increase idle timeout
-    connectionTimeoutMillis: 90000, // Wait up to 1.5 min for a connection
+    ssl: { rejectUnauthorized: false }, // Force accept certs
+    max: 1, // Force sequential execution to prevent connection drops
+    idleTimeoutMillis: 5000, // Close idle quickly
+    connectionTimeoutMillis: 10000,
     keepAlive: true,
-    keepAliveInitialDelayMillis: 500, // Very aggressive keep-alive
   };
 
   _pool = new Pool(poolConfig);
@@ -57,57 +56,49 @@ function getPool(): pkg.Pool {
  */
 async function executeWithRetry(text: string, values: unknown[]): Promise<QueryResult> {
   const pool = getPool();
-  const retries = 5; // Increased retries for unstable environments
+  const retries = 3; // Lower retries for faster debugging
   let attempt = 0;
 
   while (attempt < retries) {
     attempt++;
     let client: PoolClient | null = null;
-    const clientErrorHandler = (_err: Error) => {
-      // Internal error handler to prevent unhandled 'error' event
-    };
 
     try {
-      // 1. Connect with timeout
-      const clientPromise = pool.connect();
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('DB_CONNECT_TIMEOUT')), 20000)
-      );
+      // 1. Dedicated connection with detailed error capture
+      client = await pool.connect();
 
-      client = await (Promise.race([clientPromise, timeoutPromise]) as Promise<PoolClient>);
-      client.on('error', clientErrorHandler);
-
-      // 2. Execute with timeout
-      const queryPromise = client.query(text, values);
-      const queryTimeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('DB_QUERY_TIMEOUT')), 90000)
-      );
-
-      const res = await (Promise.race([queryPromise, queryTimeout]) as Promise<QueryResult>);
+      // 2. Execute with standard PG timeout (90s)
+      const res = await client.query(text, values);
       return res;
     } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
+      const err = error as Error;
+      const msg = err.message || String(error);
+
       const isTransient =
         msg.includes('timeout') ||
         msg.includes('terminated') ||
-        msg.includes('unexpected') ||
         msg.includes('RESET') ||
         msg.includes('SSL') ||
-        msg.includes('ECONNRESET') ||
-        msg.includes('DB_CONNECT_TIMEOUT') ||
-        msg.includes('DB_QUERY_TIMEOUT');
+        msg.includes('ECONNRESET');
 
       if (isTransient && attempt < retries) {
-        console.warn(`[Database] Attempt ${attempt}/${retries} failed: ${msg}. Retrying...`);
-        // Exponential backoff
-        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt - 1)));
+        console.error(
+          `[Database] ⚠️ Attempt ${attempt} failed: ${msg}. Stack: ${err.stack?.split('\n')[1]}`
+        );
+        await new Promise(r => setTimeout(r, 500)); // Quicker retry
         continue;
       }
+
+      // Log full error for terminal debugging
+      console.error('[Database] ❌ Critical DB Error:', {
+        message: msg,
+        query: text.substring(0, 100) + '...',
+        attempt,
+      });
       throw error;
     } finally {
       if (client) {
-        client.removeListener('error', clientErrorHandler);
-        client.release();
+        client.release(true); // Force destroy connection on error/finish to ensure fresh start
       }
     }
   }
@@ -957,7 +948,7 @@ export async function getSalesHistory(
   if (accountId) {
     const result = await sql`
       SELECT * FROM marketplace_orders
-      WHERE user_id = ${userId}
+      WHERE user_id::text = ${userId}::text
         AND account_id = ${accountId}
         AND order_date >= ${dateFrom.toISOString()}
         AND order_date <= ${dateTo.toISOString()}

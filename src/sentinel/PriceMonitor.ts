@@ -11,30 +11,52 @@ export class SentinelPriceMonitor implements PriceMonitor {
       errors: [] as string[],
     };
 
-    // Group products by marketplace to optimize calls
-    // Note: This implementation currently uses the user's primary/legacy keys.
-    // TODO: Support multi-account monitoring by grouping by account_id.
-    const wbProducts = products.filter(p => p.marketplace === 'WB');
-    const ozonProducts = products.filter(p => p.marketplace === 'Ozon');
+    // 1. Group products by (account_id, marketplace) to support true Multi-Account
+    const groups = new Map<
+      string,
+      {
+        accountId: number | undefined;
+        marketplace: 'WB' | 'Ozon';
+        products: DBProduct[];
+      }
+    >();
 
-    // --- WB Monitoring ---
-    if (wbProducts.length > 0) {
-      const nmIds = wbProducts.map(p => p.nm_id).filter((id): id is string => id !== null);
-      if (nmIds.length > 0) {
+    for (const p of products) {
+      const mkt = p.marketplace as 'WB' | 'Ozon';
+      const accId = p.account_id || undefined;
+      const key = `${accId || 'legacy'}-${mkt}`;
+
+      if (!groups.has(key)) {
+        groups.set(key, { accountId: accId, marketplace: mkt, products: [] });
+      }
+      groups.get(key)!.products.push(p);
+    }
+
+    // 2. Process each group independently
+    for (const group of groups.values()) {
+      const { accountId, marketplace, products: groupProducts } = group;
+
+      if (marketplace === 'WB') {
+        const nmIds = groupProducts.map(p => p.nm_id).filter((id): id is string => id !== null);
+        if (nmIds.length === 0) continue;
+
         try {
-          logger.debug('[PriceMonitor] Calling WB API...', {
+          logger.debug(`[PriceMonitor] WB fetch for Account ${accountId || 'Legacy'}`, {
             userId: user.id,
             count: nmIds.length,
           });
-          const result = await marketplaceService.fetchCurrentPrices(user.id, 'WB', nmIds);
-          logger.info(`[PriceMonitor] WB Result: ${result.prices.size} prices`, {
-            userId: user.id,
-            found: result.prices.size,
-            requested: nmIds.length,
-          });
+
+          const result = await marketplaceService.fetchCurrentPrices(
+            Number(user.id),
+            'WB',
+            nmIds,
+            accountId
+          );
 
           if (result.errors) {
-            prices.errors.push(...result.errors.map(e => `WB (User ${user.id}): ${e}`));
+            prices.errors.push(
+              ...result.errors.map(e => `WB (Acc ${accountId || 'Legacy'}): ${e}`)
+            );
           }
 
           for (const [id, price] of result.prices.entries()) {
@@ -42,37 +64,38 @@ export class SentinelPriceMonitor implements PriceMonitor {
           }
         } catch (err) {
           prices.errors.push(
-            `WB Monitor Error (User ${user.id}): ${err instanceof Error ? err.message : String(err)}`
+            `WB Error (Acc ${accountId || 'Legacy'}): ${err instanceof Error ? err.message : String(err)}`
           );
         }
       }
-    }
 
-    // --- Ozon Monitoring ---
-    if (ozonProducts.length > 0) {
-      const ozonIds = ozonProducts
-        .map(p => parseInt(p.product_id.replace('ozon-', '')))
-        .filter(id => !isNaN(id) && id > 0);
+      if (marketplace === 'Ozon') {
+        const ozonIds = groupProducts
+          .map(p => {
+            const pid = p.product_id;
+            return pid.startsWith('ozon-') ? parseInt(pid.replace('ozon-', '')) : parseInt(pid);
+          })
+          .filter(id => !isNaN(id) && id > 0);
 
-      if (ozonIds.length > 0) {
+        if (ozonIds.length === 0) continue;
+
         try {
-          logger.debug('[PriceMonitor] Calling Ozon API...', {
+          logger.debug(`[PriceMonitor] Ozon fetch for Account ${accountId || 'Legacy'}`, {
             userId: user.id,
             count: ozonIds.length,
           });
-          const result = await marketplaceService.fetchCurrentPrices(user.id, 'Ozon', ozonIds);
-          logger.info(`[PriceMonitor] Ozon Result: ${result.prices.size} prices`, {
-            userId: user.id,
-            found: result.prices.size,
-            requested: ozonIds.length,
-          });
+
+          const result = await marketplaceService.fetchCurrentPrices(
+            Number(user.id),
+            'Ozon',
+            ozonIds,
+            accountId
+          );
 
           if (result.errors) {
-            prices.errors.push(...result.errors.map(e => `Ozon (User ${user.id}): ${e}`));
-          } else if (result.prices.size === 0) {
-            const msg = `Ozon Monitor Warning: API returned 0 prices for ${ozonIds.length} products (User ${user.id})`;
-            prices.errors.push(msg);
-            logger.warn(msg, { userId: user.id });
+            prices.errors.push(
+              ...result.errors.map(e => `Ozon (Acc ${accountId || 'Legacy'}): ${e}`)
+            );
           }
 
           for (const [id, price] of result.prices.entries()) {
@@ -80,7 +103,7 @@ export class SentinelPriceMonitor implements PriceMonitor {
           }
         } catch (err) {
           prices.errors.push(
-            `Ozon Monitor Error (User ${user.id}): ${err instanceof Error ? err.message : String(err)}`
+            `Ozon Error (Acc ${accountId || 'Legacy'}): ${err instanceof Error ? err.message : String(err)}`
           );
         }
       }

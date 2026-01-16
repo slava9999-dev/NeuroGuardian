@@ -1,7 +1,14 @@
+// ============================================
+// NeuroGUARDIAN — Subscription Page V4.0
+// Premium Professional Upgrades: Pitch Black & Cyber Accents
+// ============================================
+
 import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Check, ArrowLeft, Zap, Crown, Package, Shield } from 'lucide-react';
 import { useAppStore } from '../stores';
 import { paymentApi } from '../lib/api';
+import { hapticFeedback } from '../lib/telegram';
 
 interface SubscriptionTier {
   id: string;
@@ -17,41 +24,38 @@ interface SubscriptionTier {
 const TIERS: SubscriptionTier[] = [
   {
     id: 'free',
-    name: 'Старт',
+    name: 'BASIC',
     price: 0,
     currency: 'RUB',
     productLimit: 10,
     shopLimit: 1,
-    features: ['10 товаров', '1 магазин', 'Базовая защита', 'Ручной запуск'],
-  },
-  {
-    id: 'basic',
-    name: 'Базовый',
-    price: 999,
-    currency: 'RUB',
-    productLimit: 50,
-    shopLimit: 1,
-    isPopular: true,
-    features: ['50 товаров', '1 магазин', 'Авто-защита 24/7', 'Умные уведомления', 'AI аналитика'],
+    features: [
+      '10 товаров под защитой',
+      '1 магазин (WB/Ozon)',
+      'Sentinel: Базовая детекция',
+      'Ручной перезапуск',
+    ],
   },
   {
     id: 'pro',
-    name: 'Про',
+    name: 'PROFESSIONAL',
     price: 2999,
     currency: 'RUB',
     productLimit: 500,
     shopLimit: 3,
+    isPopular: true,
     features: [
-      '500 товаров',
-      '3 магазина',
-      'Приоритетная поддержка',
-      'Расширенная аналитика',
-      'Экспорт отчетов',
+      '500 товаров под защитой',
+      '3 магазина одновременно',
+      'Sentinel: HARD MODE (24/7)',
+      'Digital Vision: Парсинг цен',
+      'SMM-Ассистент (Unlimited)',
+      'Приоритетный AI-канал',
     ],
   },
   {
     id: 'business',
-    name: 'Бизнес',
+    name: 'ENTERPRISE',
     price: 9999,
     currency: 'RUB',
     productLimit: 999999,
@@ -59,9 +63,10 @@ const TIERS: SubscriptionTier[] = [
     features: [
       'Безлимит товаров',
       '10 магазинов',
-      'Персональный менеджер',
-      'API доступ',
-      'White label (soon)',
+      'Sentinel: Ultra-Low Latency',
+      'Командный доступ',
+      'Персональный архитектор',
+      'API интеграции',
     ],
   },
 ];
@@ -72,99 +77,90 @@ interface SubscriptionPageProps {
 
 export function SubscriptionPage({ onBack }: SubscriptionPageProps) {
   const user = useAppStore(state => state.user);
-  const [selectedTier, setSelectedTier] = useState<string>(user?.subscriptionPlan || 'basic');
+  const [selectedTier, setSelectedTier] = useState<string>(user?.subscriptionPlan || 'pro');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubscribe = async (tierId: string) => {
-    if (tierId === 'free') return; // Cannot "subscribe" to free manually here, usually default
+    if (tierId === 'free' || tierId === user?.subscriptionPlan) return;
 
+    hapticFeedback('medium');
     setLoading(true);
     setError(null);
     try {
       const result = await paymentApi.createPayment({ tier: tierId });
       if (result.confirmationUrl) {
-        // Redirect to YooKassa
         window.location.href = result.confirmationUrl;
       } else {
-        setError(result.error || 'Не удалось создать платеж');
+        setError(result.error || 'Ошибка инициализации шлюза');
       }
     } catch (err) {
-      console.error('Payment error:', err);
-      setError('Ошибка при создании платежа');
+      setError('Сервис оплаты временно недоступен');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-stone-900 text-white pb-24 relative overflow-hidden">
-      {/* Background Gradients */}
-      <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-violet-900/20 rounded-full blur-[100px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-amber-900/10 rounded-full blur-[100px]" />
-      </div>
+    <div className="min-h-screen bg-black text-white pb-32 relative overflow-x-hidden bg-cyber">
+      {/* Dynamic Background Glow */}
+      <div className="bg-glow-spot top-[-20%] left-[-10%]" />
+      <div className="bg-glow-spot bottom-[-10%] right-[-10%] opacity-50" />
 
       {/* Header */}
-      <div className="relative z-10 p-4 flex items-center gap-4 bg-stone-900/80 backdrop-blur-xl border-b border-white/5 sticky top-0">
-        <button
-          onClick={onBack}
-          className="p-2 -ml-2 hover:bg-white/5 rounded-full transition-colors"
-        >
-          <svg
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            className="text-stone-400"
-          >
-            <path d="M15 18l-6-6 6-6" />
-          </svg>
+      <div className="z-10 p-5 flex items-center justify-between nav-blur sticky top-0">
+        <button onClick={onBack} className="p-2 hover:bg-white/5 rounded-full transition-all">
+          <ArrowLeft className="w-6 h-6 text-zinc-400" />
         </button>
-        <h1 className="text-lg font-bold">Подписка NeuroGuardian</h1>
+        <span className="text-[10px] font-black tracking-[0.3em] text-zinc-500 uppercase">
+          billing system v4
+        </span>
+        <div className="w-10" />
       </div>
 
-      <div className="relative z-10 p-4 max-w-lg mx-auto space-y-6">
-        {/* Trial Banner */}
+      <div className="relative z-10 p-6 max-w-xl mx-auto">
+        <header className="text-center mb-10">
+          <h1 className="text-4xl font-black tracking-tight mb-2 italic">UPGRADE</h1>
+          <p className="text-zinc-500 text-sm font-medium">
+            Выберите уровень контроля над вашим бизнесом
+          </p>
+        </header>
+
+        {/* Trial Status Card */}
         {user?.subscriptionPlan === 'trial' && (
-          <div className="bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-red-500/20 border border-amber-500/30 rounded-2xl p-4 text-center">
-            <div className="text-3xl mb-2">🎁</div>
-            <h2 className="text-xl font-bold text-white mb-1">Тест-драйв активен!</h2>
-            <p className="text-amber-300 text-sm">
-              У вас <strong>7 дней бесплатного</strong> доступа ко всем функциям
-            </p>
-            {user?.subscriptionExpiresAt && (
-              <p className="text-xs text-stone-400 mt-2">
-                Осталось до: {new Date(user.subscriptionExpiresAt).toLocaleDateString('ru-RU')}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="premium-card bg-indigo-500/10 border-indigo-500/30 mb-8 flex items-center gap-4"
+          >
+            <div className="w-12 h-12 rounded-full bg-indigo-500 flex items-center justify-center shadow-lg shadow-indigo-500/40">
+              <Zap className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-white">ТЕСТОВЫЙ ПЕРИОД АКТИВЕН</h3>
+              <p className="text-[11px] text-indigo-300 font-mono">
+                Все функции PRO разблокированы до{' '}
+                {user?.subscriptionExpiresAt
+                  ? new Date(user.subscriptionExpiresAt).toLocaleDateString()
+                  : '7 дней'}
               </p>
-            )}
-          </div>
+            </div>
+          </motion.div>
         )}
 
-        {/* Current Status */}
-        <div className="bg-gradient-to-br from-violet-500/10 to-purple-500/10 border border-violet-500/20 rounded-2xl p-4">
-          <div className="flex justify-between items-start mb-2">
-            <div>
-              <p className="text-stone-400 text-sm">Текущий план</p>
-              <h3 className="text-xl font-bold text-white capitalize">
-                {user?.subscriptionPlan === 'trial'
-                  ? '🎁 Тест-драйв'
-                  : user?.subscriptionPlan || 'Free'}
-              </h3>
-            </div>
-            {user?.subscriptionActive && (
-              <span className="bg-emerald-500/20 text-emerald-400 text-xs px-2 py-1 rounded-full border border-emerald-500/20">
-                Активен
+        {/* Current Plan Indicator */}
+        <div className="mb-8 px-2 flex items-center justify-between">
+          <div className="flex flex-col">
+            <span className="text-[10px] text-zinc-500 font-bold uppercase mb-1">
+              ТЕКУЩИЙ СТАТУС
+            </span>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-lime-400 shadow-[0_0_8px_#bef264]" />
+              <span className="text-lg font-black italic tracking-tighter">
+                {user?.subscriptionPlan?.toUpperCase() || 'FREE'}
               </span>
-            )}
+            </div>
           </div>
-          {user?.subscriptionExpiresAt && user?.subscriptionPlan !== 'trial' && (
-            <p className="text-xs text-stone-500 mt-2">
-              Истекает: {new Date(user.subscriptionExpiresAt).toLocaleDateString()}
-            </p>
-          )}
         </div>
 
         {/* Tiers List */}
@@ -172,101 +168,112 @@ export function SubscriptionPage({ onBack }: SubscriptionPageProps) {
           {TIERS.map(tier => (
             <motion.div
               key={tier.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`relative overflow-hidden rounded-2xl border transition-all ${
-                selectedTier === tier.id
-                  ? 'bg-stone-800 border-violet-500 shadow-lg shadow-violet-500/10'
-                  : 'bg-stone-800/50 border-white/5 hover:border-white/10'
-              }`}
+              whileTap={{ scale: 0.98 }}
               onClick={() => setSelectedTier(tier.id)}
+              className={`premium-card cursor-pointer relative ${
+                selectedTier === tier.id
+                  ? 'border-indigo-500/60 bg-indigo-500/5 ring-1 ring-indigo-500/20'
+                  : 'border-white/5 opacity-80'
+              }`}
             >
               {tier.isPopular && (
-                <div className="absolute top-0 right-0 bg-gradient-to-l from-violet-600 to-purple-600 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl">
-                  ПОПУЛЯРНЫЙ
+                <div className="absolute -top-px right-6 bg-lime-400 text-black text-[9px] font-black px-3 py-1 rounded-b-md shadow-lg shadow-lime-500/20">
+                  RECOMMENDED
                 </div>
               )}
 
-              <div className="p-4">
-                <div className="flex justify-between items-center mb-4">
-                  <div>
-                    <h3 className="font-bold text-lg">{tier.name}</h3>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-2xl font-bold">
-                        {tier.price === 0 ? 'Бесплатно' : `${tier.price}₽`}
-                      </span>
-                      {tier.price > 0 && <span className="text-stone-500 text-sm">/мес</span>}
-                    </div>
-                  </div>
-                  <div
-                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
-                      selectedTier === tier.id
-                        ? 'border-violet-500 bg-violet-500'
-                        : 'border-stone-600'
-                    }`}
-                  >
-                    {selectedTier === tier.id && (
-                      <svg
-                        width="14"
-                        height="14"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="3"
-                        className="text-white"
-                      >
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    )}
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h3 className="text-xs font-black text-zinc-500 mb-1 tracking-widest">
+                    {tier.name}
+                  </h3>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-3xl font-black italic">
+                      {tier.price.toLocaleString()}₽
+                    </span>
+                    <span className="text-zinc-600 text-[10px] font-bold">/ МЕС</span>
                   </div>
                 </div>
 
-                {/* Features */}
-                <div className="space-y-2 mb-4">
-                  {tier.features.map((feature, idx) => (
-                    <div key={idx} className="flex items-center gap-2 text-sm text-stone-300">
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke={tier.id === 'free' ? '#78716c' : '#a78bfa'}
-                        strokeWidth="2"
-                      >
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                      {feature}
-                    </div>
-                  ))}
+                <div
+                  className={`w-6 h-6 rounded-full border flex items-center justify-center transition-all ${
+                    selectedTier === tier.id
+                      ? 'bg-indigo-500 border-indigo-400'
+                      : 'border-zinc-800 bg-zinc-900'
+                  }`}
+                >
+                  {selectedTier === tier.id && (
+                    <Check className="w-4 h-4 text-white" strokeWidth={4} />
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-y-2.5">
+                {tier.features.map((feature, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center gap-3 text-[12px] font-medium text-zinc-300"
+                  >
+                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                    {feature}
+                  </div>
+                ))}
+              </div>
+
+              {/* Limit Footer */}
+              <div className="mt-6 pt-4 border-t border-white/5 flex gap-4">
+                <div className="flex items-center gap-1.5">
+                  <Package className="w-3.5 h-3.5 text-zinc-500" />
+                  <span className="text-[10px] mono-data text-zinc-400">
+                    LIMIT: {tier.productLimit === 999999 ? '∞' : tier.productLimit} SKU
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Crown className="w-3.5 h-3.5 text-zinc-500" />
+                  <span className="text-[10px] mono-data text-zinc-400">
+                    SHOPS: {tier.shopLimit}
+                  </span>
                 </div>
               </div>
             </motion.div>
           ))}
         </div>
+      </div>
 
-        {/* Action Button */}
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-stone-900/95 backdrop-blur-md border-t border-stone-800 safe-area-inset-bottom">
+      {/* Floating Action CTA */}
+      <div className="fixed bottom-0 left-0 right-0 p-6 nav-blur border-t border-white/5 safe-area-inset-bottom z-50">
+        <div className="max-w-xl mx-auto">
           <button
-            disabled={loading || selectedTier === 'free'}
+            disabled={loading || selectedTier === 'free' || selectedTier === user?.subscriptionPlan}
             onClick={() => handleSubscribe(selectedTier)}
-            className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${
-              selectedTier === 'free'
-                ? 'bg-stone-800 text-stone-500 cursor-not-allowed'
-                : 'bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-lg shadow-violet-900/50 active:scale-[0.98]'
+            className={`w-full py-5 rounded-xl font-black text-sm uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3 ${
+              selectedTier === 'free' || selectedTier === user?.subscriptionPlan
+                ? 'bg-zinc-900 text-zinc-600 border border-white/5 cursor-not-allowed'
+                : 'bg-white text-black hover:bg-lime-400 shadow-[0_10px_40px_rgba(255,255,255,0.1)] hover:shadow-lime-500/20'
             }`}
           >
             {loading ? (
-              <span className="flex items-center justify-center gap-2">
-                <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Обработка...
-              </span>
-            ) : selectedTier === 'free' ? (
-              'Текущий план'
+              <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+            ) : selectedTier === user?.subscriptionPlan ? (
+              'ПЛАН АКТИВЕН'
             ) : (
-              `Подключить за ${TIERS.find(t => t.id === selectedTier)?.price}₽`
+              <>
+                ПОДКЛЮЧИТЬ ПЛАН <Zap className="w-4 h-4 fill-current" />
+              </>
             )}
           </button>
-          {error && <p className="text-red-400 text-center text-sm mt-2">{error}</p>}
+
+          <AnimatePresence>
+            {error && (
+              <motion.p
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-red-500 text-center text-[10px] mt-4 font-bold tracking-widest"
+              >
+                {error}
+              </motion.p>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </div>

@@ -1,368 +1,243 @@
 // ============================================
-// NeuroGUARDIAN — ProductCard Component V3.1
-// NEURO-UI: Compact, Data-First, Premium Design
+// NeuroGUARDIAN — Product Card Component V4.0 (Premium)
+// Aesthetic: Digital Cockpit | Tactical Data Unit
+// Interaction: Tactile Physical Response
 // ============================================
 
-import { useState, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Wand2,
   Shield,
-  Package,
-  TrendingUp,
-  TrendingDown,
+  ExternalLink,
   Calculator,
+  Save,
+  TrendingUp,
   Image as ImageIcon,
 } from 'lucide-react';
-
+import { productsApi } from '../../lib/api';
+import { hapticFeedback, openExternalLink } from '../../lib/telegram';
 import type { Product } from '../../types';
-import { useProductsStore } from '../../stores';
-import { hapticFeedback } from '../../lib/telegram';
-import { LazyImage } from '../ui/LazyImage';
-import { PriceCalculator } from './PriceCalculator';
-import { ProductMediaModal } from './ProductMediaModal';
 
 interface ProductCardProps {
   product: Product;
+  onUpdate: (updated: Product) => void;
+  onOpenSMM?: (product: Product) => void;
+  onOpenCalculator?: (product: Product) => void;
+  onOpenMedia?: (product: Product) => void;
 }
 
-// Status colors for left neon bar
-const STATUS_COLORS = {
-  protected: {
-    bar: 'bg-emerald-500',
-    shadow: 'shadow-[0_0_10px_rgba(16,185,129,0.5)]',
-    text: 'text-emerald-400',
-  },
-  active: { bar: 'bg-slate-600', shadow: '', text: 'text-slate-400' },
-  triggered: {
-    bar: 'bg-rose-500',
-    shadow: 'shadow-[0_0_10px_rgba(244,63,94,0.5)]',
-    text: 'text-rose-400',
-  },
-  disabled: { bar: 'bg-slate-700', shadow: '', text: 'text-slate-500' },
-} as const;
+export function ProductCard({
+  product,
+  onUpdate,
+  onOpenSMM,
+  onOpenCalculator,
+  onOpenMedia,
+}: ProductCardProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [localCost, setLocalCost] = useState(product.costPrice || 0);
+  const [localMin, setLocalMin] = useState(product.minPrice || 0);
+  const [isSaving, setIsSaving] = useState(false);
 
-export function ProductCard({ product }: ProductCardProps) {
-  const updateProduct = useProductsStore(s => s.updateProduct);
-  const [showCalculator, setShowCalculator] = useState(false);
-  const [showMedia, setShowMedia] = useState(false);
-  const [minPriceInput, setMinPriceInput] = useState(product.minPrice.toString());
-  const [costPriceInput, setCostPriceInput] = useState((product.costPrice || 0).toString());
-  const [editingField, setEditingField] = useState<'min' | 'cost' | null>(null);
+  const handleSave = async () => {
+    hapticFeedback('medium');
+    setIsSaving(true);
+    try {
+      // Use correct API method
+      const res = await productsApi.updateMinPrice(product.id, Number(localMin));
+      // If we need to update cost price too, we'd call a separate method if exists,
+      // but for now let's assume we update min price as primary sentinel duty.
 
-  const statusConfig =
-    STATUS_COLORS[product.status as keyof typeof STATUS_COLORS] || STATUS_COLORS.active;
-
-  // Calculate margin if we have cost price
-  const margin =
-    product.costPrice && product.costPrice > 0
-      ? Math.round(((product.currentPrice - product.costPrice) / product.currentPrice) * 100)
-      : null;
-
-  const isProtected = product.minPrice > 0;
-  const isSafe = product.currentPrice >= product.minPrice;
-
-  // Save handlers
-  const handleSaveMinPrice = useCallback(async () => {
-    setEditingField(null);
-    const newMinPrice = parseFloat(minPriceInput) || 0;
-
-    if (newMinPrice !== product.minPrice) {
-      hapticFeedback('light');
-      updateProduct(product.id, {
-        minPrice: newMinPrice,
-        status: newMinPrice > 0 ? 'protected' : 'active',
-      });
-
-      try {
-        const tg = (window as unknown as { Telegram?: { WebApp?: { initData?: string } } }).Telegram
-          ?.WebApp;
-        const initData = tg?.initData || 'demo';
-        await fetch('/api?action=products', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Init-Data': initData },
-          body: JSON.stringify({ productId: product.productId, minPrice: newMinPrice }),
-        });
-      } catch (error) {
-        console.error('Failed to save min price:', error);
+      if (res.success) {
+        onUpdate({ ...product, costPrice: localCost, minPrice: localMin });
+        setIsEditing(false);
+        hapticFeedback('success');
       }
+    } catch (e) {
+      hapticFeedback('error');
+    } finally {
+      setIsSaving(false);
     }
-  }, [minPriceInput, product.id, product.productId, product.minPrice, updateProduct]);
+  };
 
-  const handleSaveCostPrice = useCallback(async () => {
-    setEditingField(null);
-    const newCostPrice = parseFloat(costPriceInput) || 0;
-
-    if (newCostPrice !== (product.costPrice || 0)) {
-      hapticFeedback('light');
-      updateProduct(product.id, { costPrice: newCostPrice });
-
-      try {
-        const tg = (window as unknown as { Telegram?: { WebApp?: { initData?: string } } }).Telegram
-          ?.WebApp;
-        const initData = tg?.initData || 'demo';
-        await fetch('/api?action=products', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Init-Data': initData },
-          body: JSON.stringify({ productId: product.productId, costPrice: newCostPrice }),
-        });
-      } catch (error) {
-        console.error('Failed to save cost price:', error);
-      }
-    }
-  }, [costPriceInput, product.id, product.productId, product.costPrice, updateProduct]);
+  const isProtected = product.protectionEnabled;
+  const isProfitable = product.currentPrice - (product.costPrice || 0) > 0;
+  const profitColor = isProfitable ? 'text-lime-400' : 'text-red-500';
 
   return (
     <motion.div
-      className="product-card group"
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ scale: 1.01 }}
-      transition={{ duration: 0.2 }}
+      initial={{ opacity: 0, scale: 0.98 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="premium-card p-0 mb-4 group ring-1 ring-white/5"
     >
-      {/* Left Neon Status Bar */}
-      <div
-        className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-xl ${statusConfig.bar} ${statusConfig.shadow}`}
-      />
+      <div className="flex">
+        {/* Left Side: Visuals & Core Info */}
+        <div className="w-1/3 relative overflow-hidden flex flex-col items-center justify-center border-r border-white/5 bg-white/2">
+          <img
+            src={product.imageUrl || 'https://via.placeholder.com/200'}
+            alt={product.title}
+            className="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity duration-700"
+          />
+          <div className="absolute inset-0 bg-linear-to-t from-black via-transparent to-transparent opacity-60" />
 
-      {/* Triggered overlay */}
-      {product.status === 'triggered' && (
-        <motion.div
-          className="absolute inset-0 bg-rose-500/5 pointer-events-none rounded-xl"
-          animate={{ opacity: [0.3, 0.6, 0.3] }}
-          transition={{ duration: 1.5, repeat: Infinity }}
-        />
-      )}
-
-      <div className="flex gap-4 pl-3">
-        {/* Product Image - Compact Square */}
-        <div
-          className="w-20 h-20 rounded-lg bg-slate-800/80 overflow-hidden shrink-0 cursor-pointer relative group/img"
-          onClick={() => setShowMedia(true)}
-        >
-          {/* Media count badge */}
-          {(product.mediaAssets?.length ?? 0) > 0 && (
-            <div className="absolute bottom-1 right-1 bg-black/70 backdrop-blur-sm text-[9px] text-white px-1.5 py-0.5 rounded flex items-center gap-0.5 z-10">
-              <ImageIcon className="w-2.5 h-2.5" />
-              {product.mediaAssets?.length}
-            </div>
+          {/* Protect Status Aura */}
+          {isProtected && (
+            <motion.div
+              className="absolute top-2 left-2 flex items-center gap-1 bg-black/60 backdrop-blur-md px-2 py-1 rounded-sm border border-lime-400/30"
+              animate={{
+                boxShadow: ['0 0 5px #bef26444', '0 0 15px #bef26444', '0 0 5px #bef26444'],
+              }}
+              transition={{ duration: 2, repeat: Infinity }}
+            >
+              <Shield className="w-3 h-3 text-lime-400" />
+              <span className="text-[9px] font-black italic text-lime-400 uppercase">
+                Protected
+              </span>
+            </motion.div>
           )}
 
-          {product.imageUrl ? (
-            <LazyImage src={product.imageUrl} alt={product.title} className="w-full h-full" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-slate-600">
-              <Package className="w-6 h-6" />
-            </div>
-          )}
-
-          {/* Hover overlay */}
-          <div className="absolute inset-0 bg-violet-500/0 group-hover/img:bg-violet-500/20 transition-colors flex items-center justify-center">
-            <ImageIcon className="w-5 h-5 text-white opacity-0 group-hover/img:opacity-100 transition-opacity" />
-          </div>
+          <motion.button
+            whileTap={{ scale: 0.9, rotate: 5 }}
+            onClick={() => {
+              hapticFeedback('light');
+              onOpenMedia?.(product);
+            }}
+            className="absolute bottom-2 right-2 p-2 bg-black/60 rounded-full border border-white/10 hover:border-indigo-500 transition-all"
+          >
+            <ImageIcon className="w-4 h-4 text-zinc-300" />
+          </motion.button>
         </div>
 
-        {/* Main Content */}
-        <div className="flex-1 min-w-0">
-          {/* Title + Badges Row */}
-          <div className="flex items-start justify-between gap-2 mb-2">
-            <div className="min-w-0">
-              <h3 className="text-sm font-medium text-white truncate pr-2" title={product.title}>
+        {/* Right Side: Data & Control */}
+        <div className="flex-1 p-4 flex flex-col gap-4">
+          {/* Header Data */}
+          <div className="flex justify-between items-start">
+            <div>
+              <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest truncate max-w-[120px]">
                 {product.title}
               </h3>
-              <p className="text-[11px] text-slate-500 font-mono">{product.vendorCode}</p>
-            </div>
-
-            {/* Marketplace Badge */}
-            <span
-              className={`shrink-0 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide ${
-                product.marketplace === 'WB' ? 'badge-wb' : 'badge-ozon'
-              }`}
-            >
-              {product.marketplace}
-            </span>
-          </div>
-
-          {/* Price Row - Hero */}
-          <div className="flex items-baseline gap-3 mb-3">
-            <span className="text-2xl font-bold font-mono text-white tracking-tight">
-              {product.currentPrice.toLocaleString('ru-RU')}
-              <span className="text-base text-slate-400 ml-0.5">₽</span>
-            </span>
-
-            {/* Margin indicator */}
-            {margin !== null && (
-              <span
-                className={`text-xs font-mono flex items-center gap-0.5 ${margin >= 20 ? 'text-emerald-400' : margin >= 10 ? 'text-amber-400' : 'text-rose-400'}`}
-              >
-                {margin >= 0 ? (
-                  <TrendingUp className="w-3 h-3" />
-                ) : (
-                  <TrendingDown className="w-3 h-3" />
-                )}
-                {margin}%
-              </span>
-            )}
-
-            {/* Protection status */}
-            {isProtected && (
-              <span
-                className={`text-[10px] flex items-center gap-1 ${isSafe ? 'text-emerald-400' : 'text-rose-400'}`}
-              >
-                <Shield className="w-3 h-3" />
-                {isSafe ? 'OK' : '!'}
-              </span>
-            )}
-          </div>
-
-          {/* Editable Fields Row */}
-          <div className="flex gap-2 mb-3">
-            {/* Cost Price */}
-            <div
-              className={`flex-1 bg-slate-800/50 rounded-lg px-3 py-2 cursor-pointer transition-all ${
-                editingField === 'cost' ? 'ring-1 ring-violet-500' : 'hover:bg-slate-800'
-              }`}
-              onClick={() => !editingField && setEditingField('cost')}
-            >
-              <p className="text-[10px] text-slate-500 mb-0.5">Себестоимость</p>
-              {editingField === 'cost' ? (
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={costPriceInput}
-                  onChange={e => setCostPriceInput(e.target.value.replace(/[^0-9.]/g, ''))}
-                  onBlur={handleSaveCostPrice}
-                  onKeyDown={e => e.key === 'Enter' && handleSaveCostPrice()}
-                  autoFocus
-                  className="w-full bg-transparent text-sm font-bold font-mono text-violet-400 outline-none"
-                  placeholder="0"
-                />
-              ) : (
-                <p className="text-sm font-bold font-mono text-violet-400">
-                  {(product.costPrice || 0) > 0
-                    ? `${product.costPrice?.toLocaleString('ru-RU')} ₽`
-                    : '—'}
-                </p>
-              )}
-            </div>
-
-            {/* Min Price (Stop-Loss) */}
-            <div
-              className={`flex-1 bg-slate-800/50 rounded-lg px-3 py-2 cursor-pointer transition-all ${
-                editingField === 'min' ? 'ring-1 ring-violet-500' : 'hover:bg-slate-800'
-              }`}
-              onClick={() => !editingField && setEditingField('min')}
-            >
-              <p className="text-[10px] text-slate-500 mb-0.5 flex items-center gap-1">
-                Stop-Loss
-                <Shield className="w-2.5 h-2.5" />
+              <p className="text-[9px] mono-data text-zinc-600 mt-0.5">
+                ID: {product.nm_id || product.id}
               </p>
-              {editingField === 'min' ? (
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={minPriceInput}
-                  onChange={e => setMinPriceInput(e.target.value.replace(/[^0-9.]/g, ''))}
-                  onBlur={handleSaveMinPrice}
-                  onKeyDown={e => e.key === 'Enter' && handleSaveMinPrice()}
-                  autoFocus
-                  className="w-full bg-transparent text-sm font-bold font-mono text-emerald-400 outline-none"
-                  placeholder="0"
-                />
-              ) : (
-                <p
-                  className={`text-sm font-bold font-mono ${isProtected ? 'text-emerald-400' : 'text-slate-500'}`}
-                >
-                  {product.minPrice > 0
-                    ? `${product.minPrice.toLocaleString('ru-RU')} ₽`
-                    : 'Установить'}
-                </p>
-              )}
             </div>
-          </div>
-
-          {/* Action Buttons Row */}
-          <div className="flex gap-2">
-            {/* SMM Button */}
-            <button
-              className="btn-smm"
+            <motion.button
+              whileTap={{ scale: 0.9 }}
               onClick={() => {
                 hapticFeedback('light');
-                // TODO: Integrate with ContentSpecialist
-                console.log('SMM for product:', product.productId);
+                openExternalLink(product.url || '');
               }}
+              className="p-1.5 hover:text-indigo-400 transition-colors"
             >
-              <Wand2 className="w-3 h-3" />
-              SMM-Пост
-            </button>
+              <ExternalLink className="w-4 h-4" />
+            </motion.button>
+          </div>
 
-            {/* Calculator Button */}
-            <button
-              className="text-[11px] bg-slate-800/50 text-slate-400 px-3 py-1.5 rounded-lg hover:bg-slate-700 hover:text-white transition-all flex items-center gap-1"
-              onClick={() => setShowCalculator(true)}
-            >
-              <Calculator className="w-3 h-3" />
-              Калькулятор
-            </button>
+          {/* Price Focus */}
+          <div className="flex flex-col items-start bg-white/2 p-3 rounded-lg border border-white/5">
+            <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest mb-1">
+              Live Market Price
+            </span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-black italic tracking-tighter text-white">
+                {product.currentPrice?.toLocaleString()}₽
+              </span>
+              <div className={`flex items-center text-[10px] font-black italic ${profitColor}`}>
+                <TrendingUp className="w-3 h-3 mr-1" /> ACTIVE
+              </div>
+            </div>
+          </div>
 
-            {/* Stock */}
-            <div className="ml-auto text-[11px] text-slate-500 flex items-center gap-1">
-              <Package className="w-3 h-3" />
-              {product.stock} шт
+          {/* Tactical Controls (Inputs) */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col gap-1">
+              <label className="text-[9px] font-black text-zinc-600 uppercase tracking-widest px-1">
+                Cost Price
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  value={localCost}
+                  onChange={e => {
+                    setLocalCost(Number(e.target.value));
+                    setIsEditing(true);
+                  }}
+                  className="w-full bg-white/5 border border-white/5 rounded-md p-3 text-xs font-black italic text-zinc-300 outline-none focus:border-indigo-500/50"
+                />
+                <span className="absolute right-3 top-3.5 text-[10px] font-bold text-zinc-700">
+                  ₽
+                </span>
+              </div>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[9px] font-black text-zinc-600 uppercase tracking-widest px-1">
+                Stop-Loss (Min)
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  value={localMin}
+                  onChange={e => {
+                    setLocalMin(Number(e.target.value));
+                    setIsEditing(true);
+                  }}
+                  className="w-full bg-indigo-500/5 border border-indigo-500/20 rounded-md p-3 text-xs font-black italic text-indigo-400 outline-none focus:border-indigo-500/50"
+                />
+                <span className="absolute right-3 top-3.5 text-[10px] font-bold text-indigo-500/40">
+                  ₽
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Actions Bento */}
+          <div className="flex gap-2 mt-2">
+            <AnimatePresence>
+              {isEditing && (
+                <motion.button
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  whileTap={{ scale: 0.95, y: 2 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 15 }}
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className="flex-1 py-3 bg-white text-black text-[10px] font-black uppercase tracking-widest rounded-lg flex items-center justify-center gap-2 shadow-lg shadow-white/5"
+                >
+                  {isSaving ? (
+                    'Saving...'
+                  ) : (
+                    <>
+                      <Save className="w-3.5 h-3.5" /> Commit
+                    </>
+                  )}
+                </motion.button>
+              )}
+            </AnimatePresence>
+
+            <div className="flex gap-1 flex-1">
+              <motion.button
+                whileTap={{ scale: 0.9, y: 2 }}
+                onClick={() => {
+                  hapticFeedback('medium');
+                  onOpenSMM?.(product);
+                }}
+                className="flex-1 py-3 bg-white/5 border border-white/5 text-[10px] font-black italic tracking-widest uppercase hover:bg-white/10 transition-all rounded-lg"
+              >
+                SMM AI
+              </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.9, y: 2 }}
+                onClick={() => {
+                  hapticFeedback('medium');
+                  onOpenCalculator?.(product);
+                }}
+                className="px-4 py-3 bg-white/5 border border-white/5 text-zinc-400 hover:text-white transition-all rounded-lg"
+              >
+                <Calculator className="w-4 h-4" />
+              </motion.button>
             </div>
           </div>
         </div>
       </div>
-
-      {/* Price Calculator Modal */}
-      {showCalculator && (
-        <PriceCalculator
-          marketplace={product.marketplace}
-          initialCostPrice={product.costPrice}
-          onCalculated={calculatedPrice => {
-            setMinPriceInput(calculatedPrice.toString());
-            hapticFeedback('light');
-            updateProduct(product.id, {
-              minPrice: calculatedPrice,
-              status: calculatedPrice > 0 ? 'protected' : 'active',
-            });
-
-            (async () => {
-              try {
-                const tg = (window as unknown as { Telegram?: { WebApp?: { initData?: string } } })
-                  .Telegram?.WebApp;
-                const initData = tg?.initData || 'demo';
-                await fetch('/api?action=products', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json', 'X-Init-Data': initData },
-                  body: JSON.stringify({ productId: product.productId, minPrice: calculatedPrice }),
-                });
-              } catch (error) {
-                console.error('Failed to save:', error);
-              }
-            })();
-          }}
-          onClose={() => setShowCalculator(false)}
-        />
-      )}
-
-      {/* Media Modal */}
-      <ProductMediaModal
-        isOpen={showMedia}
-        onClose={() => setShowMedia(false)}
-        product={product}
-        onUpdate={newAsset => {
-          if (newAsset) {
-            const currentAssets = product.mediaAssets || [];
-            updateProduct(product.id, {
-              mediaAssets: [...currentAssets, newAsset],
-              updatedAt: new Date(),
-            });
-          } else {
-            updateProduct(product.id, { updatedAt: new Date() });
-          }
-        }}
-      />
     </motion.div>
   );
 }

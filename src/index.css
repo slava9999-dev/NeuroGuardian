@@ -1,67 +1,57 @@
 @import 'tailwindcss';
 
 /* ============================================
-   NeuroGUARDIAN — NEURO-UI V3.1 Design System
-   Obsidian Theme: Cosmic Slate + Electric Violet
-   Inspired by: Linear, Vercel, Binance Pro
+   NeuroGUARDIAN — NEURO-UI V4.0 PREMIUM
+   Theme: Deep Space | Cyber Indigo | Acid Lime
+   Aesthetic: High-Tech, Professional, Premium
    ============================================ */
 
-/* ============================================
-   🎨 THEME CONFIGURATION
-   ============================================ */
 @theme {
-  /* Background: Deep Space (replacing Stone) */
-  --color-background: #020617; /* Slate-950 - main background */
-  --color-surface: #0f172a; /* Slate-900 - cards */
-  --color-surface-hl: #1e293b; /* Slate-800 - hover states */
-  --color-surface-dim: #0c111c; /* Darker surface for depth */
+  /* Background: Ultimate Dark */
+  --color-background: #000000; 
+  --color-surface: #0a0a0b; /* Pitch Black Surface */
+  --color-surface-hl: #141416; /* Dark slate hover */
+  --color-surface-dim: #050505; 
 
-  /* Primary: Electric Violet (Intelligence) */
-  --color-primary: #7c3aed; /* Violet-600 */
-  --color-primary-glow: #8b5cf6; /* Violet-500 */
-  --color-primary-dim: rgba(124, 58, 237, 0.1);
-  --color-primary-border: rgba(124, 58, 237, 0.3);
+  /* Primary: Cyber Indigo (The Brain) */
+  --color-primary: #6366f1; /* Indigo-500 */
+  --color-primary-glow: #818cf8;
+  --color-primary-dim: rgba(99, 102, 241, 0.1);
+  --color-primary-border: rgba(99, 102, 241, 0.4);
 
-  /* Status Colors (Neon) */
-  --color-success: #10b981; /* Emerald-500 - Profit */
-  --color-warning: #f59e0b; /* Amber-500 - Alerts only */
-  --color-danger: #f43f5e; /* Rose-500 - Loss/Stop-Loss */
-  --color-info: #3b82f6; /* Blue-500 */
+  /* Secondary: Acid Lime (The Security/Profit) */
+  --color-success: #bef264; /* Lime-300 - High Visibility Profit */
+  --color-warning: #fbbf24; /* Amber-400 */
+  --color-danger: #ff4d4d; /* Pure Red - Critical */
+  --color-info: #0ea5e9; /* Sky-500 */
 
-  /* Text Colors */
-  --color-text-main: #f8fafc; /* Slate-50 */
-  --color-text-dim: #94a3b8; /* Slate-400 */
-  --color-text-muted: #64748b; /* Slate-500 */
+  /* Text: Ultra Contrast */
+  --color-text-main: #ffffff; 
+  --color-text-dim: #a1a1aa; /* Zinc-400 */
+  --color-text-muted: #52525b; /* Zinc-600 */
 
-  /* Glass Effect */
-  --glass-bg: rgba(15, 23, 42, 0.7);
-  --glass-bg-light: rgba(30, 41, 59, 0.5);
-  --glass-border: rgba(255, 255, 255, 0.05);
-  --glass-border-hover: rgba(124, 58, 237, 0.3);
-  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  /* Glass Effects v4 (Refined) */
+  --glass-bg: rgba(10, 10, 11, 0.8);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border-hover: rgba(99, 102, 241, 0.6);
+  --glass-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
 
-  /* Neon Shadows */
-  --shadow-neon: 0 0 20px rgba(124, 58, 237, 0.3);
-  --shadow-neon-strong: 0 0 40px rgba(124, 58, 237, 0.5);
-  --shadow-success: 0 0 20px rgba(16, 185, 129, 0.3);
-  --shadow-danger: 0 0 20px rgba(244, 63, 94, 0.3);
+  /* Professional Shadows */
+  --shadow-neon: 0 0 15px rgba(99, 102, 241, 0.2);
+  --shadow-neon-strong: 0 0 30px rgba(99, 102, 241, 0.4);
+  --shadow-success: 0 0 15px rgba(190, 242, 100, 0.2);
 
   /* Typography */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', 'Menlo', monospace;
+  --font-sans: 'Inter', 'Inter Tight', -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
 }
 
 /* ============================================
-   🎯 BASE STYLES
+   🎯 BASE RESET & UTILITIES
    ============================================ */
 * {
   box-sizing: border-box;
-}
-
-html {
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -69,533 +59,210 @@ body {
   padding: 0;
   background: var(--color-background);
   color: var(--color-text-main);
-  min-height: 100vh;
-  min-height: 100dvh;
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+  letter-spacing: -0.01em;
 }
 
-/* Cosmic Background Gradient */
-.bg-cosmic {
-  background:
-    radial-gradient(ellipse at top, rgba(124, 58, 237, 0.15) 0%, transparent 50%),
-    var(--color-background);
+/* Cyber Grid Background */
+.bg-cyber {
+  background-color: var(--color-background);
+  background-image: 
+    linear-gradient(rgba(99, 102, 241, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99, 102, 241, 0.03) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.bg-glow-spot {
+  position: fixed;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.08) 0%, transparent 70%);
+  filter: blur(80px);
+  pointer-events: none;
+  z-index: -1;
 }
 
 /* ============================================
-   📜 SCROLLBAR
+   🃏 PREMIUM CARD SYSTEM
    ============================================ */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+.premium-card {
+  position: relative;
+  background: var(--color-surface);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  padding: 20px;
+  transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+  overflow: hidden;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
-::-webkit-scrollbar-track {
+.premium-card:active {
+  transform: scale(0.995) translateY(1px);
   background: var(--color-surface-dim);
 }
 
-::-webkit-scrollbar-thumb {
-  background: var(--color-surface-hl);
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--color-primary);
-}
-
-/* ============================================
-   🪟 GLASSMORPHISM COMPONENTS
-   ============================================ */
-.glass-panel {
-  background: var(--glass-bg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--glass-border);
-  border-radius: 16px;
-  box-shadow: var(--glass-shadow);
-}
-
-.glass-panel-hover {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.glass-panel-hover:hover {
-  border-color: var(--glass-border-hover);
-  box-shadow: var(--shadow-neon);
-}
-
-/* Surface Card */
-.surface-card {
-  background: var(--color-surface);
-  border: 1px solid var(--glass-border);
-  border-radius: 12px;
-  transition: all 0.2s ease;
-}
-
-.surface-card:hover {
+.premium-card:hover {
+  transform: translateY(-4px);
   border-color: var(--color-primary-border);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), var(--shadow-neon);
+}
+
+.premium-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.03),
+    transparent
+  );
+  transition: 0.5s;
+}
+
+.premium-card:hover::after {
+  left: 200%;
 }
 
 /* ============================================
-   💡 STATUS INDICATORS
+   🔘 PRO BUTTONS - TACTILE PHYSICS
    ============================================ */
-.status-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-
-.status-safe {
-  background: var(--color-success);
-  box-shadow: var(--shadow-success);
-}
-
-.status-danger {
-  background: var(--color-danger);
-  box-shadow: var(--shadow-danger);
-  animation: pulse-danger 1.5s infinite;
-}
-
-.status-warning {
-  background: var(--color-warning);
-  box-shadow: 0 0 8px var(--color-warning);
-}
-
-.status-primary {
-  background: var(--color-primary);
-  box-shadow: var(--shadow-neon);
-}
-
-@keyframes pulse-danger {
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.7;
-    transform: scale(1.2);
-  }
-}
-
-/* Neon Status Bar (Left Edge) */
-.neon-bar-success {
-  background: var(--color-success);
-  box-shadow: 0 0 10px var(--color-success);
-}
-
-.neon-bar-danger {
-  background: var(--color-danger);
-  box-shadow: 0 0 10px var(--color-danger);
-}
-
-.neon-bar-primary {
-  background: var(--color-primary);
-  box-shadow: 0 0 10px var(--color-primary);
-}
-
-/* ============================================
-   ✨ TYPOGRAPHY
-   ============================================ */
-.text-gradient-primary {
-  background: linear-gradient(135deg, var(--color-primary-glow), var(--color-primary));
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.text-gradient-cosmic {
-  background: linear-gradient(135deg, #a78bfa, #7c3aed, #6366f1);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.text-mono {
-  font-family: var(--font-mono);
-}
-
-.text-price {
-  font-family: var(--font-mono);
+.btn-premium {
+  background: #ffffff;
+  color: #000000;
   font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-/* ============================================
-   🔘 BUTTON STYLES
-   ============================================ */
-.btn-primary {
-  background: linear-gradient(135deg, var(--color-primary-glow), var(--color-primary));
-  color: white;
-  font-weight: 600;
-  padding: 12px 24px;
+  padding: 14px 28px;
   border-radius: 12px;
   border: none;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: var(--shadow-neon);
-}
-
-.btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-neon-strong);
-}
-
-.btn-primary:active {
-  transform: translateY(0);
-}
-
-/* Glow Animation for CTA */
-.btn-glow {
-  animation: glow-pulse 2s ease-in-out infinite;
-}
-
-@keyframes glow-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 20px rgba(124, 58, 237, 0.4);
-  }
-  50% {
-    box-shadow: 0 0 40px rgba(124, 58, 237, 0.6);
-  }
-}
-
-.btn-secondary {
-  background: var(--color-primary-dim);
-  color: var(--color-primary-glow);
-  font-weight: 500;
-  padding: 12px 24px;
-  border-radius: 12px;
-  border: 1px solid var(--color-primary-border);
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.btn-secondary:hover {
-  background: rgba(124, 58, 237, 0.2);
-  border-color: var(--color-primary);
-}
-
-.btn-ghost {
-  background: transparent;
-  color: var(--color-text-dim);
-  font-weight: 500;
-  padding: 10px 16px;
-  border-radius: 10px;
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.btn-ghost:hover {
-  background: var(--color-surface-hl);
-  color: var(--color-text-main);
-}
-
-/* SMM Button Style */
-.btn-smm {
-  background: var(--color-primary-dim);
-  color: var(--color-primary-glow);
-  font-size: 12px;
-  font-weight: 500;
-  padding: 6px 12px;
-  border-radius: 8px;
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.33, 1, 0.68, 1);
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  gap: 10px;
+  box-shadow: 0 4px 0px rgba(255, 255, 255, 0.1);
 }
 
-.btn-smm:hover {
-  background: rgba(124, 58, 237, 0.2);
+.btn-premium:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0px rgba(255, 255, 255, 0.05);
+  background: #f0f0f0;
 }
 
-/* ============================================
-   📝 INPUT STYLES
-   ============================================ */
-.input-field {
-  background: var(--color-surface-dim);
+.btn-premium-outline {
+  background: transparent;
+  color: #ffffff;
   border: 1px solid var(--glass-border);
-  border-radius: 12px;
-  padding: 14px 16px;
-  color: var(--color-text-main);
-  font-size: 16px;
-  width: 100%;
-  transition: all 0.2s ease;
-  outline: none;
-}
-
-.input-field:focus {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-dim);
-}
-
-.input-field::placeholder {
-  color: var(--color-text-muted);
-}
-
-/* ============================================
-   🎭 BADGES
-   ============================================ */
-.badge {
-  font-size: 11px;
   font-weight: 600;
-  padding: 4px 8px;
-  border-radius: 6px;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
+  padding: 12px 24px;
+  border-radius: 10px;
+  transition: all 0.2s cubic-bezier(0.33, 1, 0.68, 1);
 }
 
-.badge-primary {
-  background: var(--color-primary-dim);
-  color: var(--color-primary-glow);
-  border: 1px solid var(--color-primary-border);
+.btn-premium-outline:active {
+  transform: scale(0.96) translateY(2px);
+  background: rgba(255, 255, 255, 0.05);
 }
 
-.badge-success {
-  background: rgba(16, 185, 129, 0.1);
+/* ============================================
+   📊 DATA VISUALS
+   ============================================ */
+.mono-data {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  letter-spacing: -0.05em;
+}
+
+.price-pro {
+  font-family: var(--font-mono);
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--color-text-main);
+}
+
+.profit-lime {
   color: var(--color-success);
-  border: 1px solid rgba(16, 185, 129, 0.3);
-}
-
-.badge-danger {
-  background: rgba(244, 63, 94, 0.1);
-  color: var(--color-danger);
-  border: 1px solid rgba(244, 63, 94, 0.3);
-}
-
-.badge-hit {
-  background: linear-gradient(135deg, var(--color-primary-glow), var(--color-primary));
-  color: white;
-  animation: glow-pulse 2s ease-in-out infinite;
-}
-
-/* Marketplace Badges */
-.badge-wb {
-  background: rgba(138, 43, 226, 0.1);
-  color: #a855f7;
-  border: 1px solid rgba(138, 43, 226, 0.3);
-}
-
-.badge-ozon {
-  background: rgba(59, 130, 246, 0.1);
-  color: #3b82f6;
-  border: 1px solid rgba(59, 130, 246, 0.3);
+  text-shadow: 0 0 10px rgba(190, 242, 100, 0.3);
 }
 
 /* ============================================
-   🃏 CARD STYLES
+   🛡️ SENTINEL STATUS INDICATORS
    ============================================ */
-.product-card {
+.sentinel-aura {
   position: relative;
-  background: var(--color-surface);
-  border: 1px solid var(--glass-border);
-  border-radius: 12px;
-  padding: 16px;
-  overflow: hidden;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-flex;
 }
 
-.product-card:hover {
-  border-color: var(--color-primary-border);
-  box-shadow: var(--shadow-neon);
-}
-
-/* Status Bar on Left Edge */
-.product-card::before {
+.sentinel-aura::before {
   content: '';
   position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: var(--card-status-color, var(--color-surface-hl));
+  inset: -10px;
+  background: radial-gradient(circle, rgba(190, 242, 100, 0.1) 0%, transparent 70%);
+  animation: pulse-aura 2s infinite;
 }
 
-.product-card.safe::before {
-  --card-status-color: var(--color-success);
-  box-shadow: 0 0 8px var(--color-success);
-}
-
-.product-card.danger::before {
-  --card-status-color: var(--color-danger);
-  box-shadow: 0 0 8px var(--color-danger);
-}
-
-/* Subscription Tier Card */
-.tier-card {
-  background: var(--color-surface);
-  border: 1px solid var(--glass-border);
-  border-radius: 16px;
-  padding: 24px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.tier-card:hover {
-  border-color: var(--color-primary-border);
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-neon);
-}
-
-.tier-card.popular {
-  border-color: var(--color-primary);
-  background: linear-gradient(180deg, rgba(124, 58, 237, 0.1) 0%, var(--color-surface) 100%);
+@keyframes pulse-aura {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.1); }
 }
 
 /* ============================================
-   ⚡ ANIMATIONS
+   📱 NAVIGATION (DASHBOARD)
    ============================================ */
-.animate-fade-in {
-  animation: fadeIn 0.3s ease-out;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-slide-up {
-  animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(100%);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Neon Sphere Animation (for Agent Avatar) */
-.neon-sphere {
-  position: relative;
-  border-radius: 50%;
-  background: radial-gradient(
-    circle at 30% 30%,
-    var(--color-primary-glow),
-    var(--color-primary),
-    #4c1d95
-  );
-  box-shadow:
-    0 0 60px rgba(124, 58, 237, 0.5),
-    inset 0 0 40px rgba(255, 255, 255, 0.1);
-  animation: sphere-pulse 3s ease-in-out infinite;
-}
-
-@keyframes sphere-pulse {
-  0%,
-  100% {
-    box-shadow:
-      0 0 60px rgba(124, 58, 237, 0.4),
-      inset 0 0 40px rgba(255, 255, 255, 0.1);
-  }
-  50% {
-    box-shadow:
-      0 0 80px rgba(124, 58, 237, 0.6),
-      inset 0 0 50px rgba(255, 255, 255, 0.2);
-  }
-}
-
-/* Avatar Ring Glow */
-.avatar-ring {
-  position: relative;
-}
-
-.avatar-ring::before {
-  content: '';
-  position: absolute;
-  inset: -3px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--color-primary-glow), var(--color-primary));
-  z-index: -1;
-  opacity: 0.7;
-}
-
-/* ============================================
-   🏷️ TAB BAR
-   ============================================ */
-.tab-bar {
-  background: rgba(2, 6, 23, 0.95);
-  backdrop-filter: blur(16px);
+.nav-blur {
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border-top: 1px solid var(--glass-border);
 }
 
-.tab-item {
-  color: var(--color-text-dim);
-  transition: all 0.2s ease;
-}
-
-.tab-item.active {
+.nav-item-active {
   color: var(--color-primary-glow);
+  position: relative;
 }
 
-.tab-item.active::after {
+.nav-item-active::before {
   content: '';
   position: absolute;
-  bottom: 0;
+  top: -12px;
   left: 50%;
   transform: translateX(-50%);
-  width: 40%;
-  height: 2px;
+  width: 20px;
+  height: 4px;
   background: var(--color-primary);
-  border-radius: 1px;
+  border-radius: 0 0 4px 4px;
+  box-shadow: 0 2px 10px var(--color-primary);
 }
 
 /* ============================================
-   🌌 BENTO GRID
+   🎭 LOADING & SPHERES
    ============================================ */
-.bento-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+.neuro-loader {
+  width: 80px;
+  height: 80px;
+  background: radial-gradient(circle, var(--color-primary) 0%, transparent 70%);
+  border-radius: 50%;
+  filter: blur(15px);
+  animation: float-neuro 3s ease-in-out infinite;
 }
 
-.bento-item {
-  background: var(--glass-bg-light);
-  border: 1px solid var(--glass-border);
-  border-radius: 16px;
-  padding: 16px;
-  backdrop-filter: blur(8px);
-  transition: all 0.2s ease;
+@keyframes float-neuro {
+  0%, 100% { transform: translateY(0) scale(1); opacity: 0.6; }
+  50% { transform: translateY(-15px) scale(1.1); opacity: 1; }
 }
 
-.bento-item:hover {
-  border-color: var(--color-primary-border);
-  background: rgba(30, 41, 59, 0.7);
+/* Hide scrollbar but keep functionality */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
-
-/* ============================================
-   ✅ CHECKMARK STYLES
-   ============================================ */
-.check-success {
-  color: var(--color-success);
-}
-
-.check-list li {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 0;
-  color: var(--color-text-dim);
-}
-
-.check-list li svg {
-  color: var(--color-success);
-  flex-shrink: 0;
-}
-
-/* ============================================
-   📱 SAFE AREA (iOS)
-   ============================================ */
-.safe-area-inset-bottom {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

@@ -33,11 +33,21 @@ export class SentinelDefenseExecutor {
       const productObj = { id: pId, offerId: product.offer_id || undefined, price: minPrice };
 
       if (defenseMode === 'zero_stock') {
-        const res = await marketplaceService.setZeroStock(user.id, marketplace, [productObj]);
+        const res = await marketplaceService.setZeroStock(
+          user.id,
+          marketplace,
+          [productObj],
+          product.account_id || undefined
+        );
         success = res.success;
         errorMsg = res.error || '';
       } else {
-        const res = await marketplaceService.setDefensePrice(user.id, marketplace, [productObj]);
+        const res = await marketplaceService.setDefensePrice(
+          user.id,
+          marketplace,
+          [productObj],
+          product.account_id || undefined
+        );
         success = res.success;
         errorMsg = res.error || '';
       }
@@ -102,9 +112,12 @@ export class SentinelDefenseExecutor {
 
       if (!pId) throw new Error(`Invalid ID for product ${product.product_id}`);
 
-      const res = await marketplaceService.updatePrices(user.id, marketplace, [
-        { id: pId, price: newPrice },
-      ]);
+      const res = await marketplaceService.updatePrices(
+        user.id,
+        marketplace,
+        [{ id: pId, price: newPrice }],
+        product.account_id || undefined
+      );
       updateSuccess = res.success;
     } catch (e) {
       logger.error(`Smart Reprice failed for ${product.product_id}`, e, { userId: user.id });

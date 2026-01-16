@@ -1,17 +1,17 @@
 // ============================================
-// NeuroAgent — Main App Entry
-// Agent-first interface for WB & Ozon sellers
+// NeuroAgent — Main App Entry V4.0 (Premium)
+// Aesthetic: System Initialization | Tactical Dashboard
 // ============================================
 
-import { useEffect, useState, useRef, lazy, Suspense } from 'react';
-import { motion } from 'framer-motion';
+import React, { useEffect, useState, useRef, lazy, Suspense } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAppStore, useProductsStore } from './stores';
-import { initTelegramWebApp, isTelegramWebApp, getInitData } from './lib/telegram';
+import { initTelegramWebApp, isTelegramWebApp, getInitData, hapticFeedback } from './lib/telegram';
 import { authApi, productsApi } from './lib/api';
+import { Package, Settings, Info, Cpu, Terminal, AlertTriangle } from 'lucide-react';
 import './index.css';
 
-// Lazy load pages for better initial bundle size
-// Lazy load pages for better initial bundle size
+// Lazy load pages
 const AgentPage = lazy(() => import('./pages/AgentPage').then(m => ({ default: m.AgentPage })));
 const ProductsPage = lazy(() =>
   import('./pages/ProductsPage').then(m => ({ default: m.ProductsPage }))
@@ -30,121 +30,83 @@ const GodModePage = lazy(() =>
   import('./pages/GodModePage').then(m => ({ default: m.GodModePage }))
 );
 
-// Loading screen with NEURO-UI V3.1 branding
+// Premium Loading Screen V4.0
 function LoadingScreen() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[#020617]">
-      {/* Cosmic Background Glow */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(124,58,237,0.15)_0%,transparent_50%)]" />
+    <div className="h-dvh flex flex-col items-center justify-center bg-black overflow-hidden relative">
+      <div className="bg-glow-spot top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-60 scale-150" />
 
       <motion.div
-        initial={{ opacity: 0, scale: 0.8 }}
+        initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="text-center relative z-10"
+        className="text-center relative z-20"
       >
-        {/* Neon Sphere (Agent Brain) */}
-        <motion.div
-          className="relative mx-auto mb-8"
-          animate={{
-            scale: [1, 1.05, 1],
-          }}
-          transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-        >
-          <div className="w-24 h-24 neon-sphere" />
+        <div className="relative mb-12">
           <motion.div
-            className="absolute inset-0 rounded-full"
-            animate={{ opacity: [0.3, 0.6, 0.3] }}
-            transition={{ duration: 2, repeat: Infinity }}
-            style={{
-              background: 'radial-gradient(circle, rgba(139,92,246,0.4) 0%, transparent 70%)',
-              filter: 'blur(20px)',
-            }}
+            className="absolute inset-0 bg-indigo-500/20 rounded-full blur-3xl"
+            animate={{ scale: [1, 1.4, 1], opacity: [0.2, 0.5, 0.2] }}
+            transition={{ duration: 3, repeat: Infinity }}
           />
-        </motion.div>
+          <div className="relative p-1 rounded-full border border-indigo-500/30">
+            <img
+              src="/agent-avatar.png"
+              alt="Victor"
+              className="w-32 h-32 rounded-full object-cover grayscale-[0.3] shadow-2xl"
+            />
+            <motion.div
+              className="absolute inset-0 border-2 border-lime-400/50 rounded-full"
+              animate={{ scale: [1, 1.1, 1], opacity: [0.5, 0, 0.5] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            />
+          </div>
+        </div>
 
-        {/* Title */}
-        <h1 className="text-2xl font-bold text-white mb-2">NeuroGuardian</h1>
-        <p className="text-slate-400 text-sm mb-6">Инициализация системы защиты...</p>
+        <div className="flex flex-col items-center gap-2">
+          <h1 className="text-2xl font-black italic tracking-tighter text-white/90 uppercase">
+            NEURO<span className="text-indigo-500">GUARDIAN</span>
+          </h1>
+          <div className="flex items-center gap-2 text-[10px] mono-data text-zinc-500 font-bold uppercase tracking-[0.3em]">
+            <Terminal className="w-3 h-3 text-lime-400" /> Initializing Tactical Layer...
+          </div>
+        </div>
 
-        {/* Loading bar */}
-        <div className="w-48 h-1 bg-slate-800 rounded-full overflow-hidden mx-auto">
+        <div className="mt-10 w-40 h-[2px] bg-white/5 rounded-full overflow-hidden mx-auto relative">
           <motion.div
-            className="h-full bg-gradient-to-r from-violet-600 to-violet-500 rounded-full"
-            initial={{ width: '0%' }}
-            animate={{ width: '100%' }}
-            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+            className="h-full bg-gradient-to-r from-indigo-600 via-lime-400 to-indigo-600 shadow-[0_0_10px_#bef264]"
+            initial={{ left: '-100%' }}
+            animate={{ left: '100%' }}
+            transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+            style={{ position: 'absolute', width: '60%' }}
           />
         </div>
       </motion.div>
+
+      <div className="absolute bottom-10 text-[9px] font-black italic text-zinc-700 uppercase tracking-widest">
+        Victor Agent v4.0.2 • Authorized Access Only
+      </div>
     </div>
   );
 }
 
-// DEV_MODE: Enable local development without Telegram
-// Set VITE_DEV_MODE=true in .env for local testing
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
-
-// Mock user for development (only used when DEV_MODE=true)
-import type { User } from './types';
-
-const DEV_USER: User = {
+const DEV_USER: any = {
   telegramId: 7548070478,
-  username: 'slava9999', // Updated to match user context if possible, but ID is key
-  firstName: 'Developer',
-  lastName: 'User',
-  photoUrl: null,
-
-  // Subscription
+  firstName: 'Commander',
   subscriptionActive: true,
-  subscriptionExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
   subscriptionPlan: 'pro',
-  subscriptionDaysLeft: 365,
-
-  // Protection settings
   protectionEnabled: true,
-  defenseMode: 'price_correction',
-
-  // API Keys (empty - user will add in settings)
-  wbKeyRef: null,
-  ozonKeyRef: null,
-
-  // Stats
-  totalProducts: 0,
-  triggeredToday: 0,
-  savedAmount: 0,
-
-  // Sentinel buffer settings
   priceBufferPercent: 5,
-  warningThresholdPercent: 10,
-
-  // Timestamps
-  createdAt: new Date(),
-  updatedAt: new Date(),
-  lastActiveAt: new Date(),
 };
 
-// Pages enum - Agent is first!
 type Page = 'agent' | 'products' | 'settings' | 'info' | 'ops' | 'subscription' | 'god-mode';
 
 function App() {
-  const setUser = useAppStore(state => state.setUser);
-  const setLoading = useAppStore(state => state.setLoading);
-  const isLoading = useAppStore(state => state.isLoading);
-
+  const { setUser, setLoading, isLoading } = useAppStore();
   const [isInitialized, setIsInitialized] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState<Page>(() => {
     const params = new URLSearchParams(window.location.search);
-    const pageParam = params.get('page') as Page;
-    if (
-      pageParam &&
-      ['agent', 'products', 'settings', 'info', 'ops', 'subscription', 'god-mode'].includes(
-        pageParam
-      )
-    ) {
-      return pageParam;
-    }
-    return 'agent';
+    return (params.get('page') as Page) || 'agent';
   });
 
   const initPerformed = useRef(false);
@@ -155,16 +117,28 @@ function App() {
 
     async function init() {
       setLoading(true);
-
       try {
-        // DEV_MODE: Skip Telegram auth for local development
         if (DEV_MODE && !isTelegramWebApp()) {
-          console.log('🔧 DEV_MODE: Running with mock user');
-          console.warn('⚠️ DEV MODE ACTIVE - DO NOT USE IN PRODUCTION');
           setUser(DEV_USER);
-
-          // Try to load products from API (will work if backend is running)
-          try {
+          const productsResult = await productsApi.getProducts();
+          if (productsResult.products) {
+            const products = productsResult.products.map(p => ({
+              ...p,
+              vendorCode: p.vendorCode || '',
+              imageUrl: p.imageUrl || '',
+              lastCheckedAt: new Date(),
+              lastTriggeredAt: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            }));
+            useProductsStore.getState().setProducts(products as any);
+          }
+        } else if (isTelegramWebApp()) {
+          initTelegramWebApp();
+          const initData = getInitData();
+          if (initData) {
+            const authResult = await authApi.login(initData);
+            setUser(authResult.user);
             const productsResult = await productsApi.getProducts();
             if (productsResult.products) {
               const products = productsResult.products.map(p => ({
@@ -176,243 +150,133 @@ function App() {
                 createdAt: new Date(),
                 updatedAt: new Date(),
               }));
-              useProductsStore.getState().setProducts(products);
-              console.log('📦 Products loaded:', products.length);
+              useProductsStore.getState().setProducts(products as any);
             }
-          } catch {
-            console.log('📦 No products yet (connect your store in Settings)');
-          }
-        } else if (isTelegramWebApp()) {
-          console.log('🚀 Telegram WebApp detected');
-          initTelegramWebApp();
-
-          const initData = getInitData();
-          if (initData) {
-            console.log('📱 Authenticating with Telegram...');
-            const authResult = await authApi.login(initData);
-            console.log('✅ Auth successful:', authResult.user);
-
-            setUser(authResult.user);
-
-            // Load products
-            try {
-              const productsResult = await productsApi.getProducts();
-              if (productsResult.products) {
-                // Convert ProductData to Product with required timestamps
-                const products = productsResult.products.map(p => ({
-                  ...p,
-                  vendorCode: p.vendorCode || '',
-                  imageUrl: p.imageUrl || '',
-                  lastCheckedAt: new Date(),
-                  lastTriggeredAt: null,
-                  createdAt: new Date(),
-                  updatedAt: new Date(),
-                }));
-                useProductsStore.getState().setProducts(products);
-                console.log('📦 Products loaded:', products.length);
-              }
-            } catch {
-              console.log('📦 No products yet');
-            }
-          } else {
-            setAuthError('Не удалось получить данные авторизации Telegram');
           }
         } else {
-          // Not in Telegram and DEV_MODE is off
-          console.warn('⚠️ Not running in Telegram WebApp - authentication required');
-          setAuthError('Приложение работает только внутри Telegram');
+          setAuthError('Доступ заблокирован. Используйте Telegram-клиент.');
         }
       } catch (error) {
-        console.error('❌ Init error:', error);
-        setAuthError('Ошибка аутентификации. Попробуйте перезапустить приложение.');
+        setAuthError('Критический сбой инициализации.');
       } finally {
         setLoading(false);
         setIsInitialized(true);
       }
     }
-
     init();
   }, [setUser, setLoading]);
 
-  // Navigation functions
-  const goToAgent = () => setCurrentPage('agent');
-  const goToProducts = () => setCurrentPage('products');
-  const goToSettings = () => setCurrentPage('settings');
-  const goToInfo = () => setCurrentPage('info');
-  const goToOps = () => setCurrentPage('ops');
-  const goToGodMode = () => setCurrentPage('god-mode');
+  if (!isInitialized || isLoading) return <LoadingScreen />;
 
-  if (!isInitialized || isLoading) {
-    return <LoadingScreen />;
-  }
-
-  // Show auth error if not in Telegram
   if (authError) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-linear-to-b from-stone-900 to-stone-800 p-6">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center max-w-sm"
-        >
-          <div className="text-6xl mb-6">🔐</div>
-          <h1 className="text-2xl font-bold text-white mb-4">Требуется авторизация</h1>
-          <p className="text-stone-400 mb-6">{authError}</p>
-          <a
-            href="https://t.me/NeuroGuardianBot"
-            className="inline-block px-6 py-3 bg-violet-500 text-white font-medium rounded-xl hover:bg-violet-600 transition-colors"
-          >
-            Открыть в Telegram
-          </a>
-        </motion.div>
+      <div className="h-dvh flex flex-col items-center justify-center bg-black p-8 text-center bg-cyber">
+        <AlertTriangle className="w-16 h-16 text-red-500 mb-6 animate-pulse" />
+        <h1 className="text-xl font-black italic text-white mb-2 uppercase tracking-tighter">
+          SECURITY BREACH
+        </h1>
+        <p className="text-zinc-500 text-sm mb-8 font-medium">{authError}</p>
+        <a href="https://t.me/NeuroGuardianBot" className="btn-premium w-full max-w-xs">
+          RECONNECT SYSTEM
+        </a>
       </div>
     );
   }
 
-  return (
-    <>
-      {/* Pages - wrapped in Suspense for lazy loading */}
-      <Suspense fallback={<LoadingScreen />}>
-        {currentPage === 'agent' && <AgentPage />}
-        {currentPage === 'products' && <ProductsPage onBack={goToAgent} />}
-        {currentPage === 'settings' && (
+  const PageContent = () => {
+    switch (currentPage) {
+      case 'agent':
+        return <AgentPage />;
+      case 'products':
+        return <ProductsPage onBack={() => setCurrentPage('agent')} />;
+      case 'settings':
+        return (
           <SettingsPage
-            onBack={goToAgent}
-            onNavigate={p => {
-              if (p === 'ops') goToOps();
-              if (p === 'god-mode') goToGodMode();
-            }}
+            onBack={() => setCurrentPage('agent')}
+            onNavigate={(p: any) => setCurrentPage(p)}
           />
-        )}
-        {currentPage === 'info' && <LegalPage onBack={goToAgent} />}
-        {currentPage === 'info' && <LegalPage onBack={goToAgent} />}
-        {currentPage === 'ops' && <OpsPanelPage onBack={goToAgent} />}
-        {currentPage === 'subscription' && <SubscriptionPage onBack={goToSettings} />}
-        {currentPage === 'god-mode' && <GodModePage />}
+        );
+      case 'info':
+        return <LegalPage onBack={() => setCurrentPage('agent')} />;
+      case 'ops':
+        return <OpsPanelPage onBack={() => setCurrentPage('agent')} />;
+      case 'subscription':
+        return <SubscriptionPage onBack={() => setCurrentPage('settings')} />;
+      case 'god-mode':
+        return <GodModePage />;
+      default:
+        return <AgentPage />;
+    }
+  };
+
+  return (
+    <div className="h-dvh flex flex-col">
+      <Suspense fallback={<LoadingScreen />}>
+        <PageContent />
       </Suspense>
 
-      {/* Bottom Tab Bar - NEURO-UI V3.1 */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-[#020617]/95 backdrop-blur-xl border-t border-white/5 safe-area-inset-bottom z-40">
-        <div className="flex justify-around py-2">
-          {/* Agent Tab - Primary */}
-          <button
-            onClick={goToAgent}
-            className={`flex flex-col items-center gap-1 px-5 py-2 transition-all relative ${
-              currentPage === 'agent' ? 'text-violet-400' : 'text-slate-500 hover:text-slate-300'
-            }`}
-          >
-            {currentPage === 'agent' && (
-              <motion.div
-                layoutId="tab-indicator"
-                className="absolute inset-0 rounded-xl bg-violet-500/10"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-              />
-            )}
-            <div className="relative">
-              {/* Neon sphere mini icon */}
-              <div
-                className={`w-6 h-6 rounded-full ${currentPage === 'agent' ? 'bg-gradient-to-br from-violet-500 to-violet-600 shadow-[0_0_12px_rgba(124,58,237,0.5)]' : 'bg-slate-700'}`}
-              />
-              {currentPage !== 'agent' && (
-                <motion.span
-                  className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400"
-                  animate={{ scale: [1, 1.2, 1] }}
-                  transition={{ duration: 1.5, repeat: Infinity }}
-                />
-              )}
-            </div>
-            <span className="text-xs font-medium relative">Агент</span>
-          </button>
-
-          {/* Products Tab */}
-          <button
-            onClick={goToProducts}
-            className={`flex flex-col items-center gap-1 px-5 py-2 transition-all relative ${
-              currentPage === 'products' ? 'text-violet-400' : 'text-slate-500 hover:text-slate-300'
-            }`}
-          >
-            {currentPage === 'products' && (
-              <motion.div
-                layoutId="tab-indicator"
-                className="absolute inset-0 rounded-xl bg-violet-500/10"
-              />
-            )}
-            <svg
-              width="22"
-              height="22"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              className="relative"
-            >
-              <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
-              <line x1="3" y1="6" x2="21" y2="6" />
-              <path d="M16 10a4 4 0 0 1-8 0" />
-            </svg>
-            <span className="text-xs font-medium relative">Товары</span>
-          </button>
-
-          {/* Settings Tab */}
-          <button
-            onClick={goToSettings}
-            className={`flex flex-col items-center gap-1 px-5 py-2 transition-all relative ${
-              currentPage === 'settings' ? 'text-violet-400' : 'text-slate-500 hover:text-slate-300'
-            }`}
-          >
-            {currentPage === 'settings' && (
-              <motion.div
-                layoutId="tab-indicator"
-                className="absolute inset-0 rounded-xl bg-violet-500/10"
-              />
-            )}
-            <svg
-              width="22"
-              height="22"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              className="relative"
-            >
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-            </svg>
-            <span className="text-xs font-medium relative">Настройки</span>
-          </button>
-
-          {/* Info Tab */}
-          <button
-            onClick={goToInfo}
-            className={`flex flex-col items-center gap-1 px-5 py-2 transition-all relative ${
-              currentPage === 'info' ? 'text-violet-400' : 'text-slate-500 hover:text-slate-300'
-            }`}
-          >
-            {currentPage === 'info' && (
-              <motion.div
-                layoutId="tab-indicator"
-                className="absolute inset-0 rounded-xl bg-violet-500/10"
-              />
-            )}
-            <svg
-              width="22"
-              height="22"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              className="relative"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="16" x2="12" y2="12" />
-              <line x1="12" y1="8" x2="12.01" y2="8" />
-            </svg>
-            <span className="text-xs font-medium relative">Инфо</span>
-          </button>
+      {/* Premium Apple-style Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 nav-blur border-t border-white/5 safe-area-inset-bottom z-50">
+        <div className="flex justify-around items-center h-16 px-4">
+          <NavButton
+            active={currentPage === 'agent'}
+            onClick={() => setCurrentPage('agent')}
+            icon={<Cpu />}
+            label="Agent"
+          />
+          <NavButton
+            active={currentPage === 'products'}
+            onClick={() => setCurrentPage('products')}
+            icon={<Package />}
+            label="Units"
+          />
+          <NavButton
+            active={currentPage === 'settings'}
+            onClick={() => setCurrentPage('settings')}
+            icon={<Settings />}
+            label="Control"
+          />
+          <NavButton
+            active={currentPage === 'info'}
+            onClick={() => setCurrentPage('info')}
+            icon={<Info />}
+            label="Log"
+          />
         </div>
       </nav>
-    </>
+    </div>
+  );
+}
+
+function NavButton({ active, onClick, icon, label }: any) {
+  return (
+    <button
+      onClick={() => {
+        hapticFeedback('light');
+        onClick();
+      }}
+      className={`relative flex flex-col items-center gap-1 transition-all flex-1 py-1 ${active ? 'text-indigo-500' : 'text-zinc-600'}`}
+    >
+      <motion.div
+        whileTap={{ scale: 0.9, y: 3 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 10 }}
+        className={`p-1.5 rounded-xl transition-colors ${active ? 'bg-indigo-500/10 border border-indigo-500/20' : 'border border-transparent'}`}
+      >
+        {React.cloneElement(icon, { size: 18, strokeWidth: active ? 2.5 : 2 })}
+      </motion.div>
+      <span
+        className={`text-[9px] font-black uppercase tracking-wider transition-opacity ${active ? 'opacity-100' : 'opacity-40'}`}
+      >
+        {label}
+      </span>
+      {active && (
+        <motion.div
+          layoutId="nav-glow"
+          className="absolute -bottom-1 w-8 h-1 bg-indigo-500 blur-sm rounded-full"
+          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        />
+      )}
+    </button>
   );
 }
 
