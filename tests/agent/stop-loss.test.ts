@@ -97,7 +97,7 @@ describe('executeSetStopLoss', () => {
 
     expect(result.success).toBe(false);
     // Zod returns "Invalid input" when field is missing
-    expect(result.error).toContain('Required');
+    expect(result.error).toContain('Invalid input');
   });
 
   it('should fail on negative price', async () => {
