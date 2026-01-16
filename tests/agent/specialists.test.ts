@@ -153,10 +153,12 @@ describe('Specialists', () => {
       expect(sentinelSpecialist.name).toBe('SentinelSpecialist');
     });
 
-    it('should have 2 tools', () => {
-      expect(sentinelSpecialist.tools).toHaveLength(2);
+    it('should have 4 tools', () => {
+      expect(sentinelSpecialist.tools).toHaveLength(4);
       expect(sentinelSpecialist.tools).toContain('get_competitor_price');
       expect(sentinelSpecialist.tools).toContain('get_system_logs');
+      expect(sentinelSpecialist.tools).toContain('set_stop_loss');
+      expect(sentinelSpecialist.tools).toContain('bulk_protect_products');
     });
 
     it('should have systemPrompt with status system', () => {
@@ -200,16 +202,15 @@ describe('Specialists', () => {
 
     it('should have systemPrompt with formulas', () => {
       const prompt = analyticsSpecialist.systemPrompt;
-      expect(prompt).toContain('Маржа');
-      expect(prompt).toContain('Комиссия');
+      expect(prompt).toContain('Чистая маржа');
+      expect(prompt).toContain('Комиссия WB');
       expect(prompt).toContain('Логистика');
     });
 
     it('should have ABC analysis explanation', () => {
       const prompt = analyticsSpecialist.systemPrompt;
-      expect(prompt).toContain('80%');
-      expect(prompt).toContain('15%');
-      expect(prompt).toContain('5%');
+      expect(prompt).toContain('категория С');
+      expect(prompt).toContain('50%');
     });
 
     it('should build context with analytics prefix', async () => {

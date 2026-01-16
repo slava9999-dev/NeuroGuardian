@@ -29,6 +29,15 @@ export const setStopLossTool = defineTool<SetStopLossArgs>({
       const { getFilteredProducts, updateProductMinPrice } =
         await import('../../../api-lib/services/database.js');
 
+      // Manual validation to ensure data integrity
+      const validation = SetStopLossArgsSchema.safeParse(args);
+      if (!validation.success) {
+        return {
+          success: false,
+          error: validation.error.issues.map(i => i.message || i.path.join('.')).join(', '),
+        };
+      }
+
       // Find the product directly via SQL
       const products = await getFilteredProducts(userId, {
         search: args.product_id,

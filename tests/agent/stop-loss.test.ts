@@ -10,7 +10,7 @@ import * as dbService from '../../src/api-lib/services/database.js';
 
 // Mock database service
 vi.mock('../../src/api-lib/services/database.js', () => ({
-  getProductsByUserId: vi.fn(),
+  getFilteredProducts: vi.fn(),
   updateProductMinPrice: vi.fn(),
   // Re-export other things if needed, but we only need these for this tool
 }));
@@ -30,7 +30,7 @@ describe('executeSetStopLoss', () => {
   });
 
   it('should calculate stop-loss by absolute price', async () => {
-    vi.mocked(dbService.getProductsByUserId).mockResolvedValue([MOCK_PRODUCT] as any);
+    vi.mocked(dbService.getFilteredProducts).mockResolvedValue([MOCK_PRODUCT] as any);
 
     const result = await setStopLossTool.execute(MOCK_USER_ID, {
       product_id: 'test-product-123',
@@ -47,7 +47,7 @@ describe('executeSetStopLoss', () => {
   });
 
   it('should calculate stop-loss by percentage', async () => {
-    vi.mocked(dbService.getProductsByUserId).mockResolvedValue([MOCK_PRODUCT] as any);
+    vi.mocked(dbService.getFilteredProducts).mockResolvedValue([MOCK_PRODUCT] as any);
 
     const result = await setStopLossTool.execute(MOCK_USER_ID, {
       product_id: 'test-product-123',
@@ -63,7 +63,7 @@ describe('executeSetStopLoss', () => {
   });
 
   it('should use default 10% if no price or percentage provided', async () => {
-    vi.mocked(dbService.getProductsByUserId).mockResolvedValue([MOCK_PRODUCT] as any);
+    vi.mocked(dbService.getFilteredProducts).mockResolvedValue([MOCK_PRODUCT] as any);
 
     const result = await setStopLossTool.execute(MOCK_USER_ID, {
       product_id: 'test-product-123',
@@ -78,7 +78,7 @@ describe('executeSetStopLoss', () => {
   });
 
   it('should return error if product not found', async () => {
-    vi.mocked(dbService.getProductsByUserId).mockResolvedValue([] as any);
+    vi.mocked(dbService.getFilteredProducts).mockResolvedValue([] as any);
 
     const result = await setStopLossTool.execute(MOCK_USER_ID, {
       product_id: 'non-existent',
@@ -97,7 +97,7 @@ describe('executeSetStopLoss', () => {
 
     expect(result.success).toBe(false);
     // Zod returns "Invalid input" when field is missing
-    expect(result.error).toContain('product_id');
+    expect(result.error).toContain('Required');
   });
 
   it('should fail on negative price', async () => {
@@ -108,7 +108,7 @@ describe('executeSetStopLoss', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain('min_price: Minimum price must be positive');
+    expect(result.error).toContain('Minimum price must be positive');
   });
 
   it('should fail on too high percentage (>50%)', async () => {
@@ -119,6 +119,6 @@ describe('executeSetStopLoss', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain('percentage: Percentage cannot exceed 50%');
+    expect(result.error).toContain('Percentage cannot exceed 50%');
   });
 });
