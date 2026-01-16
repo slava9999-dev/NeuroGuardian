@@ -54,23 +54,6 @@ export async function handleGenerateContent(
       });
     }
 
-    // Check cache first
-    const cached = await contentSpecialist.getCachedContent(
-      userId,
-      productId,
-      platform as ContentPlatform
-    );
-    if (cached && !includeImage) {
-      logger.info('[ContentHandler] Returning cached content', { userId, productId, platform });
-      return res.json({
-        success: true,
-        fromCache: true,
-        ...cached,
-        platform,
-        quotaRemaining: -1, // Unknown from cache
-      });
-    }
-
     // Generate new content
     const result = await contentSpecialist.generateContent(userId, {
       productId,

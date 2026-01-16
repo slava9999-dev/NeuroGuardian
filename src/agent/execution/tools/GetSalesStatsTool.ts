@@ -3,6 +3,7 @@
 // Version: 5.0.0 | Date: January 2026
 // ============================================
 
+import { defineTool } from '../ToolRegistry.js';
 import {
   GetSalesStatsArgsSchema,
   type GetSalesStatsArgs,
@@ -11,23 +12,17 @@ import {
 /**
  * Get Sales Stats Tool
  *
- * Fetches real sales statistics from WB/Ozon APIs
- * Uses existing marketplace service functions
+ * Industrial implementation with local DB caching + API fallback
  */
 export const getSalesStatsTool = defineTool<GetSalesStatsArgs>({
   name: 'get_sales_stats',
-  description:
-    'Получить статистику продаж за период. Показывает заказы, выручку, возвраты и тренды.',
+  description: 'Get sales statistics (orders, revenue, etc) for a period',
   schema: GetSalesStatsArgsSchema,
   category: 'analyze',
   requiresConfirmation: false,
-  examples: [
-    'User: "продажи за сегодня" → get_sales_stats({ period: "today" })',
-    'User: "статистика за неделю" → get_sales_stats({ period: "week" })',
-    'User: "сколько продал за месяц" → get_sales_stats({ period: "month" })',
-  ],
+  examples: ['sales stats for last week', 'how much revenue today', 'sales on ozon last month'],
 
-  async execute(userId, args) {
+  async execute(userId: number, args: GetSalesStatsArgs) {
     try {
       const { sql } = await import('../../../api-lib/services/database.js');
       const { from, to } = calculateDateRange(args.period || 'week');

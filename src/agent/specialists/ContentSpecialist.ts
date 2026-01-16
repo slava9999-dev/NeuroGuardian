@@ -122,7 +122,7 @@ export class ContentSpecialist extends BaseSpecialist {
     userId: number,
     request: ContentGenerationRequest
   ): Promise<ContentGenerationResult> {
-    const startTime = Date.now();
+    // const startTime = Date.now();
 
     try {
       const quota = await checkAndDecrementQuota(userId);
@@ -229,7 +229,7 @@ export class ContentSpecialist extends BaseSpecialist {
 
   private parseContentResponse(
     response: string,
-    platform: ContentPlatform
+    _platform: ContentPlatform
   ): { postText: string; hashtags: string } {
     const postMatch = response.match(/---POST---\s*([\s\S]*?)\s*---HASHTAGS---/);
     const hashtagsMatch = response.match(/---HASHTAGS---\s*([\s\S]*?)\s*---END---/);

@@ -11,7 +11,7 @@ export { StorageService, storageService } from './StorageService.js';
 export { WatermarkService, watermarkService } from './WatermarkService.js';
 
 // Types
-export type { VisionAnalysisResult, VisionCheckRequest, MaterialType } from './VisionService.js';
+export type { VisionAnalysisResult, VisionCheckRequest } from './VisionService.js';
 
 export type { RenderWorkflow, RenderJobConfig, RenderJob, RenderResult } from './RenderFactory.js';
 
