@@ -1,6 +1,6 @@
 # 📊 Project State — NeuroGUARDIAN
 
-# Updated: 2026-01-16T15:40:00+03:00
+# Updated: 2026-01-16T21:17:00+03:00
 
 # This file tracks current progress and is updated at end of each session
 
@@ -8,8 +8,45 @@
 
 ## 🎯 Current Phase: RELEASE PREPARATION (Phase 12) 🚀 PRODUCTION READY
 
-**Last Session:** 2026-01-16 (Session 63)
-**Focus:** 🎨 NEURO-UI V3.1 Complete Redesign
+**Last Session:** 2026-01-16 (Session 64)
+**Focus:** 🛠 Ozon Order Sync Fix & TypeScript Hardening
+
+### Session 2026-01-16 (Session 64 - Stable Orders & TS Cleanup) 🛠
+
+**Objective: Исправление синхронизации заказов Ozon и устранение всех TS-ошибок для пуша**
+
+> ✅ **CRITICAL:** Исправлена ошибка синхронизации Ozon (FBS V3). Добавлено обязательное поле `to` в фильтры.
+> ✅ **CRITICAL:** Устранены 30+ TypeScript ошибок, блокировавших `git push`.
+> ✅ **MAJOR:** Полная чистка неиспользуемого кода (dead code removal) в ключевых компонентах UI.
+> ✅ **MAJOR:** Проект успешно забилжен и запушен в репозиторий. Все 466 тестов пройдены.
+
+**Completed Actions:**
+
+- [x] **Ozon Fix**: Модифицирован `OzonService.ts`, добавлены даты в запросы FBS/FBO.
+- [x] **TS Hardening**: Исправлены типы в `ProductCard`, `DashboardGrid`, `AlertSender`.
+- [x] **Cleanup**: Удалено более 50 неиспользуемых импортов и иконок (`lucide-react`).
+- [x] **Push & Build**: Успешное выполнение `npm run build` и `git push` (пре-пуш чеки пройдены).
+- [x] **Diagnostics**: Подтверждено получение заказов по Ozon FBS через `debug_ozon_api.mjs`.
+
+**Files Changed:**
+
+```
+src/api-lib/core-services/OzonService.ts — Фикс дат API
+src/components/dashboard/ProductCard.tsx — Исправление обращений к полям
+src/components/dashboard/DashboardGrid.tsx — Добавлен onUpdate prop
+src/pages/AgentPage.tsx — Чистка импортов и неиспользуемых состояний
+src/pages/SettingsPage.tsx — Удаление дубликатов и лишних иконок
+src/sentinel/AlertSender.ts — Фикс типизации логов
++ 3 других файла (App.tsx, SubscriptionPage.tsx)
+```
+
+**Key Insights:**
+
+```
+Ozon V3 API требует строгого соблюдения параметров 'from' и 'to' для FBS.
+Husky + TSC в пре-пуш хуке — отличный фильтр от "грязного" кода.
+Чистка UI компонентов уменьшила размер бандла и улучшила читаемость.
+```
 
 ### Session 2026-01-16 (Session 63 - NEURO-UI V3.1 Obsidian Theme) 🎨
 
@@ -591,7 +628,7 @@ PgVector остается основным движком знаний.
 
 | Metric              | Value         | Target |
 | ------------------- | ------------- | ------ |
-| Unit/Int Tests      | 320           | 250+   |
+| Unit/Int Tests      | 466           | 250+   |
 | Knowledge Base Docs | 13            | 10+    |
 | Pass Typecheck      | ✅ Passed     | ✅     |
 | Production status   | ✅ Live       | ✅     |
@@ -604,11 +641,12 @@ PgVector остается основным движком знаний.
 
 ## 🔴 Critical TODO (P0) - RELEASE BLOCKERS
 
-| #   | Issue                 | Status     | Notes                   |
-| --- | --------------------- | ---------- | ----------------------- |
-| 1   | E2E тест полного флоу | ✅ DONE    | payments logic verified |
-| 2   | Загрузить аватар бота | ⏳ PENDING | viktor_avatar.png       |
-| 3   | Тест YooKassa в проде | ✅ DONE    | logic simulation passed |
+| #   | Issue                            | Status     | Notes                 |
+| --- | -------------------------------- | ---------- | --------------------- |
+| 1   | Configure API_KEY_ENCRYPTION_KEY | ⏳ TODO    | Security risk         |
+| 2   | Fix WB API 429 Rate Limiting     | ⏳ TODO    | Needs 60s delay/queue |
+| 3   | Загрузить аватар бота            | ⏳ PENDING | viktor_avatar.png     |
+| 4   | Ozon FBS Order Sync              | ✅ DONE    | Added 'to' field fix  |
 
 ---
 
@@ -624,4 +662,4 @@ PgVector остается основным движком знаний.
 
 ---
 
-_Last updated: 2026-01-14T09:47:00+03:00_
+_Last updated: 2026-01-16T21:18:00+03:00_
