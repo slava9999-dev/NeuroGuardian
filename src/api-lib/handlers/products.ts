@@ -207,7 +207,7 @@ export async function handleSyncProducts(
             const dbProducts = limitedProducts.map(p => {
               const defaults = smartDefaults?.get(p.product_id);
               return {
-                user_id: userId,
+                user_id: String(userId),
                 product_id: p.product_id,
                 nm_id: p.nm_id || null,
                 title: p.title,
@@ -299,7 +299,7 @@ export async function handleSyncProducts(
           const dbProducts = limitedProducts.map(p => {
             const defaults = smartDefaults?.get(p.product_id);
             return {
-              user_id: userId,
+              user_id: String(userId),
               product_id: p.product_id,
               nm_id: p.nm_id || null,
               title: p.title,
@@ -692,5 +692,79 @@ export async function handleBatchUpdateCosts(
   } catch (error) {
     console.error('Batch update costs error:', error);
     return res.status(500).json({ error: 'Internal server error during batch update' });
+  }
+}
+
+// ============================================
+// 🔴 LOSS PRODUCTS - "5 товаров торгуются в минус"
+// Critical for Dashboard value proposition
+// ============================================
+
+/**
+ * Get products with negative or zero margin
+ * Shows: products where price <= cost_price (trading at loss)
+ */
+export async function handleLossProducts(
+  req: VercelRequest,
+  res: VercelResponse,
+  userId: number
+): Promise<VercelResponse> {
+  try {
+    const { threshold = 0 } = req.query;
+    const marginThreshold = parseFloat(String(threshold)) || 0;
+
+    // Find products where profit margin is below threshold
+    // Uses estimated_buyer_price (what buyer pays after all discounts)
+    const result = await sql`
+      SELECT 
+        p.product_id,
+        p.nm_id,
+        p.title,
+        p.marketplace,
+        p.current_price,
+        p.estimated_buyer_price,
+        p.cost_price,
+        p.min_price,
+        CASE 
+          WHEN p.cost_price > 0 AND p.estimated_buyer_price > 0 
+          THEN ROUND(((p.estimated_buyer_price - p.cost_price) / p.estimated_buyer_price * 100)::numeric, 1)
+          ELSE NULL
+        END as margin_percent,
+        CASE 
+          WHEN p.cost_price > 0 AND p.estimated_buyer_price > 0 
+          THEN ROUND((p.estimated_buyer_price - p.cost_price)::numeric, 2)
+          ELSE NULL
+        END as profit_per_unit
+      FROM products p
+      WHERE p.user_id = ${userId}
+        AND p.cost_price IS NOT NULL
+        AND p.cost_price > 0
+        AND p.estimated_buyer_price IS NOT NULL
+        AND (
+          p.estimated_buyer_price <= p.cost_price 
+          OR (p.estimated_buyer_price - p.cost_price) / p.estimated_buyer_price * 100 < ${marginThreshold}
+        )
+      ORDER BY profit_per_unit ASC NULLS LAST
+      LIMIT 50
+    `;
+
+    const lossProducts = result.rows;
+    const totalLoss = lossProducts
+      .filter(p => p.profit_per_unit !== null && p.profit_per_unit < 0)
+      .reduce((sum, p) => sum + Math.abs(Number(p.profit_per_unit) || 0), 0);
+
+    return res.json({
+      success: true,
+      count: lossProducts.length,
+      totalPotentialLossPerUnit: Math.round(totalLoss),
+      products: lossProducts,
+      alert:
+        lossProducts.length > 0
+          ? `⚠️ Внимание! ${lossProducts.length} товаров торгуются в минус или с низкой маржой. Исправьте цены!`
+          : null,
+    });
+  } catch (error) {
+    console.error('Loss products error:', error);
+    return res.status(500).json({ error: 'Failed to get loss products' });
   }
 }

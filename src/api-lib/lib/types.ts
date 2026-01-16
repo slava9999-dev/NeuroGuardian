@@ -111,12 +111,12 @@ export interface DBUser {
 
 export interface Product {
   id: number;
-  user_id: number;
+  user_id: string; // Changed to string
   sku: string;
   name: string;
   current_price: number;
   min_price?: number;
-  wb_nmid?: number;
+  wb_nmid?: string; // Changed to string
   ozon_product_id?: string;
   marketplace: 'WB' | 'Ozon';
   stock: number;
@@ -137,9 +137,9 @@ export type PendingPriceStatus = 'pending' | 'processing' | 'completed' | 'faile
  */
 export interface DBProduct {
   id: number; // SERIAL PRIMARY KEY
-  user_id: number; // BIGINT NOT NULL REFERENCES users(id)
+  user_id: string; // VARCHAR(50) NOT NULL REFERENCES users(id)
   product_id: string; // VARCHAR(255) NOT NULL
-  nm_id: number | null; // BIGINT (WB nmId)
+  nm_id: string | null; // VARCHAR(50) (WB nmId)
   offer_id: string | null; // VARCHAR(255) (Ozon offer_id - migration 007)
   official_sku: string | null; // VARCHAR(255)
   title: string; // VARCHAR(500) NOT NULL

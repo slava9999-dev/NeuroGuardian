@@ -47,7 +47,7 @@ export class WbService {
     // Step 4: Map to unified format
     return cards.map(card => ({
       product_id: `wb-${card.nmID}`,
-      nm_id: card.nmID,
+      nm_id: card.nmID.toString(),
       title: card.title || card.subjectName || 'Без названия',
       image_url: card.photos?.[0]?.big || card.photos?.[0]?.c246x328 || null,
       current_price: priceMap.get(card.nmID) || 0,
@@ -56,6 +56,8 @@ export class WbService {
       width_cm: card.dimensions?.width,
       height_cm: card.dimensions?.height,
       depth_cm: card.dimensions?.length,
+      needs_details_update:
+        !card.dimensions?.width || !card.dimensions?.height || !card.dimensions?.length,
     }));
   }
 
@@ -540,6 +542,108 @@ export class WbService {
       console.warn('WB fetchOrders error:', e);
     }
     return [];
+  }
+
+  /**
+   * Fetch detailed dimensions for specific products
+   * Checks both 'dimensions' object and 'characteristics' array
+   */
+  async updateProductDimensions(
+    apiKey: string,
+    nmIds: number[]
+  ): Promise<Map<number, { width: number; height: number; depth: number; weight: number }>> {
+    const dimensionsMap = new Map<
+      number,
+      { width: number; height: number; depth: number; weight: number }
+    >();
+
+    if (nmIds.length === 0) return dimensionsMap;
+
+    try {
+      let hasMore = true;
+      let updatedAt: string | undefined = undefined;
+      let nmID: number | undefined = undefined;
+
+      let loops = 0;
+      const targetIds = new Set(nmIds);
+
+      // Scan up to 50 pages (5000 items) or until found
+      // This is inefficient if user has 10k items, but API limitation requires scanning
+      while (hasMore && targetIds.size > 0 && loops < 50) {
+        loops++;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const body: any = {
+          settings: {
+            cursor: { limit: 100 },
+            filter: { withPhoto: -1 },
+          },
+        };
+
+        if (updatedAt && nmID) {
+          body.settings.cursor.updatedAt = updatedAt;
+          body.settings.cursor.nmID = nmID;
+        }
+
+        const response = await fetch(`${this.CONTENT_API_URL}/get/cards/list`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: apiKey,
+          },
+          body: JSON.stringify(body),
+        });
+
+        if (!response.ok) break;
+
+        const data = await response.json();
+        const cards: WbCard[] = data.cards || [];
+
+        if (cards.length < 100) hasMore = false;
+
+        if (cards.length > 0) {
+          const last = cards[cards.length - 1];
+          updatedAt = last.updatedAt;
+          nmID = last.nmID;
+
+          for (const card of cards) {
+            if (targetIds.has(card.nmID)) {
+              let width = card.dimensions?.width || 0;
+              let height = card.dimensions?.height || 0;
+              let depth = card.dimensions?.length || 0;
+              const weight = 0;
+
+              // Fallback to characteristics
+              if (!width || !height || !depth) {
+                const chars = card.characteristics || [];
+                for (const char of chars) {
+                  const name = char.name.toLowerCase();
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  const val: any = char.value;
+                  const value = Array.isArray(val) ? val[0] : val;
+                  const numVal = parseInt(String(value).replace(/\D/g, '')) || 0;
+
+                  if (name.includes('ширина упаковки')) width = numVal;
+                  else if (name.includes('высота упаковки')) height = numVal;
+                  else if (name.includes('длина упаковки')) depth = numVal;
+                }
+              }
+
+              // Only add if we found something useful
+              if (width || height || depth) {
+                dimensionsMap.set(card.nmID, { width, height, depth, weight });
+                targetIds.delete(card.nmID);
+              }
+            }
+          }
+        } else {
+          hasMore = false;
+        }
+      }
+    } catch (e) {
+      console.warn('Error fetching detailed dimensions:', e);
+    }
+
+    return dimensionsMap;
   }
 }
 

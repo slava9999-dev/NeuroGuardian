@@ -56,50 +56,64 @@ export interface VisionCheckRequest {
   imageBase64?: string;
   checkType: 'full' | 'quality_only' | 'compliance_only';
   targetMarketplace?: 'WB' | 'Ozon' | 'both';
+  mode?: 'fast' | 'deep_scan'; // Added mode
 }
 
 // ============================================
 // Gemini Vision Provider
 // ============================================
 
-const GEMINI_VISION_MODEL = 'gemini-1.5-pro'; // Vendor alias for latest stable model
+const GEMINI_VISION_MODEL_PRO = 'gemini-1.5-pro';
+const GEMINI_VISION_MODEL_FAST = 'gemini-1.5-flash';
 
-const VISION_ANALYSIS_PROMPT = `Ты — экспертная система контроля качества для товаров из дерева и эпоксидной смолы.
+// ============================================
+// 🌍 UNIVERSAL MARKETPLACE QUALITY PROMPT
+// Works for ANY product: clothing, electronics, toys, etc.
+// ============================================
+const VISION_ANALYSIS_PROMPT = `Ты — строгий контролёр качества фотографий для маркетплейсов (Wildberries, Ozon).
 
-Проанализируй изображение и верни ТОЛЬКО валидный JSON (без markdown, без комментариев):
+ЗАДАЧА: Проанализируй изображение товара и верни ТОЛЬКО валидный JSON:
 
 {
-  "lighting_score": <0-10, оценка освещения>,
-  "composition_score": <0-10, композиция кадра>,
+  "lighting_score": <0-10, освещение>,
+  "composition_score": <0-10, композиция>,
   "sharpness_score": <0-10, резкость>,
   "blur_detected": <true/false>,
   "overexposed": <true/false>,
   "underexposed": <true/false>,
   "noise_level": <"low"|"medium"|"high">,
-  "material_detected": <"oak"|"ash"|"walnut"|"beech"|"resin"|"epoxy"|"unknown">,
+  "product_category": <определённая категория: "одежда"|"обувь"|"электроника"|"игрушки"|"мебель"|"декор"|"косметика"|"продукты"|"другое">,
+  "material_detected": <определённый материал или "unknown">,
   "material_confidence": <0-1>,
-  "texture_tags": [<массив тегов на русском: "живой край", "сучки", "годовые кольца", "эпоксидная река">],
-  "wb_compliant": <true/false - подходит для Wildberries?>,
-  "wb_issues": [<проблемы для WB: "Нужен белый фон", "Низкое разрешение">],
+  "quality_issues": [<список проблем на русском>],
+  "selling_points": [<5 продающих преимуществ для описания товара>],
+  "wb_compliant": <true/false>,
+  "wb_issues": [<проблемы для WB>],
   "ozon_compliant": <true/false>,
   "ozon_issues": [<проблемы для Ozon>],
-  "product_category": <"столешница"|"стол"|"разделочная доска"|"часы"|"декор"|null>,
   "detected_colors": [<основные цвета>],
-  "dimensions_visible": <true/false - видны ли размеры/масштаб>,
-  "seo_tags_ru": [<SEO теги на русском, 5-10 штук>],
-  "seo_tags_en": [<SEO теги на английском, 5-10 штук>]
+  "dimensions_visible": <true/false>,
+  "seo_tags_ru": [<5-10 SEO тегов на русском>],
+  "seo_tags_en": [<5-10 SEO тегов на английском>],
+  "quality_verdict": <"excellent"|"good"|"needs_work"|"reject">,
+  "improvement_tips": [<конкретные советы по улучшению фото>]
 }
 
 ПРАВИЛА ОЦЕНКИ WB COMPLIANCE:
-- Фон должен быть белым или светлым (не тёмный)
+- Фон белый или светлый (не тёмный, не пёстрый)
 - Разрешение минимум 900x1200
-- Товар должен занимать 60-80% кадра
-- Не должно быть посторонних предметов
-- Не должно быть водяных знаков
+- Товар занимает 60-80% кадра
+- Нет посторонних предметов
+- Нет водяных знаков, логотипов, надписей
+- Товар в фокусе, без размытия
 
 ПРАВИЛА ОЦЕНКИ OZON:
-- Аналогично WB, но менее строгие требования к фону
-- Допускаются lifestyle-фото`;
+- Аналогично WB, но допускается серый фон (#f2f2f2)
+- Lifestyle-фото допускаются
+- Товар целиком в кадре
+
+ВАЖНО: Если фото плохого качества, напиши в quality_verdict "needs_work" или "reject" и укажи конкретные improvement_tips.
+Если фото хорошее — сгенерируй 5 продающих selling_points для описания товара.`;
 
 export class VisionService {
   private apiKey: string;
@@ -120,6 +134,9 @@ export class VisionService {
     if (!this.apiKey) {
       throw new Error('GEMINI_API_KEY not configured');
     }
+
+    // Determine model
+    const model = request.mode === 'deep_scan' ? GEMINI_VISION_MODEL_PRO : GEMINI_VISION_MODEL_FAST;
 
     try {
       // Prepare image data
@@ -165,11 +182,11 @@ export class VisionService {
         };
       }
 
-      logger.info(`[VisionService] Sending request to model: ${GEMINI_VISION_MODEL}`);
+      logger.info(`[VisionService] Sending request to model: ${model}`);
 
       // Call Gemini Vision API
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_VISION_MODEL}:generateContent?key=${this.apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -231,7 +248,7 @@ export class VisionService {
         seo_tags_ru: analysis.seo_tags_ru || [],
         seo_tags_en: analysis.seo_tags_en || [],
         analyzed_at: new Date().toISOString(),
-        model_version: GEMINI_VISION_MODEL,
+        model_version: model,
         processing_time_ms: processingTime,
       };
 

@@ -1,6 +1,6 @@
 export interface MarketplaceProduct {
   product_id: string;
-  nm_id?: number;
+  nm_id?: string;
   title: string;
   image_url: string | null;
   current_price: number;
@@ -10,6 +10,7 @@ export interface MarketplaceProduct {
   height_cm?: number;
   depth_cm?: number;
   weight_kg?: number;
+  needs_details_update?: boolean;
 }
 
 export interface MarketplacePriceUpdate {

@@ -239,7 +239,35 @@ export async function handlePaymentWebhook(
         WHERE payment_id = ${payment.id}
       `;
 
-      // Send success notification
+      // ============================================
+      // 💰 ADMIN NOTIFICATION - SEE YOUR MONEY!
+      // ============================================
+      const adminTelegramId = process.env.ADMIN_TELEGRAM_ID;
+      if (adminTelegramId) {
+        const amount = parseFloat(payment.amount.value);
+        try {
+          await sendTelegramNotification(
+            parseInt(adminTelegramId),
+            `💰 <b>КАССА:</b> Поступило <b>${amount}₽</b> от user_${userId}\n` +
+              `📦 Тариф: ${tier} (${billingPeriod})\n` +
+              `🆔 Payment: ${paymentId}`
+          );
+        } catch (adminNotifyErr) {
+          logger.warn('Admin payment notification failed', { error: adminNotifyErr });
+        }
+      }
+
+      // Log to payment_logs table for audit trail
+      try {
+        await sql`
+          INSERT INTO payment_logs (user_id, payment_id, amount, tier, billing_period, status, source_ip)
+          VALUES (${userId}, ${paymentId}, ${parseFloat(payment.amount.value)}, ${tier}, ${billingPeriod}, 'succeeded', ${clientIP})
+        `;
+      } catch (logErr) {
+        logger.warn('Payment log insert failed (table may not exist)', { error: logErr });
+      }
+
+      // Send success notification to user
       const tierNames: Record<string, string> = {
         basic: 'Базовый',
         pro: 'Профессиональный',

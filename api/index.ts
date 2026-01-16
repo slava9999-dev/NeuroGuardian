@@ -59,6 +59,7 @@ import {
   handleBatchSetStopLoss,
   handleApplyMinPrices,
   handleBatchUpdateCosts,
+  handleLossProducts,
 } from '../src/api-lib/handlers/products.js';
 
 // Payment handlers
@@ -368,6 +369,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           'apply-min-prices': handleApplyMinPrices,
           'batch-update-costs': handleBatchUpdateCosts,
           'sentinel-logs': handleSentinelLogs,
+          'loss-products': handleLossProducts,
         };
         // ENFORCE SUBSCRIPTION
         return withSubscription(req, res, handlers[action], auth.context.userId);
@@ -444,16 +446,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // ========== AI AGENT ENDPOINTS ==========
       case 'agent':
-        return handleAgentV5Secure(req, res);
-
       case 'agent-v4':
-        return handleAgentV4Secure(req, res);
-
       case 'agent-confirm':
-        return handleAgentV5ConfirmSecure(req, res);
+      case 'agent-v4-confirm': {
+        const auth = await extractAnyAuthAsync(req);
+        if (auth.success === false) {
+          return sendAuthError(res, auth.error, auth.statusCode);
+        }
 
-      case 'agent-v4-confirm':
-        return handleAgentV4ConfirmSecure(req, res);
+        const agentHandlers: Record<
+          string,
+          (req: VercelRequest, res: VercelResponse) => Promise<VercelResponse>
+        > = {
+          agent: handleAgentV5Secure,
+          'agent-v4': handleAgentV4Secure,
+          'agent-confirm': handleAgentV5ConfirmSecure,
+          'agent-v4-confirm': handleAgentV4ConfirmSecure,
+        };
+
+        // Wrap handler to ignore 3rd argument (userId) if not used, or rely on internal auth re-check
+        // strict wrapper: (q, s, u) => handler(q, s)
+        return withSubscription(
+          req,
+          res,
+          (q, s, _u) => agentHandlers[action](q, s),
+          auth.context.userId
+        );
+      }
 
       case 'agent-status':
       case 'agent-v5-status':

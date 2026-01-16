@@ -10,7 +10,12 @@ export { handleAuth, handleSettings, handlePlans } from './auth.js';
 export { handleCreatePayment, handlePaymentWebhook } from './payments.js';
 
 // Product handlers
-export { handleProducts, handleSyncProducts, handleBatchSetStopLoss } from './products.js';
+export {
+  handleProducts,
+  handleSyncProducts,
+  handleBatchSetStopLoss,
+  handleLossProducts,
+} from './products.js';
 
 // Admin handlers
 export {

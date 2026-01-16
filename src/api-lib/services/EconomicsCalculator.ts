@@ -42,6 +42,10 @@ export class EconomicsCalculator {
       category: product.category || undefined,
       marketplace: product.marketplace,
       includeSpp: true, // Account for estimated platform discounts
+      volumeLiters:
+        product.width_cm && product.height_cm && product.depth_cm
+          ? (product.width_cm * product.height_cm * product.depth_cm) / 1000
+          : undefined,
     });
 
     return result;

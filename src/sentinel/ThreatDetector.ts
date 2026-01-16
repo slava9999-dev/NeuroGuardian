@@ -18,7 +18,7 @@ export interface Threat {
   type: ThreatType;
   severity: 'low' | 'medium' | 'high' | 'critical';
   productId: string;
-  nmId?: number | null;
+  nmId?: string | null; // Changed from number to string after ID migration
   message: string;
   data: unknown;
 }

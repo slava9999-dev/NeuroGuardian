@@ -73,7 +73,7 @@ describe('Unit Economics Calculator', () => {
     it('4. Ozon: Low-margin product (beauty) - may be loss with 2025 rates', () => {
       const result = calculateUnitEconomics({
         price: 500,
-        costPrice: 150, // Reduced cost to be actually profitable with 20% commission + logistics
+        costPrice: 100, // Reduced cost to be actually profitable with 20% commission + logistics + marketing + tax
         marketplace: 'Ozon',
         category: 'Красота',
         useOzonCard: false,
@@ -200,7 +200,7 @@ describe('Unit Economics Calculator', () => {
     it('12. High price (1 million rubles)', () => {
       const result = calculateUnitEconomics({
         price: 1000000,
-        costPrice: 500000,
+        costPrice: 400000, // Reduced from 500k to ensure profit with 10% marketing + 7% tax (~170k extra costs)
         marketplace: 'WB',
         category: 'Одежда',
       });

@@ -19,7 +19,7 @@ export class SentinelPriceMonitor implements PriceMonitor {
 
     // --- WB Monitoring ---
     if (wbProducts.length > 0) {
-      const nmIds = wbProducts.map(p => p.nm_id).filter((id): id is number => id !== null);
+      const nmIds = wbProducts.map(p => p.nm_id).filter((id): id is string => id !== null);
       if (nmIds.length > 0) {
         try {
           logger.debug('[PriceMonitor] Calling WB API...', {

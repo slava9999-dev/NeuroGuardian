@@ -325,7 +325,7 @@ export async function runPriceProtection(userId: number): Promise<ProtectionResu
 
           if (product.marketplace === 'WB' && keys.wb && product.nm_id) {
             const updateResult = await updateWbPrices(keys.wb, [
-              { nmId: product.nm_id, price: recommendedPrice },
+              { nmId: parseInt(String(product.nm_id)), price: recommendedPrice },
             ]);
             success = updateResult.success;
             if (!success) detail.error = updateResult.error;
@@ -442,7 +442,7 @@ export async function checkProductPrice(
 
   const proxyProduct: MarketplaceProduct = {
     product_id: externalId,
-    nm_id: marketplace === 'wb' ? parseInt(externalId) : undefined,
+    nm_id: marketplace === 'wb' ? externalId : undefined, // nm_id is string after migration
     title: 'Product ' + externalId, // Placeholder title as we don't have full data here
     image_url: null,
     current_price: currentPrice,
