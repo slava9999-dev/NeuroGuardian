@@ -93,9 +93,10 @@ describe('Specialists', () => {
     it('should have systemPrompt with key sections', () => {
       const prompt = productsSpecialist.systemPrompt;
       expect(prompt).toContain('ВИКТОР');
-      expect(prompt).toContain('ТОВАР');
+      expect(prompt).toContain('ОПЕРАЦИОННЫЙ ДИРЕКТОР');
+      expect(prompt).toContain('CRITICAL MODE');
       expect(prompt).toContain('get_products');
-      expect(prompt).toContain('ПРАВИЛА');
+      expect(prompt).toContain('ЖЕЛЕЗНЫЕ ПРАВИЛА');
     });
 
     it('should build context with user info', async () => {
@@ -131,14 +132,15 @@ describe('Specialists', () => {
 
     it('should have systemPrompt with confirmation protocol', () => {
       const prompt = pricingSpecialist.systemPrompt;
-      expect(prompt).toContain('ПОДТВЕРЖД');
-      expect(prompt).toContain('КРИТИЧЕСКИ');
+      expect(prompt).toContain('ФИНАНСОВЫЙ КОНТРОЛЛЕР');
+      expect(prompt).toContain('CONFIRMATION');
+      expect(prompt).toContain('CFO MODE');
       expect(prompt).toContain('Да/Нет');
     });
 
     it('should have safety warnings in prompt', () => {
       const prompt = pricingSpecialist.systemPrompt;
-      expect(prompt).toContain('ОПАСНО');
+      expect(prompt).toContain('ЖЕЛЕЗНЫЕ ПРАВИЛА');
       expect(prompt).toContain('НИКОГДА');
     });
 
@@ -166,13 +168,12 @@ describe('Specialists', () => {
       expect(prompt).toContain('🟢');
       expect(prompt).toContain('🟡');
       expect(prompt).toContain('🔴');
-      expect(prompt).toContain('HARD-MODE');
+      expect(prompt).toContain('TACTICAL MODE');
     });
 
     it('should require link for competitor analysis', () => {
       const prompt = sentinelSpecialist.systemPrompt;
-      expect(prompt).toContain('конкурент');
-      // expect(prompt).toContain('артикул'); // Removed strict check for 'артикул' as prompt structure changed
+      expect(prompt).toContain('демпингует');
     });
 
     it('should build context with SENTINEL prefix', async () => {
@@ -202,15 +203,15 @@ describe('Specialists', () => {
 
     it('should have systemPrompt with formulas', () => {
       const prompt = analyticsSpecialist.systemPrompt;
-      expect(prompt).toContain('Чистая маржа');
-      expect(prompt).toContain('Комиссия WB');
-      expect(prompt).toContain('Логистика');
+      expect(prompt).toContain('СТРАТЕГИЧЕСКИЙ КОНСУЛЬТАНТ');
+      expect(prompt).toContain('Юнит-экономика 2.0');
+      expect(prompt).toContain('ROI');
     });
 
     it('should have ABC analysis explanation', () => {
       const prompt = analyticsSpecialist.systemPrompt;
-      expect(prompt).toContain('категория С');
-      expect(prompt).toContain('50%');
+      expect(prompt).toContain('Категория A');
+      expect(prompt).toContain('Категория C');
     });
 
     it('should build context with analytics prefix', async () => {
@@ -231,20 +232,20 @@ describe('Specialists', () => {
     it('should have friendly systemPrompt', () => {
       const prompt = chatSpecialist.systemPrompt;
       expect(prompt).toContain('ВИКТОР');
-      expect(prompt).toContain('ПОМОЩНИК');
-      expect(prompt).toContain('🫡');
+      expect(prompt).toContain('НАСТАВНИК ПО БИЗНЕСУ');
+      expect(prompt).toContain('MENTOR');
     });
 
     it('should have onboarding scenarios', () => {
       const prompt = chatSpecialist.systemPrompt;
-      expect(prompt).toContain('настрой');
-      expect(prompt).toContain('Шаг 1');
+      expect(prompt).toContain('ONBOARDING FUNNEL');
+      expect(prompt).toContain('Этап 0');
     });
 
     it('should have setup scenarios', () => {
       const prompt = chatSpecialist.systemPrompt;
-      expect(prompt).toContain('синхрониз');
-      expect(prompt).toContain('товары');
+      expect(prompt).toContain('Синхронизация');
+      expect(prompt).toContain('база пуста');
     });
 
     it('should suggest onboarding for users without API keys', async () => {
