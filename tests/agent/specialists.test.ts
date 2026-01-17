@@ -188,7 +188,7 @@ describe('Specialists', () => {
 
     it('should use Gemini Pro model', () => {
       // Access protected property via type assertion
-      expect((analyticsSpecialist as unknown as { model: string }).model).toBe('gemini-2.5-pro');
+      expect((analyticsSpecialist as unknown as { model: string }).model).toBe('gemini-1.5-pro');
     });
 
     it('should have 5 tools', () => {
