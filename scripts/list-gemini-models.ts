@@ -1,65 +1,36 @@
-// ============================================
-// Script to list available Gemini models
-// Usage: npx tsx scripts/list-gemini-models.ts
-// ============================================
-
-import { config } from 'dotenv';
+import dotenv from 'dotenv';
 import path from 'path';
+import fetch from 'node-fetch';
 
-// Load env
-config({ path: path.resolve(process.cwd(), '.env') });
-config({ path: path.resolve(process.cwd(), '.env.local') });
-
-const API_KEY = process.env.GEMINI_API_KEY;
-
-if (!API_KEY) {
-  console.error('❌ GEMINI_API_KEY is missing in .env');
-  process.exit(1);
-}
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 async function listModels() {
-  console.log('🔍 Querying Google Gemini API for available models...');
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    console.log('❌ GEMINI_API_KEY not found in .env');
+    return;
+  }
+
+  console.log(`🔑 Using API Key: ${apiKey.substring(0, 8)}...`);
 
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`
     );
-
     if (!response.ok) {
-      throw new Error(`API Request Failed: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json();
-
-    if (!data.models) {
-      console.log('⚠️ No models returned from API.');
+      console.error(`❌ API Error: ${response.status} ${response.statusText}`);
+      console.error(await response.text());
       return;
     }
 
-    // Filter and sort models
-    const visionModels = data.models
-      .filter((m: any) => m.supportedGenerationMethods.includes('generateContent'))
-      .sort((a: any, b: any) => b.displayName.localeCompare(a.displayName));
-
-    console.log('\n🧠 AVAILABLE VISION-CAPABLE MODELS:');
-    console.log('===================================');
-
-    visionModels.forEach((model: any) => {
-      const isVision =
-        model.displayName.toLowerCase().includes('vision') ||
-        model.name.includes('1.5') ||
-        model.name.includes('2.0');
-
-      console.log(`\n🔹 [${model.name.replace('models/', '')}]`);
-      console.log(`   Name: ${model.displayName}`);
-      console.log(`   Version: ${model.version}`);
-      console.log(`   Limit (Input): ${model.inputTokenLimit}`);
-      console.log(`   Limit (Output): ${model.outputTokenLimit}`);
-
-      if (model.description) {
-        console.log(`   Desc: ${model.description.substring(0, 100)}...`);
-      }
+    const data = await response.json();
+    console.log('\n✅ Available Models:');
+    console.log('--------------------------------------------------');
+    data.models.forEach((model: any) => {
+      console.log(`- ${model.name} (${model.displayName})`);
+      console.log(`  Methods: ${model.supportedGenerationMethods.join(', ')}`);
     });
+    console.log('--------------------------------------------------');
   } catch (error) {
     console.error('❌ Failed to list models:', error);
   }

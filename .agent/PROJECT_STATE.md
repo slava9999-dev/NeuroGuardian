@@ -271,7 +271,12 @@ PgVector остается основным движком знаний.
 - [x] Implement overlapping text chunks (200 characters)
 - [x] Optimize context retrieval (7 documents)
 - [x] Add Active Support (Validation, Learning, Memory) to Multi-Agent
-- [x] Create `SyncCatalogTool` and Setup Guide for onboarding
+- [x] **Fix Gemini API 404/429 Errors**
+  - [x] Identify correct model configurations for OpenRouter.
+  - [x] Switch to `google/gemini-2.0-flash-001` for stability and intelligence.
+  - [x] Verify `SemanticMiner` end-to-end flow.
+- [ ] **Frontend Polishing (Next Step)**
+  - [ ] visualise semantic analysis results in the UI.
 - [x] **Implement VisionCore (Gemini 1.5 Flash)**
 - [x] **Implement RenderFactory (Replicate + Watermark)**
 - [x] **Setup Media Queue (Upstash QStash)**

@@ -116,7 +116,9 @@ export const logger = {
               stack: isDebugEnabled() ? error.stack : undefined,
               name: error.name,
             }
-          : String(error),
+          : typeof error === 'object' && error !== null
+            ? JSON.stringify(error)
+            : String(error),
     };
 
     console.error(formatLog('error', message, errorContext));

@@ -13,17 +13,21 @@ const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1';
 
 // Model names on OpenRouter
 const MODELS = {
-  flash: 'google/gemini-2.0-flash-001', // Fast, cheap (stable version)
-  pro: 'google/gemini-2.0-pro-exp-02-05', // Advanced reasoning
-  // Fallbacks if Gemini unavailable
-  claudeHaiku: 'anthropic/claude-3-haiku', // Fast alternative
-  claudeSonnet: 'anthropic/claude-3.5-sonnet', // Pro alternative
-  mistralSmall: 'mistralai/mistral-small-2501', // Budget option
+  // Direct Gemini models (Fallback IDs)
+  'gemini-2.0-flash': 'gemini-1.5-flash',
+  'gemini-1.5-pro': 'gemini-1.5-flash', // Fallback to flash if Pro is quota limited
+  // OpenRouter specific models (Primary)
+  flash: 'google/gemini-2.0-flash-001',
+  pro: 'google/gemini-2.0-flash-001', // Using 2.0 Flash for Pro as well (Smarter & Faster & 1M context)
+  // Fallbacks
+  claudeHaiku: 'anthropic/claude-3-haiku',
+  claudeSonnet: 'anthropic/claude-3.5-sonnet',
+  mistralSmall: 'mistralai/mistral-small-2501',
 } as const;
 
 export type GeminiModel =
-  | 'gemini-2.5-flash'
-  | 'gemini-2.5-pro'
+  | 'gemini-2.0-flash'
+  | 'gemini-1.5-pro'
   | 'claude-haiku'
   | 'claude-sonnet'
   | 'mistral-small';
@@ -35,7 +39,7 @@ export interface GeminiConfig {
 }
 
 const DEFAULT_CONFIG: GeminiConfig = {
-  model: 'gemini-2.5-flash',
+  model: 'gemini-2.0-flash',
   temperature: 0.1,
   maxTokens: 2048,
 };
@@ -45,9 +49,9 @@ const DEFAULT_CONFIG: GeminiConfig = {
  */
 function getOpenRouterModel(model: GeminiModel): string {
   switch (model) {
-    case 'gemini-2.5-flash':
+    case 'gemini-2.0-flash':
       return MODELS.flash;
-    case 'gemini-2.5-pro':
+    case 'gemini-1.5-pro':
       return MODELS.pro;
     case 'claude-haiku':
       return MODELS.claudeHaiku;
@@ -78,17 +82,16 @@ export class GeminiProvider implements LLMProvider {
     const config = { ...this.config, ...options };
     const startTime = Date.now();
 
-    // 1. Try Direct Google API first if key exists (simpler, free-er)
-    // Or fallback if OpenRouter key is missing
+    // 1. Try Direct Google API first ONLY if OpenRouter key is missing
+    // Direct API is blocked in some regions (e.g. Russia)
     const googleKey = process.env.GEMINI_API_KEY;
     const useDirect = !this.apiKey && !!googleKey;
 
     if (useDirect) {
       try {
-        // 🛡️ CEMENTED MODEL: gemini-2.5-flash (Verified available)
-        // Fallback to 2.0-flash only if explicitly requested, but default is 2.5
-        let modelId = 'gemini-2.5-flash';
-        if (config.model === 'gemini-2.5-pro') modelId = 'gemini-2.5-pro';
+        // 🛡️ CEMENTED MODELS: Fallback models for direct API
+        let modelId = 'gemini-1.5-flash';
+        if (config.model === 'gemini-1.5-pro') modelId = 'gemini-1.5-pro';
 
         // 1. Extract System Prompt
         const systemMsg = messages.find(m => m.role === 'system');
@@ -188,9 +191,8 @@ export class GeminiProvider implements LLMProvider {
 
       if (!response.ok) {
         const errorText = await response.text();
-        logger.error('[GeminiProvider] OpenRouter error', {
+        logger.error('[GeminiProvider] OpenRouter error', errorText, {
           status: response.status,
-          error: errorText.slice(0, 200),
           model: modelId,
         });
         throw new Error(`OpenRouter error: ${response.status} - ${errorText.slice(0, 100)}`);
@@ -246,8 +248,8 @@ export class GeminiProvider implements LLMProvider {
 
     if (useDirect) {
       try {
-        let modelId = 'gemini-2.5-flash';
-        if (config.model === 'gemini-2.5-pro') modelId = 'gemini-2.5-pro';
+        let modelId = 'gemini-1.5-flash';
+        if (config.model === 'gemini-1.5-pro') modelId = 'gemini-1.5-pro';
 
         // Extract System Prompt
         const systemMsg = messages.find(m => m.role === 'system');
@@ -412,8 +414,8 @@ export class GeminiProvider implements LLMProvider {
 }
 
 // Singleton instances for different use cases
-export const geminiFlash = new GeminiProvider({ model: 'gemini-2.5-flash' });
-export const geminiPro = new GeminiProvider({ model: 'gemini-2.5-pro' });
+export const geminiFlash = new GeminiProvider({ model: 'gemini-2.0-flash' });
+export const geminiPro = new GeminiProvider({ model: 'gemini-1.5-pro' });
 
 // Alternative models if Gemini unavailable
 export const claudeHaiku = new GeminiProvider({ model: 'claude-haiku' });
