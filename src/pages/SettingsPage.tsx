@@ -88,10 +88,7 @@ export function SettingsPage({
   };
 
   return (
-    <div className="min-h-screen bg-black text-white px-5 py-6 pb-32 bg-cosmic overflow-x-hidden">
-      {/* Glow Spots */}
-      <div className="nebula-glow opacity-30" />
-
+    <div className="min-h-full text-white px-5 py-6 pb-32 relative overflow-x-hidden">
       {/* Header */}
       <header className="flex items-center justify-between mb-10 nav-blur sticky top-0 z-50 p-2 -mx-2 rounded-full border border-white/5">
         <button

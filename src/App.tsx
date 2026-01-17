@@ -12,14 +12,9 @@ import { Package, Settings, Info, Cpu } from 'lucide-react';
 import { ViktorCore } from './components/ui/ViktorCore';
 import './index.css';
 
-// Lazy load pages
-const AgentPage = lazy(() => import('./pages/AgentPage').then(m => ({ default: m.AgentPage })));
-const ProductsPage = lazy(() =>
-  import('./pages/ProductsPage').then(m => ({ default: m.ProductsPage }))
-);
-const SettingsPage = lazy(() =>
-  import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage }))
-);
+import { AgentPage } from './pages/AgentPage';
+import { ProductsPage } from './pages/ProductsPage';
+import { SettingsPage } from './pages/SettingsPage';
 const LegalPage = lazy(() => import('./pages/LegalPage').then(m => ({ default: m.LegalPage })));
 const OpsPanelPage = lazy(() =>
   import('./pages/OpsPanelPage').then(m => ({ default: m.OpsPanelPage }))
@@ -204,11 +199,9 @@ function App() {
       <div className="bg-cosmic" />
       <div className="nebula-glow" />
 
-      <main className="flex-1 overflow-y-auto no-scrollbar relative min-h-0">
-        <Suspense fallback={<LoadingScreen />}>
-          <PageContent />
-        </Suspense>
-      </main>
+      <div className="flex-1 relative min-h-0 overflow-y-auto no-scrollbar">
+        <PageContent />
+      </div>
 
       {/* Premium Apple-style Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 nav-glass safe-area-inset-bottom z-50">

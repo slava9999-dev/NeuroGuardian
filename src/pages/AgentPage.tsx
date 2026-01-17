@@ -105,10 +105,7 @@ export function AgentPage() {
   const hasMessages = messages.length > 0;
 
   return (
-    <div className="h-dvh bg-black flex flex-col relative overflow-hidden bg-cosmic">
-      {/* Background Glows */}
-      <div className="nebula-glow opacity-40" />
-
+    <div className="h-full flex flex-col relative">
       {/* Welcome Screen */}
       <AnimatePresence>
         {!hasMessages && (

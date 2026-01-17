@@ -63,11 +63,7 @@ export function ProductsPage({ onBack }: ProductsPageProps) {
   // }, [products, searchQuery]);
 
   return (
-    <div className="min-h-screen pb-24 relative overflow-hidden">
-      {/* Cosmic Background Layer (Local override for depth) */}
-      <div className="fixed inset-0 bg-cosmic z-[-2]" />
-      <div className="fixed inset-0 nebula-glow z-[-1]" />
-
+    <div className="min-h-full pb-24 relative">
       {/* Header */}
       <header className="sticky top-0 z-30 bg-[#02040a]/80 backdrop-blur-2xl border-b border-white/5">
         <div className="px-4 py-3">
