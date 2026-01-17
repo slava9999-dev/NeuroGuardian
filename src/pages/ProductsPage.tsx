@@ -13,6 +13,7 @@ import { BulkStopLossModal } from '../components/dashboard/BulkStopLossModal';
 import { BulkUpdateCostsModal } from '../components/dashboard/BulkUpdateCostsModal';
 import { LogHistory } from '../components/dashboard/LogHistory';
 import { hapticFeedback } from '../lib/telegram';
+import { ViktorCore } from '../components/ui/ViktorCore';
 
 // Format money
 function formatMoney(amount: number): string {
@@ -62,12 +63,13 @@ export function ProductsPage({ onBack }: ProductsPageProps) {
   // }, [products, searchQuery]);
 
   return (
-    <div className="min-h-screen bg-[#020617] pb-24">
-      {/* Cosmic Background Glow */}
-      <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,rgba(124,58,237,0.08)_0%,transparent_50%)] pointer-events-none" />
+    <div className="min-h-screen pb-24 relative overflow-hidden">
+      {/* Cosmic Background Layer (Local override for depth) */}
+      <div className="fixed inset-0 bg-cosmic z-[-2]" />
+      <div className="fixed inset-0 nebula-glow z-[-1]" />
 
       {/* Header */}
-      <header className="sticky top-0 z-30 bg-[#020617]/90 backdrop-blur-xl border-b border-white/5">
+      <header className="sticky top-0 z-30 bg-[#02040a]/80 backdrop-blur-2xl border-b border-white/5">
         <div className="px-4 py-3">
           <div className="flex items-center justify-between gap-3">
             {/* Back + Title */}
@@ -133,11 +135,11 @@ export function ProductsPage({ onBack }: ProductsPageProps) {
             <p className="text-[9px] text-slate-500 uppercase tracking-wider">Всего</p>
           </motion.div>
           <motion.div
-            className="surface-card p-3 text-center border-emerald-500/20"
-            whileHover={{ scale: 1.02 }}
+            className="surface-card p-3 text-center border-emerald-500/20 shadow-success-v5"
+            whileHover={{ scale: 1.05, translateY: -2 }}
           >
             <p className="text-xl font-bold font-mono text-emerald-400">{stats.protected}</p>
-            <p className="text-[9px] text-slate-500 uppercase tracking-wider">Защита</p>
+            <p className="text-[9px] text-slate-500 uppercase tracking-wider">Active</p>
           </motion.div>
           <motion.div className="surface-card p-3 text-center" whileHover={{ scale: 1.02 }}>
             <p className="text-xl font-bold font-mono text-slate-400">{stats.unprotected}</p>
@@ -170,7 +172,7 @@ export function ProductsPage({ onBack }: ProductsPageProps) {
                   {formatMoney(stats.savedAmount)}
                 </p>
               </div>
-              <div className="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 shadow-success-v5">
                 <Zap className="w-6 h-6 text-emerald-400" />
               </div>
             </div>
@@ -185,16 +187,16 @@ export function ProductsPage({ onBack }: ProductsPageProps) {
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Поиск по названию или артикулу..."
-              className="w-full bg-slate-900/50 border border-white/5 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-slate-500 focus:border-violet-500/50 focus:outline-none transition-colors"
+              placeholder="Search assets or IDs..."
+              className="w-full bg-[#0a0c14]/50 border border-white/5 rounded-2xl pl-10 pr-4 py-3 text-sm text-white placeholder-slate-600 focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20 focus:outline-none transition-all"
             />
           </div>
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`p-3 rounded-xl border transition-colors ${
+            className={`p-3 rounded-2xl border transition-all ${
               showFilters
-                ? 'bg-violet-500/20 border-violet-500/30 text-violet-400'
-                : 'bg-slate-900/50 border-white/5 text-slate-400 hover:text-white'
+                ? 'bg-violet-500/20 border-violet-500/40 text-violet-400 shadow-neon-v5'
+                : 'bg-[#0a0c14]/50 border-white/5 text-slate-500 hover:text-white'
             }`}
           >
             <Filter className="w-5 h-5" />
@@ -234,10 +236,10 @@ export function ProductsPage({ onBack }: ProductsPageProps) {
               hapticFeedback('light');
               setShowBulkStopLoss(true);
             }}
-            className="flex-1 py-3 px-4 rounded-xl bg-violet-500/10 border border-violet-500/30 text-violet-400 font-medium hover:bg-violet-500/20 transition-all flex items-center justify-center gap-2"
+            className="flex-1 py-4 px-4 btn-premium gap-2"
           >
             <Shield className="w-4 h-4" />
-            <span className="text-sm">Включить Защиту</span>
+            <span className="text-sm">Secure All</span>
           </button>
 
           <button
@@ -294,11 +296,11 @@ export function ProductsPage({ onBack }: ProductsPageProps) {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.5 }}
           >
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-violet-600 shadow-[0_0_20px_rgba(124,58,237,0.3)] shrink-0" />
-            <p className="text-sm text-slate-300 flex-1">
-              💡 Напишите мне{' '}
-              <span className="text-violet-400 font-medium">«защити все товары»</span> во вкладке
-              Агент
+            <ViktorCore size="sm" />
+            <p className="text-sm text-slate-300 flex-1 leading-relaxed">
+              💡 <b>Victor Pulse:</b> Try saying{' '}
+              <span className="text-violet-400 font-medium italic">"protect everything"</span> in
+              the Agent tab.
             </p>
           </motion.div>
         )}

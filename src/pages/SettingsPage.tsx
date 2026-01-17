@@ -86,9 +86,9 @@ export function SettingsPage({
   };
 
   return (
-    <div className="min-h-screen bg-black text-white px-5 py-6 pb-32 bg-cyber overflow-x-hidden">
+    <div className="min-h-screen bg-black text-white px-5 py-6 pb-32 bg-cosmic overflow-x-hidden">
       {/* Glow Spots */}
-      <div className="bg-glow-spot top-[-10%] left-[-10%] opacity-30" />
+      <div className="nebula-glow opacity-30" />
 
       {/* Header */}
       <header className="flex items-center justify-between mb-10 nav-blur sticky top-0 z-50 p-2 -mx-2 rounded-full border border-white/5">
@@ -111,7 +111,7 @@ export function SettingsPage({
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="mb-8 p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[11px] font-bold tracking-widest uppercase flex items-center gap-3"
+            className="mb-8 p-4 rounded-xl bg-violet-500/10 border border-violet-500/20 text-violet-400 text-[11px] font-bold tracking-widest uppercase flex items-center gap-3"
           >
             <RefreshCcw className="w-4 h-4 animate-spin" /> {syncStatus}
           </motion.div>
@@ -124,10 +124,10 @@ export function SettingsPage({
           <div className="relative">
             <img
               src="/agent-avatar.png"
-              className="w-16 h-16 rounded-full border-2 border-indigo-500/50 object-cover"
+              className="w-16 h-16 rounded-full border-2 border-violet-500/50 object-cover"
               alt="User"
             />
-            <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-lime-400 border-4 border-black" />
+            <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-400 border-4 border-black" />
           </div>
           <div>
             <h2 className="text-xl font-black italic tracking-tighter uppercase">
@@ -151,7 +151,7 @@ export function SettingsPage({
               setEditingAccount({ marketplace: 'wb', is_active: true });
               setShowAccountModal(true);
             }}
-            className="flex items-center gap-2 text-[10px] font-black text-lime-400 hover:text-white transition-all uppercase tracking-widest"
+            className="flex items-center gap-2 text-[10px] font-black text-emerald-400 hover:text-white transition-all uppercase tracking-widest"
           >
             <Plus className="w-3 h-3" /> Add Account
           </button>
@@ -175,7 +175,7 @@ export function SettingsPage({
                   </h4>
                   <div className="flex items-center gap-2">
                     <div
-                      className={`w-1.5 h-1.5 rounded-full ${acc.is_active ? 'bg-lime-400 shadow-[0_0_8px_#bef264]' : 'bg-red-500'}`}
+                      className={`w-1.5 h-1.5 rounded-full ${acc.is_active ? 'bg-emerald-400 shadow-[0_0_8px_#10b981]' : 'bg-rose-500'}`}
                     />
                     <span className="text-[9px] mono-data text-zinc-500 uppercase">
                       {acc.marketplace} • {acc.is_active ? 'Online' : 'Disabled'}
@@ -211,10 +211,10 @@ export function SettingsPage({
           <motion.button
             whileTap={{ scale: 0.95, y: 2 }}
             onClick={() => handleDefenseModeChange('price_correction')}
-            className={`p-4 rounded-xl border transition-all text-left flex flex-col gap-3 ${defenseMode === 'price_correction' ? 'bg-indigo-500/10 border-indigo-500/50' : 'bg-white/2 border-white/5 opacity-60'}`}
+            className={`p-4 rounded-xl border transition-all text-left flex flex-col gap-3 ${defenseMode === 'price_correction' ? 'bg-violet-500/10 border-violet-500/50' : 'bg-white/2 border-white/5 opacity-60'}`}
           >
             <RefreshCcw
-              className={`w-6 h-6 ${defenseMode === 'price_correction' ? 'text-indigo-400' : 'text-zinc-600'}`}
+              className={`w-6 h-6 ${defenseMode === 'price_correction' ? 'text-violet-400' : 'text-zinc-600'}`}
             />
             <div>
               <h4 className="text-xs font-black tracking-tight uppercase">Correction</h4>
@@ -239,7 +239,7 @@ export function SettingsPage({
         {/* Advanced Sliders */}
         <div className="premium-card border-white/5 space-y-8">
           <header className="flex items-center gap-2 mb-2">
-            <Shield className="w-4 h-4 text-indigo-500" />
+            <Shield className="w-4 h-4 text-violet-500" />
             <span className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em]">
               Safety Buffers
             </span>
@@ -255,7 +255,7 @@ export function SettingsPage({
                   Account for Ozon/WB cards
                 </span>
               </div>
-              <span className="mono-data text-xl text-indigo-400">
+              <span className="mono-data text-xl text-violet-400">
                 {user?.priceBufferPercent ?? 5}%
               </span>
             </div>
@@ -272,7 +272,7 @@ export function SettingsPage({
               onMouseUp={() =>
                 settingsApi.updateSettings({ priceBufferPercent: user?.priceBufferPercent })
               }
-              className="w-full h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+              className="w-full h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-violet-500"
             />
             <p className="text-[9px] text-zinc-600 italic">
               Sentinel will use this percentage as a safety net against dynamic platform discounts.
@@ -287,18 +287,18 @@ export function SettingsPage({
         <div className="premium-card flex flex-col gap-4 border-lime-500/20">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Crown className="w-5 h-5 text-lime-400" />
+              <Crown className="w-5 h-5 text-emerald-400" />
               <span className="text-sm font-black italic">
                 {user?.subscriptionPlan?.toUpperCase() || 'FREE'} PLAN
               </span>
             </div>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-lime-500/20 text-lime-400 border border-lime-400/20 font-bold tracking-widest uppercase">
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-400/20 font-bold tracking-widest uppercase">
               ACTIVE
             </span>
           </div>
           <button
             onClick={() => onNavigate?.('subscription')}
-            className="w-full py-4 rounded-xl bg-white text-black font-black text-[10px] uppercase tracking-[0.2em] hover:bg-lime-400 transition-all flex items-center justify-center gap-2"
+            className="w-full py-4 rounded-xl bg-white text-black font-black text-[10px] uppercase tracking-[0.2em] hover:bg-emerald-400 transition-all flex items-center justify-center gap-2"
           >
             Manage Billing <CreditCard className="w-3.5 h-3.5" />
           </button>
@@ -336,7 +336,7 @@ export function SettingsPage({
                     type="text"
                     value={editingAccount.name || ''}
                     onChange={e => setEditingAccount({ ...editingAccount, name: e.target.value })}
-                    className="w-full bg-white/2 border border-white/5 rounded-xl p-4 text-sm font-bold text-white outline-none focus:border-indigo-500"
+                    className="w-full bg-white/2 border border-white/5 rounded-xl p-4 text-sm font-bold text-white outline-none focus:border-violet-500"
                     placeholder="e.g. ALPHA STORE"
                   />
                 </div>
@@ -352,7 +352,7 @@ export function SettingsPage({
                         onClick={() =>
                           setEditingAccount({ ...editingAccount, marketplace: m as any })
                         }
-                        className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${editingAccount.marketplace === m ? 'bg-indigo-500 text-white' : 'bg-white/5 text-zinc-500'}`}
+                        className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${editingAccount.marketplace === m ? 'bg-violet-600 text-white shadow-lg shadow-violet-900/40' : 'bg-white/5 text-zinc-500'}`}
                       >
                         {m}
                       </button>
@@ -386,7 +386,7 @@ export function SettingsPage({
 
               <button
                 onClick={handleSaveAccount}
-                className="w-full py-5 bg-white text-black font-black text-[10px] uppercase tracking-[0.3em] rounded-2xl mt-10 hover:bg-lime-400 transition-all flex items-center justify-center gap-3"
+                className="w-full py-5 bg-white text-black font-black text-[10px] uppercase tracking-[0.3em] rounded-2xl mt-10 hover:bg-emerald-400 transition-all flex items-center justify-center gap-3"
               >
                 {isSaving ? (
                   'Processing...'

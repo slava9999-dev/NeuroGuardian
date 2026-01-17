@@ -8,7 +8,8 @@ import { motion } from 'framer-motion';
 import { useAppStore, useProductsStore } from './stores';
 import { initTelegramWebApp, isTelegramWebApp, getInitData, hapticFeedback } from './lib/telegram';
 import { authApi, productsApi } from './lib/api';
-import { Package, Settings, Info, Cpu, Terminal, AlertTriangle } from 'lucide-react';
+import { Package, Settings, Info, Cpu } from 'lucide-react';
+import { ViktorCore } from './components/ui/ViktorCore';
 import './index.css';
 
 // Lazy load pages
@@ -30,59 +31,47 @@ const GodModePage = lazy(() =>
   import('./pages/GodModePage').then(m => ({ default: m.GodModePage }))
 );
 
-// Premium Loading Screen V4.0
+// Premium Loading Screen V5.0 (Cosmic)
 function LoadingScreen() {
   return (
-    <div className="h-dvh flex flex-col items-center justify-center bg-black overflow-hidden relative">
-      <div className="bg-glow-spot top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-60 scale-150" />
+    <div className="h-dvh flex flex-col items-center justify-center bg-[#02040a] overflow-hidden relative">
+      <div className="bg-cosmic" />
+      <div className="nebula-glow" />
 
       <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
+        initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         className="text-center relative z-20"
       >
         <div className="relative mb-12">
-          <motion.div
-            className="absolute inset-0 bg-indigo-500/20 rounded-full blur-3xl"
-            animate={{ scale: [1, 1.4, 1], opacity: [0.2, 0.5, 0.2] }}
-            transition={{ duration: 3, repeat: Infinity }}
-          />
-          <div className="relative p-1 rounded-full border border-indigo-500/30">
-            <img
-              src="/agent-avatar.png"
-              alt="Victor"
-              className="w-32 h-32 rounded-full object-cover grayscale-[0.3] shadow-2xl"
-            />
-            <motion.div
-              className="absolute inset-0 border-2 border-lime-400/50 rounded-full"
-              animate={{ scale: [1, 1.1, 1], opacity: [0.5, 0, 0.5] }}
-              transition={{ duration: 2, repeat: Infinity }}
-            />
-          </div>
+          <ViktorCore size="lg" />
         </div>
 
         <div className="flex flex-col items-center gap-2">
-          <h1 className="text-2xl font-black italic tracking-tighter text-white/90 uppercase">
-            NEURO<span className="text-indigo-500">GUARDIAN</span>
+          <h1 className="text-3xl font-black italic tracking-tighter text-white uppercase">
+            NEURO<span className="text-violet-500">GUARDIAN</span>
           </h1>
-          <div className="flex items-center gap-2 text-[10px] mono-data text-zinc-500 font-bold uppercase tracking-[0.3em]">
-            <Terminal className="w-3 h-3 text-lime-400" /> Initializing Tactical Layer...
+          <div className="flex items-center gap-3 text-[10px] mono-data text-slate-500 font-bold uppercase tracking-[0.4em]">
+            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_#10b981]" />
+            Initializing Neural Mesh...
           </div>
         </div>
 
-        <div className="mt-10 w-40 h-[2px] bg-white/5 rounded-full overflow-hidden mx-auto relative">
+        <div className="mt-12 w-48 h-[1px] bg-white/5 rounded-full overflow-hidden mx-auto relative px-10">
           <motion.div
-            className="h-full bg-gradient-to-r from-indigo-600 via-lime-400 to-indigo-600 shadow-[0_0_10px_#bef264]"
+            className="h-full bg-linear-to-r from-transparent via-violet-500 to-transparent shadow-[0_0_15px_#8b5cf6]"
             initial={{ left: '-100%' }}
             animate={{ left: '100%' }}
-            transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-            style={{ position: 'absolute', width: '60%' }}
+            transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+            style={{ position: 'absolute', width: '50%' }}
           />
         </div>
       </motion.div>
 
-      <div className="absolute bottom-10 text-[9px] font-black italic text-zinc-700 uppercase tracking-widest">
-        Victor Agent v4.0.2 • Authorized Access Only
+      <div className="absolute bottom-10 flex flex-col items-center gap-2">
+        <div className="text-[9px] font-black italic text-slate-700 uppercase tracking-widest">
+          NeuroV5 Industrial Core • Secure Auth
+        </div>
       </div>
     </div>
   );
@@ -170,8 +159,8 @@ function App() {
 
   if (authError) {
     return (
-      <div className="h-dvh flex flex-col items-center justify-center bg-black p-8 text-center bg-cyber">
-        <AlertTriangle className="w-16 h-16 text-red-500 mb-6 animate-pulse" />
+      <div className="h-dvh flex flex-col items-center justify-center bg-black p-8 text-center bg-cosmic">
+        <div className="nebula-glow opacity-30" />
         <h1 className="text-xl font-black italic text-white mb-2 uppercase tracking-tighter">
           SECURITY BREACH
         </h1>
@@ -210,13 +199,17 @@ function App() {
   };
 
   return (
-    <div className="h-dvh flex flex-col">
+    <div className="h-dvh flex flex-col relative overflow-hidden bg-[#02040a]">
+      {/* Global Cosmic Layer */}
+      <div className="bg-cosmic" />
+      <div className="nebula-glow" />
+
       <Suspense fallback={<LoadingScreen />}>
         <PageContent />
       </Suspense>
 
       {/* Premium Apple-style Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 nav-blur border-t border-white/5 safe-area-inset-bottom z-50">
+      <nav className="fixed bottom-0 left-0 right-0 nav-glass safe-area-inset-bottom z-50">
         <div className="flex justify-around items-center h-16 px-4">
           <NavButton
             active={currentPage === 'agent'}
@@ -255,12 +248,12 @@ function NavButton({ active, onClick, icon, label }: any) {
         hapticFeedback('light');
         onClick();
       }}
-      className={`relative flex flex-col items-center gap-1 transition-all flex-1 py-1 ${active ? 'text-indigo-500' : 'text-zinc-600'}`}
+      className={`relative flex flex-col items-center gap-1 transition-all flex-1 py-1 ${active ? 'text-violet-500' : 'text-slate-600'}`}
     >
       <motion.div
         whileTap={{ scale: 0.9, y: 3 }}
         transition={{ type: 'spring', stiffness: 400, damping: 10 }}
-        className={`p-1.5 rounded-xl transition-colors ${active ? 'bg-indigo-500/10 border border-indigo-500/20' : 'border border-transparent'}`}
+        className={`p-1.5 rounded-xl transition-colors ${active ? 'bg-violet-500/10 border border-violet-500/20' : 'border border-transparent'}`}
       >
         {React.cloneElement(icon, { size: 18, strokeWidth: active ? 2.5 : 2 })}
       </motion.div>
@@ -272,7 +265,7 @@ function NavButton({ active, onClick, icon, label }: any) {
       {active && (
         <motion.div
           layoutId="nav-glow"
-          className="absolute -bottom-1 w-8 h-1 bg-indigo-500 blur-sm rounded-full"
+          className="absolute -bottom-1 w-8 h-1 bg-violet-500 blur-sm rounded-full"
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
         />
       )}

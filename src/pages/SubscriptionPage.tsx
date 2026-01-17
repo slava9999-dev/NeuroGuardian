@@ -102,10 +102,9 @@ export function SubscriptionPage({ onBack }: SubscriptionPageProps) {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white pb-32 relative overflow-x-hidden bg-cyber">
+    <div className="min-h-screen bg-black text-white pb-32 relative overflow-x-hidden bg-cosmic">
       {/* Dynamic Background Glow */}
-      <div className="bg-glow-spot top-[-20%] left-[-10%]" />
-      <div className="bg-glow-spot bottom-[-10%] right-[-10%] opacity-50" />
+      <div className="nebula-glow opacity-50" />
 
       {/* Header */}
       <div className="z-10 p-5 flex items-center justify-between nav-blur sticky top-0">
@@ -113,7 +112,7 @@ export function SubscriptionPage({ onBack }: SubscriptionPageProps) {
           <ArrowLeft className="w-6 h-6 text-zinc-400" />
         </button>
         <span className="text-[10px] font-black tracking-[0.3em] text-zinc-500 uppercase">
-          billing system v4
+          billing system v5
         </span>
         <div className="w-10" />
       </div>
@@ -131,14 +130,14 @@ export function SubscriptionPage({ onBack }: SubscriptionPageProps) {
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="premium-card bg-indigo-500/10 border-indigo-500/30 mb-8 flex items-center gap-4"
+            className="premium-card bg-violet-500/10 border-violet-500/30 mb-8 flex items-center gap-4"
           >
-            <div className="w-12 h-12 rounded-full bg-indigo-500 flex items-center justify-center shadow-lg shadow-indigo-500/40">
+            <div className="w-12 h-12 rounded-full bg-violet-500 flex items-center justify-center shadow-lg shadow-violet-500/40">
               <Zap className="w-6 h-6 text-white" />
             </div>
             <div>
               <h3 className="text-sm font-bold text-white">ТЕСТОВЫЙ ПЕРИОД АКТИВЕН</h3>
-              <p className="text-[11px] text-indigo-300 font-mono">
+              <p className="text-[11px] text-violet-300 font-mono">
                 Все функции PRO разблокированы до{' '}
                 {user?.subscriptionExpiresAt
                   ? new Date(user.subscriptionExpiresAt).toLocaleDateString()
@@ -155,7 +154,7 @@ export function SubscriptionPage({ onBack }: SubscriptionPageProps) {
               ТЕКУЩИЙ СТАТУС
             </span>
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-lime-400 shadow-[0_0_8px_#bef264]" />
+              <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#10b981]" />
               <span className="text-lg font-black italic tracking-tighter">
                 {user?.subscriptionPlan?.toUpperCase() || 'FREE'}
               </span>
@@ -172,12 +171,12 @@ export function SubscriptionPage({ onBack }: SubscriptionPageProps) {
               onClick={() => setSelectedTier(tier.id)}
               className={`premium-card cursor-pointer relative ${
                 selectedTier === tier.id
-                  ? 'border-indigo-500/60 bg-indigo-500/5 ring-1 ring-indigo-500/20'
+                  ? 'border-violet-500/60 bg-violet-500/5 ring-1 ring-violet-500/20'
                   : 'border-white/5 opacity-80'
               }`}
             >
               {tier.isPopular && (
-                <div className="absolute -top-px right-6 bg-lime-400 text-black text-[9px] font-black px-3 py-1 rounded-b-md shadow-lg shadow-lime-500/20">
+                <div className="absolute -top-px right-6 bg-emerald-400 text-black text-[9px] font-black px-3 py-1 rounded-b-md shadow-lg shadow-emerald-500/20">
                   RECOMMENDED
                 </div>
               )}
@@ -198,7 +197,7 @@ export function SubscriptionPage({ onBack }: SubscriptionPageProps) {
                 <div
                   className={`w-6 h-6 rounded-full border flex items-center justify-center transition-all ${
                     selectedTier === tier.id
-                      ? 'bg-indigo-500 border-indigo-400'
+                      ? 'bg-violet-500 border-violet-400'
                       : 'border-zinc-800 bg-zinc-900'
                   }`}
                 >
@@ -214,7 +213,7 @@ export function SubscriptionPage({ onBack }: SubscriptionPageProps) {
                     key={idx}
                     className="flex items-center gap-3 text-[12px] font-medium text-zinc-300"
                   >
-                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-violet-500" />
                     {feature}
                   </div>
                 ))}
@@ -249,7 +248,7 @@ export function SubscriptionPage({ onBack }: SubscriptionPageProps) {
             className={`w-full py-5 rounded-xl font-black text-sm uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3 ${
               selectedTier === 'free' || selectedTier === user?.subscriptionPlan
                 ? 'bg-zinc-900 text-zinc-600 border border-white/5 cursor-not-allowed'
-                : 'bg-white text-black hover:bg-lime-400 shadow-[0_10px_40px_rgba(255,255,255,0.1)] hover:shadow-lime-500/20'
+                : 'bg-white text-black hover:bg-emerald-400 shadow-[0_10px_40px_rgba(255,255,255,0.1)] hover:shadow-emerald-500/20'
             }`}
           >
             {loading ? (

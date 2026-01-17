@@ -13,6 +13,8 @@ import { inferGender } from '../../agent/utils/genderDetection.js';
 import { stateManager } from '../../agent/core/StateManager.js';
 import { db, systemFlags } from '../../infrastructure/database/db.js';
 import { eq } from 'drizzle-orm';
+import { VoiceService } from '../services/VoiceService.js';
+// Using built-in Node 18+ FormData and Blob
 
 // ============================================
 // TYPES
@@ -112,6 +114,43 @@ async function sendTelegramMessage(
     return true;
   } catch (error) {
     logger.error('Failed to send Telegram message', error);
+    return false;
+  }
+}
+
+async function sendTelegramVoice(
+  chatId: number,
+  audioBuffer: Buffer,
+  caption?: string
+): Promise<boolean> {
+  try {
+    const token = getBotToken();
+    const formData = new FormData();
+    formData.append('chat_id', chatId.toString());
+
+    // Convert Buffer to Uint8Array for proper Blob compatibility
+    const blob = new Blob([new Uint8Array(audioBuffer)], { type: 'audio/mpeg' });
+    formData.append('voice', blob, 'viktor_reply.mp3');
+
+    if (caption) {
+      formData.append('caption', caption);
+      formData.append('parse_mode', 'HTML');
+    }
+
+    const response = await fetch(`${TELEGRAM_API}${token}/sendVoice`, {
+      method: 'POST',
+      body: formData as any,
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      logger.error('Telegram sendVoice error', { error, chatId });
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    logger.error('Failed to send Telegram voice', error);
     return false;
   }
 }
@@ -545,6 +584,20 @@ async function handleUserMessage(
       }
 
       await sendTelegramMessage(chatId, response, { parseMode: 'HTML' });
+
+      // --- OPTIONAL VOICE RESPONSE ---
+      // Send voice message if text is not too long and VoiceService is available
+      if (VoiceService.isAvailable() && result.message.length < 1000) {
+        try {
+          // Clean text for TTS (remove HTML tags and Markdown)
+          const cleanText = result.message.replace(/<[^>]*>?/gm, '').replace(/\*|_|`/g, '');
+
+          const audioBuffer = await VoiceService.synthesize(cleanText);
+          await sendTelegramVoice(chatId, audioBuffer);
+        } catch (vErr) {
+          logger.error('Failed to send voice response', vErr);
+        }
+      }
     } else {
       await sendTelegramMessage(
         chatId,

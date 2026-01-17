@@ -61,7 +61,7 @@ export function ProductCard({
 
   const isProtected = product.status === 'protected';
   const isProfitable = product.currentPrice - (product.costPrice || 0) > 0;
-  const profitColor = isProfitable ? 'text-lime-400' : 'text-red-500';
+  const profitColor = isProfitable ? 'text-emerald-400' : 'text-rose-500';
 
   return (
     <motion.div
@@ -82,15 +82,15 @@ export function ProductCard({
           {/* Protect Status Aura */}
           {isProtected && (
             <motion.div
-              className="absolute top-2 left-2 flex items-center gap-1 bg-black/60 backdrop-blur-md px-2 py-1 rounded-sm border border-lime-400/30"
+              className="absolute top-2 left-2 flex items-center gap-1 bg-black/60 backdrop-blur-md px-2 py-1 rounded-md border border-emerald-500/30"
               animate={{
-                boxShadow: ['0 0 5px #bef26444', '0 0 15px #bef26444', '0 0 5px #bef26444'],
+                boxShadow: ['0 0 5px #10b98122', '0 0 15px #10b98144', '0 0 5px #10b98122'],
               }}
               transition={{ duration: 2, repeat: Infinity }}
             >
-              <Shield className="w-3 h-3 text-lime-400" />
-              <span className="text-[9px] font-black italic text-lime-400 uppercase">
-                Protected
+              <Shield className="w-3 h-3 text-emerald-400" />
+              <span className="text-[9px] font-black italic text-emerald-400 uppercase">
+                Active Protection
               </span>
             </motion.div>
           )}
@@ -137,10 +137,12 @@ export function ProductCard({
               Live Market Price
             </span>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-black italic tracking-tighter text-white">
+              <span className="text-3xl font-black italic tracking-tighter text-white text-quantum">
                 {product.currentPrice?.toLocaleString()}₽
               </span>
-              <div className={`flex items-center text-[10px] font-black italic ${profitColor}`}>
+              <div
+                className={`flex items-center text-[10px] font-black italic ${profitColor} profit-pulse`}
+              >
                 <TrendingUp className="w-3 h-3 mr-1" /> ACTIVE
               </div>
             </div>
