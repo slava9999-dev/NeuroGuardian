@@ -18,7 +18,7 @@ process.env.OPENAI_API_KEY = 'test-openai-key';
 process.env.VITE_DEV_MODE = 'true';
 
 // Mock fetch globally
-global.fetch = vi.fn();
+vi.stubGlobal('fetch', vi.fn());
 
 // Reset mocks between tests
 beforeEach(() => {
