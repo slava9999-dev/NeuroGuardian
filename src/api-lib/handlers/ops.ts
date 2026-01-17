@@ -13,6 +13,7 @@ import {
   getRecentAuditEntries,
   markEventProcessed,
   getSystemEvents,
+  type ResourceType,
 } from '../services/ops-logger.js';
 import { getUsersStats, getUsersPaginated } from '../services/users.js';
 import {
@@ -110,7 +111,7 @@ export async function handleOpsAudit(
 
   let records;
   if (resourceType && resourceId) {
-    records = await getAuditTrail(resourceType as any, resourceId);
+    records = await getAuditTrail(resourceType as ResourceType, resourceId);
   } else {
     records = await getRecentAuditEntries();
   }
@@ -310,8 +311,9 @@ export async function handleOpsAction(
     } else {
       return res.status(502).json({ error: 'Failed to trigger action upstream' });
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e);
     console.error('Ops Action Failed:', e);
-    return res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: message });
   }
 }

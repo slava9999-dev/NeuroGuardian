@@ -13,33 +13,68 @@ dotenv.config({ path: path.join(process.cwd(), '.env') });
 
 const envSchema = z.object({
   // Infrastructure
-  POSTGRES_URL: z.string().url().or(z.string().startsWith('postgresql://')),
-  DATABASE_URL: z.string().url().or(z.string().startsWith('postgresql://')).optional(),
-  POSTGRES_DATABASE: z.string().optional(),
+  POSTGRES_URL: z
+    .string()
+    .transform(v => v.replace(/\r/g, '').trim())
+    .refine(v => v.startsWith('postgresql://') || v.startsWith('postgres://'), {
+      message: 'Invalid PostgreSQL URL',
+    }),
+  DATABASE_URL: z
+    .string()
+    .transform(v => v.replace(/\r/g, '').trim())
+    .optional(),
+  POSTGRES_DATABASE: z
+    .string()
+    .transform(v => v.replace(/\r/g, '').trim())
+    .optional(),
 
   // Security
   API_KEY_ENCRYPTION_KEY: z
     .string()
-    .min(32, 'Encryption key must be at least 32 characters for AES-256'),
-  ADMIN_API_KEY: z.string().min(16),
-  CRON_SECRET: z.string().min(16),
+    .transform(v => v.replace(/\r/g, '').trim())
+    .refine(v => v.length >= 32, 'Encryption key must be at least 32 characters'),
+  ADMIN_API_KEY: z
+    .string()
+    .transform(v => v.replace(/\r/g, '').trim())
+    .refine(v => v.length >= 16, 'Admin API Key must be at least 16 characters'),
+  CRON_SECRET: z
+    .string()
+    .transform(v => v.replace(/\r/g, '').trim())
+    .refine(v => v.length >= 16, 'Cron Secret must be at least 16 characters'),
 
   // Telegram
-  TELEGRAM_BOT_TOKEN: z.string().regex(/^\d+:[a-zA-Z0-9_-]+$/, 'Invalid Telegram Bot Token format'),
+  TELEGRAM_BOT_TOKEN: z
+    .string()
+    .transform(v => v.replace(/\r/g, '').trim())
+    .refine(v => /^\d+:[a-zA-Z0-9_-]+$/.test(v), 'Invalid Telegram Bot Token format'),
   ADMIN_TELEGRAM_ID: z
     .string()
     .or(z.number())
-    .transform(v => String(v)),
+    .transform(v => String(v).replace(/\r/g, '').trim())
+    .optional(),
   ADMIN_CHAT_ID: z
     .string()
     .or(z.number())
-    .transform(v => String(v)),
+    .transform(v => String(v).replace(/\r/g, '').trim())
+    .optional(),
 
   // LLM / AI
-  GEMINI_API_KEY: z.string().optional(),
-  OPENROUTER_API_KEY: z.string().optional(),
-  GROQ_API_KEY: z.string().optional(),
-  OPENAI_API_KEY: z.string().optional(),
+  GEMINI_API_KEY: z
+    .string()
+    .transform(v => v.replace(/\r/g, '').trim())
+    .optional(),
+  OPENROUTER_API_KEY: z
+    .string()
+    .transform(v => v.replace(/\r/g, '').trim())
+    .optional(),
+  GROQ_API_KEY: z
+    .string()
+    .transform(v => v.replace(/\r/g, '').trim())
+    .optional(),
+  OPENAI_API_KEY: z
+    .string()
+    .transform(v => v.replace(/\r/g, '').trim())
+    .optional(),
 
   // Mode
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),

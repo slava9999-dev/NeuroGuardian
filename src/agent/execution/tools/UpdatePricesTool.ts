@@ -3,26 +3,12 @@
 // Version: 5.0.0 | Date: January 2026
 // ============================================
 
-import { z } from 'zod';
 import { defineTool } from '../ToolRegistry.js';
 import type { DBProduct } from '../../../api-lib/lib/types.js';
-
-/**
- * Arguments schema for update_prices tool
- */
-const UpdatePricesArgsSchema = z.object({
-  updates: z
-    .array(
-      z.object({
-        product_id: z.string().describe('Product ID or NM ID'),
-        new_price: z.number().positive().describe('New price in rubles'),
-      })
-    )
-    .describe('List of price updates'),
-  reason: z.string().optional().describe('Reason for price change (for audit logs)'),
-});
-
-type UpdatePricesArgs = z.infer<typeof UpdatePricesArgsSchema>;
+import {
+  UpdatePricesArgsSchema,
+  type UpdatePricesArgs,
+} from '../../../api-lib/agent/validators.js';
 
 /**
  * Update Prices Tool
@@ -47,10 +33,16 @@ export const updatePricesTool = defineTool<UpdatePricesArgs>({
         await import('../../../api-lib/services/database.js');
 
       const products = await getProductsByUserId(userId);
-      const results: any[] = [];
+      const results: Array<{
+        product_id: string;
+        title: string;
+        old_price: number;
+        new_price: number;
+        marketplace: string;
+      }> = [];
       const errors: string[] = [];
 
-      for (const update of args.updates) {
+      for (const update of args.products || []) {
         // Find product
         const product = products.find(
           (p: DBProduct) =>

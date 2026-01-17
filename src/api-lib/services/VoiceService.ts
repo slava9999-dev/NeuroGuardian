@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { logger } from '../lib/logger.js';
+import { logger } from '../lib/index.js';
 
 /**
  * Service for voice synthesis using ElevenLabs API

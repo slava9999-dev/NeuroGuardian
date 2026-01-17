@@ -72,6 +72,7 @@ export const GetMarketplaceInfoArgsSchema = z.object({
 export const SearchWebArgsSchema = z.object({
   query: z.string().min(1, 'Query is required'),
   topic: z.enum(['competitors', 'market', 'news', 'general']).optional().default('general'),
+  num_results: z.number().int().min(1).max(10).optional().default(5),
 });
 
 export const GetCompetitorPriceArgsSchema = z.object({

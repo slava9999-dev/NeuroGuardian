@@ -51,6 +51,14 @@ interface DBUserRecord {
   subscription_end_date?: string | Date;
 }
 
+interface PendingAction {
+  type: string;
+  taskId: string;
+  details: Record<string, unknown>;
+  summary: string;
+  created_at: string;
+}
+
 // Helper: KV Client
 async function getKVClient() {
   const [url, token] = await Promise.all([
@@ -189,7 +197,7 @@ export async function handleAgentV5(
           { ex: 3600 }
         );
         // Inject taskId
-        (result.actions[0] as any).taskId = taskId;
+        Object.assign(result.actions[0], { taskId });
       }
     } catch (e) {
       console.warn('[Agent V5] KV Save failed:', e);
@@ -262,7 +270,7 @@ export async function handleAgentV5Confirm(
   }
 
   const pendingKey = `pending:v5:${userId}`;
-  const pendingAction = (await kv.get(pendingKey)) as any;
+  const pendingAction = (await kv.get(pendingKey)) as PendingAction | null;
 
   if (!pendingAction) {
     return res.json({
@@ -296,7 +304,7 @@ export async function handleAgentV5Confirm(
         // Clear pending
         await kv.del(pendingKey);
 
-        const data = result.data as any;
+        const data = result.data as Record<string, unknown>;
         return res.json({
           success: true,
           message: data?.message || '✅ Операция успешно выполнена.',
@@ -355,7 +363,7 @@ export const handleAgentV5Secure = securityMiddleware(
     auditEvent: 'agent.v5.execute',
     rateLimit: { limit: 20, windowSeconds: 60 },
   },
-  ((req: any, res: any) => handleAgentV5(req, res)) as any
+  handleAgentV5 as any
 );
 
 /**
@@ -365,5 +373,5 @@ export const handleAgentV5ConfirmSecure = securityMiddleware(
   {
     auditEvent: 'agent.v5.confirm',
   },
-  ((req: any, res: any) => handleAgentV5Confirm(req, res)) as any
+  handleAgentV5Confirm as any
 );

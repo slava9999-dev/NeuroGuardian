@@ -3,24 +3,9 @@
 // Version: 5.0.0 | Date: January 2026
 // ============================================
 
-import { z } from 'zod';
 import { defineTool } from '../ToolRegistry.js';
 
-/**
- * Arguments schema for search_web tool
- */
-const SearchWebArgsSchema = z.object({
-  query: z.string().min(3).max(200).describe('Search query'),
-  num_results: z
-    .number()
-    .min(1)
-    .max(10)
-    .optional()
-    .default(5)
-    .describe('Number of results to return'),
-});
-
-type SearchWebArgs = z.infer<typeof SearchWebArgsSchema>;
+import { SearchWebArgsSchema, type SearchWebArgs } from '../../../api-lib/agent/validators.js';
 
 /**
  * Search Web Tool

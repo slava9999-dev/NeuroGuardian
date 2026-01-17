@@ -8,6 +8,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { validateTelegramInitData, sanitizeInput } from '../lib/index.js';
 import { getSecret, getSecretSync } from '../lib/secrets-helper.js';
 import { logOpsEvent } from '../services/ops-logger.js';
+import type { TelegramUser } from '../services/database.js';
+import { sql } from '../services/database.js';
 
 // ============================================
 // TYPES
@@ -16,7 +18,7 @@ import { logOpsEvent } from '../services/ops-logger.js';
 export interface AuthContext {
   userId: number;
   authMethod: 'telegram' | 'admin' | 'cron';
-  user?: any; // Full user record including plan
+  user?: TelegramUser; // Full user record including plan
 }
 
 export type AuthResult =
@@ -30,7 +32,7 @@ export type SaaSHandler = (
   req: VercelRequest,
   res: VercelResponse,
   context: AuthContext
-) => Promise<any>;
+) => Promise<VercelResponse | void>;
 
 // ============================================
 // AUTH EXTRACTORS
@@ -188,7 +190,6 @@ export function extractCronAuth(req: VercelRequest): AuthResult {
 /**
  * Try all auth methods in order: Telegram → Admin → Cron (async version)
  */
-import { sql } from '../services/database.js';
 
 export async function extractAnyAuthAsync(req: VercelRequest): Promise<AuthResult> {
   let userId: number | undefined;

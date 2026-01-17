@@ -195,10 +195,10 @@ export async function handleSentinelDashboard(
     const keys = await getMarketplaceKeys(userId);
 
     if (keys.wb) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const wbProducts = products.filter((p: any) => p.marketplace === 'WB');
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const nmIds = wbProducts.map((p: any) => p.nm_id).filter((id: any) => id !== null);
+      const wbProducts = products.filter(p => p.marketplace === 'WB') as DBProduct[];
+      const nmIds = wbProducts
+        .map(p => Number(p.nm_id))
+        .filter((id): id is number => !isNaN(id) && id !== 0);
 
       if (nmIds.length > 0) {
         try {
@@ -206,7 +206,7 @@ export async function handleSentinelDashboard(
 
           for (const product of wbProducts) {
             if (!product.nm_id) continue;
-            const livePrice = priceMap.get(product.nm_id);
+            const livePrice = priceMap.get(Number(product.nm_id));
             if (livePrice === undefined) continue;
 
             const scan = threatDetector.scanProductThreats(product as DBProduct, livePrice, 'WB');
@@ -233,12 +233,10 @@ export async function handleSentinelDashboard(
     }
 
     if (keys.ozon) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const ozonProducts = products.filter((p: any) => p.marketplace === 'Ozon');
+      const ozonProducts = products.filter(p => p.marketplace === 'Ozon') as DBProduct[];
       const ozonIds = ozonProducts
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .map((p: any) => parseInt(p.product_id.replace('ozon-', '')))
-        .filter(Boolean);
+        .map(p => parseInt(p.product_id.replace('ozon-', '')))
+        .filter((id): id is number => !isNaN(id));
 
       if (ozonIds.length > 0) {
         try {
@@ -295,18 +293,17 @@ export async function handleSentinelDashboard(
         },
 
         // Defense history
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        recentActions: actionsResult.rows.map((row: any) => ({
-          id: row.id,
-          productTitle: row.product_title,
-          marketplace: row.marketplace,
-          threatType: row.threat_type,
-          action: row.defense_action,
-          detectedPrice: row.detected_price,
-          minPrice: row.min_price,
-          savedAmount: row.saved_amount,
-          success: row.success,
-          createdAt: row.created_at,
+        recentActions: actionsResult.rows.map(row => ({
+          id: row.id as string,
+          productTitle: row.product_title as string,
+          marketplace: row.marketplace as string,
+          threatType: row.threat_type as string,
+          action: row.defense_action as string,
+          detectedPrice: Number(row.detected_price || 0),
+          minPrice: Number(row.min_price || 0),
+          savedAmount: Number(row.saved_amount || 0),
+          success: Boolean(row.success),
+          createdAt: row.created_at as string,
         })),
 
         // Aggregated statistics

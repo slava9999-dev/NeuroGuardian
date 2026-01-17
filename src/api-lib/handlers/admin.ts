@@ -5,10 +5,10 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql } from '../services/database.js';
-
 import { getUserById, initializeDatabase } from '../services/index.js';
 import { getSecret, logger } from '../lib/index.js';
 import { verifyAdminAccessAsync } from '../middleware/auth.js';
+import type { SentinelLog } from '../lib/types.js';
 
 /**
  * Helper to get Telegram secrets
@@ -533,8 +533,7 @@ export async function handleSentinelLogs(
         totalSaved: parseInt(summary.total_saved) || 0,
         uniqueProducts: parseInt(summary.unique_products) || 0,
       },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      logs: logsResult.rows.map((log: any) => ({
+      logs: logsResult.rows.map((log: SentinelLog) => ({
         id: log.id,
         productId: log.product_id,
         productTitle: log.product_title,
@@ -592,7 +591,11 @@ export async function handleHealth(
     const dbOk = dbResult.rows[0]?.ok === 1;
 
     // Get kernel health if available
-    let kernelHealth: any = null;
+    let kernelHealth: {
+      status?: string;
+      unhealthyCount?: number;
+      degradedCount?: number;
+    } | null = null;
     try {
       const { getKernelHealth, getKernelManifest } = await import('../../core/modules.js');
       kernelHealth = getKernelHealth();
@@ -808,7 +811,11 @@ export async function handleAdminTestOzon(
       body: JSON.stringify({ filter: {}, last_id: '', limit: 5 }),
     });
 
-    const data = (await response.json()) as any;
+    const data = (await response.json()) as {
+      result?: { items?: unknown[]; total?: number };
+      message?: string;
+      error?: string;
+    };
 
     return res.json({
       status: response.status,

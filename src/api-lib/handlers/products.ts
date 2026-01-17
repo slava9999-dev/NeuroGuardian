@@ -14,6 +14,7 @@ import {
   updateProductMinPrice,
   updateProductCostPrice,
 } from '../services/index.js';
+import type { DBProduct } from '../lib/types.js';
 import { mediaQueue } from '../../vision/index.js';
 
 // fetchWithRetry moved to api-lib/lib/index.js
@@ -30,30 +31,12 @@ export async function handleProducts(
   if (req.method === 'GET') {
     const products = await getProductsByUserId(userId);
 
-    // Define a type for the product object returned from the DB
-    interface DbProduct {
-      product_id: string;
-      nm_id: string | null;
-      vendor_code: string | null;
-      title: string | null;
-      image_url: string | null;
-      current_price: number | null;
-      estimated_buyer_price: number | null;
-      marketplace_discount_percent: number | null;
-      min_price: number | null;
-      cost_price: number | null;
-      current_stock: number | null;
-      marketplace: string;
-      status: string;
-      is_monitored: boolean;
-      media_assets: any[];
-    }
-
-    const formatted = (products as unknown as DbProduct[]).map(p => ({
+    const rows = products as unknown as DBProduct[];
+    const formatted = rows.map(p => ({
       id: p.product_id,
       productId: p.product_id, // CRITICAL: Frontend needs this for updates!
       nmId: p.nm_id,
-      vendorCode: p.vendor_code || p.product_id,
+      vendorCode: p.official_sku || p.product_id,
       title: sanitizeInput(String(p.title || '')),
       imageUrl: p.image_url,
       currentPrice: Number(p.current_price || 0),

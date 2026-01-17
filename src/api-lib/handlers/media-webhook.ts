@@ -109,6 +109,13 @@ export default async function handleMediaWebhook(req: VercelRequest, res: Vercel
 // Worker Logic
 // ----------------------------------------------------------------------------
 
+interface IngestionMetadata {
+  productId?: string;
+  userId?: number;
+  assetId?: string;
+  [key: string]: unknown;
+}
+
 async function processVisionAnalysis(imageUrl: string, assetId?: string) {
   if (!assetId) {
     logger.warn('[MediaWebhook] No assetId provided for vision analysis');
@@ -132,7 +139,7 @@ async function processVisionAnalysis(imageUrl: string, assetId?: string) {
   logger.info(`[MediaWebhook] Analysis saved for asset ${assetId}`);
 }
 
-async function processIngestion(imageUrl: string, metadata: any) {
+async function processIngestion(imageUrl: string, metadata: IngestionMetadata) {
   const { productId, userId } = metadata || {};
   if (!productId || !userId) {
     logger.warn('[MediaWebhook] Missing metadata for ingestion', metadata);

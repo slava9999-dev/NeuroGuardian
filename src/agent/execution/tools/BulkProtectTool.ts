@@ -3,31 +3,12 @@
 // Version: 5.0.0 | Date: January 2026
 // ============================================
 
-import { z } from 'zod';
 import { defineTool } from '../ToolRegistry.js';
 
-/**
- * Arguments schema for bulk_protect_products tool
- */
-const BulkProtectProductsArgsSchema = z.object({
-  percentage: z
-    .number()
-    .min(5)
-    .max(30)
-    .default(10)
-    .describe('Percentage below current price to set as min_price'),
-  marketplace: z
-    .enum(['WB', 'Ozon'])
-    .optional()
-    .describe('Only protect products from specific marketplace'),
-  only_unprotected: z
-    .boolean()
-    .optional()
-    .default(true)
-    .describe('Only protect products without existing min_price'),
-});
-
-type BulkProtectProductsArgs = z.infer<typeof BulkProtectProductsArgsSchema>;
+import {
+  BulkProtectProductsArgsSchema,
+  type BulkProtectProductsArgs,
+} from '../../../api-lib/agent/validators.js';
 
 /**
  * Bulk Protect Products Tool
@@ -53,7 +34,7 @@ export const bulkProtectProductsTool = defineTool<BulkProtectProductsArgs>({
 
       // Execute bulk update directly in DB (Industrial Grade Performance)
       const totalProtected = await bulkUpdateMinPrice(userId, args.percentage, {
-        marketplace: args.marketplace,
+        marketplace: args.marketplace === 'all' ? undefined : args.marketplace,
         onlyUnprotected: args.only_unprotected,
       });
 

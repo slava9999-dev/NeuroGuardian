@@ -131,11 +131,28 @@ export interface Product {
 
 export type PendingPriceStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
+export interface ProductMediaAsset {
+  id: number;
+  productId: string;
+  userId: string;
+  type: string;
+  status: string;
+  originalUrl: string;
+  processedUrl?: string | null;
+  thumbnailUrl?: string | null;
+  visionMetadata?: Record<string, unknown> | null;
+  width?: number | null;
+  height?: number | null;
+  mimeType?: string | null;
+  createdAt: string;
+}
+
 /**
  * Database Product type — matches `products` table exactly
  * Includes pending price tracking fields (Dec 2024 Audit)
  */
 export interface DBProduct {
+  media_assets?: ProductMediaAsset[];
   id: number; // SERIAL PRIMARY KEY
   user_id: string; // VARCHAR(50) NOT NULL REFERENCES users(id)
   product_id: string; // VARCHAR(255) NOT NULL
@@ -210,6 +227,25 @@ export interface DBPriceRule {
 /**
  * N8n Workflow type
  */
+/**
+ * Sentinel Log entry — matches `sentinel_logs` table
+ */
+export interface SentinelLog {
+  id: number;
+  user_id: string;
+  product_id: string;
+  product_title: string;
+  detected_price: number;
+  min_price: number;
+  defense_action: 'notify' | 'restore' | 'block' | 'discount';
+  saved_amount: number;
+  marketplace: string;
+  created_at: Date;
+  threat_type?: string;
+  success: boolean;
+  details?: Record<string, unknown>;
+}
+
 export interface N8nWorkflow {
   id: string;
   name: string;

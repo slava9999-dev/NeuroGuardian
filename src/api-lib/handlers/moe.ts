@@ -53,9 +53,10 @@ export async function handleMoEClassify(
       },
       latencyMs,
     });
-  } catch (error: any) {
-    logger.error('[MoE API] Classification failed', { userId, error: error.message });
-    return res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error('[MoE API] Classification failed', { userId, error: message });
+    return res.status(500).json({ error: message });
   }
 }
 
@@ -115,9 +116,10 @@ export async function handleMoEQuery(
       sessionId: effectiveSessionId,
       message: 'Query submitted for processing',
     });
-  } catch (error: any) {
-    logger.error('[MoE API] Query submission failed', { userId, error: error.message });
-    return res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error('[MoE API] Query submission failed', { userId, error: message });
+    return res.status(500).json({ error: message });
   }
 }
 
@@ -182,11 +184,12 @@ export async function handleMoEHealth(
     });
 
     return res.status(overallHealthy ? 200 : 503).json(status);
-  } catch (error: any) {
-    logger.error('[MoE API] Health check failed', { error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error('[MoE API] Health check failed', { error: message });
     return res.status(500).json({
       healthy: false,
-      error: error.message,
+      error: message,
     });
   }
 }
@@ -220,8 +223,9 @@ export async function handleMoEPriceCheck(
       eventId,
       message: 'Price check submitted for background processing',
     });
-  } catch (error: any) {
-    logger.error('[MoE API] Price check submission failed', { userId, error: error.message });
-    return res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error('[MoE API] Price check submission failed', { userId, error: message });
+    return res.status(500).json({ error: message });
   }
 }

@@ -42,13 +42,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const stats = await sql`
           SELECT 
             COUNT(DISTINCT o.id) as orders_count,
-            COALESCE(SUM(o.total_price), 0) as revenue,
+            COALESCE(SUM(o.price_total), 0) as revenue,
             (SELECT COUNT(*) FROM products WHERE user_id = ${user.id}) as total_products,
             (SELECT COUNT(*) FROM products WHERE user_id = ${user.id} AND current_stock < 10 AND current_stock > 0) as low_stock_count,
             (SELECT COUNT(*) FROM products WHERE user_id = ${user.id} AND min_price > 0) as protected_count
-          FROM orders o
+          FROM marketplace_orders o
           WHERE o.user_id = ${user.id}
-            AND o.created_at > NOW() - INTERVAL '24 hours'
+            AND o.order_date > NOW() - INTERVAL '24 hours'
         `;
 
         // Get Sentinel stats for past 24h
@@ -130,7 +130,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           message,
         };
 
-        const success = await sendAlertToUser(user.id, alert);
+        const success = await sendAlertToUser(Number(user.id), alert);
         if (success) {
           sentCount++;
         } else {
