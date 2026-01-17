@@ -77,6 +77,24 @@ export class YooKassaService {
           tier: request.tier,
           billing_period: request.billing_period,
         },
+        receipt: {
+          customer: {
+            email: 'user@neuroguardian.app', // Fallback email as we don't always have user email in Telegram
+          },
+          items: [
+            {
+              description: `Подписка ${this.getTierName(request.tier)}`,
+              quantity: '1.00',
+              amount: {
+                value: amount.toFixed(2),
+                currency: 'RUB',
+              },
+              vat_code: '1', // Без НДС (или 1 - 20%, зависит от СНО). Ставим 1 (Standard) или 2-6 если нужно.
+              payment_mode: 'full_payment',
+              payment_subject: 'service',
+            },
+          ],
+        },
       };
 
       // Call YooKassa API

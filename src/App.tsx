@@ -204,9 +204,11 @@ function App() {
       <div className="bg-cosmic" />
       <div className="nebula-glow" />
 
-      <Suspense fallback={<LoadingScreen />}>
-        <PageContent />
-      </Suspense>
+      <main className="flex-1 overflow-y-auto no-scrollbar relative min-h-0">
+        <Suspense fallback={<LoadingScreen />}>
+          <PageContent />
+        </Suspense>
+      </main>
 
       {/* Premium Apple-style Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 nav-glass safe-area-inset-bottom z-50">
@@ -215,19 +217,19 @@ function App() {
             active={currentPage === 'agent'}
             onClick={() => setCurrentPage('agent')}
             icon={<Cpu />}
-            label="Agent"
+            label="Агент"
           />
           <NavButton
             active={currentPage === 'products'}
             onClick={() => setCurrentPage('products')}
             icon={<Package />}
-            label="Units"
+            label="Товары"
           />
           <NavButton
             active={currentPage === 'settings'}
             onClick={() => setCurrentPage('settings')}
             icon={<Settings />}
-            label="Control"
+            label="Настройки"
           />
           <NavButton
             active={currentPage === 'info'}

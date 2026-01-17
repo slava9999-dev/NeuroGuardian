@@ -135,7 +135,7 @@ export function AgentPage() {
               transition={{ delay: 0.3 }}
             >
               <h2 className="text-[10px] font-black tracking-[0.5em] text-violet-500/60 uppercase">
-                System Status: Active
+                Статус Системы: Активен
               </h2>
               <h1 className="text-4xl font-black tracking-tighter italic">
                 HELLO,{' '}
@@ -190,7 +190,7 @@ export function AgentPage() {
               <div className="flex items-center gap-1.5">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 <span className="text-[10px] text-zinc-500 font-bold uppercase">
-                  {isProcessing ? 'Thinking...' : 'Quantum Strategy'}
+                  {isProcessing ? 'Думаю...' : 'Квантовая Стратегия'}
                 </span>
               </div>
             </div>
@@ -202,7 +202,7 @@ export function AgentPage() {
             }}
             className="px-4 py-2 rounded-full bg-white/5 border border-white/5 text-[10px] font-black text-zinc-400 hover:text-white transition-all uppercase tracking-widest"
           >
-            New Briefing
+            Новый Брифинг
           </button>
         </header>
       )}
@@ -230,7 +230,7 @@ export function AgentPage() {
             ref={inputRef}
             value={inputValue}
             onChange={e => setInputValue(e.target.value)}
-            placeholder={isListening ? 'SENSING VOICE...' : 'Command Victor...'}
+            placeholder={isListening ? 'СЛУШАЮ...' : 'Командуйте Виктором...'}
             className="flex-1 bg-transparent text-white px-2 py-3 text-sm focus:outline-none resize-none max-h-32 min-h-[48px] font-medium placeholder:text-zinc-700"
             onKeyDown={e =>
               e.key === 'Enter' &&
@@ -270,7 +270,7 @@ function LoadingDots() {
       <div className="w-2 h-2 rounded-full bg-violet-500 animate-bounce delay-100" />
       <div className="w-2 h-2 rounded-full bg-violet-500 animate-bounce delay-200" />
       <span className="text-[10px] font-black text-violet-400 uppercase tracking-widest">
-        Quantum Computing
+        Квантовые Вычисления
       </span>
     </div>
   );
@@ -296,7 +296,7 @@ function MessageUI({ message }: { message: ChatMessage }) {
         />
       </div>
       <span className="text-[9px] font-black italic text-zinc-600 uppercase tracking-widest">
-        {isUser ? 'Commander' : 'Victor V5 Agent'} •{' '}
+        {isUser ? 'Командир' : 'Агент Виктор V5'} •{' '}
         {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
       </span>
     </motion.div>

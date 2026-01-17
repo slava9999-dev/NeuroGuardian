@@ -139,7 +139,7 @@ export function ProductsPage({ onBack }: ProductsPageProps) {
             whileHover={{ scale: 1.05, translateY: -2 }}
           >
             <p className="text-xl font-bold font-mono text-emerald-400">{stats.protected}</p>
-            <p className="text-[9px] text-slate-500 uppercase tracking-wider">Active</p>
+            <p className="text-[9px] text-zinc-500 uppercase tracking-wider">Актив</p>
           </motion.div>
           <motion.div className="surface-card p-3 text-center" whileHover={{ scale: 1.02 }}>
             <p className="text-xl font-bold font-mono text-slate-400">{stats.unprotected}</p>
@@ -187,7 +187,7 @@ export function ProductsPage({ onBack }: ProductsPageProps) {
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search assets or IDs..."
+              placeholder="Поиск товаров или ID..."
               className="w-full bg-[#0a0c14]/50 border border-white/5 rounded-2xl pl-10 pr-4 py-3 text-sm text-white placeholder-slate-600 focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20 focus:outline-none transition-all"
             />
           </div>
@@ -239,7 +239,7 @@ export function ProductsPage({ onBack }: ProductsPageProps) {
             className="flex-1 py-4 px-4 btn-premium gap-2"
           >
             <Shield className="w-4 h-4" />
-            <span className="text-sm">Secure All</span>
+            <span className="text-sm">Защитить Все</span>
           </button>
 
           <button
@@ -299,8 +299,8 @@ export function ProductsPage({ onBack }: ProductsPageProps) {
             <ViktorCore size="sm" />
             <p className="text-sm text-slate-300 flex-1 leading-relaxed">
               💡 <b>Victor Pulse:</b> Try saying{' '}
-              <span className="text-violet-400 font-medium italic">"protect everything"</span> in
-              the Agent tab.
+              <span className="text-violet-400 font-medium italic">"защити всё"</span> в the Agent
+              tab.
             </p>
           </motion.div>
         )}
