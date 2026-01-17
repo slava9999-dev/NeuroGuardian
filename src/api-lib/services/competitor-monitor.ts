@@ -63,17 +63,51 @@ export async function fetchWbCompetitorData(nmId: number | string): Promise<Comp
   // v4 is the current version as of 2026
   const url = `https://card.wb.ru/cards/v4/detail?appType=1&curr=rub&dest=-1257786&spp=30&nm=${nmId}`;
 
-  try {
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        Accept: 'application/json',
-      },
-    });
+  let retries = 3;
+  let response: Response | null = null;
 
-    if (!response.ok) {
-      throw new Error(`WB API Error: ${response.status} ${response.statusText}`);
+  while (retries >= 0) {
+    try {
+      const currentResponse = await fetch(url, {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          Accept: 'application/json',
+        },
+      });
+
+      response = currentResponse;
+
+      if (response.status === 429 && retries > 0) {
+        const wait = 2000 * (3 - retries + 1);
+        console.warn(`[CompetitorMonitor] WB 429 Rate Limit hit. Retrying in ${wait}ms...`);
+        await new Promise(resolve => setTimeout(resolve, wait));
+        retries--;
+        continue;
+      }
+
+      if (response.status >= 500 && retries > 0) {
+        console.warn(`[CompetitorMonitor] WB ${response.status} Error. Retrying...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        retries--;
+        continue;
+      }
+
+      break; // Success or out of retries with a non-retryable error
+    } catch (error) {
+      if (retries > 0) {
+        console.warn('[CompetitorMonitor] Network error, retrying...', error);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        retries--;
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  try {
+    if (!response || !response.ok) {
+      throw new Error(`WB API Error: ${response?.status} ${response?.statusText}`);
     }
 
     interface WbPriceV4 {
@@ -181,8 +215,14 @@ export async function fetchOzonCompetitorData(productId: string): Promise<Compet
 
     if (!response.ok) return null;
 
-    const data: any = await response.json();
-    const ozonResult = data.organic?.find((r: any) => r.link?.includes('ozon.ru'));
+    interface OzonSerperResult {
+      link?: string;
+      title?: string;
+      snippet?: string;
+    }
+
+    const data = (await response.json()) as { organic?: OzonSerperResult[] };
+    const ozonResult = data.organic?.find(r => r.link?.includes('ozon.ru'));
 
     if (!ozonResult || (!ozonResult.snippet && !ozonResult.title)) return null;
 

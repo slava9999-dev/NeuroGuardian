@@ -61,7 +61,7 @@ export function getEnv(): Env {
   if (!result.success) {
     console.error('❌ CONFIGURATION ERROR: Invalid environment variables');
     console.error('----------------------------------------------------');
-    (result as any).error.issues.forEach((issue: any) => {
+    result.error.issues.forEach(issue => {
       console.error(`👉 [${issue.path.join('.')}]: ${issue.message}`);
     });
     console.error('----------------------------------------------------');
@@ -75,6 +75,15 @@ export function getEnv(): Env {
   }
 
   _env = result.data;
+
+  // Security Check: Ensure the key is not the default one in production
+  const DEFAULT_KEY = 'NeuroGuardian2024SecretKey32chXX';
+  if (_env.NODE_ENV === 'production' && _env.API_KEY_ENCRYPTION_KEY === DEFAULT_KEY) {
+    console.error('❌ SECURITY CRITICAL: Using default API_KEY_ENCRYPTION_KEY in production!');
+    console.error('Run "npm run gen-key" to create a new secure key.');
+    process.exit(1);
+  }
+
   return _env;
 }
 

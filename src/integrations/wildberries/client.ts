@@ -47,24 +47,71 @@ export class WildberriesClient {
     return value;
   }
 
+  /**
+   * Universal fetch with retries for 429 (Rate Limit) and 5xx errors
+   */
+  private async fetchWithRetry(
+    url: string,
+    options: RequestInit,
+    retries = 3,
+    backoff = 2000
+  ): Promise<Response> {
+    try {
+      await this.rateLimiter.acquire();
+      const response = await fetch(url, options);
+
+      if (response.status === 429 && retries > 0) {
+        const retryAfter = response.headers.get('Retry-After');
+        const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : backoff;
+
+        console.warn(`[WildberriesClient] 429 Rate Limit hit. Retrying in ${waitTime}ms...`, {
+          url,
+          retriesRemaining: retries,
+        });
+
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        return this.fetchWithRetry(url, options, retries - 1, backoff * 2);
+      }
+
+      if (response.status >= 500 && retries > 0) {
+        console.warn(`[WildberriesClient] ${response.status} Server Error. Retrying...`, {
+          url,
+          retriesRemaining: retries,
+        });
+        await new Promise(resolve => setTimeout(resolve, backoff));
+        return this.fetchWithRetry(url, options, retries - 1, backoff * 2);
+      }
+
+      return response;
+    } catch (error) {
+      if (retries > 0) {
+        console.warn('[WildberriesClient] Network error, retrying...', { error: String(error) });
+        await new Promise(resolve => setTimeout(resolve, backoff));
+        return this.fetchWithRetry(url, options, retries - 1, backoff * 2);
+      }
+      throw error;
+    }
+  }
+
   async getProducts(): Promise<WBProduct[]> {
     if (!this.config.apiKey) return [];
-    await this.rateLimiter.acquire();
-
     try {
-      const response = await fetch(`${this.config.baseUrl}/content/v2/get/cards/list`, {
-        method: 'POST',
-        headers: {
-          Authorization: this.config.apiKey,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          settings: {
-            cursor: { limit: 100 },
-            filter: { withPhoto: -1 },
+      const response = await this.fetchWithRetry(
+        `${this.config.baseUrl}/content/v2/get/cards/list`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: this.config.apiKey,
+            'Content-Type': 'application/json',
           },
-        }),
-      });
+          body: JSON.stringify({
+            settings: {
+              cursor: { limit: 100 },
+              filter: { withPhoto: -1 },
+            },
+          }),
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to get products: ${response.status}`);
@@ -80,9 +127,7 @@ export class WildberriesClient {
 
   async getPrices(): Promise<WBPrice[]> {
     if (!this.config.apiKey) return [];
-    await this.rateLimiter.acquire();
-
-    const response = await fetch(`${this.config.baseUrl}/public/api/v1/info`, {
+    const response = await this.fetchWithRetry(`${this.config.baseUrl}/public/api/v1/info`, {
       headers: { Authorization: this.config.apiKey },
     });
 
@@ -95,9 +140,7 @@ export class WildberriesClient {
 
   async updatePrice(nmId: number, price: number): Promise<boolean> {
     if (!this.config.apiKey) return false;
-    await this.rateLimiter.acquire();
-
-    const response = await fetch(`${this.config.baseUrl}/public/api/v1/prices`, {
+    const response = await this.fetchWithRetry(`${this.config.baseUrl}/public/api/v1/prices`, {
       method: 'POST',
       headers: {
         Authorization: this.config.apiKey,
@@ -120,9 +163,9 @@ export class WildberriesClient {
 
     for (const nmId of nmIds) {
       try {
-        await this.rateLimiter.acquire();
-        const response = await fetch(
-          `https://card.wb.ru/cards/v1/detail?appType=1&curr=rub&nm=${nmId}`
+        const response = await this.fetchWithRetry(
+          `https://card.wb.ru/cards/v1/detail?appType=1&curr=rub&nm=${nmId}`,
+          {}
         );
         const data = await response.json();
 

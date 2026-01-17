@@ -17,7 +17,18 @@ export function encryptApiKey(apiKey: string): string {
   if (!apiKey) return apiKey;
 
   try {
-    const key = Buffer.from(config.API_KEY_ENCRYPTION_KEY.slice(0, 32), 'utf8');
+    // Key must be exactly 32 bytes for aes-256
+    let key: Buffer;
+    const rawKey = config.API_KEY_ENCRYPTION_KEY;
+
+    if (rawKey.length === 64 && /^[0-9a-fA-F]+$/.test(rawKey)) {
+      // It's a hex string (32 bytes)
+      key = Buffer.from(rawKey, 'hex');
+    } else {
+      // It's a plaintext string, take first 32 chars or pad
+      key = Buffer.alloc(32);
+      Buffer.from(rawKey, 'utf8').copy(key);
+    }
 
     const iv = crypto.randomBytes(12);
     const cipher = crypto.createCipheriv(ENCRYPTION_ALGORITHM, key, iv);
@@ -56,7 +67,15 @@ export function decryptApiKey(encryptedKey: string): string {
 
   try {
     const [ivHex, authTagHex, encrypted] = parts;
-    const key = Buffer.from(config.API_KEY_ENCRYPTION_KEY.slice(0, 32), 'utf8');
+    const rawKey = config.API_KEY_ENCRYPTION_KEY;
+
+    let key: Buffer;
+    if (rawKey.length === 64 && /^[0-9a-fA-F]+$/.test(rawKey)) {
+      key = Buffer.from(rawKey, 'hex');
+    } else {
+      key = Buffer.alloc(32);
+      Buffer.from(rawKey, 'utf8').copy(key);
+    }
 
     const iv = Buffer.from(ivHex, 'hex');
     const authTag = Buffer.from(authTagHex, 'hex');

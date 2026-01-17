@@ -28,6 +28,7 @@
     "db:studio": "drizzle-kit studio",
     "checklist": "node scripts/production-checklist.cjs",
     "pre-flight": "npx tsx scripts/ops/pre-flight.ts",
+    "gen-key": "npx tsx scripts/ops/generate-key.ts",
 
     "docker:up": "cd docker && docker compose up -d",
     "docker:down": "cd docker && docker compose down",

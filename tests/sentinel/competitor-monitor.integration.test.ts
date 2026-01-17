@@ -10,7 +10,7 @@ describe('CompetitorMonitor (Integration)', () => {
 
   beforeAll(() => {
     vi.unstubAllGlobals(); // Restore real fetch
-    vi.setConfig({ testTimeout: 40000 });
+    vi.setConfig({ testTimeout: 60000 });
   });
 
   it('should fetch real data from WB public API', async () => {
@@ -34,7 +34,7 @@ describe('CompetitorMonitor (Integration)', () => {
       console.warn('⚠️ Network or API error during integration test (Soft Fail):', error);
       // Soft fail: do not fail the test suite if external API is flaky
     }
-  }, 30000);
+  }, 60000);
 
   it('should return null for non-existent product', async () => {
     try {
@@ -43,5 +43,5 @@ describe('CompetitorMonitor (Integration)', () => {
     } catch (error) {
       console.warn('⚠️ Network or API error during integration test (Soft Fail):', error);
     }
-  }, 30000);
+  }, 60000);
 });
