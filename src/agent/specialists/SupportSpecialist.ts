@@ -10,7 +10,7 @@ export class SupportSpecialist extends BaseSpecialist {
   readonly name = 'SupportSpecialist';
   readonly description = 'Управление репутацией, ответы на отзывы и поддержка клиентов';
 
-  protected override model: 'gemini-2.5-flash' | 'gemini-2.5-pro' = 'gemini-2.5-flash';
+  protected override model: 'gemini-2.0-flash' | 'gemini-1.5-pro' = 'gemini-2.0-flash';
 
   readonly tools = ['get_reviews', 'generate_review_reply'];
 

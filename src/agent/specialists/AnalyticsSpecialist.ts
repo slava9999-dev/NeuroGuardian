@@ -11,7 +11,7 @@ export class AnalyticsSpecialist extends BaseSpecialist {
   readonly description = 'Handles unit economics, ABC analysis, forecasts, and business analytics';
 
   // Use more powerful model for complex reasoning
-  protected override model: 'gemini-2.5-flash' | 'gemini-2.5-pro' = 'gemini-2.5-pro';
+  protected override model: 'gemini-2.0-flash' | 'gemini-1.5-pro' = 'gemini-1.5-pro';
 
   readonly tools = [
     'calculate_unit_economics',
