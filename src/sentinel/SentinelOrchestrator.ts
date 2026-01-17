@@ -145,7 +145,10 @@ export class SentinelOrchestrator {
   /**
    * Run for a specific user
    */
-  async runForUser(userId: string | number): Promise<SentinelRunResult> {
+  async runForUser(
+    userId: string | number,
+    options: { limit?: number; skipDigitalVision?: boolean } = {}
+  ): Promise<SentinelRunResult> {
     const result: SentinelRunResult = {
       usersProcessed: 1,
       threatsDetected: 0,
@@ -164,7 +167,7 @@ export class SentinelOrchestrator {
         first_name: user.firstName,
         protection_enabled: user.protectionEnabled,
       } as unknown as DBUser;
-      await this.processUser(legacyUser, result);
+      await this.processUser(legacyUser, result, undefined, options);
     }
     return result;
   }
@@ -172,7 +175,8 @@ export class SentinelOrchestrator {
   private async processUser(
     user: DBUser,
     summary: SentinelRunResult,
-    userResult?: UserCycleResult
+    userResult?: UserCycleResult,
+    options: { limit?: number; skipDigitalVision?: boolean } = {}
   ): Promise<void> {
     const monitoredProducts = await db.query.products.findMany({
       columns: { id: true },
@@ -180,6 +184,7 @@ export class SentinelOrchestrator {
         eq(products.userId, String(user.id)),
         drizzleSql`(${products.isMonitored} = true OR ${products.minPrice} > 0)`
       ),
+      limit: options.limit,
     });
 
     const productIds = monitoredProducts.map(p => p.id);
@@ -262,43 +267,47 @@ export class SentinelOrchestrator {
             if (!livePrice) return;
 
             // --- Digital Vision Update ---
-            const lastUpdate = product.updated_at ? new Date(product.updated_at).getTime() : 0;
-            const shouldRefreshRealPrice =
-              !product.estimated_buyer_price || Date.now() - lastUpdate > 12 * 60 * 60 * 1000;
+            if (!options.skipDigitalVision) {
+              const lastUpdate = product.updated_at ? new Date(product.updated_at).getTime() : 0;
+              const shouldRefreshRealPrice =
+                !product.estimated_buyer_price || Date.now() - lastUpdate > 12 * 60 * 60 * 1000;
 
-            if (shouldRefreshRealPrice) {
-              try {
-                const sku =
-                  marketplace === 'WB'
-                    ? String(product.nm_id)
-                    : product.product_id.replace('ozon-', '');
-                const realPriceInfo =
-                  marketplace === 'WB'
-                    ? await priceParserService.getWbRealPrice(sku)
-                    : await priceParserService.getOzonRealPrice(sku);
+              if (shouldRefreshRealPrice) {
+                try {
+                  const sku =
+                    marketplace === 'WB'
+                      ? String(product.nm_id)
+                      : product.product_id.replace('ozon-', '');
+                  const realPriceInfo =
+                    marketplace === 'WB'
+                      ? await priceParserService.getWbRealPrice(sku)
+                      : await priceParserService.getOzonRealPrice(sku);
 
-                if (realPriceInfo.buyerPrice > 0) {
-                  const discountPercent =
-                    realPriceInfo.sellerPrice > 0
-                      ? ((realPriceInfo.sellerPrice - realPriceInfo.buyerPrice) /
-                          realPriceInfo.sellerPrice) *
-                        100
-                      : 0;
+                  if (realPriceInfo.buyerPrice > 0) {
+                    const discountPercent =
+                      realPriceInfo.sellerPrice > 0
+                        ? ((realPriceInfo.sellerPrice - realPriceInfo.buyerPrice) /
+                            realPriceInfo.sellerPrice) *
+                          100
+                        : 0;
 
-                  await db
-                    .update(products)
-                    .set({
-                      estimatedBuyerPrice: realPriceInfo.buyerPrice,
-                      marketplaceDiscountPercent: String(Math.round(discountPercent)),
-                      updatedAt: new Date(),
-                    })
-                    .where(eq(products.id, product.id));
+                    await db
+                      .update(products)
+                      .set({
+                        estimatedBuyerPrice: realPriceInfo.buyerPrice,
+                        marketplaceDiscountPercent: String(Math.round(discountPercent)),
+                        updatedAt: new Date(),
+                      })
+                      .where(eq(products.id, product.id));
 
-                  product.estimated_buyer_price = realPriceInfo.buyerPrice;
-                  product.marketplace_discount_percent = discountPercent;
+                    product.estimated_buyer_price = realPriceInfo.buyerPrice;
+                    product.marketplace_discount_percent = discountPercent;
+                  }
+                } catch (e) {
+                  logger.warn(`Failed to update buyer price for ${product.product_id}`, {
+                    error: e,
+                  });
                 }
-              } catch (e) {
-                logger.warn(`Failed to update buyer price for ${product.product_id}`, { error: e });
               }
             }
 

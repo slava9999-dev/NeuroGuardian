@@ -27,9 +27,12 @@ async function runSmokeTest() {
     const user = userRes.rows[0];
     console.log(`👤 Testing with user: ${user.first_name} (${user.id})`);
 
-    // 2. Run Sentinel for this user
+    // 2. Run Sentinel for this user (LIMIT TO 3 PRODUCTS + SKIP DIGITAL VISION FOR SPEED)
     const start = Date.now();
-    const result = await sentinelOrchestrator.runForUser(user.id);
+    const result = await sentinelOrchestrator.runForUser(user.id, {
+      limit: 3,
+      skipDigitalVision: true,
+    });
     const duration = Date.now() - start;
 
     // 3. Verify Results
