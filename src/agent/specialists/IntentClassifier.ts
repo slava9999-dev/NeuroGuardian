@@ -259,7 +259,7 @@ async function classifyWithLLM(query: string): Promise<ClassificationResult | nu
   const startTime = Date.now();
 
   try {
-    const llm = new GeminiProvider({ model: 'gemini-2.5-flash', temperature: 0 });
+    const llm = new GeminiProvider({ model: 'gemini-2.0-flash', temperature: 0 });
 
     const response = await llm.complete([
       {

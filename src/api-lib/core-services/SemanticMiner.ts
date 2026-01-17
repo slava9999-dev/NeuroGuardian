@@ -110,7 +110,6 @@ export class SemanticMiner {
 
       // Stealth Mode
       await page.evaluateOnNewDocument(() => {
-        // @ts-expect-error - overriding webdriver property for stealth
         Object.defineProperty(navigator, 'webdriver', {
           get: () => false,
         });
@@ -476,17 +475,12 @@ export class SemanticMiner {
       const data = await response.json();
       const feedbacks = (data.feedbacks || []) as any[];
 
-      return (
-        feedbacks
-          .slice(0, this.reviewsToAnalyze)
-          // @ts-expect-error - f is implicit any from API
-          .map(f => ({
-            reviewId: String(f.id),
-            rating: f.productValuation,
-            text: f.text,
-            date: f.createdDate,
-          }))
-      );
+      return feedbacks.slice(0, this.reviewsToAnalyze).map(f => ({
+        reviewId: String(f.id),
+        rating: f.productValuation,
+        text: f.text,
+        date: f.createdDate,
+      }));
     } catch {
       return [];
     }

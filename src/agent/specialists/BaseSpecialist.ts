@@ -53,10 +53,10 @@ export abstract class BaseSpecialist {
   abstract readonly systemPrompt: string;
 
   protected llm: GeminiProvider;
-  protected model: 'gemini-2.5-flash' | 'gemini-2.5-pro' = 'gemini-2.5-flash';
+  protected model: 'gemini-2.0-flash' | 'gemini-1.5-pro' = 'gemini-2.0-flash';
 
-  constructor(model?: 'gemini-2.5-flash' | 'gemini-2.5-pro') {
-    this.model = model || 'gemini-2.5-flash';
+  constructor(model?: 'gemini-2.0-flash' | 'gemini-1.5-pro') {
+    this.model = model || 'gemini-2.0-flash';
     this.llm = new GeminiProvider({ model: this.model });
   }
 
