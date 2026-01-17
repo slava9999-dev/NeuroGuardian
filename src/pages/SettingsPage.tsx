@@ -132,7 +132,7 @@ export function SettingsPage({
             <h2 className="text-xl font-black italic tracking-tighter uppercase">
               {user?.firstName || 'Commander'}
             </h2>
-            <p className="text-[10px] mono-data text-zinc-500 uppercase tracking-[0.2em]">
+            <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">
               {user?.username ? `@${user.username}` : 'Стратегический Оператор'}
             </p>
           </div>
@@ -143,7 +143,7 @@ export function SettingsPage({
       <section className="mb-10">
         <div className="flex items-center justify-between mb-4 px-1">
           <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em]">
-            Хаб Маркетплейсов
+            Подключенные Аккаунты
           </h3>
           <button
             onClick={() => {
@@ -152,7 +152,7 @@ export function SettingsPage({
             }}
             className="flex items-center gap-2 text-[10px] font-black text-emerald-400 hover:text-white transition-all uppercase tracking-widest"
           >
-            <Plus className="w-3 h-3" /> Добавить Аккаунт
+            <Plus className="w-3 h-3" /> Добавить
           </button>
         </div>
 
@@ -176,7 +176,7 @@ export function SettingsPage({
                     <div
                       className={`w-1.5 h-1.5 rounded-full ${acc.is_active ? 'bg-emerald-400 shadow-[0_0_8px_#10b981]' : 'bg-rose-500'}`}
                     />
-                    <span className="text-[9px] mono-data text-zinc-500 uppercase">
+                    <span className="text-[9px] font-mono text-zinc-500 uppercase">
                       {acc.marketplace} • {acc.is_active ? 'Активен' : 'Отключен'}
                     </span>
                   </div>
@@ -198,19 +198,26 @@ export function SettingsPage({
               </div>
             </div>
           ))}
+          {accounts.length === 0 && (
+            <div className="text-center py-8 border border-white/5 border-dashed rounded-2xl">
+              <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">
+                Нет подключенных аккаунтов
+              </p>
+            </div>
+          )}
         </div>
       </section>
 
       {/* Viktor Voice Control */}
       <section className="mb-10">
         <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em] mb-4 px-1">
-          Личность Виктора
+          Персона Виктора
         </h3>
         <div className="premium-card border-white/5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div
-                className={`p-3 rounded-xl ${user?.voiceEnabled ? 'bg-emerald-500/10 text-emerald-400' : 'bg-zinc-500/10 text-zinc-500'}`}
+                className={`p-3 rounded-xl transition-all ${user?.voiceEnabled ? 'bg-emerald-500/10 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.1)]' : 'bg-zinc-500/10 text-zinc-500'}`}
               >
                 {user?.voiceEnabled ? (
                   <Volume2 className="w-5 h-5" />
@@ -219,11 +226,11 @@ export function SettingsPage({
                 )}
               </div>
               <div>
-                <h4 className="text-sm font-black italic tracking-tight uppercase">
+                <h4 className="text-sm font-black italic tracking-tight uppercase transition-colors">
                   Голосовые Ответы
                 </h4>
-                <p className="text-[9px] text-zinc-500 font-bold uppercase mt-0.5">
-                  Виктор будет отвечать голосовыми сообщениями
+                <p className="text-[9px] text-zinc-500 font-bold uppercase mt-0.5 max-w-[180px]">
+                  Виктор будет отвечать аудио-сообщениями в Telegram
                 </p>
               </div>
             </div>
@@ -236,7 +243,7 @@ export function SettingsPage({
               className={`w-12 h-6 rounded-full transition-all relative ${user?.voiceEnabled ? 'bg-emerald-500' : 'bg-zinc-800'}`}
             >
               <div
-                className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${user?.voiceEnabled ? 'left-7' : 'left-1'}`}
+                className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-md ${user?.voiceEnabled ? 'left-7' : 'left-1'}`}
               />
             </button>
           </div>
@@ -246,62 +253,65 @@ export function SettingsPage({
       {/* Sentinel Security Panel */}
       <section className="mb-10">
         <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em] mb-4 px-1">
-          Тактика Sentinel
+          Алгоритмы Защиты Sentinel
         </h3>
         <div className="grid grid-cols-2 gap-3 mb-6">
           <motion.button
             whileTap={{ scale: 0.95, y: 2 }}
             onClick={() => handleDefenseModeChange('price_correction')}
-            className={`p-4 rounded-xl border transition-all text-left flex flex-col gap-3 ${defenseMode === 'price_correction' ? 'bg-violet-500/10 border-violet-500/50' : 'bg-white/2 border-white/5 opacity-60'}`}
+            className={`p-4 rounded-xl border transition-all text-left flex flex-col gap-3 ${defenseMode === 'price_correction' ? 'bg-violet-500/10 border-violet-500/50 shadow-[0_0_20px_rgba(139,92,246,0.1)]' : 'bg-white/2 border-white/5 opacity-60'}`}
           >
             <RefreshCcw
               className={`w-6 h-6 ${defenseMode === 'price_correction' ? 'text-violet-400' : 'text-zinc-600'}`}
             />
             <div>
               <h4 className="text-xs font-black tracking-tight uppercase">Коррекция</h4>
-              <p className="text-[9px] text-zinc-500 font-bold uppercase mt-1">
-                Принудительная минимальная цена
+              <p className="text-[9px] text-zinc-500 font-bold uppercase mt-1 leading-tight">
+                Мгновенный возврат к Стоп-Лоссу
               </p>
             </div>
           </motion.button>
           <motion.button
             whileTap={{ scale: 0.95, y: 2 }}
             onClick={() => handleDefenseModeChange('zero_stock')}
-            className={`p-4 rounded-xl border transition-all text-left flex flex-col gap-3 ${defenseMode === 'zero_stock' ? 'bg-red-500/5 border-red-500/50' : 'bg-white/2 border-white/5 opacity-60'}`}
+            className={`p-4 rounded-xl border transition-all text-left flex flex-col gap-3 ${defenseMode === 'zero_stock' ? 'bg-red-500/5 border-red-500/50 shadow-[0_0_20px_rgba(239,68,68,0.05)]' : 'bg-white/2 border-white/5 opacity-60'}`}
           >
             <MinusCircle
               className={`w-6 h-6 ${defenseMode === 'zero_stock' ? 'text-red-500' : 'text-zinc-600'}`}
             />
             <div>
-              <h4 className="text-xs font-black tracking-tight uppercase">Экстренная Остановка</h4>
-              <p className="text-[9px] text-zinc-500 font-bold uppercase mt-1">
-                Обнуление остатков
+              <h4 className="text-xs font-black tracking-tight uppercase">Заморозка</h4>
+              <p className="text-[9px] text-zinc-500 font-bold uppercase mt-1 leading-tight">
+                Обнуление остатков при демпинге
               </p>
             </div>
           </motion.button>
         </div>
 
         {/* Advanced Sliders */}
-        <div className="premium-card border-white/5 space-y-8">
-          <header className="flex items-center gap-2 mb-2">
-            <Shield className="w-4 h-4 text-violet-500" />
+        <div className="premium-card border-white/5">
+          <header className="flex items-center gap-2 mb-6">
+            <Shield className="w-4 h-4 text-violet-500 shadow-[0_0_10px_rgba(139,92,246,0.5)]" />
             <span className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em]">
               Буферы Безопасности
             </span>
           </header>
 
-          <div className="space-y-4 text-left">
+          <div className="space-y-6 text-left">
             <div className="flex justify-between items-center bg-white/2 p-3 rounded-lg border border-white/5">
               <div className="flex flex-col">
-                <span className="text-[10px] font-black text-zinc-500 uppercase">Буфер Скидки</span>
+                <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
+                  БУФЕР ЦЕНЫ
+                </span>
                 <span className="text-[8px] text-zinc-600 font-bold uppercase">
-                  Учет СПП и карт лояльности
+                  Допуск для СПП и акций
                 </span>
               </div>
-              <span className="mono-data text-xl text-violet-400">
+              <span className="font-mono text-xl font-bold text-violet-400">
                 {user?.priceBufferPercent ?? 5}%
               </span>
             </div>
+
             <input
               type="range"
               min="0"
@@ -317,9 +327,10 @@ export function SettingsPage({
               }
               className="w-full h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-violet-500"
             />
-            <p className="text-[9px] text-zinc-600 italic">
-              Sentinel будет использовать этот процент как страховку от динамических скидок
-              площадок.
+
+            <p className="text-[9px] text-zinc-500 font-medium leading-relaxed italic border-l-2 border-violet-500/30 pl-3">
+              Интеллектуальный буфер Sentinel предотвращает ложные срабатывания при временных
+              колебаниях скидок маркетплейса.
             </p>
           </div>
         </div>
@@ -328,23 +339,33 @@ export function SettingsPage({
       {/* Subscription & Security */}
       <section className="space-y-4">
         <SecurityBadge />
-        <div className="premium-card flex flex-col gap-4 border-lime-500/20">
+        <div className="premium-card flex flex-col gap-5 border-success/20 bg-linear-to-br from-success/5 to-transparent">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Crown className="w-5 h-5 text-emerald-400" />
-              <span className="text-sm font-black italic">
-                {user?.subscriptionPlan?.toUpperCase() || 'FREE'} PLAN
+              <div className="p-2.5 rounded-xl bg-success/10 text-success">
+                <Crown className="w-5 h-5 shadow-[0_0_10px_var(--color-success)]" />
+              </div>
+              <div>
+                <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-0.5">
+                  Ваш Тариф
+                </span>
+                <span className="text-sm font-black italic uppercase text-white">
+                  {user?.subscriptionPlan || 'FREE'} PLAN
+                </span>
+              </div>
+            </div>
+            <div className="flex flex-col items-end">
+              <span className="text-[9px] px-2 py-0.5 rounded-md bg-success text-black font-black tracking-widest uppercase">
+                АКТИВЕН
               </span>
             </div>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-400/20 font-bold tracking-widest uppercase">
-              ACTIVE
-            </span>
           </div>
+
           <button
             onClick={() => onNavigate?.('subscription')}
-            className="w-full py-4 rounded-xl bg-white text-black font-black text-[10px] uppercase tracking-[0.2em] hover:bg-emerald-400 transition-all flex items-center justify-center gap-2"
+            className="w-full py-4 rounded-2xl bg-white text-black font-black text-[10px] uppercase tracking-[0.2em] shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
           >
-            Управление Подпиской <CreditCard className="w-3.5 h-3.5" />
+            УПРАВЛЕНИЕ ПОДПИСКОЙ <CreditCard className="w-3.5 h-3.5" />
           </button>
         </div>
       </section>
@@ -352,91 +373,99 @@ export function SettingsPage({
       {/* Modal - Account Edit (Premium Styled) */}
       <AnimatePresence>
         {showAccountModal && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/90 backdrop-blur-md p-4">
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-background/90 backdrop-blur-xl p-4">
             <motion.div
-              initial={{ y: 100 }}
+              initial={{ y: '100%' }}
               animate={{ y: 0 }}
-              exit={{ y: 100 }}
-              className="w-full max-w-md premium-card p-8 border-indigo-500/30"
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="w-full max-w-md premium-card p-8 border-primary/30 bg-surface relative"
             >
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 w-12 h-1 bg-white/10 rounded-full sm:hidden" />
+
               <div className="flex justify-between items-center mb-8">
-                <h3 className="text-xl font-black italic tracking-tighter uppercase">
-                  {editingAccount.id ? 'Редактировать Аккаунт' : 'Инициализировать Аккаунт'}
+                <h3 className="text-xl font-black italic tracking-tighter uppercase text-white">
+                  {editingAccount.id ? 'Настройка Аккаунта' : 'Новое Подключение'}
                 </h3>
                 <button
                   onClick={() => setShowAccountModal(false)}
-                  className="text-zinc-600 hover:text-white uppercase text-[10px] font-black tracking-widest"
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 transition-colors"
+                  aria-label="Закрыть"
                 >
-                  Закрыть
+                  <Plus className="w-5 h-5 rotate-45 text-zinc-500" />
                 </button>
               </div>
 
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">
-                    Название Магазина
+                  <label className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em] px-1">
+                    Название Профиля
                   </label>
                   <input
                     type="text"
                     value={editingAccount.name || ''}
                     onChange={e => setEditingAccount({ ...editingAccount, name: e.target.value })}
-                    className="w-full bg-white/2 border border-white/5 rounded-xl p-4 text-sm font-bold text-white outline-none focus:border-violet-500"
-                    placeholder="e.g. ALPHA STORE"
+                    className="w-full bg-white/2 border border-white/5 rounded-xl p-4 text-sm font-bold text-white outline-none focus:border-primary/50 transition-colors"
+                    placeholder="Напр: Основной Склад"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">
+                  <label className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em] px-1">
                     Платформа
                   </label>
-                  <div className="flex gap-2">
-                    {['wb', 'ozon'].map(m => (
+                  <div className="grid grid-cols-2 gap-2">
+                    {(['wb', 'ozon'] as const).map(m => (
                       <button
                         key={m}
-                        onClick={() =>
-                          setEditingAccount({ ...editingAccount, marketplace: m as any })
-                        }
-                        className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${editingAccount.marketplace === m ? 'bg-violet-600 text-white shadow-lg shadow-violet-900/40' : 'bg-white/5 text-zinc-500'}`}
+                        onClick={() => setEditingAccount({ ...editingAccount, marketplace: m })}
+                        className={`py-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${editingAccount.marketplace === m ? 'bg-primary border-primary/50 text-black shadow-[0_10px_20px_var(--color-primary-dim)]' : 'bg-white/2 border-white/5 text-zinc-500'}`}
                       >
-                        {m}
+                        {m === 'wb' ? 'Wildberries' : 'Ozon'}
                       </button>
                     ))}
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">
-                    Безопасные Ключи
+                  <label className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em] px-1">
+                    Секретный Токен (API)
                   </label>
-                  <input
-                    type="password"
-                    value={
-                      editingAccount.marketplace === 'ozon'
-                        ? editingAccount.ozon_api_key
-                        : editingAccount.wb_token || ''
-                    }
-                    onChange={e =>
-                      setEditingAccount({
-                        ...editingAccount,
-                        [editingAccount.marketplace === 'ozon' ? 'ozon_api_key' : 'wb_token']:
-                          e.target.value,
-                      })
-                    }
-                    className="w-full bg-white/2 border border-white/5 rounded-xl p-4 text-sm font-bold text-white outline-none focus:border-indigo-500"
-                    placeholder="••••••••••••••••"
-                  />
+                  <div className="relative">
+                    <input
+                      type="password"
+                      value={
+                        editingAccount.marketplace === 'ozon'
+                          ? editingAccount.ozon_api_key
+                          : editingAccount.wb_token || ''
+                      }
+                      onChange={e =>
+                        setEditingAccount({
+                          ...editingAccount,
+                          [editingAccount.marketplace === 'ozon' ? 'ozon_api_key' : 'wb_token']:
+                            e.target.value,
+                        })
+                      }
+                      className="w-full bg-white/2 border border-white/5 rounded-xl p-4 text-sm font-bold text-white outline-none focus:border-success/40 transition-colors"
+                      placeholder="••••••••••••••••"
+                    />
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                      <Shield className="w-4 h-4 text-zinc-700" />
+                    </div>
+                  </div>
                 </div>
               </div>
 
               <button
                 onClick={handleSaveAccount}
-                className="w-full py-5 bg-white text-black font-black text-[10px] uppercase tracking-[0.3em] rounded-2xl mt-10 hover:bg-emerald-400 transition-all flex items-center justify-center gap-3"
+                disabled={isSaving}
+                className="w-full py-5 bg-white text-black font-black text-[10px] uppercase tracking-[0.3em] rounded-2xl mt-12 hover:bg-success transition-all flex items-center justify-center gap-3 shadow-xl"
               >
                 {isSaving ? (
-                  'Обработка...'
+                  <RefreshCcw className="w-4 h-4 animate-spin" />
                 ) : (
                   <>
-                    Авторизовать <CheckCircle2 className="w-4 h-4" />
+                    АКТИВИРОВАТЬ СВЯЗЬ <CheckCircle2 className="w-4 h-4" />
                   </>
                 )}
               </button>

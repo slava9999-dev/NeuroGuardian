@@ -3,11 +3,12 @@
 // Aesthetic: System Initialization | Tactical Dashboard
 // ============================================
 
-import React, { useEffect, useState, useRef, lazy, Suspense } from 'react';
-import { motion } from 'framer-motion';
+import React, { useEffect, useState, useRef, lazy } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAppStore, useProductsStore } from './stores';
 import { initTelegramWebApp, isTelegramWebApp, getInitData, hapticFeedback } from './lib/telegram';
 import { authApi, productsApi } from './lib/api';
+import type { User, Product } from './types';
 import { Package, Settings, Info, Cpu } from 'lucide-react';
 import { ViktorCore } from './components/ui/ViktorCore';
 import './index.css';
@@ -29,63 +30,49 @@ const GodModePage = lazy(() =>
 // Premium Loading Screen V5.0 (Cosmic)
 function LoadingScreen() {
   return (
-    <div className="h-dvh flex flex-col items-center justify-center bg-[#02040a] overflow-hidden relative">
+    <div className="h-dvh flex flex-col items-center justify-center bg-background overflow-hidden relative">
       <div className="bg-cosmic" />
       <div className="nebula-glow" />
 
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
         className="text-center relative z-20"
       >
-        <div className="relative mb-12">
+        <div className="relative mb-10">
           <ViktorCore size="lg" />
         </div>
 
         <div className="flex flex-col items-center gap-2">
           <h1 className="text-3xl font-black italic tracking-tighter text-white uppercase">
-            NEURO<span className="text-violet-500">GUARDIAN</span>
+            NEURO<span className="text-primary">GUARDIAN</span>
           </h1>
-          <div className="flex items-center gap-3 text-[10px] mono-data text-slate-500 font-bold uppercase tracking-[0.4em]">
-            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_#10b981]" />
-            Initializing Neural Mesh...
+          <div className="flex items-center gap-3 text-[10px] font-mono text-slate-400 font-bold uppercase tracking-[0.4em]">
+            <div className="w-1.5 h-1.5 bg-success rounded-full animate-pulse shadow-[0_0_8px_var(--color-success)]" />
+            Инициализация Системы...
           </div>
         </div>
-
-        <div className="mt-12 w-48 h-[1px] bg-white/5 rounded-full overflow-hidden mx-auto relative px-10">
-          <motion.div
-            className="h-full bg-linear-to-r from-transparent via-violet-500 to-transparent shadow-[0_0_15px_#8b5cf6]"
-            initial={{ left: '-100%' }}
-            animate={{ left: '100%' }}
-            transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
-            style={{ position: 'absolute', width: '50%' }}
-          />
-        </div>
       </motion.div>
-
-      <div className="absolute bottom-10 flex flex-col items-center gap-2">
-        <div className="text-[9px] font-black italic text-slate-700 uppercase tracking-widest">
-          NeuroV5 Industrial Core • Secure Auth
-        </div>
-      </div>
     </div>
   );
 }
 
 const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
-const DEV_USER: any = {
+const DEV_USER = {
   telegramId: 7548070478,
   firstName: 'Commander',
+  username: 'commander_dev',
   subscriptionActive: true,
   subscriptionPlan: 'pro',
   protectionEnabled: true,
   priceBufferPercent: 5,
+  hasUnlinkedAccounts: false,
 };
 
 type Page = 'agent' | 'products' | 'settings' | 'info' | 'ops' | 'subscription' | 'god-mode';
 
 function App() {
-  const { setUser, setLoading, isLoading } = useAppStore();
+  const { setUser, setLoading, isLoading, user } = useAppStore();
   const [isInitialized, setIsInitialized] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState<Page>(() => {
@@ -103,7 +90,7 @@ function App() {
       setLoading(true);
       try {
         if (DEV_MODE && !isTelegramWebApp()) {
-          setUser(DEV_USER);
+          setUser(DEV_USER as User);
           const productsResult = await productsApi.getProducts();
           if (productsResult.products) {
             const products = productsResult.products.map(p => ({
@@ -115,7 +102,7 @@ function App() {
               createdAt: new Date(),
               updatedAt: new Date(),
             }));
-            useProductsStore.getState().setProducts(products as any);
+            useProductsStore.getState().setProducts(products as Product[]);
           }
         } else if (isTelegramWebApp()) {
           initTelegramWebApp();
@@ -134,13 +121,13 @@ function App() {
                 createdAt: new Date(),
                 updatedAt: new Date(),
               }));
-              useProductsStore.getState().setProducts(products as any);
+              useProductsStore.getState().setProducts(products as Product[]);
             }
           }
         } else {
           setAuthError('Доступ заблокирован. Используйте Telegram-клиент.');
         }
-      } catch (error) {
+      } catch {
         setAuthError('Критический сбой инициализации.');
       } finally {
         setLoading(false);
@@ -154,14 +141,18 @@ function App() {
 
   if (authError) {
     return (
-      <div className="h-dvh flex flex-col items-center justify-center bg-black p-8 text-center bg-cosmic">
+      <div className="h-dvh flex flex-col items-center justify-center bg-background p-8 text-center relative overflow-hidden">
+        <div className="bg-cosmic" />
         <div className="nebula-glow opacity-30" />
-        <h1 className="text-xl font-black italic text-white mb-2 uppercase tracking-tighter">
-          SECURITY BREACH
+        <h1 className="text-xl font-black italic text-white mb-2 uppercase tracking-tighter relative z-10">
+          СИСТЕМНАЯ ОШИБКА
         </h1>
-        <p className="text-zinc-500 text-sm mb-8 font-medium">{authError}</p>
-        <a href="https://t.me/NeuroGuardianBot" className="btn-premium w-full max-w-xs">
-          RECONNECT SYSTEM
+        <p className="text-zinc-400 text-sm mb-8 font-medium relative z-10">{authError}</p>
+        <a
+          href="https://t.me/NeuroGuardianBot"
+          className="btn-premium w-full max-w-xs relative z-10"
+        >
+          ПЕРЕПОДКЛЮЧИТЬСЯ
         </a>
       </div>
     );
@@ -177,7 +168,7 @@ function App() {
         return (
           <SettingsPage
             onBack={() => setCurrentPage('agent')}
-            onNavigate={(p: any) => setCurrentPage(p)}
+            onNavigate={(p: string) => setCurrentPage(p as Page)}
           />
         );
       case 'info':
@@ -193,19 +184,36 @@ function App() {
     }
   };
 
+  const PageWrapper = ({ children, pageId }: { children: React.ReactNode; pageId: string }) => (
+    <motion.div
+      key={pageId}
+      initial={{ opacity: 0, y: 5 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -5 }}
+      transition={{ duration: 0.3, ease: 'easeOut' }}
+      className="h-full"
+    >
+      {children}
+    </motion.div>
+  );
+
   return (
-    <div className="h-dvh flex flex-col relative overflow-hidden bg-[#02040a]">
+    <div className="h-dvh flex flex-col relative overflow-hidden bg-background">
       {/* Global Cosmic Layer */}
       <div className="bg-cosmic" />
       <div className="nebula-glow" />
 
-      <div className="flex-1 relative min-h-0 overflow-y-auto no-scrollbar">
-        <PageContent />
-      </div>
+      <main className="flex-1 relative min-h-0 overflow-y-auto no-scrollbar">
+        <AnimatePresence mode="wait" initial={false}>
+          <PageWrapper pageId={currentPage}>
+            <PageContent />
+          </PageWrapper>
+        </AnimatePresence>
+      </main>
 
       {/* Premium Apple-style Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 nav-glass safe-area-inset-bottom z-50">
-        <div className="flex justify-around items-center h-16 px-4">
+      <nav className="fixed bottom-0 left-0 right-0 nav-glass safe-area-inset-bottom z-50 border-t border-white/5">
+        <div className="flex justify-around items-center h-16 px-4 max-w-lg mx-auto">
           <NavButton
             active={currentPage === 'agent'}
             onClick={() => setCurrentPage('agent')}
@@ -222,13 +230,14 @@ function App() {
             active={currentPage === 'settings'}
             onClick={() => setCurrentPage('settings')}
             icon={<Settings />}
-            label="Настройки"
+            label="Параметры"
+            dot={user?.hasUnlinkedAccounts}
           />
           <NavButton
             active={currentPage === 'info'}
             onClick={() => setCurrentPage('info')}
             icon={<Info />}
-            label="Log"
+            label="Лог"
           />
         </div>
       </nav>
@@ -236,31 +245,46 @@ function App() {
   );
 }
 
-function NavButton({ active, onClick, icon, label }: any) {
+interface NavButtonProps {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactElement;
+  label: string;
+  dot?: boolean;
+}
+
+function NavButton({ active, onClick, icon, label, dot }: NavButtonProps) {
   return (
     <button
       onClick={() => {
         hapticFeedback('light');
         onClick();
       }}
-      className={`relative flex flex-col items-center gap-1 transition-all flex-1 py-1 ${active ? 'text-violet-500' : 'text-slate-600'}`}
+      aria-current={active ? 'page' : undefined}
+      aria-label={label}
+      className={`relative flex flex-col items-center gap-1.5 transition-all flex-1 py-1 ${active ? 'text-primary' : 'text-zinc-500 hover:text-zinc-300'}`}
     >
-      <motion.div
-        whileTap={{ scale: 0.9, y: 3 }}
-        transition={{ type: 'spring', stiffness: 400, damping: 10 }}
-        className={`p-1.5 rounded-xl transition-colors ${active ? 'bg-violet-500/10 border border-violet-500/20' : 'border border-transparent'}`}
+      <div
+        className={`p-1.5 rounded-xl transition-all duration-300 relative ${active ? 'bg-primary/10' : ''}`}
       >
-        {React.cloneElement(icon, { size: 18, strokeWidth: active ? 2.5 : 2 })}
-      </motion.div>
+        {React.cloneElement(icon as React.ReactElement<{ size?: number; strokeWidth?: number }>, {
+          size: 20,
+          strokeWidth: active ? 2.5 : 2,
+        })}
+
+        {dot && (
+          <div className="absolute top-0 right-0 w-2 h-2 bg-danger rounded-full border-2 border-background" />
+        )}
+      </div>
       <span
-        className={`text-[9px] font-black uppercase tracking-wider transition-opacity ${active ? 'opacity-100' : 'opacity-40'}`}
+        className={`text-[9px] font-bold uppercase tracking-wider transition-opacity ${active ? 'opacity-100' : 'opacity-60'}`}
       >
         {label}
       </span>
       {active && (
         <motion.div
-          layoutId="nav-glow"
-          className="absolute -bottom-1 w-8 h-1 bg-violet-500 blur-sm rounded-full"
+          layoutId="nav-indicator"
+          className="absolute -top-px w-8 h-[2px] bg-primary rounded-full shadow-[0_0_10px_var(--color-primary)]"
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
         />
       )}

@@ -94,7 +94,8 @@ export function SubscriptionPage({ onBack }: SubscriptionPageProps) {
       } else {
         setError(result.error || 'Ошибка инициализации шлюза');
       }
-    } catch (_) {
+    } catch {
+      hapticFeedback('error');
       setError('Сервис оплаты временно недоступен');
     } finally {
       setLoading(false);
@@ -183,9 +184,9 @@ export function SubscriptionPage({ onBack }: SubscriptionPageProps) {
 
               <div className="flex justify-between items-start mb-6">
                 <div>
-                  <h3 className="text-xs font-black text-zinc-500 mb-1 tracking-widest">
+                  <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">
                     {tier.name}
-                  </h3>
+                  </p>
                   <div className="flex items-baseline gap-1">
                     <span className="text-3xl font-black italic">
                       {tier.price.toLocaleString()}₽
@@ -223,13 +224,13 @@ export function SubscriptionPage({ onBack }: SubscriptionPageProps) {
               <div className="mt-6 pt-4 border-t border-white/5 flex gap-4">
                 <div className="flex items-center gap-1.5">
                   <Package className="w-3.5 h-3.5 text-zinc-500" />
-                  <span className="text-[10px] mono-data text-zinc-400">
+                  <span className="text-[10px] font-mono text-zinc-400">
                     LIMIT: {tier.productLimit === 999999 ? '∞' : tier.productLimit} SKU
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Crown className="w-3.5 h-3.5 text-zinc-500" />
-                  <span className="text-[10px] mono-data text-zinc-400">
+                  <span className="text-[10px] font-mono text-zinc-400">
                     SHOPS: {tier.shopLimit}
                   </span>
                 </div>

@@ -27,24 +27,24 @@ export function ViktorCore({ size = 'md', status: manualStatus }: ViktorCoreProp
 
   const colors = {
     idle: {
-      core: 'bg-violet-500',
-      glow: 'rgba(139, 92, 246, 0.4)',
-      aura: 'rgba(139, 92, 246, 0.1)',
+      core: 'bg-primary',
+      glow: 'var(--color-primary-dim)',
+      aura: 'var(--color-primary-dim)',
     },
     processing: {
-      core: 'bg-indigo-400',
-      glow: 'rgba(129, 140, 248, 0.6)',
-      aura: 'rgba(129, 140, 248, 0.2)',
+      core: 'bg-primary-glow',
+      glow: 'var(--color-primary-border)',
+      aura: 'var(--color-primary-dim)',
     },
     alert: {
-      core: 'bg-rose-500',
-      glow: 'rgba(244, 63, 94, 0.6)',
-      aura: 'rgba(244, 63, 94, 0.2)',
+      core: 'bg-danger',
+      glow: 'rgba(248, 113, 113, 0.6)',
+      aura: 'rgba(248, 113, 113, 0.2)',
     },
     success: {
-      core: 'bg-emerald-500',
-      glow: 'rgba(16, 185, 129, 0.6)',
-      aura: 'rgba(16, 185, 129, 0.2)',
+      core: 'bg-success',
+      glow: 'var(--color-success-dim)',
+      aura: 'var(--color-success-dim)',
     },
   };
 

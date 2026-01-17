@@ -49,6 +49,8 @@ export interface User {
 
   voiceEnabled?: boolean; // Toggle for AI voice responses
 
+  hasUnlinkedAccounts?: boolean; // Flag for UI notification
+
   // Timestamps (optional - only used on backend)
   createdAt?: Date;
   updatedAt?: Date;
@@ -103,6 +105,7 @@ export interface Product {
 
   // Media
   mediaAssets?: MediaAsset[];
+  url?: string; // Link to marketplace product page
 
   // Timestamps
   lastCheckedAt: Date;
@@ -133,7 +136,7 @@ export interface MediaAsset {
   thumbnailUrl?: string; // 200x200 thumbnail
 
   // Metadata from Vision analysis
-  visionMetadata?: Record<string, any>; // Relaxed type for frontend to avoid circular deps
+  visionMetadata?: Record<string, unknown>; // Relaxed type for frontend to avoid circular deps
 
   // Dimensions
   width?: number;

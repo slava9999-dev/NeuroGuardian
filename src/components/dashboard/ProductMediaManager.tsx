@@ -240,7 +240,18 @@ function MediaAssetCard({ asset }: { asset: MediaAsset }) {
     thumbnail: 'Thumb',
   };
 
-  const vision = asset.visionMetadata as any;
+  interface VisionMetadata {
+    overall_quality?: number;
+    wb_compliant?: boolean;
+    ozon_compliant?: boolean;
+    lighting_score?: number;
+    sharpness_score?: number;
+    texture_tags?: string[];
+    wb_issues?: string[];
+    ozon_issues?: string[];
+  }
+
+  const vision = asset.visionMetadata as VisionMetadata | undefined;
   const qualityScore = vision?.overall_quality || 0;
 
   return (
@@ -333,20 +344,20 @@ function MediaAssetCard({ asset }: { asset: MediaAsset }) {
             <div className="grid grid-cols-2 gap-1.5">
               <div className="p-1 rounded bg-stone-800 border border-stone-700">
                 <div className="text-[8px] text-stone-500 uppercase">Освещение</div>
-                <div className="text-xs font-bold">{vision.lighting_score}/10</div>
+                <div className="text-xs font-bold">{vision?.lighting_score}/10</div>
               </div>
               <div className="p-1 rounded bg-stone-800 border border-stone-700">
                 <div className="text-[8px] text-stone-500 uppercase">Резкость</div>
-                <div className="text-xs font-bold">{vision.sharpness_score}/10</div>
+                <div className="text-xs font-bold">{vision?.sharpness_score}/10</div>
               </div>
             </div>
 
             {/* Tags */}
-            {vision.texture_tags?.length > 0 && (
+            {(vision?.texture_tags?.length || 0) > 0 && (
               <div>
                 <div className="text-[8px] text-stone-500 uppercase mb-1">Фактура</div>
                 <div className="flex flex-wrap gap-1">
-                  {vision.texture_tags.slice(0, 3).map((tag: string) => (
+                  {vision?.texture_tags?.slice(0, 3).map((tag: string) => (
                     <span
                       key={tag}
                       className="text-[9px] px-1 py-0.5 rounded bg-violet-500/20 text-violet-300 border border-violet-500/30"
@@ -359,11 +370,11 @@ function MediaAssetCard({ asset }: { asset: MediaAsset }) {
             )}
 
             {/* Compliance Issues */}
-            {(vision.wb_issues?.length > 0 || vision.ozon_issues?.length > 0) && (
+            {((vision?.wb_issues?.length || 0) > 0 || (vision?.ozon_issues?.length || 0) > 0) && (
               <div className="mt-auto">
                 <div className="text-[8px] text-red-500 uppercase mb-1 font-bold">Ошибки</div>
                 <div className="text-[9px] text-stone-300 line-clamp-2">
-                  {[...(vision.wb_issues || []), ...(vision.ozon_issues || [])][0]}
+                  {[...(vision?.wb_issues || []), ...(vision?.ozon_issues || [])][0]}
                 </div>
               </div>
             )}
