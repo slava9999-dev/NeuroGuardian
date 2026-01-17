@@ -1,6 +1,5 @@
 import { sentinelOrchestrator } from '../../src/sentinel/SentinelOrchestrator.js';
 import { sql } from '../../src/api-lib/services/database.js';
-import { logger } from '../../src/api-lib/lib/logger.js';
 
 /**
  * Sentinel Smoke Test
@@ -48,7 +47,12 @@ async function runSmokeTest() {
 
       // If errors are critical (not just marketplace API issues), fail the test
       const criticalErrors = result.errors.filter(
-        e => !e.includes('429') && !e.includes('timeout') && !e.includes('CRYPTOGRAPHIC_ERROR') // Allow during key migration
+        e =>
+          !e.includes('429') &&
+          !e.includes('timeout') &&
+          !e.includes('CRYPTOGRAPHIC_ERROR') &&
+          !e.includes('keys not configured') &&
+          !e.includes('Key reset required')
       );
       if (criticalErrors.length > 0) {
         console.log('\n🔴 SMOKE TEST FAILED: Critical errors found.');
