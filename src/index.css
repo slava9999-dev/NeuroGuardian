@@ -60,7 +60,14 @@ body {
   color: var(--color-text-main);
   font-family: var(--font-sans);
   overflow-x: hidden;
+  overflow-y: auto;
   letter-spacing: -0.015em;
+  min-height: 100vh;
+}
+
+html {
+  height: 100%;
+  overflow-y: auto;
 }
 
 /* Cosmic Nebula Background */
