@@ -17,6 +17,7 @@ interface AppState {
   // Global protection toggle
   protectionEnabled: boolean;
   defenseMode: DefenseMode;
+  voiceEnabled: boolean;
 
   // Subscription status
   subscriptionDaysLeft: number | null;
@@ -27,6 +28,7 @@ interface AppState {
   setError: (error: string | null) => void;
   setProtectionEnabled: (enabled: boolean) => Promise<void>;
   setDefenseMode: (mode: DefenseMode) => Promise<void>;
+  setVoiceEnabled: (enabled: boolean) => Promise<void>;
   updateSubscription: (active: boolean, expiresAt: Date | null) => void;
   logout: () => void;
 }
@@ -41,6 +43,7 @@ export const useAppStore = create<AppState>()(
       error: null,
       protectionEnabled: false,
       defenseMode: 'zero_stock',
+      voiceEnabled: true,
       subscriptionDaysLeft: null,
 
       // Actions
@@ -74,6 +77,7 @@ export const useAppStore = create<AppState>()(
             isAuthenticated: true,
             protectionEnabled: user.protectionEnabled,
             defenseMode: user.defenseMode,
+            voiceEnabled: user.voiceEnabled ?? true,
             subscriptionDaysLeft: daysLeft,
           });
         } else {
@@ -135,6 +139,33 @@ export const useAppStore = create<AppState>()(
           }
         } catch (error) {
           console.error('❌ Failed to sync defense mode:', error);
+        }
+      },
+
+      setVoiceEnabled: async enabled => {
+        set(state => ({
+          user: state.user ? { ...state.user, voiceEnabled: enabled } : null,
+          voiceEnabled: enabled,
+        }));
+        // Sync with server
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const tg = (window as any).Telegram?.WebApp;
+          const initData = tg?.initData || '';
+          if (initData) {
+            await fetch('/api?action=settings', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'settings',
+                initData,
+                voiceEnabled: enabled,
+              }),
+            });
+            console.log('✅ Voice preference synced:', enabled);
+          }
+        } catch (error) {
+          console.error('❌ Failed to sync voice preference:', error);
         }
       },
 

@@ -146,6 +146,7 @@ export interface TelegramUser {
   price_buffer_percent: number;
   warning_threshold_percent: number;
   tax_rate: number;
+  voice_enabled: boolean;
   created_at: Date;
   updated_at: Date;
 }

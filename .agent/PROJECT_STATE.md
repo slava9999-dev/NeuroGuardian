@@ -1,6 +1,6 @@
 # 📊 Project State — NeuroGUARDIAN
 
-# Updated: 2026-01-17T20:45:00+03:00
+# Updated: 2026-01-17T21:30:00+03:00
 
 # This file tracks current progress and is updated at end of each session
 
@@ -8,8 +8,32 @@
 
 ## 🎯 Current Phase: RELEASE PREPARATION (Phase 12) 🚀 PRODUCTION READY
 
-**Last Session:** 2026-01-17 (Session 71)
-**Focus:** ⚡ Pre-Flight Optimization & V5.0 Deployment
+**Last Session:** 2026-01-17 (Session 72)
+**Focus:** 🎙️ Viktor Voice Control & Preference Sync
+
+### Session 2026-01-17 (Session 72 - Viktor Voice Control & Preference Sync) 🎙️
+
+**Objective: Реализация пользовательской настройки голосовых ответов и синхронизация предпочтений**
+
+> ✅ **CRITICAL:** Внедрена система управления голосом **Viktor Persona**. Пользователи теперь могут включать/выключать голосовые сообщения в настройках.
+> ✅ **CRITICAL:** Выполнена миграция БД: добавлена колонка `voice_enabled` в таблицу `users`.
+> ✅ **CRITICAL:** Телеграм-бот теперь проверяет флаг `voiceEnabled` перед синтезом речи, экономя токены ElevenLabs для тех, кому нужен только текст.
+> ✅ **MAJOR:** UI Настроек обновлен: добавлен премиальный переключатель с иконками `Volume2`/`VolumeX` и тактильной отдачей.
+
+**Completed Actions:**
+
+- [x] **DB Migration**: Сценарий `migrate-voice-enabled.ts` успешно выполнен в продакшн-окружении.
+- [x] **API Support**: Эндпоинты `auth` и `settings` обновлены для передачи и сохранения `voiceEnabled`.
+- [x] **Global Store**: Zustand `AppStore` интегрирован с новым состоянием и экшеном `setVoiceEnabled`.
+- [x] **Bot Logic**: `handleUserMessage` в `telegram.ts` адаптирован под предпочтения пользователя.
+- [x] **UI Polish**: Секция "Viktor Persona" добавлена в `SettingsPage` в стиле V5 Cosmic.
+
+**Key Insights:**
+
+```
+Пользовательский контроль над AI-фичами — залог долгосрочного удержания. Не всем удобно слушать аудио в общественных местах.
+Консистентность camelCase (Frontend) и snake_case (DB) через Drizzle ORM позволяет поддерживать чистый код при сохранении совместимости с Postgres.
+```
 
 ### Session 2026-01-17 (Session 71 - Pre-Flight Optimization & V5.0 Deployment) ⚡
 

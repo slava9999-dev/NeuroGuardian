@@ -90,6 +90,7 @@ export async function handleAuth(
       savedAmount: Number(fullUser.saved_amount) || 0,
       priceBufferPercent: fullUser.price_buffer_percent ?? 5,
       warningThresholdPercent: fullUser.warning_threshold_percent ?? 10,
+      voiceEnabled: fullUser.voice_enabled ?? true,
     },
   });
 }
@@ -117,6 +118,7 @@ export async function handleSettings(
       hasWbApiKey: !!user.api_key_wb,
       hasOzonApiKey: !!user.api_key_ozon,
       hasOzonClientId: !!user.ozon_client_id,
+      voiceEnabled: user.voice_enabled ?? true,
     });
   }
 
@@ -202,6 +204,12 @@ export async function handleSettings(
     const threshold = Math.max(5, Math.min(25, Number(body.warningThresholdPercent) || 10));
     await sql`UPDATE users SET warning_threshold_percent = ${threshold} WHERE id = ${userId}`;
     updates.push('warningThresholdPercent');
+  }
+
+  if (body.voiceEnabled !== undefined) {
+    const enabled = body.voiceEnabled === true;
+    await sql`UPDATE users SET voice_enabled = ${enabled} WHERE id = ${userId}`;
+    updates.push('voiceEnabled');
   }
 
   return res.json({ success: true, updated: updates });

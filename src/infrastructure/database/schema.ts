@@ -22,6 +22,7 @@ export const users = pgTable('users', {
   protectionEnabled: boolean('protection_enabled').default(true),
   isActive: boolean('is_active').default(true),
   subscriptionPlan: varchar('subscription_plan', { length: 255 }),
+  voiceEnabled: boolean('voice_enabled').default(true),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });

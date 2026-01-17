@@ -104,6 +104,7 @@ export const settingsApi = {
     autoRenew?: boolean;
     priceBufferPercent?: number;
     warningThresholdPercent?: number;
+    voiceEnabled?: boolean;
   }) => {
     const initData = getInitData();
     const response = await api.post('', { action: 'settings', initData, ...settings });

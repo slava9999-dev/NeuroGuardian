@@ -17,6 +17,8 @@ import {
   CheckCircle2,
   MinusCircle,
   Crown,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import { useAppStore } from '../stores';
 import { hapticFeedback } from '../lib/telegram';
@@ -31,7 +33,7 @@ export function SettingsPage({
   onBack: () => void;
   onNavigate?: (page: string) => void;
 }) {
-  const { user, defenseMode, setDefenseMode, setUser } = useAppStore();
+  const { user, defenseMode, setUser, setVoiceEnabled } = useAppStore();
   const [isSaving, setIsSaving] = useState(false);
   const [syncStatus] = useState<string | null>(null);
 
@@ -72,7 +74,7 @@ export function SettingsPage({
         setShowAccountModal(false);
         loadAccounts();
       }
-    } catch (e) {
+    } catch {
       alert('System Error');
     } finally {
       setIsSaving(false);
@@ -81,7 +83,7 @@ export function SettingsPage({
 
   const handleDefenseModeChange = (mode: DefenseMode) => {
     hapticFeedback('medium');
-    setDefenseMode(mode);
+    useAppStore.getState().setDefenseMode(mode);
     settingsApi.updateSettings({ defenseMode: mode });
   };
 
@@ -199,6 +201,48 @@ export function SettingsPage({
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Viktor Voice Control */}
+      <section className="mb-10">
+        <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em] mb-4 px-1">
+          Viktor Persona
+        </h3>
+        <div className="premium-card border-white/5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div
+                className={`p-3 rounded-xl ${user?.voiceEnabled ? 'bg-emerald-500/10 text-emerald-400' : 'bg-zinc-500/10 text-zinc-500'}`}
+              >
+                {user?.voiceEnabled ? (
+                  <Volume2 className="w-5 h-5" />
+                ) : (
+                  <VolumeX className="w-5 h-5" />
+                )}
+              </div>
+              <div>
+                <h4 className="text-sm font-black italic tracking-tight uppercase">
+                  Voice Responses
+                </h4>
+                <p className="text-[9px] text-zinc-500 font-bold uppercase mt-0.5">
+                  Viktor will reply with voice messages
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                const newValue = !user?.voiceEnabled;
+                hapticFeedback(newValue ? 'success' : 'light');
+                setVoiceEnabled(newValue);
+              }}
+              className={`w-12 h-6 rounded-full transition-all relative ${user?.voiceEnabled ? 'bg-emerald-500' : 'bg-zinc-800'}`}
+            >
+              <div
+                className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${user?.voiceEnabled ? 'left-7' : 'left-1'}`}
+              />
+            </button>
+          </div>
         </div>
       </section>
 

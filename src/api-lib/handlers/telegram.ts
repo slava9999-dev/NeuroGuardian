@@ -11,7 +11,7 @@ import { logger, config } from '../lib/index.js';
 import { circuitBreakers } from '../lib/circuit-breaker.js';
 import { inferGender } from '../../agent/utils/genderDetection.js';
 import { stateManager } from '../../agent/core/StateManager.js';
-import { db, systemFlags } from '../../infrastructure/database/db.js';
+import { db, systemFlags, users } from '../../infrastructure/database/db.js';
 import { eq } from 'drizzle-orm';
 import { VoiceService } from '../services/VoiceService.js';
 // Using built-in Node 18+ FormData and Blob
@@ -586,8 +586,12 @@ async function handleUserMessage(
       await sendTelegramMessage(chatId, response, { parseMode: 'HTML' });
 
       // --- OPTIONAL VOICE RESPONSE ---
-      // Send voice message if text is not too long and VoiceService is available
-      if (VoiceService.isAvailable() && result.message.length < 1000) {
+      // Send voice message if text is not too long, VoiceService is available, and user enabled it
+      const dbUser = await db.query.users.findFirst({
+        where: eq(users.id, userId.toString()),
+      });
+
+      if (dbUser?.voiceEnabled && VoiceService.isAvailable() && result.message.length < 1000) {
         try {
           // Clean text for TTS (remove HTML tags and Markdown)
           const cleanText = result.message.replace(/<[^>]*>?/gm, '').replace(/\*|_|`/g, '');

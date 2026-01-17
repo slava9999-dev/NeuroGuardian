@@ -47,6 +47,8 @@ export interface User {
   priceBufferPercent?: number; // Buffer for card discounts (Ozon Card, WB Pay)
   warningThresholdPercent?: number; // Alert when price is within this % of min
 
+  voiceEnabled?: boolean; // Toggle for AI voice responses
+
   // Timestamps (optional - only used on backend)
   createdAt?: Date;
   updatedAt?: Date;
