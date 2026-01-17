@@ -61,12 +61,21 @@ async function main() {
   console.log('📋 Step 3: Creating knowledge_embeddings table...');
   try {
     // Check available keys to determine dimension
-    const hasOpenAI = !!process.env.OPENAI_API_KEY;
+    const ragProvider = process.env.RAG_PROVIDER?.toLowerCase();
+    const hasOpenAI = !!process.env.OPENAI_API_KEY && ragProvider !== 'gemini';
     const hasGemini = !!process.env.GEMINI_API_KEY || !!process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-    const vectorDim = hasOpenAI ? 1536 : hasGemini ? 768 : 1536; // Default 1536
+
+    let vectorDim = 1536; // Default
+    if (ragProvider === 'gemini') {
+      vectorDim = 768;
+    } else if (hasOpenAI) {
+      vectorDim = 1536;
+    } else if (hasGemini) {
+      vectorDim = 768;
+    }
 
     console.log(
-      `   ℹ️  Detected provider: ${hasOpenAI ? 'OpenAI' : hasGemini ? 'Gemini' : 'None'}`
+      `   ℹ️  Detected provider: ${ragProvider === 'gemini' ? 'Gemini (Forced)' : hasOpenAI ? 'OpenAI' : hasGemini ? 'Gemini' : 'None'}`
     );
     console.log(`   ℹ️  Vector dimensions: ${vectorDim}`);
 
@@ -81,9 +90,33 @@ async function main() {
     if (tableCheck.rows[0].has_table) {
       console.log('   ⚠️  Table already exists.');
 
-      // Check if existing dimension matches (hacky check but works for now)
-      // Ideally we would inspect column type
-    } else {
+      // Check current dimension
+      const dimCheck = await sql`
+        SELECT atttypmod FROM pg_attribute 
+        WHERE attrelid = 'knowledge_embeddings'::regclass 
+        AND attname = 'embedding'
+      `;
+
+      const currentDim = dimCheck.rows[0].atttypmod - 4; // pgvector offset
+      if (currentDim !== vectorDim) {
+        console.log(
+          `   🔄 Dimension mismatch: Current ${currentDim} vs Target ${vectorDim}. Recreating table...`
+        );
+        await sql.unsafe(`DROP TABLE knowledge_embeddings CASCADE`);
+      } else {
+        console.log('   ✅ Dimension matches existing table.');
+      }
+    }
+
+    // Re-check table status
+    const tableFinalCheck = await sql`
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_name = 'knowledge_embeddings'
+      ) as has_table
+    `;
+
+    if (!tableFinalCheck.rows[0].has_table) {
       await sql.unsafe(`
         CREATE TABLE knowledge_embeddings (
           id SERIAL PRIMARY KEY,
@@ -136,7 +169,8 @@ async function main() {
   console.log('📚 Step 5: Ingesting knowledge base documents...');
 
   // Check if we have embedding API key
-  const hasOpenAI = !!process.env.OPENAI_API_KEY;
+  const ragProvider = process.env.RAG_PROVIDER?.toLowerCase();
+  const hasOpenAI = !!process.env.OPENAI_API_KEY && ragProvider !== 'gemini';
   const hasGemini = !!process.env.GEMINI_API_KEY || !!process.env.GOOGLE_GENERATIVE_AI_API_KEY;
 
   if (!hasOpenAI && !hasGemini) {
@@ -149,7 +183,9 @@ async function main() {
     process.exit(0);
   }
 
-  console.log(`   Using ${hasOpenAI ? 'OpenAI' : 'Gemini'} for embeddings`);
+  console.log(
+    `   Using ${ragProvider === 'gemini' ? 'Gemini' : hasOpenAI ? 'OpenAI' : 'Gemini'} for embeddings`
+  );
 
   try {
     const startTime = Date.now();

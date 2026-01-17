@@ -403,7 +403,7 @@ function formatAlert(alert: Alert, smartMessage?: string | null): string {
     const actionLabel = alert.analysis.action === 'zero_stock' ? 'Остаток → 0' : 'Возврат цены';
 
     return [
-      `🛡️ *СТОРОЖ*`,
+      `🛡️ *Sentinel*`,
       ``,
       `${headerEmoji} *${headerText}*`,
       ``,
@@ -434,7 +434,7 @@ function formatAlert(alert: Alert, smartMessage?: string | null): string {
         : alert.product.name;
 
     const lines = [
-      `⚠️ *СТОРОЖ — Обнаружена угроза*`,
+      `⚠️ *Sentinel — Обнаружена угроза*`,
       ``,
       `${mpEmoji} ${alert.product.marketplace.toUpperCase()} • ${time}`,
       `📦 ${escapeMarkdown(shortTitle)}`,

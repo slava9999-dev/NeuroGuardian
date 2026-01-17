@@ -1,6 +1,6 @@
 // ============================================
 // NeuroGUARDIAN — Watermark Service
-// Applies Arbarea security watermark using Sharp
+// Applies NeuroGuardian security watermark using Sharp
 // Version: 1.0.0 | Date: January 2026
 // ============================================
 
@@ -11,7 +11,7 @@ export class WatermarkService {
   private watermarkSvg: string;
 
   constructor() {
-    // Standard Arbarea watermark SVG
+    // Standard NeuroGuardian watermark SVG
     this.watermarkSvg = `
       <svg width="300" height="80">
         <text x="50%" y="50%" 
@@ -21,7 +21,7 @@ export class WatermarkService {
               fill="rgba(255,255,255,0.4)"
               text-anchor="middle" 
               dominant-baseline="middle">
-          ARBAREA
+          NEUROGUARDIAN
         </text>
       </svg>
     `;

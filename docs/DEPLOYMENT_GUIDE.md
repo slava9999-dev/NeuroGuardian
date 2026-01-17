@@ -19,7 +19,7 @@
 
 1. Открой [Firebase Console](https://console.firebase.google.com/)
 2. Нажми **"Создать проект"**
-3. Введи имя: `neuroguardian` или `arbarea-mobile-app`
+3. Введи имя: `neuroguardian` или `neuroguardian-app`
 4. Включи Google Analytics (опционально)
 
 ### 1.2 Получение API ключей
@@ -32,13 +32,13 @@
 
 ```javascript
 const firebaseConfig = {
-  apiKey: "AIzaSy...", // ← ЭТОТ КЛЮЧ
-  authDomain: "xxx.firebaseapp.com",
-  projectId: "xxx",
-  storageBucket: "xxx.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123:web:abc",
-  measurementId: "G-XXX",
+  apiKey: 'AIzaSy...', // ← ЭТОТ КЛЮЧ
+  authDomain: 'xxx.firebaseapp.com',
+  projectId: 'xxx',
+  storageBucket: 'xxx.appspot.com',
+  messagingSenderId: '123456789',
+  appId: '1:123:web:abc',
+  measurementId: 'G-XXX',
 };
 ```
 
@@ -180,11 +180,9 @@ openssl rand -hex 16
 Открой [Google Cloud Console](https://console.cloud.google.com) и включи API:
 
 1. **Secret Manager API**:
-
    - https://console.cloud.google.com/apis/library/secretmanager.googleapis.com
 
 2. **Cloud Tasks API**:
-
    - https://console.cloud.google.com/apis/library/cloudtasks.googleapis.com
 
 3. **Artifact Registry API**:
@@ -227,7 +225,7 @@ gcloud tasks queues create sentinel-worker-queue --location=us-central1
 | ----------------------------------- | -------------------------------------------- | ---------------------- |
 | `VITE_FIREBASE_API_KEY`             | `AIzaSy...`                                  | Firebase API ключ      |
 | `VITE_FIREBASE_AUTH_DOMAIN`         | `xxx.firebaseapp.com`                        | Firebase Auth Domain   |
-| `VITE_FIREBASE_PROJECT_ID`          | `arbarea-mobile-app`                         | ID проекта             |
+| `VITE_FIREBASE_PROJECT_ID`          | `neuroguardian-app`                          | ID проекта             |
 | `VITE_FIREBASE_STORAGE_BUCKET`      | `xxx.appspot.com`                            | Storage bucket         |
 | `VITE_FIREBASE_MESSAGING_SENDER_ID` | `123456789`                                  | Sender ID              |
 | `VITE_FIREBASE_APP_ID`              | `1:123:web:abc`                              | App ID                 |
@@ -256,7 +254,7 @@ YOOKASSA_SHOP_ID=123456
 YOOKASSA_SECRET_KEY=live_xxx
 
 # Google Cloud
-GOOGLE_CLOUD_PROJECT=arbarea-mobile-app
+GOOGLE_CLOUD_PROJECT=neuroguardian-app
 FUNCTIONS_REGION=us-central1
 TASKS_QUEUE_NAME=sentinel-worker-queue
 ```

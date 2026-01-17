@@ -1,4 +1,4 @@
-# 🧠 NeuroGUARDIAN — Полный контекст для Arborius
+# 🧠 NeuroGUARDIAN — Полный контекст проекта
 
 **Дата:** 2026-01-15  
 **Версия:** 3.0.0  
@@ -236,6 +236,7 @@ interface DBProduct {
   user_id: number; // BIGINT (Telegram ID)
   product_id: string; // VARCHAR(255)
   nm_id: number | null; // BIGINT (WB)
+  watermarked: MediaAsset | null; // With logon)
   offer_id: string | null; // VARCHAR(255) (Ozon)
   official_sku: string | null;
   title: string; // VARCHAR(500)
@@ -442,11 +443,11 @@ YOOKASSA_SECRET_KEY=...
 - Production агент возвращает ошибку (нужно проверить логи Vercel)
 - user_id BIGINT overflow (Telegram ID > INT32)
 
-### 📋 Roadmap для Arborius:
+### 📋 Roadmap проекта:
 
 1. **Content Generation** — генерация описаний для WB/Ozon
 2. **Media Pipeline** — обработка изображений (белый фон для WB)
-3. **SEO Optimization** — гибридные тексты (SEO + Arbarea стиль)
+3. **SEO Optimization** — гибридные тексты (SEO + премиальный стиль)
 4. **Stock Sync** — мгновенная синхронизация при заказе
 
 ---
@@ -459,4 +460,4 @@ YOOKASSA_SECRET_KEY=...
 
 ---
 
-_Документ сгенерирован автоматически для передачи контекста архитектору Arborius_
+_Документ сгенерирован автоматически для передачи контекста_

@@ -60,7 +60,7 @@ export interface ProductMediaCollection {
   whiteBackground: MediaAsset | null; // For WB/Ozon main card
   lifestyle: MediaAsset[]; // Marketing shots (can be multiple)
   thumbnails: MediaAsset[]; // Various sizes
-  watermarked: MediaAsset | null; // With Arbarea logo
+  watermarked: MediaAsset | null; // With security logo
 }
 
 // ============================================
@@ -112,7 +112,7 @@ CREATE INDEX IF NOT EXISTS idx_media_assets_vision ON media_assets USING GIN (vi
 `;
 
 // ============================================
-// Strict ID Types (Arborius requirement)
+// Strict ID Types
 // ============================================
 
 /**

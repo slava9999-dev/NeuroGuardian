@@ -40,8 +40,13 @@ async function runQA() {
   console.log('🤖 INITIALIZING AGENT QA SESSION...');
   console.log('====================================');
 
-  // Specific RAG Check Question
-  const QUESTIONS = ['Что такое Saved Amount в логах Sentinel?', 'Где взять API ключ для Ozon?'];
+  // Specific RAG Check Questions for New 2025 Knowledge
+  const QUESTIONS = [
+    'Какие штрафы за самовыкупы на Wildberries в 2025 году?',
+    'Что такое индекс ошибок на Ozon и какой штраф если он выше 10%?',
+    'Как рассчитать стоимость логистики КГТ на WB? Напиши формулу.',
+    'Какие есть стратегии защиты от конкурентов при атаке негативными отзывами?',
+  ];
 
   for (const question of QUESTIONS) {
     console.log(`\n❓ ВОПРОС: "${question}"`);

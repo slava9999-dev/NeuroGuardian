@@ -83,11 +83,11 @@ AWS_S3_BUCKET=neuroguardian-media
             │ VisionAnalysisResult                     │
             │ ├── Lighting Score: 8/10                │
             │ ├── Sharpness: 9/10                     │
-            │ ├── Material: "oak" (95% conf)          │
-            │ ├── Texture Tags: ["живой край", "сучки"]│
+            │ ├── Material: "metal" (95% conf)         │
+            │ ├── Texture Tags: ["natural", "grain"]  │
             │ ├── WB Compliant: false                  │
             │ │   └── Issues: ["Нужен белый фон"]     │
-            │ ├── SEO Tags: ["дуб", "столешница"...]  │
+            │ ├── SEO Tags: ["стол", "интерьер"...]    │
             │ └── Processing Time: 2.3s               │
             └──────────────────────────────────────────┘
 ```
@@ -306,7 +306,7 @@ CREATE TABLE media_jobs (
 
 ## 🛡️ Security: Watermarking
 
-### Arbarea Watermark Implementation:
+### NeuroGuardian Watermark Implementation:
 
 ```typescript
 import sharp from 'sharp';
@@ -321,7 +321,7 @@ async function addArbaeraWatermark(
             font-family="Inter, sans-serif" 
             font-size="24" 
             fill="rgba(255,255,255,${options.opacity})">
-        ARBAREA
+        NEUROGUARDIAN
       </text>
     </svg>
   `;

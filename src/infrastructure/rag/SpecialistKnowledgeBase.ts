@@ -16,7 +16,8 @@ export type SpecialistType =
   | 'PricingSpecialist'
   | 'SentinelSpecialist'
   | 'AnalyticsSpecialist'
-  | 'ChatSpecialist';
+  | 'ChatSpecialist'
+  | 'SupportSpecialist';
 
 export interface RetrievedContext {
   documents: SearchResult[];
@@ -34,6 +35,7 @@ const SPECIALIST_NAMESPACES: Record<SpecialistType, EmbeddingNamespace[]> = {
   SentinelSpecialist: ['sentinel', 'pricing', 'wb_api', 'ozon_api'],
   AnalyticsSpecialist: ['analytics', 'pricing', 'faq'],
   ChatSpecialist: ['faq', 'onboarding'],
+  SupportSpecialist: ['faq', 'wb_api', 'ozon_api', 'sentinel'],
 };
 
 // ============================================

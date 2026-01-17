@@ -123,14 +123,18 @@ export class ProductsSpecialist extends BaseSpecialist {
 
     // RAG: Retrieve knowledge base context
     if (context.query) {
-      const ragContext = await specialistKnowledgeBase.retrieveForSpecialist(
-        context.query,
-        'ProductsSpecialist'
-      );
+      try {
+        const ragContext = await specialistKnowledgeBase.retrieveForSpecialist(
+          context.query,
+          'ProductsSpecialist'
+        );
 
-      if (ragContext.formattedContext) {
-        lines.push('\n## СПРАВОЧНАЯ ИНФОРМАЦИЯ (RAG):');
-        lines.push(ragContext.formattedContext);
+        if (ragContext.formattedContext) {
+          lines.push('\n## СПРАВОЧНАЯ ИНФОРМАЦИЯ (RAG):');
+          lines.push(ragContext.formattedContext);
+        }
+      } catch (error) {
+        // Silently fail RAG
       }
     }
 

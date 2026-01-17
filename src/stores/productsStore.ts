@@ -107,7 +107,7 @@ export const useProductsStore = create<ProductsState>()(
         setError: error => set({ error, isLoading: false }, false, 'setError'),
       }),
       {
-        name: 'arborius-products',
+        name: 'neuroguardian-products',
         partialize: state => ({ products: state.products }),
       }
     ),

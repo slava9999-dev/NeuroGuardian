@@ -42,11 +42,13 @@ const DEFAULT_NAMESPACE_MAPPING: NamespaceMapping = {
   wb_api_rules: 'wb_api',
   wb_commissions: 'wb_api',
   wb_full_guide: 'wb_api',
+  wb_pitfalls_2025: 'wb_api',
 
   // Ozon related
   ozon_api_rules: 'ozon_api',
   ozon_commissions: 'ozon_api',
   ozon_full_guide: 'ozon_api',
+  ozon_pitfalls_2025: 'ozon_api',
 
   // Sentinel/Security
   sentinel_instruction: 'sentinel',
@@ -55,6 +57,7 @@ const DEFAULT_NAMESPACE_MAPPING: NamespaceMapping = {
 
   // Pricing
   pricing_strategies: 'pricing',
+  advanced_strategies_2025: 'pricing',
 
   // Analytics
   unit_economics_guide: 'analytics',
@@ -65,6 +68,7 @@ const DEFAULT_NAMESPACE_MAPPING: NamespaceMapping = {
   api_keys_guide: 'onboarding',
   app_guide: 'onboarding',
   common_mistakes: 'faq',
+  marketplace_penalties_summary: 'faq',
   quick_responses: 'faq',
   success_cases: 'faq',
   reviews_guide: 'faq',

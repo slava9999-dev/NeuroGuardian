@@ -1,6 +1,6 @@
 # 📊 Project State — NeuroGUARDIAN
 
-# Updated: 2026-01-16T21:17:00+03:00
+# Updated: 2026-01-17T12:40:00+03:00
 
 # This file tracks current progress and is updated at end of each session
 
@@ -8,8 +8,41 @@
 
 ## 🎯 Current Phase: RELEASE PREPARATION (Phase 12) 🚀 PRODUCTION READY
 
-**Last Session:** 2026-01-16 (Session 64)
-**Focus:** 🛠 Ozon Order Sync Fix & TypeScript Hardening
+**Last Session:** 2026-01-17 (Session 65)
+**Focus:** 🛡️ Industrial Pre-Flight & Admin Control
+
+### Session 2026-01-17 (Session 66 - RAG Knowledge Expansion & Specialist Integration) 🧠
+
+**Objective: Расширение базы знаний (Pitfalls 2025) и внедрение RAG во всех специалистов**
+
+> ✅ **CRITICAL:** Устранена ошибка `Incorrect API key` в RAG пайплайне. Принудительное использование `RAG_PROVIDER=gemini`.
+> ✅ **CRITICAL:** Реализован механизм автоматического пересоздания таблицы векторов при несовпадении размерности (768 vs 1536).
+> ✅ **MAJOR:** База знаний расширена новыми документами по стратегиям и ловушкам 2025 года (WB/Ozon).
+> ✅ **MAJOR:** Все 6 специалистов (`Support`, `Sentinel`, `Pricing`, `Analytics`, `Products`, `Chat`) теперь используют RAG контекст.
+
+**Completed Actions:**
+
+- [x] **RAG Fix**: Скрипт `setup-vector-store.ts` теперь проверяет размерность векторов и пересоздает таблицу `knowledge_embeddings` при смене провайдера.
+- [x] **Knowledge Base**: Созданы `wb_pitfalls_2025.md`, `ozon_pitfalls_2025.md`, `advanced_strategies_2025.md`.
+- [x] **Specialist RAG**: Внедрен вызов `specialistKnowledgeBase.retrieveForSpecialist` в `buildContext` для всех агентов.
+- [x] **SupportSpecialist**: Теперь отвечает на вопросы по Индексу Ошибок (Ozon) и блокировкам.
+- [x] **QA Verification**: Агент успешно прошел тест на знание штрафов 2025 года и формул логистики КГТ.
+
+**Files Changed:**
+
+```
+src/agent/specialists/*.ts — Added RAG retrieval to all specialists
+scripts/setup-vector-store.ts — Dimension mismatch fix
+src/infrastructure/rag/IngestionPipeline.ts — New namespaces
+docs/knowledge_base/ — New content
+```
+
+**Key Insights:**
+
+```
+Специализация RAG (Namespaces) работает: Support получает документы по API ошибкам, а Pricing — по стратегиям.
+Gemini Embeddings (768 dim) работают быстрее и стабильнее для русского языка в текущем сетапе.
+```
 
 ### Session 2026-01-17 (Session 65 - Industrial Pre-Flight & Admin Control) 🛡️
 
@@ -700,4 +733,4 @@ PgVector остается основным движком знаний.
 
 ---
 
-_Last updated: 2026-01-16T21:18:00+03:00_
+_Last updated: 2026-01-17T12:40:00+03:00_

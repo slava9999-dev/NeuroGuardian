@@ -76,14 +76,18 @@ export class PricingSpecialist extends BaseSpecialist {
 
     // RAG: Retrieve knowledge base context
     if (context.query) {
-      const ragContext = await specialistKnowledgeBase.retrieveForSpecialist(
-        context.query,
-        'PricingSpecialist'
-      );
+      try {
+        const ragContext = await specialistKnowledgeBase.retrieveForSpecialist(
+          context.query,
+          'PricingSpecialist'
+        );
 
-      if (ragContext.formattedContext) {
-        lines.push('\n## СПРАВОЧНАЯ ИНФОРМАЦИЯ (RAG):');
-        lines.push(ragContext.formattedContext);
+        if (ragContext.formattedContext) {
+          lines.push('\n## СПРАВОЧНАЯ ИНФОРМАЦИЯ (RAG):');
+          lines.push(ragContext.formattedContext);
+        }
+      } catch (error) {
+        // Silently fail RAG
       }
     }
 

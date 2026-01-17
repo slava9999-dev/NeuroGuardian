@@ -5,6 +5,7 @@
 // ============================================
 
 import { BaseSpecialist, type SpecialistContext } from './BaseSpecialist.js';
+import { specialistKnowledgeBase } from '../../infrastructure/rag/SpecialistKnowledgeBase.js';
 
 export class SupportSpecialist extends BaseSpecialist {
   readonly name = 'SupportSpecialist';
@@ -51,6 +52,22 @@ export class SupportSpecialist extends BaseSpecialist {
     lines.push(`- Маркетплейс: ${context.userState.marketplace || 'все'}`);
     lines.push(`- Всего отзывов в базе: ${context.userState.reviewsCount || 0}`);
     lines.push(`- Режим защиты: ${context.userState.defenseMode}`);
+
+    // RAG Retrieval
+    if (context.query) {
+      try {
+        const ragContext = await specialistKnowledgeBase.retrieveForSpecialist(
+          context.query,
+          'SupportSpecialist'
+        );
+        if (ragContext.formattedContext) {
+          lines.push('\n## РЕЛЕВАНТНЫЕ ЗНАНИЯ (RAG):');
+          lines.push(ragContext.formattedContext);
+        }
+      } catch (error) {
+        // Silently fail RAG to not break flow
+      }
+    }
 
     return lines.join('\n');
   }

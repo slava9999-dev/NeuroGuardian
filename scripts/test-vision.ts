@@ -11,14 +11,13 @@ import path from 'path';
 config({ path: path.resolve(process.cwd(), '.env') });
 config({ path: path.resolve(process.cwd(), '.env.local') });
 
-// Test image (Wood texture example)
+// Test image (Product example)
 const DEFAULT_IMAGE_URL =
   'https://fastly.picsum.photos/id/10/2500/1667.jpg?hmac=J04WWC_ebchx3WwzbM-Z4_KC_LeLBWr5LZMaAkWkF68';
 
 async function testVision(imageUrl: string) {
   // Dynamic import to ensure env vars are loaded
   const { visionService } = await import('../src/vision/VisionService.js');
-  const { logger } = await import('../src/api-lib/lib/logger.js');
 
   console.log('\n👁️  VISION CORE DIAGNOSTICS');
   console.log('============================');
@@ -46,7 +45,7 @@ async function testVision(imageUrl: string) {
     console.log(`⏱️  Time: ${elapsed}ms`);
     console.log(`📐 Quality Score: ${result.overall_quality}/10`);
     console.log(
-      `🪵 Material: ${result.material_detected} (${(result.material_confidence * 100).toFixed(0)}%)`
+      `📦 Material: ${result.material_detected} (${(result.material_confidence * 100).toFixed(0)}%)`
     );
 
     console.log('\n🔍 Quality Checks:');

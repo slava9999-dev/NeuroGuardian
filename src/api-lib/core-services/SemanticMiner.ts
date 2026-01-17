@@ -26,8 +26,8 @@ export interface CompetitorData {
 export interface CompetitorInsight {
   competitorId: string; // NMID
   competitorTitle: string;
-  painPoints: string[]; // "шатается", "быстро царапается"
-  uniqueSellingPoints: string[]; // "стальной каркас", "двойная упаковка"
+  painPoints: string[]; // "broken", "bad smell"
+  uniqueSellingPoints: string[]; // "steel frame", "eco-friendly"
   missedKeywords: string[]; // LSI keywords they are ranking for but we might miss
 }
 
@@ -35,7 +35,7 @@ export interface OptimizationSuggestion {
   targetField: 'title' | 'description' | 'attributes';
   originalContent?: string;
   suggestedContent: string;
-  reasoning: string; // "Added 'coffee station' to capture low-freq traffic"
+  reasoning: string; // "Added 'gift set' to capture low-freq traffic"
   expectedImpact: 'high' | 'medium' | 'low';
 }
 

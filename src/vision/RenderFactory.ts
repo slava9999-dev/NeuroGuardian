@@ -16,7 +16,7 @@ export type RenderWorkflow =
   | 'white_background' // WB/Ozon main card
   | 'lifestyle' // Marketing lifestyle shot
   | 'dimensions' // Add dimension overlay
-  | 'watermark'; // Add Arbarea watermark
+  | 'watermark'; // Add NeuroGuardian watermark
 
 export interface RenderJobConfig {
   workflow: RenderWorkflow;
