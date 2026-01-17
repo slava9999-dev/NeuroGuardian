@@ -88,9 +88,9 @@ export function decryptApiKey(encryptedKey: string): string {
 
     return decrypted;
   } catch (error) {
-    console.error('Decryption error:', error);
-    throw new Error(
-      'CRYPTOGRAPHIC_ERROR: Failed to decrypt API key. The key may be corrupted or the encryption key may have changed.'
-    );
+    console.error('Decryption error (SOFT FAIL): Key reset required.', { error });
+    // FAIL SAFE: Return empty string instead of crashing.
+    // This allows the user to log in and update their invalid keys.
+    return '';
   }
 }
