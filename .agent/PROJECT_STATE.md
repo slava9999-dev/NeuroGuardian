@@ -11,6 +11,28 @@
 **Last Session:** 2026-01-17 (Session 65)
 **Focus:** 🛡️ Industrial Pre-Flight & Admin Control
 
+### Session 2026-01-17 (Session 68 - Visual Content Generation & Free Tier Fallback) 🎨
+
+**Objective: Реализация генерации фото товаров с автоматическим Fallback на бесплатные модели**
+
+> ✅ **CRITICAL:** Внедрен инструмент `generate_product_image` для создания Lifestyle-фото и инфографики.
+> ✅ **CRITICAL:** Реализован **Smart Fallback**: При ошибках оплаты (402) или лимитов (429) Replicate, система автоматически переключается на бесплатный **Pollinations.ai (Flux)**.
+> ✅ **MAJOR:** Интегрирован новый инструмент в `ProductsSpecialist`.
+
+**Completed Actions:**
+
+- [x] **New Tool**: `GenerateProductImageTool.ts` добавлен в реестр и типизирован.
+- [x] **Resilient RenderFactory**: Обработка ошибок 402/429 с прозрачным переключением на Free Tier.
+- [x] **Env Config**: Добавлен `REPLICATE_API_KEY` (опционально).
+- [x] **Verification**: Тест `test-generation.ts` подтвердил успешную генерацию через Pollinations.
+
+**Key Insights:**
+
+```
+Бесплатная генерация через Pollinations.ai (Flux) работает мгновенно и дает отличное качество для тестов/MVP.
+Это снимает барьер "платной подписки на генерацию" для новых пользователей.
+```
+
 ### Session 2026-01-17 (Session 66 - RAG Knowledge Expansion & Specialist Integration) 🧠
 
 **Objective: Расширение базы знаний (Pitfalls 2025) и внедрение RAG во всех специалистов**

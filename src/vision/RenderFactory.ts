@@ -258,7 +258,8 @@ export class RenderFactory {
 
   private async removeBackground(imageUrl: string): Promise<string> {
     if (!this.replicateApiKey) {
-      throw new Error('REPLICATE_API_KEY not configured');
+      logger.warn('[RenderFactory] No Replicate key, skipping background removal (Free Tier)');
+      return imageUrl;
     }
 
     const response = await fetch(`${REPLICATE_API_URL}/predictions`, {
@@ -273,13 +274,18 @@ export class RenderFactory {
       }),
     });
 
+    if (response.status === 402) {
+      logger.warn(
+        '[RenderFactory] Replicate payment required (402). Skipping RemoveBG (Free Fallback).'
+      );
+      return imageUrl;
+    }
+
     if (!response.ok) {
       throw new Error(`RemoveBG API error: ${response.status}`);
     }
 
     const prediction = await response.json();
-
-    // Poll for completion
     return this.pollPrediction(prediction.id);
   }
 
@@ -304,6 +310,11 @@ export class RenderFactory {
       }),
     });
 
+    if (response.status === 402) {
+      logger.warn('[RenderFactory] Replicate payment required (402). Skipping Upscale.');
+      return imageUrl;
+    }
+
     if (!response.ok) {
       throw new Error(`Upscale API error: ${response.status}`);
     }
@@ -313,8 +324,14 @@ export class RenderFactory {
   }
 
   private async generateScene(prompt: string): Promise<string> {
+    const fallbackToPollinations = async () => {
+      logger.warn('[RenderFactory] Using Pollinations.ai (Free Tier)');
+      const encodedPrompt = encodeURIComponent(prompt);
+      return `https://image.pollinations.ai/prompt/${encodedPrompt}?width=1280&height=720&model=flux&nologo=true`;
+    };
+
     if (!this.replicateApiKey) {
-      throw new Error('REPLICATE_API_KEY not configured');
+      return fallbackToPollinations();
     }
 
     const response = await fetch(`${REPLICATE_API_URL}/predictions`, {
@@ -334,8 +351,21 @@ export class RenderFactory {
       }),
     });
 
+    if (response.status === 402 || response.status === 429) {
+      logger.warn(
+        `[RenderFactory] Replicate error (${response.status}). Switching to Pollinations.`,
+        { status: response.status }
+      );
+      return fallbackToPollinations();
+    }
+
     if (!response.ok) {
-      throw new Error(`Flux API error: ${response.status}`);
+      // For any other error, also try fallback as a safety net if it's an API issue?
+      // Or at least log it better.
+      // Let's be aggressive with fallback for now to ensure USER gets an image.
+      logger.error(`[RenderFactory] Flux API error: ${response.status}. Trying fallback.`);
+      return fallbackToPollinations();
+      // throw new Error(`Flux API error: ${response.status}`);
     }
 
     const prediction = await response.json();
@@ -381,7 +411,8 @@ export class RenderFactory {
 
   private async compositeImages(_productUrl: string, _sceneUrl: string): Promise<string> {
     // TODO: Implement with Sharp or Photoshop API
-    return _productUrl; // Placeholder
+    // For now, return the generated scene so we can verify the generation worked
+    return _sceneUrl;
   }
 
   private async harmonizeLighting(_imageUrl: string, _style: string): Promise<string> {

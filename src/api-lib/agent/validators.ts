@@ -112,7 +112,21 @@ export const GenerateReviewReplyArgsSchema = z.object({
   account_id: z.number().optional().describe('Account ID filter'),
 });
 
-// === WRITE TOOLS (REQUIRE CONFIRMATION) ===
+export const GenerateProductImageArgsSchema = z.object({
+  product_id: z.string().optional().describe('ID of product to use as base, if available'),
+  prompt: z.string().min(1).describe('Description of the image to generate'),
+  style: z.enum(['lifestyle', 'white_background']).default('lifestyle'),
+  marketplace: z.enum(['WB', 'Ozon', 'all']).optional().default('all'),
+});
+
+export const UpdateProductSettingsArgsSchema = z.object({
+  product_id: z.string().min(1, 'Product ID is required'),
+  cost_price: z.number().int().min(0).optional(),
+  category: z.string().optional(),
+  min_price: z.number().int().min(0).optional(),
+  is_monitored: z.boolean().optional(),
+  account_id: z.number().optional().describe('Account ID filter'),
+});
 
 export const SetStopLossArgsSchema = z.object({
   product_id: z.string().min(1, 'Product ID is required'),
@@ -159,15 +173,6 @@ export const UpdateStocksArgsSchema = z.object({
   ),
   marketplace: z.enum(['WB', 'Ozon']),
   account_id: z.number().optional(),
-});
-
-export const UpdateProductSettingsArgsSchema = z.object({
-  product_id: z.string().min(1, 'Product ID is required'),
-  cost_price: z.number().int().min(0).optional(),
-  category: z.string().optional(),
-  min_price: z.number().int().min(0).optional(),
-  is_monitored: z.boolean().optional(),
-  account_id: z.number().optional().describe('Account ID filter'),
 });
 
 // === CONFIRMATION DETAILS SCHEMAS (for handleConfirmation) ===
@@ -238,6 +243,7 @@ export type GetLowMarginProductsArgs = z.infer<typeof GetLowMarginProductsArgsSc
 export type GetReviewsArgs = z.infer<typeof GetReviewsArgsSchema>;
 export type GenerateReviewReplyArgs = z.infer<typeof GenerateReviewReplyArgsSchema>;
 export type UpdateProductSettingsArgs = z.infer<typeof UpdateProductSettingsArgsSchema>;
+export type GenerateProductImageArgs = z.infer<typeof GenerateProductImageArgsSchema>;
 
 // Confirmation details types
 export type PriceChangeItem = z.infer<typeof PriceChangeItemSchema>;

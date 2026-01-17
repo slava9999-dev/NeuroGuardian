@@ -36,6 +36,7 @@ import { updatePricesTool } from './tools/UpdatePricesTool.js';
 import { updateStocksTool } from './tools/UpdateStocksTool.js';
 import { updateProductSettingsTool } from './tools/UpdateProductSettingsTool.js';
 import { syncCatalogTool } from './tools/SyncCatalogTool.js';
+import { generateProductImageTool } from './tools/GenerateProductImageTool.js';
 
 // Search tools
 import { searchWebTool } from './tools/SearchWebTool.js';
@@ -73,6 +74,7 @@ export function registerAllTools(): void {
   toolRegistry.register(updateStocksTool);
   toolRegistry.register(updateProductSettingsTool);
   toolRegistry.register(syncCatalogTool);
+  toolRegistry.register(generateProductImageTool);
 
   // Search tools
   toolRegistry.register(searchWebTool);
@@ -110,3 +112,4 @@ export { getReviewsTool } from './tools/GetReviewsTool.js';
 export { getLowMarginProductsTool } from './tools/GetLowMarginProductsTool.js';
 export { getRealPriceTool } from './tools/GetRealPriceTool.js';
 export { syncCatalogTool } from './tools/SyncCatalogTool.js';
+export { generateProductImageTool } from './tools/GenerateProductImageTool.js';

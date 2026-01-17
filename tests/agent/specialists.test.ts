@@ -81,13 +81,14 @@ describe('Specialists', () => {
       expect(productsSpecialist.description).toContain('product');
     });
 
-    it('should have 5 tools', () => {
-      expect(productsSpecialist.tools).toHaveLength(5);
+    it('should have 6 tools', () => {
+      expect(productsSpecialist.tools).toHaveLength(6);
       expect(productsSpecialist.tools).toContain('get_products');
       expect(productsSpecialist.tools).toContain('update_product_settings');
       expect(productsSpecialist.tools).toContain('get_low_margin_products');
       expect(productsSpecialist.tools).toContain('get_real_price');
       expect(productsSpecialist.tools).toContain('sync_catalog');
+      expect(productsSpecialist.tools).toContain('generate_product_image');
     });
 
     it('should have systemPrompt with key sections', () => {
