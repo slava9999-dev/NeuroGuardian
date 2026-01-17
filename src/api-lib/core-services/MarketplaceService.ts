@@ -4,6 +4,7 @@ import { marketplaceAccountRepository } from '../repositories/MarketplaceAccount
 import type { MarketplaceProduct, MarketplaceSalesStats } from './MarketplaceTypes.js';
 import { upsertMarketplaceOrders, type MarketplaceOrder } from '../services/database.js';
 import type { WbStatisticsSale, OzonOrder } from '../lib/marketplace-types.js';
+import { withCircuitBreaker } from '../lib/index.js';
 
 // ============================================
 // MARKETPLACE DISCOUNT ESTIMATION
@@ -133,13 +134,19 @@ export class MarketplaceService {
       }
       // Cast to numbers for WB
       const nmIds = productIds.map(id => Number(id)).filter(id => !isNaN(id) && id > 0);
-      const result = await wbService.fetchPrices(keys.wb, nmIds);
+      try {
+        const result = await withCircuitBreaker('wb-prices', () =>
+          wbService.fetchPrices(keys.wb!, nmIds)
+        );
 
-      if (result.error) errors.push(`WB Error: ${result.error}`);
-      if (result.priceMap) {
-        for (const [id, price] of result.priceMap.entries()) {
-          prices.set(id, price);
+        if (result.error) errors.push(`WB Error: ${result.error}`);
+        if (result.priceMap) {
+          for (const [id, price] of result.priceMap.entries()) {
+            prices.set(id, price);
+          }
         }
+      } catch (err: any) {
+        errors.push(`WB Circuit Breaker: ${err.message}`);
       }
       return { prices, errors: errors.length > 0 ? errors : undefined };
     }
@@ -153,20 +160,21 @@ export class MarketplaceService {
       // Expecting productIds to be raw numbers or strings that parse to numbers
       const ozonIds = productIds
         .map(id => {
-          // Handle "ozon-123" format if passed
           const str = String(id);
           return str.startsWith('ozon-') ? Number(str.replace('ozon-', '')) : Number(str);
         })
         .filter(id => !isNaN(id) && id > 0);
 
-      const ozonPrices = await ozonService.fetchCurrentPrices(
-        keys.ozon.clientId,
-        keys.ozon.apiKey,
-        ozonIds
-      );
+      try {
+        const ozonPrices = await withCircuitBreaker('ozon-prices', () =>
+          ozonService.fetchCurrentPrices(keys.ozon!.clientId, keys.ozon!.apiKey, ozonIds)
+        );
 
-      for (const [id, price] of ozonPrices.entries()) {
-        prices.set(id, price);
+        for (const [id, price] of ozonPrices.entries()) {
+          prices.set(id, price);
+        }
+      } catch (err: any) {
+        errors.push(`Ozon Circuit Breaker: ${err.message}`);
       }
       return { prices, errors: errors.length > 0 ? errors : undefined };
     }

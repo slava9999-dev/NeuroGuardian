@@ -11,23 +11,41 @@
 **Last Session:** 2026-01-16 (Session 64)
 **Focus:** 🛠 Ozon Order Sync Fix & TypeScript Hardening
 
-### Session 2026-01-16 (Session 64 - Agent Hardening & Security) 🛡️
+### Session 2026-01-17 (Session 65 - Industrial Pre-Flight & Admin Control) 🛡️
 
-**Objective: Аудит, харднинг агента и обеспечение безопасности данных**
+**Objective: Внедрение промышленного протокола проверок и инструментов контроля Sentinel**
 
-> ✅ **CRITICAL:** Интегрирован **SupportSpecialist** для автоматической работы с отзывами (Генерация ответов + Аналитика).
-> ✅ **CRITICAL:** Реализовано шифрование API ключей (AES-256) в БД. Все легаси ключи мигрированы.
-> ✅ **MAJOR:** Внедрено кэширование для Vision API (хэширование изображений) — экономия токенов и ускорение.
-> ✅ **MAJOR:** Устранены блокирующие TypeScript ошибки. `git push` прошел успешно (466 тестов).
-> ✅ **Fix:** Исправлены миграции базы данных и скрипты запуска.
+> ✅ **CRITICAL:** Интегрирован **Industrial Pre-Flight** в Husky (pre-push). Система блокирует любой пуш, который не проходит 6 стадий (Lint, DB Sync, Health Check, Sentinel Smoke Test, Unit Tests, Vite Build).
+> ✅ **CRITICAL:** Реализован **Sentinel Mission Control** в Telegram (`/sentinel`). Админ может просматривать статистику циклов и мгновенно останавливать/запускать защиту (Emergency Stop).
+> ✅ **MAJOR:** Внедрена **система ротации логов** (`cleanup-logs.ts`) и **трекинг производительности БД** (`dbMeasured`) для Mission-Critical запросов.
+> ✅ **MAJOR:** Обновлены уведомления: добавлен тип `auth_error` с кнопкой «⚙️ Обновить ключи» для быстрого восстановления доступа.
 
 **Completed Actions:**
 
-- [x] **SupportSpecialist**: Новый агент для отзывов, интегрирован в оркестратор.
-- [x] **Security**: Шифрование `api_keys` и `marketplace_accounts`. Скрипт миграции отработал.
-- [x] **Vision Cache**: Таблица `vision_cache` и логика кэширования в `VisionService`.
-- [x] **TS Hardening**: Исправлены ошибки в `SetStopLossTool` и `specialists.test.ts`.
-- [x] **Migrations**: Исправлены скрипты миграций (`run-migrations.cjs`), добавлена поддержка SSL.
+- [x] **Husky Pre-push**: Финализирован скрипт `scripts/ops/pre-flight.ts`, интегрирован через Husky.
+- [x] **Sentinel Dashboard**: Команда `/sentinel` в боте с поддержкой Callback-кнопок управления.
+- [x] **DB Perf Monitoring**: Обертка `dbMeasured` логирует запросы медленнее 200мс.
+- [x] **Log Retention**: Скрипт очистки логов (`DAYS_TO_KEEP = 30`).
+- [x] **UI Recovery**: Интерактивные кнопки обновления API-ключей при ошибках 401.
+
+**Files Changed:**
+
+```
+scripts/ops/pre-flight.ts — Master control script
+scripts/ops/cleanup-logs.ts — Log retention policy
+src/api-lib/handlers/telegram.ts — Sentinel dashboard logic
+src/infrastructure/database/db.ts — Performance monitoring
+src/api-lib/services/notifications.ts — Auth recovery flow
+.husky/pre-push — Final integration
+```
+
+**Key Insights:**
+
+```
+Pre-flight smoke test — ключевой элемент стабильности. Он имитирует цикл защиты перед деплоем.
+Emergency Stop buttons — обязательный инструмент админа для предотвращения "петли" в нештатных ситуациях.
+dbMeasured выявил, что bulk-update продуктов иногда занимает >350мс на Neon DB.
+```
 
 **Files Changed:**
 

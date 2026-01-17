@@ -5,12 +5,17 @@
 
 import { vi } from 'vitest';
 
-// Mock environment variables
-process.env.TELEGRAM_BOT_TOKEN = 'test-bot-token';
-process.env.API_KEY_ENCRYPTION_KEY = 'test-encryption-key-32-chars!!';
+// Mock environment variables for tests
+process.env.POSTGRES_URL = 'postgresql://localhost:5432/test';
+process.env.POSTGRES_DATABASE = 'test';
+process.env.TELEGRAM_BOT_TOKEN = '123456789:test-bot-token-format';
+process.env.ADMIN_TELEGRAM_ID = '123456789';
+process.env.ADMIN_CHAT_ID = '123456789';
+process.env.API_KEY_ENCRYPTION_KEY = 'test-encryption-key-must-be-very-long-32+!!!';
+process.env.ADMIN_API_KEY = 'test-admin-api-key-16+';
+process.env.CRON_SECRET = 'test-cron-secret-16+';
 process.env.OPENAI_API_KEY = 'test-openai-key';
-process.env.YOOKASSA_SHOP_ID = 'test-shop-id';
-process.env.YOOKASSA_SECRET_KEY = 'test-secret-key';
+process.env.VITE_DEV_MODE = 'true';
 
 // Mock fetch globally
 global.fetch = vi.fn();
@@ -20,9 +25,9 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-// Console spy for debugging
+// Console spy for debugging - but don't mock implementation so we can see errors
 export const consoleSpy = {
-  log: vi.spyOn(console, 'log').mockImplementation(() => {}),
-  error: vi.spyOn(console, 'error').mockImplementation(() => {}),
-  warn: vi.spyOn(console, 'warn').mockImplementation(() => {}),
+  log: vi.spyOn(console, 'log'),
+  error: vi.spyOn(console, 'error'),
+  warn: vi.spyOn(console, 'warn'),
 };

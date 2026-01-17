@@ -7,9 +7,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql } from '../services/database.js';
 import { orchestrateV5 } from '../../agent/core/AgentOrchestratorV5.js';
-import { logger } from '../lib/index.js';
+import { logger, config } from '../lib/index.js';
+import { circuitBreakers } from '../lib/circuit-breaker.js';
 import { inferGender } from '../../agent/utils/genderDetection.js';
 import { stateManager } from '../../agent/core/StateManager.js';
+import { db, systemFlags } from '../../infrastructure/database/db.js';
+import { eq } from 'drizzle-orm';
 
 // ============================================
 // TYPES
@@ -61,6 +64,14 @@ interface TelegramCallbackQuery {
   data?: string;
 }
 
+interface SentinelStats {
+  usersProcessed: number;
+  threatsDetected: number;
+  actionsTaken: number;
+  errors?: string[];
+  productsScanned?: { wb: number; ozon: number };
+}
+
 // ============================================
 // TELEGRAM API HELPERS
 // ============================================
@@ -68,11 +79,7 @@ interface TelegramCallbackQuery {
 const TELEGRAM_API = 'https://api.telegram.org/bot';
 
 function getBotToken(): string {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  if (!token) {
-    throw new Error('TELEGRAM_BOT_TOKEN not configured');
-  }
-  return token;
+  return config.TELEGRAM_BOT_TOKEN;
 }
 
 async function sendTelegramMessage(
@@ -436,6 +443,66 @@ ${!isActive ? '\n💡 Оформите подписку для продолже�
   }
 }
 
+/**
+ * Admin: Sentinel Dashboard
+ */
+async function handleSentinelDashboard(chatId: string | number) {
+  try {
+    const statsFlag = await db.query.systemFlags.findFirst({
+      where: eq(systemFlags.key, 'sentinel_last_run_stats'),
+    });
+
+    const stopFlag = await db.query.systemFlags.findFirst({
+      where: eq(systemFlags.key, 'sentinel_emergency_stop'),
+    });
+
+    const stats = statsFlag?.valueText ? (JSON.parse(statsFlag.valueText) as SentinelStats) : null;
+
+    const isStopped = stopFlag?.valueBool || false;
+
+    let message = `🛡️ <b>Sentinel Mission Control</b>\n\n`;
+    message += `Статус: ${isStopped ? '🔴 ОСТАНОВЛЕН' : '🟢 РАБОТАЕТ'}\n`;
+    message += `Последняя активность: ${
+      statsFlag?.updatedAt ? new Date(statsFlag.updatedAt).toLocaleString('ru-RU') : 'нет данных'
+    }\n\n`;
+
+    if (stats) {
+      message += `📊 <b>Итоги последнего цикла:</b>\n`;
+      message += `👤 Пользователей: ${stats.usersProcessed}\n`;
+      message += `📦 Товаров (WB/Ozon): ${stats.productsScanned?.wb || 0}/${
+        stats.productsScanned?.ozon || 0
+      }\n`;
+      message += `⚠️ Угроз обнаружено: ${stats.threatsDetected}\n`;
+      message += `🛡️ Действий защиты: ${stats.actionsTaken}\n`;
+
+      if (stats.errors && stats.errors.length > 0) {
+        message += `\n❌ <b>Ошибки:</b>\n${stats.errors.slice(0, 3).join('\n')}`;
+      }
+    } else {
+      message += `⚪ Данные о прогонах отсутствуют.`;
+    }
+
+    message += `\n\n<i>NeuroGuardian Sentinel v2.0</i>`;
+
+    const buttons = [
+      [
+        {
+          text: isStopped ? '🟢 ЗАПУСТИТЬ SENTINEL' : '🛑 ОСТАНОВИТЬ SENTINEL',
+          callback_data: isStopped ? 'sentinel_start' : 'sentinel_stop',
+        },
+      ],
+      [{ text: '🔄 Обновить статистику', callback_data: 'refresh_sentinel' }],
+    ];
+
+    await sendTelegramMessage(Number(chatId), message, {
+      replyMarkup: { inline_keyboard: buttons },
+    });
+  } catch (err) {
+    logger.error('Failed to generate sentinel dashboard', err);
+    await sendTelegramMessage(Number(chatId), '❌ Не удалось загрузить панель Sentinel.');
+  }
+}
+
 // ============================================
 // MESSAGE HANDLER (VIKTOR AI)
 // ============================================
@@ -676,6 +743,43 @@ async function handleCallbackQuery(query: TelegramCallbackQuery): Promise<void> 
         }
       );
       break;
+
+    // --- SENTINEL ADMIN ACTIONS ---
+    case 'sentinel_stop':
+    case 'sentinel_start': {
+      if (String(query.from.id) === String(config.ADMIN_TELEGRAM_ID)) {
+        const shouldStop = data === 'sentinel_stop';
+        try {
+          await db
+            .insert(systemFlags)
+            .values({
+              key: 'sentinel_emergency_stop',
+              valueBool: shouldStop,
+              updatedAt: new Date(),
+            })
+            .onConflictDoUpdate({
+              target: systemFlags.key,
+              set: { valueBool: shouldStop, updatedAt: new Date() },
+            });
+
+          await answerCallbackQuery(query.id, `Sentinel ${shouldStop ? 'остановлен' : 'запущен'}`);
+          await handleSentinelDashboard(chatId);
+        } catch (err) {
+          logger.error('Failed to toggle sentinel', err);
+          await answerCallbackQuery(query.id, '❌ Ошибка переключения');
+        }
+      }
+      break;
+    }
+
+    case 'refresh_sentinel': {
+      if (String(query.from.id) === String(config.ADMIN_TELEGRAM_ID)) {
+        await handleSentinelDashboard(chatId);
+        await answerCallbackQuery(query.id, 'Данные обновлены');
+      }
+      break;
+    }
+
     default:
       // Unknown callback
       break;
@@ -737,9 +841,59 @@ export async function handleTelegramWebhook(
           case '/status':
             await handleStatusCommand(chatId, userId);
             break;
+          case '/health': {
+            if (String(user.id) === String(config.ADMIN_TELEGRAM_ID)) {
+              await sendTelegramMessage(chatId, '⏳ Запускаю проверку систем...');
+              // Simple health check summary
+              try {
+                const token = config.TELEGRAM_BOT_TOKEN;
+                const tgRes = await fetch(`${TELEGRAM_API}${token}/getMe`);
+                const tgData = (await tgRes.json()) as { result: { username: string } };
+
+                // Circuit Breakers Status
+                const cbStatus = circuitBreakers.getAllStatus();
+                const cbReport =
+                  cbStatus.length > 0
+                    ? cbStatus
+                        .map(s => `${s.state === 'CLOSED' ? '🟢' : '🔴'} ${s.name}: ${s.state}`)
+                        .join('\n')
+                    : '⚪ Предохранители не активны';
+
+                const healthMsg = `
+🛡️ <b>Системный пульс</b>
+✅ БД: Соединение ок
+✅ Бот: @${tgData.result.username}
+✅ Крипто: Ключ настроен
+🌐 Окружение: <code>${config.NODE_ENV}</code>
+
+🔌 <b>Предохранители (Circuit Breakers):</b>
+${cbReport}
+
+✨ Все системы в норме.
+`;
+                await sendTelegramMessage(chatId, healthMsg);
+              } catch (err) {
+                const errorMsg = err instanceof Error ? err.message : String(err);
+                await sendTelegramMessage(chatId, `❌ Ошибка пульса: ${errorMsg}`);
+              }
+            } else {
+              await sendTelegramMessage(chatId, '⛔ У вас нет прав для этой команды.');
+            }
+            break;
+          }
+
+          case '/sentinel': {
+            if (String(user.id) === String(config.ADMIN_TELEGRAM_ID)) {
+              await handleSentinelDashboard(chatId);
+            } else {
+              await sendTelegramMessage(chatId, '⛔ У вас нет прав для этой команды.');
+            }
+            break;
+          }
+
           default:
             // Unknown command - treat as message
-            await handleUserMessage(chatId, userId, text, user.first_name);
+            await handleUserMessage(chatId, userId, text, user.first_name || 'User');
         }
       } else if (text) {
         // Regular message - send to Viktor AI

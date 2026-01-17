@@ -11,6 +11,7 @@ export * from './types.js';
 
 // Constants
 export * from './constants.js';
+export { config } from '../../infrastructure/config/env.js';
 
 // Subscriptions
 export * from './subscription.js';

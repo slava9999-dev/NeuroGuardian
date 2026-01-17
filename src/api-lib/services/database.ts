@@ -12,18 +12,14 @@ import pkg from 'pg';
 const { Pool } = pkg;
 import type { QueryResult, PoolConfig, PoolClient } from 'pg';
 
+import { config } from '../../infrastructure/config/env.js';
+
 let _pool: pkg.Pool | null = null;
 
 function getPool(): pkg.Pool {
   if (_pool) return _pool;
 
-  const connectionString = (process.env.POSTGRES_URL || process.env.DATABASE_URL)
-    ?.replace(/\r/g, '')
-    .trim();
-
-  if (!connectionString) {
-    throw new Error('DATABASE_URL or POSTGRES_URL is not configured');
-  }
+  const connectionString = config.POSTGRES_URL.replace(/\r/g, '').trim();
 
   // Force SSL settings for stability on Node 25+ / Neon
   const poolConfig: PoolConfig = {

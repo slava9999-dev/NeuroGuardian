@@ -83,21 +83,13 @@ export const RATE_WINDOW = 60 * 1000; // 1 minute
 // ENVIRONMENT
 // ============================================
 
-const _testMode = process.env.TEST_MODE === 'true';
-const _isProduction =
-  process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
+import { config } from '../../infrastructure/config/env.js';
+
+const _isProduction = config.NODE_ENV === 'production';
 
 // In production TEST_MODE is ALWAYS false, even if env var is set
-export const TEST_MODE = _isProduction ? false : _testMode;
+export const TEST_MODE = _isProduction ? false : process.env.TEST_MODE === 'true';
 export const IS_PRODUCTION = _isProduction;
-
-if (typeof process !== 'undefined' && _isProduction && _testMode) {
-  console.error(
-    '🚨 SECURITY WARNING: TEST_MODE=true was set in production environment. ' +
-      'This has been automatically disabled for safety. ' +
-      'Remove TEST_MODE from production environment variables.'
-  );
-}
 
 // Remove or protect DEMO_USER
 export const DEMO_USER = _isProduction
@@ -112,34 +104,17 @@ export const DEMO_USER = _isProduction
 // SECRETS — DEPRECATED EXPORTS
 // ============================================
 // These are deprecated and will be removed in future versions.
-// Use getSecret() from './secrets-helper.js' instead.
-// Example:
-//   import { getSecret } from './secrets-helper.js';
-//   const token = await getSecret('telegram_bot_token', 'my_purpose');
+// Use config directly instead.
 
 /**
- * @deprecated Use getSecret('telegram_bot_token') instead
+ * @deprecated Use config.TELEGRAM_BOT_TOKEN instead
  */
-export const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
+export const TELEGRAM_BOT_TOKEN = config.TELEGRAM_BOT_TOKEN;
 
 /**
- * @deprecated Use getSecret('api_key_encryption_key') instead
+ * @deprecated Use config.API_KEY_ENCRYPTION_KEY instead
  */
-const _encKey = process.env.API_KEY_ENCRYPTION_KEY;
-
-if (IS_PRODUCTION && !_encKey) {
-  // CRITICAL SECURITY: Fail fast if encryption key is missing in production
-  throw new Error(
-    '🚨 FATAL: API_KEY_ENCRYPTION_KEY is missing in production environment! System shutdown initiated to prevent insecure data handling.'
-  );
-}
-
-if (!_encKey && !TEST_MODE) {
-  console.warn(
-    '⚠️ WARNING: API_KEY_ENCRYPTION_KEY not set. Secrets will not be encrypted properly.'
-  );
-}
-export const API_KEY_ENCRYPTION_KEY = _encKey || '';
+export const API_KEY_ENCRYPTION_KEY = config.API_KEY_ENCRYPTION_KEY;
 
 export const ALLOWED_ORIGINS = [
   'https://neuro-guardian.vercel.app',

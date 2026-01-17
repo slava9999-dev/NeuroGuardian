@@ -21,6 +21,7 @@ export type AlertType =
   | 'stock_warning' // NEW: Low stock alert
   | 'competitor_alert' // NEW: Competitor price drop
   | 'system_alert' // NEW: System health alerts from Kernel
+  | 'auth_error' // NEW: 401 Unauthorized from marketplace
   | 'system_error'
   | 'sync_completed'
   | 'daily_report'
@@ -225,7 +226,18 @@ function getAlertButtons(alert: Alert): Record<string, unknown> | undefined {
     ]);
   }
 
+  // Auth/API Alerts
+  if (alert.type === 'auth_error') {
+    buttons.push([
+      {
+        text: '⚙️ Обновить API-ключи',
+        callback_data: 'settings',
+      },
+    ]);
+  }
+
   // Subscription Alerts
+
   if (alert.type === 'subscription_expired') {
     buttons.push([
       {

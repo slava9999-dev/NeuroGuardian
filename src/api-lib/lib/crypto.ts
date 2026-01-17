@@ -4,7 +4,7 @@
 // ============================================
 
 import * as crypto from 'crypto';
-import { API_KEY_ENCRYPTION_KEY } from './constants.js';
+import { config } from '../../infrastructure/config/env.js';
 
 const ENCRYPTION_ALGORITHM = 'aes-256-gcm';
 
@@ -15,14 +15,10 @@ const ENCRYPTION_ALGORITHM = 'aes-256-gcm';
  */
 export function encryptApiKey(apiKey: string): string {
   if (!apiKey) return apiKey;
-  if (!API_KEY_ENCRYPTION_KEY) {
-    throw new Error(
-      'CRYPTOGRAPHIC_ERROR: API_KEY_ENCRYPTION_KEY is not configured. Refusing to store plaintext secrets.'
-    );
-  }
 
   try {
-    const key = Buffer.from(API_KEY_ENCRYPTION_KEY.slice(0, 32), 'utf8');
+    const key = Buffer.from(config.API_KEY_ENCRYPTION_KEY.slice(0, 32), 'utf8');
+
     const iv = crypto.randomBytes(12);
     const cipher = crypto.createCipheriv(ENCRYPTION_ALGORITHM, key, iv);
 
@@ -54,26 +50,14 @@ export function decryptApiKey(encryptedKey: string): string {
   }
 
   const parts = encryptedKey.split(':');
-  // If it doesn't have exactly 3 parts, it's not our encryption format (e.g. might be "ClientId:ApiKey")
   if (parts.length !== 3) {
     return encryptedKey;
   }
 
-  if (!API_KEY_ENCRYPTION_KEY) {
-    throw new Error(
-      'CRYPTOGRAPHIC_ERROR: API_KEY_ENCRYPTION_KEY is not configured. Cannot decrypt secrets.'
-    );
-  }
-
   try {
     const [ivHex, authTagHex, encrypted] = parts;
-    if (!ivHex || !authTagHex || !encrypted) {
-      throw new Error(
-        'CRYPTOGRAPHIC_ERROR: Invalid encrypted key format. Missing required components.'
-      );
-    }
+    const key = Buffer.from(config.API_KEY_ENCRYPTION_KEY.slice(0, 32), 'utf8');
 
-    const key = Buffer.from(API_KEY_ENCRYPTION_KEY.slice(0, 32), 'utf8');
     const iv = Buffer.from(ivHex, 'hex');
     const authTag = Buffer.from(authTagHex, 'hex');
 

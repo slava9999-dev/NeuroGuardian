@@ -23,10 +23,17 @@ export class SentinelAlertSender {
       if (notifiedIds.has(member.id)) continue;
 
       try {
-        await notificationService.sendTelegramNotification(member.id, message);
+        // Use a generic alert type to ensure Viktor's persona and correct Markdown parsing
+        await notificationService.sendAlertToUser(member.id, {
+          type: 'sentinel_alert',
+          urgency: 'low',
+          message: message,
+        });
         notifiedIds.add(member.id);
-      } catch (e) {
-        logger.warn(`Failed to send report to team member ${member.id}`, e as any);
+      } catch (err) {
+        logger.warn(`Failed to send report to team member ${member.id}`, {
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
     }
   }
@@ -59,8 +66,10 @@ export class SentinelAlertSender {
           },
         });
         notifiedIds.add(member.id);
-      } catch (e) {
-        logger.warn(`Failed to send threat alert to team member ${member.id}`, e as any);
+      } catch (err) {
+        logger.warn(`Failed to send threat alert to team member ${member.id}`, {
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
     }
   }
@@ -75,6 +84,15 @@ export class SentinelAlertSender {
     await notificationService.sendAlertToAdmin({
       type: 'sentinel_alert',
       urgency: 'critical',
+      message,
+    });
+  }
+
+  async sendAuthAlert(user: DBUser): Promise<void> {
+    const message = `🔑 **ДОСТУП ОГРАНИЧЕН**\n\nВиктор обнаружил, что ваш API-ключ для одного из маркетплейсов больше недействителен (ошибка 401).\n\nЗащита временно приостановлена для этого аккаунта. Пожалуйста, обновите токен в настройках бота, чтобы я мог продолжить работу.`;
+    await notificationService.sendAlertToUser(Number(user.id), {
+      type: 'auth_error',
+      urgency: 'high',
       message,
     });
   }
