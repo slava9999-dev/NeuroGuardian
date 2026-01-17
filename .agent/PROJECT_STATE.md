@@ -665,7 +665,22 @@ PgVector остается основным движком знаний.
 
 ---
 
-## ✅ Recently Completed (Sessions 48-51)
+## ✅ Recently Completed (Sessions 48-67)
+
+### Session 67 - Agent Persona Critical Upgrade
+
+- [x] **ProductsSpecialist**: Updated to "Operational Director" (Critical Mode).
+- [x] **PricingSpecialist**: Updated to "Financial Controller" (CFO Mode).
+- [x] **SentinelSpecialist**: Updated to "Tactical Commander" (Battle Rhythm).
+- [x] **AnalyticsSpecialist**: Updated to "Strategic Consultant" (ROI Focus).
+- [x] **ChatSpecialist**: Updated to "Business Mentor" (Onboarding Funnel).
+- [x] **SupportSpecialist**: Updated to "Brand Crisis Manager" (Reputation Defense).
+
+### Session 66 - RAG Knowledge Expansion
+
+- [x] **RAG Pipeline**: Fixed API key issues, enforced Gemini.
+- [x] **Knowledge Base**: Added 2025 pitfalls (Ozon Error Index, WB Logistics).
+- [x] **Specialist Integration**: All specialists enabled with RAG context.
 
 ### Session 51 - Release Candidate Polish
 
