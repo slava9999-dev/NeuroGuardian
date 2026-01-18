@@ -28,7 +28,7 @@ export function ProductMediaModal({ isOpen, onClose, product, onUpdate }: Produc
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
-          className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+          className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
         />
 
         {/* Modal Window */}
@@ -37,24 +37,24 @@ export function ProductMediaModal({ isOpen, onClose, product, onUpdate }: Produc
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: '100%', opacity: 0 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="relative w-full max-w-lg bg-stone-900 border border-stone-800 rounded-2xl shadow-2xl overflow-hidden max-h-[85vh] flex flex-col"
+          className="relative w-full max-w-lg bg-surface border border-slate-200 rounded-2xl shadow-2xl overflow-hidden max-h-[85vh] flex flex-col"
         >
           {/* Header */}
-          <div className="p-4 border-b border-stone-800 flex items-center justify-between bg-stone-900/95 backdrop-blur-md z-10 sticky top-0">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+          <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white/95 backdrop-blur-md z-10 sticky top-0">
+            <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
               <span className="text-2xl">📸</span>
-              {product.title}
+              Медиа-менеджер
             </h3>
             <button
               onClick={onClose}
-              className="p-2 rounded-lg hover:bg-stone-800 text-stone-400 transition-colors"
+              className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
             >
               ✕
             </button>
           </div>
 
           {/* Content (Scrollable) */}
-          <div className="p-4 overflow-y-auto">
+          <div className="p-4 overflow-y-auto bg-slate-50">
             <ProductMediaManager product={product} onUpdate={onUpdate} />
           </div>
         </motion.div>
