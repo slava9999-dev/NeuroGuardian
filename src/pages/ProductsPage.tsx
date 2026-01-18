@@ -5,7 +5,16 @@
 
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Shield, Package, History, Upload, Search, Filter, ArrowLeft } from 'lucide-react';
+import {
+  Shield,
+  Package,
+  History,
+  Upload,
+  Search,
+  Filter,
+  ArrowLeft,
+  Settings,
+} from 'lucide-react';
 import { useProductsStore } from '../stores';
 import { GlobalSwitch } from '../components/controls/GlobalSwitch';
 import { DashboardGrid } from '../components/dashboard/DashboardGrid';
@@ -21,7 +30,13 @@ import { ProductSMMModal } from '../components/dashboard/ProductSMMModal';
 import { ProductMediaModal } from '../components/dashboard/ProductMediaModal';
 import { PriceCalculator } from '../components/dashboard/PriceCalculator';
 
-export function ProductsPage({ onBack }: { onBack: () => void }) {
+export function ProductsPage({
+  onBack,
+  onNavigate,
+}: {
+  onBack: () => void;
+  onNavigate?: (page: string) => void;
+}) {
   // const user = useAppStore(state => state.user); // Unused for now
   const products = useProductsStore(state => state.products);
 
@@ -80,8 +95,18 @@ export function ProductsPage({ onBack }: { onBack: () => void }) {
               </div>
             </div>
 
-            {/* Global Switch */}
-            <div className="shrink-0">
+            {/* Actions */}
+            <div className="shrink-0 flex items-center gap-2">
+              <button
+                onClick={() => {
+                  hapticFeedback('light');
+                  onNavigate?.('settings');
+                }}
+                className="p-2 rounded-full hover:bg-slate-100 transition-all text-slate-400 hover:text-indigo-600"
+                aria-label="Настройки"
+              >
+                <Settings className="w-5 h-5" />
+              </button>
               <GlobalSwitch compact />
             </div>
           </div>
@@ -251,6 +276,16 @@ export function ProductsPage({ onBack }: { onBack: () => void }) {
             <p className="text-slate-500 text-sm max-w-[200px] mx-auto font-medium mb-8">
               Для начала работы синхронизируйте товары через настройки.
             </p>
+            <button
+              onClick={() => {
+                hapticFeedback('medium');
+                onNavigate?.('settings');
+              }}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider shadow-lg shadow-indigo-200 transition-all active:scale-95"
+            >
+              <Settings className="w-4 h-4" />
+              Подключить API
+            </button>
           </div>
         )}
       </div>

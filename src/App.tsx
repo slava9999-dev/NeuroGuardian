@@ -162,7 +162,12 @@ function App() {
       case 'agent':
         return <AgentPage />;
       case 'products':
-        return <ProductsPage onBack={() => setCurrentPage('agent')} />;
+        return (
+          <ProductsPage
+            onBack={() => setCurrentPage('agent')}
+            onNavigate={(page: string) => setCurrentPage(page as Page)}
+          />
+        );
       case 'settings':
         return (
           <SettingsPage
