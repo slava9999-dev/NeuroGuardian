@@ -1,0 +1,12 @@
+{
+  "recommendations": [
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "bradlc.vscode-tailwindcss",
+    "inngest.inngest",
+    "tamasfe.even-better-toml",
+    "unifiedjs.vscode-mdx",
+    "webben.knip-vscode",
+    "biomejs.biome"
+  ]
+}

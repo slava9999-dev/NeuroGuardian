@@ -1,0 +1,29 @@
+{
+  "$schema": "https://unpkg.com/knip@next/schema.json",
+  "entry": [
+    "src/main.tsx",
+    "api/index.ts",
+    "api/inngest.ts",
+    "scripts/**/*.{js,ts}",
+    "tests/**/*.ts"
+  ],
+  "project": [
+    "src/**/*.{ts,tsx}",
+    "api/**/*.{ts,tsx}"
+  ],
+  "ignore": [
+    "**/*.d.ts",
+    "postcss.config.js",
+    "tailwind.config.js",
+    "vite.config.ts"
+  ],
+  "ignoreDependencies": [
+    "husky",
+    "lint-staged",
+    "@types/node",
+    "@types/react",
+    "@types/react-dom",
+    "autoprefixer",
+    "postcss"
+  ]
+}

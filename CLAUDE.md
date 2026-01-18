@@ -198,6 +198,7 @@ npm run dev:api          # Только API сервер
 # Проверки
 npm test                 # Все тесты (266+)
 npm run typecheck        # TypeScript проверка
+npm run medic            # 🚑 Full diagnostics (Types, Lint, Tests, Dead Code)
 npm run check:regression # Критические проверки
 
 # Деплой

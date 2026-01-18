@@ -29,7 +29,6 @@
     "checklist": "node scripts/production-checklist.cjs",
     "pre-flight": "npx tsx scripts/ops/pre-flight.ts",
     "gen-key": "npx tsx scripts/ops/generate-key.ts",
-
     "docker:up": "cd docker && docker compose up -d",
     "docker:down": "cd docker && docker compose down",
     "docker:logs": "cd docker && docker compose logs -f",
@@ -48,7 +47,8 @@
     "test:agent:local": "npx vitest run tests/agent/viktor-local-e2e.test.ts",
     "test:agent:verbose": "npx tsx tests/agent/run-professional-tests.ts --verbose",
     "test:agent:setup": "npx tsx tests/agent/run-professional-tests.ts --setup",
-    "test:agent:cleanup": "npx tsx tests/agent/run-professional-tests.ts --cleanup"
+    "test:agent:cleanup": "npx tsx tests/agent/run-professional-tests.ts --cleanup",
+    "medic": "npx tsx scripts/neuro-medic.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.46",
@@ -100,7 +100,7 @@
     "@tailwindcss/vite": "^4.1.18",
     "@types/canvas-confetti": "^1.9.0",
     "@types/dompurify": "^3.0.5",
-    "@types/node": "^24.10.4",
+    "@types/node": "^24.10.9",
     "@types/pg": "^8.16.0",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
@@ -116,6 +116,7 @@
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
     "husky": "^9.1.7",
+    "knip": "^5.82.0",
     "lint-staged": "^16.2.7",
     "prettier": "^3.7.4",
     "sharp": "^0.34.5",

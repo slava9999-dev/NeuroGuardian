@@ -27,12 +27,12 @@ const GodModePage = lazy(() =>
   import('./pages/GodModePage').then(m => ({ default: m.GodModePage }))
 );
 
-// Premium Loading Screen V5.0 (Cosmic)
+// Premium Loading Screen V6.0 (Human)
 function LoadingScreen() {
   return (
     <div className="h-dvh flex flex-col items-center justify-center bg-background overflow-hidden relative">
       <div className="bg-cosmic" />
-      <div className="nebula-glow" />
+      {/* Nebula glow removed for cleaner Human UI */}
 
       <motion.div
         initial={{ opacity: 0, y: 10 }}
@@ -44,12 +44,12 @@ function LoadingScreen() {
         </div>
 
         <div className="flex flex-col items-center gap-2">
-          <h1 className="text-3xl font-black italic tracking-tighter text-white uppercase">
-            NEURO<span className="text-primary">GUARDIAN</span>
+          <h1 className="text-3xl font-black italic tracking-tighter text-slate-900 uppercase">
+            NEURO<span className="text-indigo-600">GUARDIAN</span>
           </h1>
           <div className="flex items-center gap-3 text-[10px] font-mono text-slate-400 font-bold uppercase tracking-[0.4em]">
-            <div className="w-1.5 h-1.5 bg-success rounded-full animate-pulse shadow-[0_0_8px_var(--color-success)]" />
-            Инициализация Системы...
+            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_var(--color-success)]" />
+            Инициализация...
           </div>
         </div>
       </motion.div>
@@ -143,11 +143,10 @@ function App() {
     return (
       <div className="h-dvh flex flex-col items-center justify-center bg-background p-8 text-center relative overflow-hidden">
         <div className="bg-cosmic" />
-        <div className="nebula-glow opacity-30" />
-        <h1 className="text-xl font-black italic text-white mb-2 uppercase tracking-tighter relative z-10">
+        <h1 className="text-xl font-black italic text-slate-900 mb-2 uppercase tracking-tighter relative z-10">
           СИСТЕМНАЯ ОШИБКА
         </h1>
-        <p className="text-zinc-400 text-sm mb-8 font-medium relative z-10">{authError}</p>
+        <p className="text-slate-500 text-sm mb-8 font-medium relative z-10">{authError}</p>
         <a
           href="https://t.me/NeuroGuardianBot"
           className="btn-premium w-full max-w-xs relative z-10"
@@ -199,9 +198,8 @@ function App() {
 
   return (
     <div className="h-dvh flex flex-col relative overflow-hidden bg-background">
-      {/* Global Cosmic Layer */}
+      {/* Global Cosmic Layer (Subtle Gradient) */}
       <div className="bg-cosmic" />
-      <div className="nebula-glow" />
 
       <main className="flex-1 relative min-h-0 overflow-y-auto no-scrollbar">
         <AnimatePresence mode="wait" initial={false}>
@@ -211,8 +209,8 @@ function App() {
         </AnimatePresence>
       </main>
 
-      {/* Premium Apple-style Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 nav-glass safe-area-inset-bottom z-50 border-t border-white/5">
+      {/* Premium Navigation (Light Glass) */}
+      <nav className="fixed bottom-0 left-0 right-0 nav-glass safe-area-inset-bottom z-50">
         <div className="flex justify-around items-center h-16 px-4 max-w-lg mx-auto">
           <NavButton
             active={currentPage === 'agent'}
@@ -230,14 +228,14 @@ function App() {
             active={currentPage === 'settings'}
             onClick={() => setCurrentPage('settings')}
             icon={<Settings />}
-            label="Параметры"
+            label="Настройки"
             dot={user?.hasUnlinkedAccounts}
           />
           <NavButton
             active={currentPage === 'info'}
             onClick={() => setCurrentPage('info')}
             icon={<Info />}
-            label="Лог"
+            label="Инфо"
           />
         </div>
       </nav>
