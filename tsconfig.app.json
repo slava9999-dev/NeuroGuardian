@@ -20,14 +20,13 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true,
+    "composite": true,
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
       "@neuroguardian/security-agent": ["./security-agent/src/index.ts"]
     }
   },
-  "include": ["src"]
+  "include": ["src", "security-agent/src"]
 }

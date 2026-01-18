@@ -12,7 +12,16 @@ import {
 import { logger } from '../lib/logger.js';
 
 const VALID_PLATFORMS: ContentPlatform[] = ['instagram', 'telegram', 'wb_desc', 'ozon_desc'];
-const VALID_STYLES = ['professional', 'friendly', 'luxury', 'casual'];
+const VALID_STYLES = [
+  'professional',
+  'friendly',
+  'luxury',
+  'casual',
+  'selling',
+  'informative',
+  'bold',
+  'storytelling',
+];
 
 /**
  * Handle content generation request

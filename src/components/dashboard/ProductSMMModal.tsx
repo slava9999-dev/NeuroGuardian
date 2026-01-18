@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { X, Wand2, Copy, Check, MessageSquare, RefreshCw } from 'lucide-react';
 import type { Product } from '../../types';
+import { contentApi } from '../../lib/api';
 import { hapticFeedback } from '../../lib/telegram';
 import { ViktorCore } from '../ui/ViktorCore';
 
@@ -19,25 +20,32 @@ export function ProductSMMModal({ isOpen, onClose, product }: ProductSMMModalPro
   const [result, setResult] = useState('');
   const [copied, setCopied] = useState(false);
 
-  // Mock generation for UI check
   const handleGenerate = async () => {
     hapticFeedback('medium');
     setIsGenerating(true);
     setResult('');
 
-    // Simulate thinking delay
-    await new Promise(r => setTimeout(r, 2000));
+    try {
+      const res = await contentApi.generate({
+        productId: product.id,
+        platform: 'telegram',
+        style: tone,
+      });
 
-    const mockResults: Record<Tone, string> = {
-      selling: `🔥 ${product.title} — ХИТ ПРОДАЖ!\n\nУспейте заказать по супер-цене: ${product.currentPrice}₽. Идеальное качество, быстрая доставка. Заказывайте прямо сейчас! 🚀`,
-      informative: `📦 Обзор товара: ${product.title}\n\nХарактеристики:\n- Артикул: ${product.vendorCode || 'Не указан'}\n- Цена: ${product.currentPrice}₽\n\nПодходит для тех, кто ценит надежность.`,
-      bold: `⚡️ Хватит переплачивать! ${product.title} за ${product.currentPrice}₽.\n\nЛучше уже не будет. Бери, пока есть! 😎`,
-      storytelling: `✨ Представьте... ${product.title} у вас в руках.\n\nЭто не просто вещь, это новый уровень комфорта. Всего ${product.currentPrice}₽ отделяют вас от мечты.`,
-    };
-
-    setResult(mockResults[tone]);
-    setIsGenerating(false);
-    hapticFeedback('success');
+      if (res.success) {
+        setResult(res.content);
+        hapticFeedback('success');
+      } else {
+        setResult(`Ошибка: ${res.error || 'Не удалось создать описание'}`);
+        hapticFeedback('error');
+      }
+    } catch (e) {
+      console.error(e);
+      setResult('Ошибка соединения. Проверьте сеть.');
+      hapticFeedback('error');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleCopy = () => {
@@ -66,7 +74,7 @@ export function ProductSMMModal({ isOpen, onClose, product }: ProductSMMModalPro
         animate={{ y: 0, opacity: 1, scale: 1 }}
         exit={{ y: '100%', opacity: 0, scale: 0.95 }}
         transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-        className="relative w-full max-w-lg bg-surface rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+        className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
       >
         {/* Header */}
         <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">

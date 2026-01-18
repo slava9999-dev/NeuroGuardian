@@ -42,7 +42,10 @@ export function ProductCard({
     hapticFeedback('medium');
     setIsSaving(true);
     try {
-      const res = await productsApi.updateMinPrice(product.id, Number(localMin));
+      const res = await productsApi.updateProductParams(product.id, {
+        minPrice: Number(localMin),
+        costPrice: Number(localCost),
+      });
       if (res.success) {
         onUpdate({ ...product, costPrice: localCost, minPrice: localMin });
         setIsEditing(false);

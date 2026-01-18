@@ -243,13 +243,47 @@ export const productsApi = {
     return response.data;
   },
 
-  updateMinPrice: async (productId: string, minPrice: number) => {
+  updateProductParams: async (
+    productId: string,
+    params: { minPrice?: number; costPrice?: number }
+  ) => {
     const initData = getInitData();
     const response = await api.post('', {
       action: 'products',
       initData,
       productId,
-      minPrice,
+      ...params,
+    });
+    return response.data;
+  },
+
+  // Deprecated wrapper for backward compatibility
+  updateMinPrice: async (productId: string, minPrice: number) => {
+    return productsApi.updateProductParams(productId, { minPrice });
+  },
+};
+
+export const contentApi = {
+  generate: async (params: {
+    productId: string;
+    platform: 'instagram' | 'telegram' | 'wb_desc' | 'ozon_desc';
+    style?: string;
+    includeImage?: boolean;
+  }): Promise<{ success: boolean; content: string; imageUrl?: string; error?: string }> => {
+    const initData = getInitData();
+    const response = await api.post('', {
+      action: 'generate-content',
+      initData,
+      ...params,
+    });
+    return response.data;
+  },
+
+  getQuota: async () => {
+    const initData = getInitData();
+    const response = await api.get('', {
+      params: { action: 'content-quota' },
+      headers: { 'X-Init-Data': initData || '' },
     });
     return response.data;
   },
