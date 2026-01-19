@@ -239,7 +239,7 @@ export class PriceProtectionAgent {
         await notificationService.sendAlert({
           type: 'price_protection',
           urgency: analysis.urgency,
-          product: analysis.product,
+          product: analysis.product as unknown as Record<string, unknown>,
           analysis,
         });
       }

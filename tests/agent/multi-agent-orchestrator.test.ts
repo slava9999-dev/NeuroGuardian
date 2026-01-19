@@ -63,6 +63,13 @@ const mockContext: OrchestratorContext = {
 describe('MultiAgentOrchestrator', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    global.fetch = vi.fn().mockImplementation(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve([{ embedding: new Array(1024).fill(0.1) }]), // HF Dummy response
+        text: () => Promise.resolve('ok'),
+      } as Response)
+    );
   });
 
   describe('Constructor and instance', () => {

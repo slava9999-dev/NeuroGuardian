@@ -1,5 +1,5 @@
 import { sql } from '../services/database.js';
-import { LLMResponse } from '../../infrastructure/llm/LLMProvider.js';
+import type { LLMResponse } from '../../infrastructure/llm/LLMProvider.js';
 
 interface WbProductApi {
   id: number;
