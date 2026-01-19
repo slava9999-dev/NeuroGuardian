@@ -273,7 +273,7 @@ export class SentinelOrchestrator {
 
     // BATTLE MODE: Optimized processing batch size
     const PRODUCT_BATCH_SIZE = 10;
-    const priceUpdates: Array<{ id: string; currentPrice: number }> = [];
+    const priceUpdates: Array<{ id: number; currentPrice: number }> = [];
 
     for (let i = 0; i < allProducts.length; i += PRODUCT_BATCH_SIZE) {
       const productBatch = allProducts.slice(i, i + PRODUCT_BATCH_SIZE);
