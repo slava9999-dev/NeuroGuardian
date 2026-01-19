@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useProductsStore } from '../../stores';
-import { hapticFeedback } from '../../lib/telegram';
+import { hapticFeedback, getInitData } from '../../lib/telegram';
 
 interface BulkUpdateCostsModalProps {
   isOpen: boolean;
@@ -94,7 +94,7 @@ export function BulkUpdateCostsModal({ isOpen, onClose }: BulkUpdateCostsModalPr
   const handleSave = async () => {
     setLoading(true);
     try {
-      const initData = (window as any).Telegram?.WebApp?.initData || '';
+      const initData = getInitData();
 
       const updatesPayload = parsedUpdates.map(u => ({
         productId: u.id,
@@ -149,12 +149,17 @@ export function BulkUpdateCostsModal({ isOpen, onClose }: BulkUpdateCostsModalPr
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed inset-x-4 top-[10%] bottom-[10%] md:inset-x-auto md:w-[600px] md:left-1/2 md:-translate-x-1/2 bg-stone-900 rounded-2xl border border-stone-800 shadow-2xl z-50 overflow-hidden flex flex-col"
+            className="fixed inset-x-4 top-[10%] bottom-[10%] md:inset-x-auto md:w-[600px] md:left-1/2 md:-translate-x-1/2 bg-zinc-900 rounded-2xl border border-white/5 shadow-2xl z-50 overflow-hidden flex flex-col"
           >
             {/* Header */}
-            <div className="p-4 border-b border-stone-800 flex justify-between items-center bg-stone-900">
-              <h2 className="text-xl font-bold text-white">📦 Массовая себестоимость</h2>
-              <button onClick={onClose} className="text-stone-500 hover:text-white">
+            <div className="p-4 border-b border-white/5 flex justify-between items-center bg-zinc-900">
+              <h2 className="text-xl font-black italic tracking-tighter uppercase text-white">
+                📦 Массовая себестоимость
+              </h2>
+              <button
+                onClick={onClose}
+                className="text-zinc-600 hover:text-white transition-colors"
+              >
                 ✕
               </button>
             </div>
@@ -163,17 +168,19 @@ export function BulkUpdateCostsModal({ isOpen, onClose }: BulkUpdateCostsModalPr
             <div className="flex-1 overflow-y-auto p-4">
               {step === 'input' ? (
                 <div className="space-y-4">
-                  <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-lg text-sm text-blue-200">
-                    <p className="font-bold mb-1">Как использовать:</p>
+                  <div className="bg-primary/5 border border-primary/20 p-4 rounded-xl text-[10px] font-bold uppercase tracking-widest text-primary leading-relaxed">
+                    <p className="font-black mb-1">Как использовать:</p>
                     <p>Скопируйте данные из Excel (Артикул и Цена) и вставьте сюда.</p>
-                    <p className="mt-1 opacity-70">Формат: Артикул [TAB] Цена</p>
+                    <p className="mt-1 opacity-50 font-mono tracking-tight text-[9px]">
+                      Формат: Артикул [TAB] Цена
+                    </p>
                   </div>
 
                   <textarea
                     value={textInput}
                     onChange={e => setTextInput(e.target.value)}
                     placeholder={`123456\t500\n789012\t1200\n...`}
-                    className="w-full h-64 bg-stone-950 border border-stone-800 rounded-xl p-4 text-stone-300 font-mono text-sm focus:border-blue-500 outline-none resize-none"
+                    className="w-full h-64 bg-black border border-white/5 rounded-2xl p-4 text-zinc-100 font-mono text-sm focus:border-primary/50 outline-none resize-none shadow-xl"
                   />
 
                   {error && (
@@ -192,16 +199,16 @@ export function BulkUpdateCostsModal({ isOpen, onClose }: BulkUpdateCostsModalPr
                     </button>
                   </div>
 
-                  <div className="border border-stone-800 rounded-xl overflow-hidden">
-                    <table className="w-full text-sm text-left">
-                      <thead className="bg-stone-800 text-stone-400">
+                  <div className="border border-white/5 rounded-2xl overflow-hidden shadow-2xl">
+                    <table className="w-full text-[10px] text-left">
+                      <thead className="bg-white/5 text-zinc-600 uppercase tracking-widest font-black">
                         <tr>
-                          <th className="p-3">Товар</th>
-                          <th className="p-3 text-right">Было</th>
-                          <th className="p-3 text-right">Станет</th>
+                          <th className="p-4">Товар</th>
+                          <th className="p-4 text-right">Было</th>
+                          <th className="p-4 text-right">Станет</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-stone-800">
+                      <tbody className="divide-y divide-white/2">
                         {parsedUpdates.map(u => (
                           <tr key={u.id} className="hover:bg-stone-800/50">
                             <td className="p-3 text-white truncate max-w-[200px]">
@@ -228,12 +235,12 @@ export function BulkUpdateCostsModal({ isOpen, onClose }: BulkUpdateCostsModalPr
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-stone-800 bg-stone-900 safe-area-bottom">
+            <div className="p-4 border-t border-white/5 bg-zinc-900 safe-area-bottom">
               {step === 'input' ? (
                 <button
                   onClick={handleParse}
                   disabled={!textInput.trim()}
-                  className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="w-full py-4 bg-white text-black font-black text-[10px] uppercase tracking-[0.2em] rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 shadow-xl hover:bg-primary"
                 >
                   Распознать
                 </button>
@@ -241,10 +248,10 @@ export function BulkUpdateCostsModal({ isOpen, onClose }: BulkUpdateCostsModalPr
                 <button
                   onClick={handleSave}
                   disabled={loading}
-                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                  className="w-full py-4 bg-primary text-black font-black text-[10px] uppercase tracking-[0.2em] rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 active:scale-95 shadow-xl"
                 >
                   {loading ? (
-                    'Сохранение...'
+                    '💾 СОХРАНЕНИЕ...'
                   ) : (
                     <>
                       <span>💾 Сохранить {parsedUpdates.length} цен</span>

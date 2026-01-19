@@ -22,7 +22,12 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '../stores';
 import { hapticFeedback } from '../lib/telegram';
-import { settingsApi, marketplaceAccountsApi, type MarketplaceAccount } from '../lib/api';
+import {
+  settingsApi,
+  marketplaceAccountsApi,
+  productsApi,
+  type MarketplaceAccount,
+} from '../lib/api';
 import { SecurityBadge } from '../components/ui/SecurityBadge';
 import type { DefenseMode } from '../types';
 
@@ -35,6 +40,7 @@ export function SettingsPage({
 }) {
   const { user, defenseMode, setUser, setVoiceEnabled } = useAppStore();
   const [isSaving, setIsSaving] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus] = useState<string | null>(null);
 
   // Multi-account state
@@ -198,12 +204,46 @@ export function SettingsPage({
               </div>
             </div>
           ))}
-          {accounts.length === 0 && (
-            <div className="text-center py-8 border border-white/5 border-dashed rounded-2xl">
-              <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">
+          {accounts.length === 0 && !isSaving && (
+            <div className="py-6 px-4 bg-white/2 border border-dashed border-white/10 rounded-2xl text-center">
+              <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-4">
                 Нет подключенных аккаунтов
               </p>
+              <button
+                onClick={() => {
+                  setEditingAccount({ marketplace: 'wb', is_active: true });
+                  setShowAccountModal(true);
+                }}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-white text-black rounded-xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-primary transition-all"
+              >
+                <Plus className="w-4 h-4" /> Добавить API Ключ
+              </button>
             </div>
+          )}
+          {accounts.length > 0 && (
+            <button
+              disabled={isSyncing}
+              onClick={async () => {
+                hapticFeedback('medium');
+                setIsSyncing(true);
+                try {
+                  // Sync both marketplaces for all active accounts
+                  await productsApi.syncProducts('WB');
+                  await productsApi.syncProducts('Ozon');
+                  hapticFeedback('success');
+                  alert('Синхронизация завершена успешно!');
+                } catch {
+                  hapticFeedback('error');
+                  alert('Ошибка синхронизации. Проверьте API ключи.');
+                } finally {
+                  setIsSyncing(false);
+                }
+              }}
+              className="w-full py-4 mt-2 rounded-2xl bg-primary/10 border border-primary/20 text-primary font-black text-[10px] uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-primary hover:text-black transition-all disabled:opacity-50"
+            >
+              <RefreshCcw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />{' '}
+              {isSyncing ? 'СИНХРОНИЗАЦИЯ...' : 'Синхронизировать Каталоги'}
+            </button>
           )}
         </div>
       </section>
@@ -427,16 +467,35 @@ export function SettingsPage({
                   </div>
                 </div>
 
+                {editingAccount.marketplace === 'ozon' && (
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em] px-1">
+                      Ozon Client ID
+                    </label>
+                    <input
+                      type="text"
+                      value={editingAccount.ozon_client_id || ''}
+                      onChange={e =>
+                        setEditingAccount({ ...editingAccount, ozon_client_id: e.target.value })
+                      }
+                      className="w-full bg-white/2 border border-white/5 rounded-xl p-4 text-sm font-bold text-white outline-none focus:border-primary/50 transition-colors"
+                      placeholder="Напр: 12345678"
+                    />
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em] px-1">
-                    Секретный Токен (API)
+                    {editingAccount.marketplace === 'ozon'
+                      ? 'Ozon API Key'
+                      : 'Секретный Токен (WB)'}
                   </label>
                   <div className="relative">
                     <input
                       type="password"
                       value={
                         editingAccount.marketplace === 'ozon'
-                          ? editingAccount.ozon_api_key
+                          ? editingAccount.ozon_api_key || ''
                           : editingAccount.wb_token || ''
                       }
                       onChange={e =>

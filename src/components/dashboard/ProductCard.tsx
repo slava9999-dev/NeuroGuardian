@@ -131,10 +131,12 @@ export function ProductCard({
 
         {/* Core Metrics: Price & Profit */}
         <div className="flex items-baseline gap-2 mb-3">
-          <span className="text-xl font-bold text-slate-900 font-display">
+          <span className="text-xl font-bold text-white font-display">
             {product.currentPrice?.toLocaleString()}₽
           </span>
-          <div className={`flex items-center text-xs font-medium ${profitColor}`}>
+          <div
+            className={`flex items-center text-[10px] font-black uppercase tracking-widest ${profitColor}`}
+          >
             {isProfitable ? (
               <TrendingUp className="w-3 h-3 mr-1" />
             ) : (
@@ -144,10 +146,10 @@ export function ProductCard({
           </div>
         </div>
 
-        {/* Controls: Inputs (iOS Style) */}
+        {/* Controls: Inputs (Cyber Style) */}
         <div className="grid grid-cols-2 gap-2 mb-3">
-          <div className="bg-slate-50 rounded-lg p-2 border border-slate-100 focus-within:border-indigo-300 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
-            <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+          <div className="bg-white/2 rounded-xl p-2.5 border border-white/5 focus-within:border-primary/50 focus-within:ring-4 focus-within:ring-primary/5 transition-all">
+            <label className="block text-[8px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-1 px-1">
               Себестоимость
             </label>
             <input
@@ -157,13 +159,13 @@ export function ProductCard({
                 setLocalCost(Number(e.target.value));
                 setIsEditing(true);
               }}
-              className="w-full bg-transparent text-sm font-semibold text-slate-700 outline-none p-0 placeholder-slate-300"
+              className="w-full bg-transparent text-sm font-black text-white outline-none p-1 placeholder-zinc-800"
               placeholder="0"
             />
           </div>
 
-          <div className="bg-slate-50 rounded-lg p-2 border border-slate-100 focus-within:border-indigo-300 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
-            <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+          <div className="bg-white/2 rounded-xl p-2.5 border border-white/5 focus-within:border-primary/50 focus-within:ring-4 focus-within:ring-primary/5 transition-all">
+            <label className="block text-[8px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-1 px-1">
               Стоп-лосс
             </label>
             <input
@@ -173,7 +175,7 @@ export function ProductCard({
                 setLocalMin(Number(e.target.value));
                 setIsEditing(true);
               }}
-              className="w-full bg-transparent text-sm font-semibold text-slate-700 outline-none p-0 placeholder-slate-300"
+              className="w-full bg-transparent text-sm font-black text-white outline-none p-1 placeholder-zinc-800"
               placeholder="0"
             />
           </div>

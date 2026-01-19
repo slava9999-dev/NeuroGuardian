@@ -14,8 +14,10 @@ import {
   Filter,
   ArrowLeft,
   Settings,
+  RefreshCcw,
 } from 'lucide-react';
 import { useProductsStore } from '../stores';
+import { productsApi } from '../lib/api';
 import { GlobalSwitch } from '../components/controls/GlobalSwitch';
 import { DashboardGrid } from '../components/dashboard/DashboardGrid';
 import { BulkStopLossModal } from '../components/dashboard/BulkStopLossModal';
@@ -38,20 +40,33 @@ export function ProductsPage({
   onNavigate?: (page: string) => void;
 }) {
   // const user = useAppStore(state => state.user); // Unused for now
-  const products = useProductsStore(state => state.products);
+  const {
+    products,
+    searchQuery,
+    setSearchQuery,
+    setProducts,
+    marketplaceFilter,
+    setMarketplaceFilter,
+    statusFilter,
+    setStatusFilter,
+  } = useProductsStore();
 
-  const searchQuery = useProductsStore(state => state.searchQuery);
-  const setSearchQuery = useProductsStore(state => state.setSearchQuery);
-  const marketplaceFilter = useProductsStore(state => state.marketplaceFilter);
-  const setMarketplaceFilter = useProductsStore(state => state.setMarketplaceFilter);
-  const statusFilter = useProductsStore(state => state.statusFilter);
-  const setStatusFilter = useProductsStore(state => state.setStatusFilter);
-
-  // Module States
+  const [isSyncing, setIsSyncing] = useState(false);
   const [showBulkStopLoss, setShowBulkStopLoss] = useState(false);
   const [showBulkCosts, setShowBulkCosts] = useState(false);
   const [showLogHistory, setShowLogHistory] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+
+  const refreshProducts = async () => {
+    try {
+      const res = await productsApi.getProducts();
+      if (res.success) {
+        setProducts(res.products as unknown as Product[]);
+      }
+    } catch (e) {
+      console.error('Failed to refresh products:', e);
+    }
+  };
 
   const [selectedForSMM, setSelectedForSMM] = useState<Product | null>(null);
   const [selectedForCalculator, setSelectedForCalculator] = useState<Product | null>(null);
@@ -70,9 +85,12 @@ export function ProductsPage({
   }, [products]);
 
   return (
-    <div className="min-h-full pb-24 bg-slate-50 relative">
+    <div className="min-h-full pb-24 bg-zinc-950 relative overflow-x-hidden">
+      {/* Dynamic Background */}
+      <div className="bg-cosmic" />
+
       {/* Header */}
-      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-slate-200">
+      <header className="sticky top-0 z-30 bg-zinc-950/80 backdrop-blur-xl border-b border-white/5">
         <div className="px-4 py-3">
           <div className="flex items-center justify-between gap-3">
             {/* Back + Title */}
@@ -88,8 +106,8 @@ export function ProductsPage({
                 <ArrowLeft className="w-5 h-5" />
               </button>
               <div className="min-w-0">
-                <h1 className="text-lg font-bold text-slate-900 tracking-tight">Товары</h1>
-                <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest">
+                <h1 className="text-lg font-bold text-white tracking-tight">Товары</h1>
+                <p className="text-[10px] font-medium text-zinc-500 uppercase tracking-widest">
                   {stats.total} SKU • {stats.protected} Active
                 </p>
               </div>
@@ -137,13 +155,13 @@ export function ProductsPage({
         {/* Search + Filter Bar */}
         <div className="flex gap-2">
           <div className="flex-1 relative group">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-primary transition-colors" />
             <input
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Поиск..."
-              className="w-full bg-white border border-slate-200 rounded-2xl pl-10 pr-4 py-3.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all shadow-sm"
+              className="w-full bg-white/2 border border-white/5 rounded-2xl pl-10 pr-4 py-3.5 text-sm text-white placeholder-zinc-600 focus:border-primary/50 focus:ring-4 focus:ring-primary/5 outline-none transition-all shadow-xl"
             />
           </div>
           <button
@@ -235,6 +253,31 @@ export function ProductsPage({
           </button>
 
           <button
+            disabled={isSyncing}
+            onClick={async () => {
+              hapticFeedback('medium');
+              setIsSyncing(true);
+              try {
+                await productsApi.syncProducts('WB');
+                await productsApi.syncProducts('Ozon');
+                await refreshProducts(); // Use locally defined refresh
+                hapticFeedback('success');
+                alert('Синхронизация завершена успешно!');
+              } catch (e) {
+                console.error(e);
+                hapticFeedback('error');
+                alert('Ошибка синхронизации. Проверьте настройки API.');
+              } finally {
+                setIsSyncing(false);
+              }
+            }}
+            className="p-3 min-w-[48px] rounded-xl bg-white/2 border border-white/10 text-zinc-500 hover:text-primary hover:border-primary/30 transition-all shadow-sm flex items-center justify-center disabled:opacity-50"
+            title="Синхронизировать с маркетплейсом"
+          >
+            <RefreshCcw className={`w-5 h-5 ${isSyncing ? 'animate-spin' : ''}`} />
+          </button>
+
+          <button
             onClick={() => {
               hapticFeedback('light');
               setShowBulkCosts(true);
@@ -268,20 +311,22 @@ export function ProductsPage({
 
         {/* Empty Catalog State */}
         {products.length === 0 && (
-          <div className="text-center py-20">
-            <div className="w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-6">
-              <Package className="w-10 h-10 text-slate-300" />
+          <div className="text-center py-20 px-4">
+            <div className="w-24 h-24 rounded-3xl bg-white/2 border border-white/5 flex items-center justify-center mx-auto mb-8 shadow-2xl">
+              <Package className="w-12 h-12 text-zinc-700" />
             </div>
-            <h3 className="text-lg font-bold text-slate-900 mb-2">Каталог пуст</h3>
-            <p className="text-slate-500 text-sm max-w-[200px] mx-auto font-medium mb-8">
-              Для начала работы синхронизируйте товары через настройки.
+            <h3 className="text-xl font-black italic tracking-tighter uppercase text-white mb-2">
+              Каталог пуст
+            </h3>
+            <p className="text-zinc-500 text-sm max-w-[240px] mx-auto font-medium mb-10 leading-relaxed uppercase tracking-tight">
+              Для начала работы подключите аккаунты маркетплейсов в настройках.
             </p>
             <button
               onClick={() => {
                 hapticFeedback('medium');
                 onNavigate?.('settings');
               }}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider shadow-lg shadow-indigo-200 transition-all active:scale-95"
+              className="inline-flex items-center gap-3 px-10 py-5 bg-white text-black rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-[0_10px_30px_rgba(255,255,255,0.1)] active:scale-95 transition-all"
             >
               <Settings className="w-4 h-4" />
               Подключить API

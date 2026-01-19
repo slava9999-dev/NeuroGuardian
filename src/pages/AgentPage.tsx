@@ -128,7 +128,7 @@ export function AgentPage() {
               <h1 className="text-4xl font-black tracking-tighter italic uppercase text-white">
                 ПРИВЕТ, {firstName}
               </h1>
-              <p className="text-zinc-500 text-sm font-medium tracking-tight max-w-[260px] mx-auto">
+              <p className="text-zinc-400 text-sm font-medium tracking-tight max-w-[260px] mx-auto">
                 Бортовая ИИ-система NeuroGUARDIAN готова к защите Вашей прибыли.
               </p>
             </div>
@@ -273,10 +273,10 @@ function MessageUI({ message }: { message: ChatMessage }) {
       animate={{ opacity: 1, y: 0 }}
     >
       <div
-        className={`px-5 py-3.5 rounded-[22px] text-[15px] leading-relaxed font-medium shadow-sm border ${
+        className={`px-5 py-3.5 rounded-[22px] text-[15px] leading-relaxed font-medium shadow-xl border ${
           isUser
-            ? 'bg-zinc-900 border-white/10 text-white rounded-br-none'
-            : 'bg-primary/5 border-primary/10 text-zinc-100 rounded-bl-none'
+            ? 'bg-primary text-black border-transparent rounded-br-none shadow-[0_8px_20px_var(--color-primary-dim)]'
+            : 'bg-zinc-800 border-zinc-700/50 text-white rounded-bl-none'
         }`}
       >
         <div

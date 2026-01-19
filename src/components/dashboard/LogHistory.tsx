@@ -121,23 +121,27 @@ export function LogHistory({ isOpen, onClose }: LogHistoryProps) {
             exit={{ opacity: 0, y: 100 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             onClick={e => e.stopPropagation()}
-            className="w-full max-w-lg max-h-[85vh] bg-stone-900 rounded-t-3xl sm:rounded-3xl border border-stone-700/50 overflow-hidden flex flex-col"
+            className="w-full max-w-lg max-h-[85vh] bg-zinc-900 rounded-t-3xl sm:rounded-3xl border border-white/5 overflow-hidden shadow-2xl flex flex-col"
           >
             {/* Header */}
-            <div className="p-6 pb-4 border-b border-stone-800 flex-shrink-0">
+            <div className="p-6 pb-4 border-b border-white/5 shrink-0">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center shadow-[0_0_20px_var(--color-primary-dim)]">
                     <span className="text-2xl">📊</span>
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-white">История защиты</h2>
-                    <p className="text-sm text-stone-400">Защита цен</p>
+                    <h2 className="text-xl font-black italic tracking-tighter uppercase text-white">
+                      История защиты
+                    </h2>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                      Защита цен
+                    </p>
                   </div>
                 </div>
                 <button
                   onClick={onClose}
-                  className="w-8 h-8 rounded-full bg-stone-800 flex items-center justify-center hover:bg-stone-700 transition-colors"
+                  className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors"
                 >
                   <svg
                     width="16"
@@ -145,8 +149,8 @@ export function LogHistory({ isOpen, onClose }: LogHistoryProps) {
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
-                    strokeWidth="2"
-                    className="text-stone-400"
+                    strokeWidth="2.5"
+                    className="text-zinc-600"
                   >
                     <line x1="18" y1="6" x2="6" y2="18" />
                     <line x1="6" y1="6" x2="18" y2="18" />
@@ -163,10 +167,10 @@ export function LogHistory({ isOpen, onClose }: LogHistoryProps) {
                       setSelectedPeriod(option.value);
                       hapticFeedback('light');
                     }}
-                    className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all ${
+                    className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
                       selectedPeriod === option.value
-                        ? 'bg-violet-500 text-white'
-                        : 'bg-stone-800 text-stone-400 hover:bg-stone-700'
+                        ? 'bg-primary text-black'
+                        : 'bg-white/5 text-zinc-500 hover:bg-white/10'
                     }`}
                   >
                     {option.label}
@@ -177,21 +181,31 @@ export function LogHistory({ isOpen, onClose }: LogHistoryProps) {
 
             {/* Summary */}
             {summary && !isLoading && (
-              <div className="px-6 py-4 border-b border-stone-800 flex-shrink-0">
+              <div className="px-6 py-4 border-b border-white/5 shrink-0">
                 <div className="grid grid-cols-3 gap-3">
-                  <div className="text-center p-3 rounded-xl bg-stone-800/50">
-                    <div className="text-xl font-bold text-violet-400">{summary.totalTriggers}</div>
-                    <div className="text-xs text-stone-500">Срабатываний</div>
+                  <div className="text-center p-3 rounded-xl bg-white/2 border border-white/5">
+                    <div className="text-xl font-black italic tracking-tighter text-primary">
+                      {summary.totalTriggers}
+                    </div>
+                    <div className="text-[9px] font-bold uppercase tracking-widest text-zinc-600">
+                      Срабатываний
+                    </div>
                   </div>
-                  <div className="text-center p-3 rounded-xl bg-stone-800/50">
-                    <div className="text-xl font-bold text-emerald-400">
+                  <div className="text-center p-3 rounded-xl bg-white/2 border border-white/5">
+                    <div className="text-xl font-black italic tracking-tighter text-emerald-400">
                       {summary.totalSaved > 0 ? `${(summary.totalSaved / 1000).toFixed(1)}k` : '0'}
                     </div>
-                    <div className="text-xs text-stone-500">Спасено ₽</div>
+                    <div className="text-[9px] font-bold uppercase tracking-widest text-zinc-600">
+                      Спасено ₽
+                    </div>
                   </div>
-                  <div className="text-center p-3 rounded-xl bg-stone-800/50">
-                    <div className="text-xl font-bold text-amber-400">{summary.uniqueProducts}</div>
-                    <div className="text-xs text-stone-500">Товаров</div>
+                  <div className="text-center p-3 rounded-xl bg-white/2 border border-white/5">
+                    <div className="text-xl font-black italic tracking-tighter text-amber-400">
+                      {summary.uniqueProducts}
+                    </div>
+                    <div className="text-[9px] font-bold uppercase tracking-widest text-zinc-600">
+                      Товаров
+                    </div>
                   </div>
                 </div>
               </div>
@@ -202,11 +216,13 @@ export function LogHistory({ isOpen, onClose }: LogHistoryProps) {
               {isLoading ? (
                 <div className="flex flex-col items-center justify-center py-12">
                   <motion.div
-                    className="w-10 h-10 border-3 border-violet-500/30 border-t-violet-500 rounded-full"
+                    className="w-10 h-10 border-3 border-primary/20 border-t-primary rounded-full"
                     animate={{ rotate: 360 }}
                     transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                   />
-                  <p className="text-stone-400 mt-4">Загрузка...</p>
+                  <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest mt-4">
+                    Загрузка...
+                  </p>
                 </div>
               ) : error ? (
                 <div className="text-center py-12">
@@ -237,12 +253,12 @@ export function LogHistory({ isOpen, onClose }: LogHistoryProps) {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.05 }}
-                        className="p-4 rounded-xl bg-stone-800/50 border border-stone-700/30"
+                        className="p-4 rounded-xl bg-white/2 border border-white/5"
                       >
                         <div className="flex items-start gap-3">
                           {/* Action icon */}
                           <div
-                            className={`w-10 h-10 rounded-xl ${actionStyle.bg} flex items-center justify-center flex-shrink-0`}
+                            className={`w-10 h-10 rounded-xl ${actionStyle.bg} flex items-center justify-center shrink-0`}
                           >
                             <span className="text-lg">{actionStyle.icon}</span>
                           </div>
@@ -291,17 +307,17 @@ export function LogHistory({ isOpen, onClose }: LogHistoryProps) {
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-stone-800 flex-shrink-0">
+            <div className="p-4 border-t border-white/5 shrink-0">
               <button
                 onClick={onClose}
-                className="w-full py-3 rounded-xl bg-stone-800 text-stone-300 font-medium hover:bg-stone-700 transition-colors"
+                className="w-full py-4 rounded-xl bg-white/5 text-zinc-500 font-black text-[10px] uppercase tracking-[0.2em] hover:bg-white/10 transition-all"
               >
                 Закрыть
               </button>
             </div>
 
             {/* Safe area for mobile */}
-            <div className="h-4 sm:hidden flex-shrink-0" />
+            <div className="h-4 sm:hidden shrink-0" />
           </motion.div>
         </motion.div>
       )}

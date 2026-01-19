@@ -212,7 +212,8 @@ export class SentinelOrchestrator {
     const productIds = monitoredProducts.map(p => p.id);
     if (productIds.length === 0) return;
 
-    const CHUNK_SIZE = 5;
+    // BATTLE MODE: Increased chunk size for better performance
+    const CHUNK_SIZE = 25;
     const allProducts: DBProduct[] = [];
 
     for (let i = 0; i < productIds.length; i += CHUNK_SIZE) {
@@ -270,7 +271,10 @@ export class SentinelOrchestrator {
       rulesMap.set(rule.product_id, rule);
     }
 
-    const PRODUCT_BATCH_SIZE = 3;
+    // BATTLE MODE: Optimized processing batch size
+    const PRODUCT_BATCH_SIZE = 10;
+    const priceUpdates: Array<{ id: string; currentPrice: number }> = [];
+
     for (let i = 0; i < allProducts.length; i += PRODUCT_BATCH_SIZE) {
       const productBatch = allProducts.slice(i, i + PRODUCT_BATCH_SIZE);
 
@@ -286,7 +290,10 @@ export class SentinelOrchestrator {
             const priceMap = marketplace === 'WB' ? prices.wb : prices.ozon;
             const livePrice = priceMap.get(key);
 
-            if (!livePrice) return;
+            // SANITY CHECK: Ignore 0/invalid prices from API glitches
+            if (livePrice === undefined || (livePrice === 0 && (product.current_price || 0) > 0)) {
+              return;
+            }
 
             // --- Digital Vision Update ---
             if (!options.skipDigitalVision) {
@@ -436,21 +443,33 @@ export class SentinelOrchestrator {
               }
             }
 
-            // 4. Update Price in DB
+            // 4. Collect Price for Bulk Update
             const priceDiff = Math.abs(livePrice - (product.current_price || 0));
             const isSignificantChange = priceDiff / (product.current_price || 1) > 0.01;
 
             if (isSignificantChange || product.current_price === 0) {
-              await db
-                .update(products)
-                .set({ currentPrice: livePrice, updatedAt: new Date() })
-                .where(eq(products.id, product.id));
+              priceUpdates.push({ id: product.id, currentPrice: livePrice });
             }
           } catch (err) {
             logger.error(`Failed to process product ${product.product_id}`, err);
           }
         })
       );
+    }
+
+    // BATTLE MODE: Execute bulk price updates
+    if (priceUpdates.length > 0) {
+      try {
+        logger.debug(`[Sentinel] Executing bulk updates for ${priceUpdates.length} products`);
+        for (const update of priceUpdates) {
+          await db
+            .update(products)
+            .set({ currentPrice: update.currentPrice, updatedAt: new Date() })
+            .where(eq(products.id, update.id));
+        }
+      } catch (err) {
+        logger.error('Bulk price update failed', err);
+      }
     }
   }
 

@@ -67,19 +67,19 @@ export function SecurityBadge({ compact = false }: { compact?: boolean }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div className="flex items-center gap-2 text-sm">
                 <span className="text-emerald-400">✓</span>
-                <span className="text-stone-300">SSL/TLS шифрование</span>
+                <span className="text-zinc-400">SSL/TLS шифрование</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <span className="text-emerald-400">✓</span>
-                <span className="text-stone-300">Vercel Edge Network</span>
+                <span className="text-zinc-400">Vercel Edge Network</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <span className="text-emerald-400">✓</span>
-                <span className="text-stone-300">PostgreSQL в изоляции</span>
+                <span className="text-zinc-400">PostgreSQL в изоляции</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <span className="text-emerald-400">✓</span>
-                <span className="text-stone-300">Telegram авторизация</span>
+                <span className="text-zinc-400">Telegram авторизация</span>
               </div>
             </div>
 
@@ -107,7 +107,7 @@ export function SecurityBadge({ compact = false }: { compact?: boolean }) {
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: 'auto', opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
-                className="mt-3 pt-3 border-t border-stone-700 space-y-4 text-sm text-stone-400"
+                className="mt-3 pt-3 border-t border-white/5 space-y-4 text-sm text-zinc-500"
               >
                 {/* API Keys */}
                 <div>
@@ -161,7 +161,7 @@ export function SecurityBadge({ compact = false }: { compact?: boolean }) {
 
                 {/* Delete Data */}
                 <div className="text-center pt-2">
-                  <p className="text-stone-500 text-xs">
+                  <p className="text-zinc-600 text-[10px] font-bold uppercase tracking-widest">
                     Хотите удалить все свои данные? Напишите нам:{' '}
                     <a
                       href="https://t.me/Vyacheslav_Neuro"

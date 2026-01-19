@@ -142,10 +142,11 @@ export function SentinelStatusBadge({ className = '', compact = false }: Sentine
 
       <style>{`
         .sentinel-status-badge {
-          background: var(--card-bg, #1a1a2e);
-          border-radius: 12px;
-          padding: 12px 16px;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          background: rgba(255, 255, 255, 0.02);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+          border-radius: 20px;
+          padding: 16px;
+          font-family: 'Inter', system-ui, sans-serif;
         }
 
         .sentinel-status-badge.compact {

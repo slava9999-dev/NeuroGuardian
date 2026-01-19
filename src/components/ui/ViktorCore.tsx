@@ -17,10 +17,10 @@ export function ViktorCore({ size = 'md', status: manualStatus }: ViktorCoreProp
   };
 
   const statusColors = {
-    idle: 'border-slate-200 shadow-slate-100',
-    processing: 'border-indigo-500 shadow-indigo-200',
-    alert: 'border-rose-500 shadow-rose-200',
-    success: 'border-emerald-500 shadow-emerald-200',
+    idle: 'border-white/5 shadow-zinc-950/50',
+    processing: 'border-primary shadow-[0_0_20px_var(--color-primary-dim)]',
+    alert: 'border-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.2)]',
+    success: 'border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.2)]',
   };
 
   return (
@@ -47,7 +47,7 @@ export function ViktorCore({ size = 'md', status: manualStatus }: ViktorCoreProp
 
       {/* Main Avatar Container */}
       <motion.div
-        className={`${containerSizes[size]} relative rounded-2xl overflow-hidden border-2 bg-white shadow-xl z-10 transition-colors duration-500 ${statusColors[status]}`}
+        className={`${containerSizes[size]} relative rounded-2xl overflow-hidden border-2 bg-zinc-950 shadow-2xl z-10 transition-colors duration-500 ${statusColors[status]}`}
         layout
       >
         <img

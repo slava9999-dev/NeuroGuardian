@@ -114,23 +114,27 @@ export function BulkStopLossModal({ isOpen, onClose }: BulkStopLossModalProps) {
             exit={{ opacity: 0, y: 100 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             onClick={e => e.stopPropagation()}
-            className="w-full max-w-md bg-stone-900 rounded-t-3xl sm:rounded-3xl border border-stone-700/50 overflow-hidden"
+            className="w-full max-w-md bg-zinc-900 rounded-t-3xl sm:rounded-3xl border border-white/5 overflow-hidden shadow-2xl"
           >
             {/* Header */}
-            <div className="p-6 pb-4 border-b border-stone-800">
+            <div className="p-6 pb-4 border-b border-white/5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center shadow-[0_0_20px_var(--color-primary-dim)]">
                     <span className="text-2xl">🛡️</span>
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-white">Массовая защита</h2>
-                    <p className="text-sm text-stone-400">Включить Сторожа для всех товаров</p>
+                    <h2 className="text-xl font-black italic tracking-tighter uppercase text-white">
+                      Массовая защита
+                    </h2>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                      Включить Сторожа для всех товаров
+                    </p>
                   </div>
                 </div>
                 <button
                   onClick={handleClose}
-                  className="w-8 h-8 rounded-full bg-stone-800 flex items-center justify-center hover:bg-stone-700 transition-colors"
+                  className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors"
                 >
                   <svg
                     width="16"
@@ -165,13 +169,17 @@ export function BulkStopLossModal({ isOpen, onClose }: BulkStopLossModalProps) {
                   >
                     <span className="text-4xl">✅</span>
                   </motion.div>
-                  <h3 className="text-xl font-bold text-white mb-2">Защита установлена!</h3>
-                  <p className="text-stone-400 mb-2">
+                  <h3 className="text-xl font-black italic uppercase text-white mb-2 tracking-tighter">
+                    Защита установлена!
+                  </h3>
+                  <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-2">
                     Обновлено товаров:{' '}
-                    <span className="text-emerald-400 font-bold">{result.success}</span>
+                    <span className="text-emerald-400 font-black">{result.success}</span>
                   </p>
                   {result.failed > 0 && (
-                    <p className="text-red-400 text-sm">Не удалось: {result.failed}</p>
+                    <p className="text-rose-500 text-[10px] font-bold uppercase tracking-widest">
+                      Не удалось: {result.failed}
+                    </p>
                   )}
                   <button
                     onClick={handleClose}
@@ -184,18 +192,18 @@ export function BulkStopLossModal({ isOpen, onClose }: BulkStopLossModalProps) {
                 // Setup state
                 <>
                   {/* Info banner */}
-                  <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                  <div className="mb-6 p-4 rounded-xl bg-primary/5 border border-primary/20">
                     <div className="flex items-start gap-3">
                       <span className="text-xl">💡</span>
                       <div>
-                        <p className="text-sm text-amber-200">
+                        <p className="text-[10px] font-bold uppercase tracking-tight text-primary">
                           {productsToUpdate === 0 ? (
                             'Все товары уже под защитой Сторожа!'
                           ) : (
                             <>
-                              <span className="font-bold text-white">{productsToUpdate}</span>{' '}
+                              <span className="font-black text-white">{productsToUpdate}</span>{' '}
                               товаров без защиты. Установим минимальную цену на{' '}
-                              <span className="font-bold text-white">{selectedPercentage}%</span>{' '}
+                              <span className="font-black text-white">{selectedPercentage}%</span>{' '}
                               ниже текущей.
                             </>
                           )}
@@ -208,7 +216,7 @@ export function BulkStopLossModal({ isOpen, onClose }: BulkStopLossModalProps) {
                     <>
                       {/* Percentage selector */}
                       <div className="mb-6">
-                        <label className="block text-sm font-medium text-stone-300 mb-3">
+                        <label className="block text-[10px] font-black text-zinc-600 uppercase tracking-widest mb-3 px-1">
                           Снижение цены от текущей
                         </label>
                         <div className="grid grid-cols-6 gap-2">
@@ -219,10 +227,10 @@ export function BulkStopLossModal({ isOpen, onClose }: BulkStopLossModalProps) {
                                 setSelectedPercentage(pct);
                                 hapticFeedback('light');
                               }}
-                              className={`py-2 rounded-xl text-sm font-bold transition-all ${
+                              className={`py-2 rounded-xl text-sm font-black transition-all ${
                                 selectedPercentage === pct
-                                  ? 'bg-amber-500 text-black'
-                                  : 'bg-stone-800 text-stone-400 hover:bg-stone-700'
+                                  ? 'bg-primary text-black'
+                                  : 'bg-white/5 text-zinc-500 hover:bg-white/10'
                               }`}
                             >
                               -{pct}%
@@ -241,15 +249,17 @@ export function BulkStopLossModal({ isOpen, onClose }: BulkStopLossModalProps) {
                             {previewProducts.map((p, i) => (
                               <div
                                 key={i}
-                                className="p-3 rounded-xl bg-stone-800/50 border border-stone-700/50"
+                                className="p-3 rounded-xl bg-white/2 border border-white/5"
                               >
-                                <p className="text-sm text-white font-medium mb-1">{p.title}</p>
-                                <div className="flex items-center gap-2 text-xs">
-                                  <span className="text-stone-400">
+                                <p className="text-sm text-white font-black italic uppercase tracking-tight mb-1">
+                                  {p.title}
+                                </p>
+                                <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest">
+                                  <span className="text-zinc-600">
                                     {p.currentPrice.toLocaleString('ru-RU')} ₽
                                   </span>
-                                  <span className="text-stone-500">→</span>
-                                  <span className="text-amber-400 font-bold">
+                                  <span className="text-zinc-700">→</span>
+                                  <span className="text-primary">
                                     min {p.newMinPrice.toLocaleString('ru-RU')} ₽
                                   </span>
                                 </div>
@@ -270,17 +280,17 @@ export function BulkStopLossModal({ isOpen, onClose }: BulkStopLossModalProps) {
                   <div className="flex gap-3">
                     <button
                       onClick={handleClose}
-                      className="flex-1 py-3 rounded-xl bg-stone-800 text-stone-300 font-medium hover:bg-stone-700 transition-colors"
+                      className="flex-1 py-4 rounded-xl bg-white/5 text-zinc-500 font-black text-[10px] uppercase tracking-[0.2em] hover:bg-white/10 transition-all"
                     >
                       Отмена
                     </button>
                     <button
                       onClick={handleApply}
                       disabled={isProcessing || productsToUpdate === 0}
-                      className={`flex-1 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${
+                      className={`flex-1 py-4 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 active:scale-95 ${
                         productsToUpdate === 0
-                          ? 'bg-stone-700 text-stone-500 cursor-not-allowed'
-                          : 'bg-gradient-to-r from-amber-500 to-orange-500 text-black hover:from-amber-400 hover:to-orange-400'
+                          ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
+                          : 'bg-white text-black hover:bg-primary'
                       }`}
                     >
                       {isProcessing ? (
