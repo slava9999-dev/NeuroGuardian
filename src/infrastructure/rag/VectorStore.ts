@@ -387,7 +387,7 @@ export class VectorStore {
     // We use a single query for all documents to minimize connection overhead
     try {
       const valuePlaceholders: string[] = [];
-      const queryValues: any[] = [];
+      const queryValues: unknown[] = [];
 
       docs.forEach((doc, i) => {
         const offset = i * 7;

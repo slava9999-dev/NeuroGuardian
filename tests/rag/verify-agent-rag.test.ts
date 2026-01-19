@@ -1,15 +1,18 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { ProductsSpecialist } from '../../src/agent/specialists/ProductsSpecialist';
-import { specialistKnowledgeBase } from '../../src/infrastructure/rag/SpecialistKnowledgeBase';
 import { vectorStore } from '../../src/infrastructure/rag/VectorStore';
 
-// Mock vectorStore to avoid API calls and DB dependency
+// Mock all external dependencies to avoid API calls and DB dependency
+vi.mock('../../src/api-lib/services/database.js', () => ({
+  sql: vi.fn().mockResolvedValue({ rows: [] }),
+}));
+
 vi.mock('../../src/infrastructure/rag/VectorStore', () => ({
   vectorStore: {
     hybridSearch: vi.fn(),
     getStats: vi.fn().mockResolvedValue({ totalDocuments: 10 }),
     deleteDocuments: vi.fn(),
-    dimensions: 768,
+    dimensions: 1024,
   },
 }));
 
@@ -38,7 +41,7 @@ describe('Agent RAG Integration Verification', () => {
       },
     ];
 
-    (vectorStore.hybridSearch as any).mockResolvedValue(mockSearchResults);
+    (vectorStore.hybridSearch as Mock).mockResolvedValue(mockSearchResults);
 
     // 2. Execute Specialist Context Build
     const context = {
@@ -74,7 +77,7 @@ describe('Agent RAG Integration Verification', () => {
   });
 
   it('should handle empty RAG results gracefully', async () => {
-    (vectorStore.hybridSearch as any).mockResolvedValue([]);
+    (vectorStore.hybridSearch as Mock).mockResolvedValue([]);
 
     const context = {
       userId: 123,
@@ -95,7 +98,7 @@ describe('Agent RAG Integration Verification', () => {
   });
 
   it('should handle VectorStore errors gracefully', async () => {
-    (vectorStore.hybridSearch as any).mockRejectedValue(new Error('DB Connection Failed'));
+    (vectorStore.hybridSearch as Mock).mockRejectedValue(new Error('DB Connection Failed'));
 
     const context = {
       userId: 123,

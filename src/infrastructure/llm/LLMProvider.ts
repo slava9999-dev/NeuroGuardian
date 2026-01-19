@@ -1,7 +1,16 @@
+export interface ToolCall {
+  id: string;
+  type: 'function';
+  function: {
+    name: string;
+    arguments: string;
+  };
+}
+
 export interface LLMMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content: string | Array<MessagePart>;
-  tool_calls?: any[];
+  tool_calls?: ToolCall[];
   tool_call_id?: string;
 }
 
@@ -12,10 +21,10 @@ export type MessagePart =
 export interface LLMResponse {
   content: string;
   tokensUsed: number;
-  toolCalls?: any[];
+  toolCalls?: ToolCall[];
 }
 
 export interface LLMProvider {
-  complete(messages: LLMMessage[], options?: any): Promise<LLMResponse>;
+  complete(messages: LLMMessage[], options?: Record<string, unknown>): Promise<LLMResponse>;
   name: string;
 }

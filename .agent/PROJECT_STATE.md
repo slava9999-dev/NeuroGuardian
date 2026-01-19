@@ -33,6 +33,8 @@
   - `rag:ingest` -> Passed (24/24 files).
   - LLM completion/tools -> Passed (Qwen 2.5).
   - Image generation -> Passed (FLUX.1).
+  - **Unit Tests**: Fixed `verify-agent-rag.test.ts` mocks to avoid real DB calls.
+  - **Type Safety**: Reduced usage of `any` in LLM providers.
 
 **Key Insights:**
 

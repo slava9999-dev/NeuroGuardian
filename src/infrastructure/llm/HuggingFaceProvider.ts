@@ -126,7 +126,7 @@ export class HuggingFaceProvider implements LLMProvider {
    */
   async completeWithTools(
     messages: LLMMessage[],
-    tools: any[],
+    tools: Record<string, unknown>[],
     options?: Partial<HuggingFaceConfig>
   ): Promise<LLMResponse> {
     const config = { ...this.config, ...options };
