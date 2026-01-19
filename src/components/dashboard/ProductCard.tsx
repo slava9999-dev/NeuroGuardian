@@ -63,19 +63,19 @@ export function ProductCard({
 
   // V6 Human Colors
   const statusColor = isProtected
-    ? 'text-emerald-600 bg-emerald-50'
-    : 'text-slate-500 bg-slate-100';
-  const profitColor = isProfitable ? 'text-emerald-600' : 'text-rose-500';
+    ? 'text-emerald-200 bg-emerald-500/10 border border-emerald-500/20'
+    : 'text-zinc-400 bg-white/5 border border-white/10';
+  const profitColor = isProfitable ? 'text-emerald-300' : 'text-rose-400';
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       whileTap={{ scale: 0.995 }}
-      className="premium-card mb-4 flex flex-row overflow-hidden"
+      className="premium-card mb-4 flex flex-row overflow-hidden bg-zinc-900/80 border border-white/5"
     >
       {/* 1. Left: Image Thumbnail (Square for mobile) */}
-      <div className="w-24 sm:w-32 relative bg-slate-100 shrink-0 border-r border-slate-100">
+      <div className="w-24 sm:w-32 relative bg-zinc-950/80 shrink-0 border-r border-white/5">
         {!imageError ? (
           <img
             src={product.imageUrl}
@@ -84,7 +84,7 @@ export function ProductCard({
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-slate-300">
+          <div className="w-full h-full flex items-center justify-center text-zinc-500">
             <ImageIcon className="w-8 h-8" />
           </div>
         )}
@@ -116,7 +116,7 @@ export function ProductCard({
                 #{product.nmId || product.id}
               </span>
             </div>
-            <h3 className="text-sm font-semibold text-slate-900 leading-tight truncate pr-2">
+            <h3 className="text-sm font-semibold text-white leading-tight truncate pr-2">
               {product.title}
             </h3>
           </div>
@@ -206,14 +206,14 @@ export function ProductCard({
               >
                 <button
                   onClick={() => onOpenSMM?.(product)}
-                  className="flex-1 bg-white border border-slate-200 text-slate-600 text-xs font-medium py-2 rounded-lg hover:bg-slate-50 active:bg-slate-100 transition-colors flex items-center justify-center gap-1.5"
+                  className="flex-1 bg-white/5 border border-white/10 text-white/80 text-xs font-medium py-2 rounded-lg hover:bg-white/10 active:bg-white/20 transition-colors flex items-center justify-center gap-1.5"
                 >
-                  <Wand2 className="w-3.5 h-3.5 text-indigo-500" />
+                  <Wand2 className="w-3.5 h-3.5 text-primary" />
                   SMM
                 </button>
                 <button
                   onClick={() => onOpenCalculator?.(product)}
-                  className="px-3 bg-white border border-slate-200 text-slate-400 py-2 rounded-lg hover:text-slate-600 active:bg-slate-100 transition-colors"
+                  className="px-3 bg-white/5 border border-white/10 text-white/60 py-2 rounded-lg hover:text-white hover:bg-white/10 active:bg-white/20 transition-colors"
                 >
                   <Calculator className="w-4 h-4" />
                 </button>

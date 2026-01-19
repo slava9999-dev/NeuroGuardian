@@ -84,6 +84,37 @@ export function ProductsPage({
     };
   }, [products]);
 
+  const viktorStatus = useMemo(() => {
+    if (stats.triggered > 0) {
+      return {
+        tone: 'alert' as const,
+        badge: 'ТРЕБУЕТ ВНИМАНИЯ',
+        title: 'Обнаружены угрозы по ценам',
+        message: `${stats.triggered} товара под атакой. Рекомендую перейти в центр защиты или написать мне.`,
+      };
+    }
+    if (stats.unprotected > 0) {
+      return {
+        tone: 'processing' as const,
+        badge: 'РЕКОМЕНДАЦИЯ ВИКТОРА',
+        title: 'Часть товаров без защиты',
+        message: `Без защиты осталось ${stats.unprotected} товаров. Я могу рассчитать стоп-лоссы автоматически.`,
+      };
+    }
+    return {
+      tone: 'success' as const,
+      badge: 'ВСЕ СПОКОЙНО',
+      title: 'Каталог под защитой',
+      message: 'Все товары защищены. Я мониторю цены каждые 30 минут.',
+    };
+  }, [stats]);
+
+  const viktorToneStyles: Record<typeof viktorStatus.tone, string> = {
+    alert: 'border-rose-500/40 bg-rose-500/10 text-rose-200',
+    processing: 'border-primary/40 bg-primary/10 text-primary/90',
+    success: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200',
+  };
+
   return (
     <div className="min-h-full pb-24 bg-zinc-950 relative overflow-x-hidden">
       {/* Dynamic Background */}
@@ -100,7 +131,7 @@ export function ProductsPage({
                   hapticFeedback('light');
                   onBack();
                 }}
-                className="p-2.5 rounded-full hover:bg-slate-100 transition-all text-slate-500 shrink-0"
+                className="p-2.5 rounded-full hover:bg-white/5 transition-all text-zinc-400 shrink-0"
                 aria-label="Назад"
               >
                 <ArrowLeft className="w-5 h-5" />
@@ -120,7 +151,7 @@ export function ProductsPage({
                   hapticFeedback('light');
                   onNavigate?.('settings');
                 }}
-                className="p-2 rounded-full hover:bg-slate-100 transition-all text-slate-400 hover:text-indigo-600"
+                className="p-2 rounded-full hover:bg-white/5 transition-all text-zinc-400 hover:text-primary"
                 aria-label="Настройки"
               >
                 <Settings className="w-5 h-5" />
@@ -132,22 +163,27 @@ export function ProductsPage({
       </header>
 
       <div className="relative z-10 px-4 py-6 space-y-6">
-        {/* Helper Hint from Viktor */}
-        {products.length > 0 && stats.unprotected > 0 && (
+        {/* Viktor Status Panel */}
+        {products.length > 0 && (
           <motion.div
-            className="p-4 rounded-2xl bg-white border border-indigo-100 shadow-sm flex items-start gap-4"
+            className={`p-4 rounded-2xl border shadow-lg shadow-black/30 flex items-start gap-4 ${viktorToneStyles[viktorStatus.tone]}`}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
           >
             <div className="shrink-0 mt-0.5">
-              <ViktorCore size="sm" />
+              <ViktorCore size="sm" status={viktorStatus.tone} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-indigo-600 mb-1">Совет</p>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                У вас {stats.unprotected} товаров без защиты. Нажмите "Защитить все", чтобы
-                автоматически рассчитать стоп-лоссы.
-              </p>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[9px] font-black uppercase tracking-[0.3em] text-white/70">
+                  {viktorStatus.badge}
+                </span>
+                <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/40">
+                  VIKTOR
+                </span>
+              </div>
+              <p className="text-sm font-semibold text-white mb-1">{viktorStatus.title}</p>
+              <p className="text-xs text-white/70 leading-relaxed">{viktorStatus.message}</p>
             </div>
           </motion.div>
         )}
@@ -168,8 +204,8 @@ export function ProductsPage({
             onClick={() => setShowFilters(!showFilters)}
             className={`px-4 rounded-2xl border transition-all shadow-sm ${
               showFilters || marketplaceFilter !== 'all' || statusFilter !== 'all'
-                ? 'bg-indigo-50 border-indigo-200 text-indigo-600'
-                : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                ? 'bg-primary/15 border-primary/40 text-primary'
+                : 'bg-white/5 border-white/10 text-zinc-400 hover:bg-white/10'
             }`}
           >
             <Filter className="w-5 h-5" />
@@ -185,9 +221,9 @@ export function ProductsPage({
               exit={{ opacity: 0, height: 0 }}
               className="overflow-hidden"
             >
-              <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-4">
+              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 shadow-lg shadow-black/30 space-y-4">
                 <div>
-                  <p className="text-[10px] text-slate-400 uppercase tracking-widest mb-2 font-bold">
+                  <p className="text-[10px] text-zinc-400 uppercase tracking-widest mb-2 font-bold">
                     Маркетплейс
                   </p>
                   <div className="flex gap-2">
@@ -197,8 +233,8 @@ export function ProductsPage({
                         onClick={() => setMarketplaceFilter(m)}
                         className={`flex-1 px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all border ${
                           marketplaceFilter === m
-                            ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200'
-                            : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'
+                            ? 'bg-primary/20 border-primary/50 text-white shadow-[0_10px_20px_var(--color-primary-dim)]'
+                            : 'bg-white/5 border-white/10 text-zinc-400 hover:bg-white/10'
                         }`}
                       >
                         {m === 'all' ? 'ВСЕ' : m}
@@ -208,7 +244,7 @@ export function ProductsPage({
                 </div>
 
                 <div>
-                  <p className="text-[10px] text-slate-400 uppercase tracking-widest mb-2 font-bold">
+                  <p className="text-[10px] text-zinc-400 uppercase tracking-widest mb-2 font-bold">
                     Статус
                   </p>
                   <div className="flex flex-wrap gap-2">
@@ -225,8 +261,8 @@ export function ProductsPage({
                         onClick={() => setStatusFilter(s.id)}
                         className={`px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all border ${
                           statusFilter === s.id
-                            ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200'
-                            : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'
+                            ? 'bg-primary/20 border-primary/50 text-white shadow-[0_10px_20px_var(--color-primary-dim)]'
+                            : 'bg-white/5 border-white/10 text-zinc-400 hover:bg-white/10'
                         }`}
                       >
                         {s.label}
@@ -246,7 +282,7 @@ export function ProductsPage({
               hapticFeedback('medium');
               setShowBulkStopLoss(true);
             }}
-            className="flex-1 min-w-[140px] py-3 px-4 bg-indigo-600 text-white rounded-xl font-bold text-xs uppercase tracking-wider shadow-lg shadow-indigo-200 active:scale-95 transition-all flex items-center justify-center gap-2"
+            className="flex-1 min-w-[140px] py-3 px-4 bg-primary text-white rounded-xl font-bold text-xs uppercase tracking-wider shadow-lg shadow-primary/30 active:scale-95 transition-all flex items-center justify-center gap-2"
           >
             <Shield className="w-4 h-4" />
             ЗАЩИТИТЬ ВСЕ
@@ -271,7 +307,7 @@ export function ProductsPage({
                 setIsSyncing(false);
               }
             }}
-            className="p-3 min-w-[48px] rounded-xl bg-white/2 border border-white/10 text-zinc-500 hover:text-primary hover:border-primary/30 transition-all shadow-sm flex items-center justify-center disabled:opacity-50"
+            className="p-3 min-w-[48px] rounded-xl bg-white/5 border border-white/10 text-zinc-300 hover:text-white hover:border-primary/40 transition-all shadow-sm flex items-center justify-center disabled:opacity-50"
             title="Синхронизировать с маркетплейсом"
           >
             <RefreshCcw className={`w-5 h-5 ${isSyncing ? 'animate-spin' : ''}`} />
@@ -282,7 +318,7 @@ export function ProductsPage({
               hapticFeedback('light');
               setShowBulkCosts(true);
             }}
-            className="p-3 min-w-[48px] rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 hover:border-indigo-200 transition-all shadow-sm flex items-center justify-center"
+            className="p-3 min-w-[48px] rounded-xl bg-white/5 border border-white/10 text-zinc-300 hover:text-white hover:border-primary/40 transition-all shadow-sm flex items-center justify-center"
             title="Загрузить себестоимость"
           >
             <Upload className="w-5 h-5" />
@@ -293,7 +329,7 @@ export function ProductsPage({
               hapticFeedback('light');
               setShowLogHistory(true);
             }}
-            className="p-3 min-w-[48px] rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 hover:border-indigo-200 transition-all shadow-sm flex items-center justify-center"
+            className="p-3 min-w-[48px] rounded-xl bg-white/5 border border-white/10 text-zinc-300 hover:text-white hover:border-primary/40 transition-all shadow-sm flex items-center justify-center"
             title="История действий"
           >
             <History className="w-5 h-5" />
@@ -312,13 +348,13 @@ export function ProductsPage({
         {/* Empty Catalog State */}
         {products.length === 0 && (
           <div className="text-center py-20 px-4">
-            <div className="w-24 h-24 rounded-3xl bg-white/2 border border-white/5 flex items-center justify-center mx-auto mb-8 shadow-2xl">
-              <Package className="w-12 h-12 text-zinc-700" />
+            <div className="w-24 h-24 rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-8 shadow-2xl">
+              <Package className="w-12 h-12 text-zinc-600" />
             </div>
             <h3 className="text-xl font-black italic tracking-tighter uppercase text-white mb-2">
               Каталог пуст
             </h3>
-            <p className="text-zinc-500 text-sm max-w-[240px] mx-auto font-medium mb-10 leading-relaxed uppercase tracking-tight">
+            <p className="text-zinc-500 text-sm max-w-[240px] mx-auto font-medium mb-10 leading-relaxed">
               Для начала работы подключите аккаунты маркетплейсов в настройках.
             </p>
             <button
@@ -326,7 +362,7 @@ export function ProductsPage({
                 hapticFeedback('medium');
                 onNavigate?.('settings');
               }}
-              className="inline-flex items-center gap-3 px-10 py-5 bg-white text-black rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-[0_10px_30px_rgba(255,255,255,0.1)] active:scale-95 transition-all"
+              className="inline-flex items-center gap-3 px-10 py-5 bg-white text-black rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-[0_10px_30px_rgba(255,255,255,0.1)] hover:bg-primary transition-all"
             >
               <Settings className="w-4 h-4" />
               Подключить API
