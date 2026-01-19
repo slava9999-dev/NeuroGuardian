@@ -13,12 +13,14 @@ export class SentinelDefenseExecutor {
     marketplace: 'WB' | 'Ozon',
     summary: SentinelRunResult,
     threatType: string,
-    userResult?: UserCycleResult
+    userResult?: UserCycleResult,
+    options: { requireConfirmation?: boolean } = {}
   ): Promise<void> {
     const defenseMode = user.defense_mode || 'price_correction';
     const minPrice = product.min_price;
     let success = false;
     let errorMsg = '';
+    let isPending = false;
 
     // Sanity check
     if (minPrice > livePrice * 5 && minPrice > 10000) {
@@ -28,31 +30,56 @@ export class SentinelDefenseExecutor {
       return;
     }
 
-    try {
-      const pId = marketplace === 'WB' ? product.nm_id || product.product_id : product.product_id;
-      const productObj = { id: pId, offerId: product.offer_id || undefined, price: minPrice };
+    // CONFIRMATION LOGIC
+    if (options.requireConfirmation) {
+      isPending = true;
+      success = true; // Treated as success for the cycle (threat handled by notification)
 
-      if (defenseMode === 'zero_stock') {
-        const res = await marketplaceService.setZeroStock(
-          user.id,
+      await sendAlert({
+        type: 'defense_confirmation',
+        urgency: 'high',
+        product: {
+          name: product.title,
           marketplace,
-          [productObj],
-          product.account_id || undefined
-        );
-        success = res.success;
-        errorMsg = res.error || '';
-      } else {
-        const res = await marketplaceService.setDefensePrice(
-          user.id,
-          marketplace,
-          [productObj],
-          product.account_id || undefined
-        );
-        success = res.success;
-        errorMsg = res.error || '';
+          externalId: product.nm_id ? String(product.nm_id) : product.product_id,
+          userId: user.id,
+        },
+        message: `⚠️ <b>ОПАСНОСТЬ: Цена ниже минимума!</b>\n\nТекущая цена: ${livePrice}₽\nМинимальная цена: ${minPrice}₽\n\nСработал Stop-Loss. Требуется подтверждение для изменения цены.`,
+        analysis: {
+          currentPrice: livePrice,
+          recommendedPrice: minPrice,
+          reason: 'Stop-Loss Violation',
+          action: 'pending_confirmation',
+        },
+      });
+    } else {
+      // AUTO-EXECUTION LOGIC
+      try {
+        const pId = marketplace === 'WB' ? product.nm_id || product.product_id : product.product_id;
+        const productObj = { id: pId, offerId: product.offer_id || undefined, price: minPrice };
+
+        if (defenseMode === 'zero_stock') {
+          const res = await marketplaceService.setZeroStock(
+            user.id,
+            marketplace,
+            [productObj],
+            product.account_id || undefined
+          );
+          success = res.success;
+          errorMsg = res.error || '';
+        } else {
+          const res = await marketplaceService.setDefensePrice(
+            user.id,
+            marketplace,
+            [productObj],
+            product.account_id || undefined
+          );
+          success = res.success;
+          errorMsg = res.error || '';
+        }
+      } catch (err) {
+        errorMsg = err instanceof Error ? err.message : String(err);
       }
-    } catch (err) {
-      errorMsg = err instanceof Error ? err.message : String(err);
     }
 
     const savedAmount = Math.max(0, minPrice - livePrice);
@@ -62,15 +89,29 @@ export class SentinelDefenseExecutor {
         userResult.actionsTaken++;
         userResult.defenseDetails.push({
           product: product.title,
-          action: defenseMode,
+          action: isPending ? 'pending_confirmation' : defenseMode,
           marketplace,
-          savedAmount,
+          savedAmount: isPending ? 0 : savedAmount, // Don't count saved amount until confirmed
         });
       }
       if (summary.defenseDetails) {
-        summary.defenseDetails.push({ product: product.title, action: defenseMode, marketplace });
+        summary.defenseDetails.push({
+          product: product.title,
+          action: isPending ? 'pending_confirmation' : defenseMode,
+          marketplace,
+        });
       }
-      await this.notifyDefenseSuccess(user, product, livePrice, minPrice, defenseMode, marketplace);
+
+      if (!isPending) {
+        await this.notifyDefenseSuccess(
+          user,
+          product,
+          livePrice,
+          minPrice,
+          defenseMode,
+          marketplace
+        );
+      }
     } else {
       const msg = `Defense failed for ${product.product_id}: ${errorMsg}`;
       summary.errors.push(msg);
@@ -83,8 +124,8 @@ export class SentinelDefenseExecutor {
       product_title: product.title,
       detected_price: livePrice,
       min_price: minPrice,
-      defense_action: defenseMode,
-      saved_amount: savedAmount,
+      defense_action: isPending ? 'pending_confirmation' : defenseMode,
+      saved_amount: isPending ? 0 : savedAmount,
       marketplace,
       threat_type: threatType,
       success,

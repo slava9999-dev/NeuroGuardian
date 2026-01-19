@@ -120,15 +120,37 @@ export class SentinelOrchestrator {
           // Alert admin immediately on user processing failure
           await this.alertSender.sendCriticalError(`Processing User ${user.id}`, err);
 
-          // INDUSTRIAL UPGRADE: Handle API Auth Failures
-          if (errorMsg.includes('401') || errorMsg.includes('Unauthorized')) {
-            logger.warn(`Auth failure for user ${user.id}, flagging account`, { userId: user.id });
+          // INDUSTRIAL UPGRADE: Handle API Auth & Crypto Failures
+          if (
+            errorMsg.includes('401') ||
+            errorMsg.includes('Unauthorized') ||
+            errorMsg.includes('Unsupported state') ||
+            errorMsg.includes('bad decrypt') ||
+            errorMsg.includes('authentication data')
+          ) {
+            logger.warn(`Auth/Crypto failure for user ${user.id}, flagging account`, {
+              userId: user.id,
+            });
+
+            // Soft disable accounts to prevent log spam, but notify user clearly
             await db.execute(drizzleSql`
               UPDATE marketplace_accounts 
               SET is_active = false, updated_at = NOW() 
               WHERE user_id = ${user.id}
             `);
-            await this.alertSender.sendAuthAlert(user);
+
+            await this.alertSender.sendAlert({
+              type: 'auth_error',
+              urgency: 'high',
+              message:
+                '🔐 <b>Обновление безопасности</b>\n\nТребуется повторный ввод API-ключей из-за смены алгоритмов шифрования.\n\nСистема приостановлена для вашей безопасности.',
+              product: {
+                name: 'System Security',
+                marketplace: 'ALL',
+                externalId: 'security-update',
+                userId: Number(user.id),
+              },
+            });
           }
         }
       }
@@ -390,7 +412,8 @@ export class SentinelOrchestrator {
                   marketplace,
                   summary,
                   stopLossThreat.type,
-                  userResult
+                  userResult,
+                  { requireConfirmation: true } // HARDCODED: ALWAYS ASK FOR CONFIRMATION
                 );
               } else {
                 try {

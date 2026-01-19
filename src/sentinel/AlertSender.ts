@@ -98,6 +98,13 @@ export class SentinelAlertSender {
   }
 
   /**
+   * Generic alert sender from Orchestrator
+   */
+  async sendAlert(alert: import('../api-lib/services/notifications.js').Alert): Promise<void> {
+    await notificationService.sendAlert(alert);
+  }
+
+  /**
    * Helper: Find other users who share API keys with this user
    */
   private async findTeamMembers(currentUser: DBUser): Promise<DBUser[]> {

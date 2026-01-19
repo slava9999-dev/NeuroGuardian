@@ -11,31 +11,33 @@
 **Last Session:** 2026-01-18 (Session 76)
 **Focus:** 💎 UI/UX Refinement & Type Safety
 
-### Session 2026-01-19 (Session 77 - Module Integration & Critical UX Fixes) 🔌
+### Session 2026-01-19 (Session 77 - Sentinel Critical Fixes & Logic Update) 🛡️
 
-**Objective: Финализация интеграции модулей (SMM, Calculator) и восстановление доступа к настройкам API ключей**
+**Objective: Восстановление работы Sentinel и изменение логики защиты (Ask-before-Action)**
 
-> ✅ **INTEGRATION:** Модули **SMM AI** и **Unit Calculator** полностью подключены к бэкенду. Реализовано сохранение себестоимости (`costPrice`).
-> ✅ **CRITICAL UX:** Восстановлена навигация к **Настройкам API** со страницы Товаров. Пользователи, столкнувшиеся с ошибкой дешифровки, теперь могут сбросить ключи в один клик.
-> ✅ **BACKEND:** Расширен API (`content.generate`, `products.updateParams`) для поддержки новых функций Frontend Human V6.
-> ✅ **STABILITY:** Исправлены ошибки сборки TypeScript (`composite: true`) и синтаксические ошибки в модальных окнах.
+> ✅ **CRITICAL RECOVERY:** Sentinel теперь корректно обрабатывает ошибки дешифровки ключей ("Encryption Error"), не ломая цикл проверки. Пользователь получает уведомление "🔐 Security Update" с просьбой обновить ключи.
+> ✅ **LOGIC CHANGE:** Реализован режим **"Ask for Confirmation"** для угроз типа Stop-Loss. Sentinel больше не меняет цену автоматически при падении ниже минимума, а отправляет кнопку "✅ Подтвердить защиту".
+> ✅ **INTEGRATION:** Модули **SMM AI** и **Unit Calculator** полностью подключены к бэкенду.
+> ✅ **UX RESCUE:** Восстановлена навигация к настройкам API.
 
 **Completed Actions:**
 
+- [x] **Sentinel Logic**:
+  - `DefenseExecutor`: Добавлен флаг `requireConfirmation`. Вместо авто-смены цены отправляется алерт с кнопкой.
+  - `SentinelOrchestrator`: Для угроз `COMPETITOR_PRICE_DROP` принудительно включено подтверждение.
+  - `AlertSender`: Добавлена обработка ошибок шифрования (Soft Fail).
+- [x] **Notifications**:
+  - Добавлен тип алерта `defense_confirmation` с кнопкой `apply_price`.
+  - Реализован обработчик `apply_price` в Telegram (существующий).
 - [x] **Backend API**:
   - `productsApi.updateProductParams` поддерживает обновление цены и себестоимости.
-  - `contentApi.generate` интегрирован с реальным AI-генератором (стили: selling, bold, etc.).
-- [x] **UI Modules**:
-  - `ProductSMMModal` переведен с моков на реальный API.
-  - `ProductCard` сохраняет себестоимость в базу данных.
-- [x] **UX Rescue**: Добавлена кнопка "Подключить API" (Empty State) и иконка Настроек в хедер `ProductsPage`.
-- [x] **Build Fix**: Исправлены ошибки `tsBuildInfoFile` и зависимости `security-agent` в `tsconfig`.
+  - `contentApi.generate` интегрирован с реальным AI-генератором.
 
 **Key Insights:**
 
 ```
-Редизайн UI не должен скрывать критически важные функции (настройки ключей), особенно в условиях ротации ключей шифрования.
-Модульность фронтенда (SMM, Media, Calc) требует зеркальной поддержки со стороны API клиента.
+Безопасность пользователя приоритетнее автоматизации. При смене ключей шифрования система должна "мягко" просить пользователя обновить данные, а не падать с ошибками.
+Режим "Подтверждение защиты" дает пользователю контроль над критическими изменениями цен, что повышает доверие к агенту.
 ```
 
 ### Session 2026-01-18 (Session 76 - UI/UX Refinement & Type Safety) 💎

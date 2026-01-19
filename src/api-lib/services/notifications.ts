@@ -27,6 +27,7 @@ export type AlertType =
   | 'daily_report'
   | 'hourly_report'
   | 'subscription_expired'
+  | 'defense_confirmation' // NEW: Manual confirmation for defense action
   | 'welcome';
 
 export interface Alert {
@@ -210,6 +211,27 @@ function getAlertButtons(alert: Alert): Record<string, unknown> | undefined {
         : `https://www.ozon.ru/product/${externalId}`;
 
     buttons.push([{ text: '🔗 Открыть товар на маркетплейсе', url: link }]);
+  }
+
+  // Defense Confirmation - Manual approval required
+  if (alert.type === 'defense_confirmation' && alert.product && alert.analysis?.recommendedPrice) {
+    const { externalId, marketplace } = alert.product;
+    const price = alert.analysis.recommendedPrice;
+
+    // Use existing handler in telegram.ts: apply_price:marketplace:id:price
+    // Marketplace should be short/lowercase (wb/ozon)
+    const mp = marketplace.toLowerCase().includes('ozon') ? 'ozon' : 'wb';
+
+    buttons.push([
+      {
+        text: `✅ Подтвердить защиту (${price}₽)`,
+        callback_data: `apply_price:${mp}:${externalId}:${price}`,
+      },
+      {
+        text: `🛡️ Изменить настройки`,
+        callback_data: `check_protection:${externalId}`,
+      },
+    ]);
   }
 
   // Sentinel Alerts
