@@ -8,6 +8,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ThreatDetector, ThreatType } from '../../src/sentinel/ThreatDetector.js';
 import { SentinelDefenseExecutor } from '../../src/sentinel/DefenseExecutor.js';
+import type { DBUser, DBProduct } from '../../src/api-lib/lib/types.js';
+import type { SentinelRunResult } from '../../src/sentinel/types.js';
 
 // Mocks
 vi.mock('../../src/api-lib/services/database.js', () => ({
@@ -35,17 +37,17 @@ describe('Sentinel Advanced Scenarios', () => {
   const detector = new ThreatDetector();
   const executor = new SentinelDefenseExecutor();
 
-  const MOCK_USER = {
+  const MOCK_USER: Partial<DBUser> = {
     id: 1,
     protection_enabled: true,
-    defense_mode: 'price_correction' as const,
+    defense_mode: 'price_correction',
   };
 
-  const MOCK_PRODUCT = {
+  const MOCK_PRODUCT: Partial<DBProduct> = {
     id: 101,
-    user_id: 1,
+    user_id: '1',
     product_id: 'ozon-12345',
-    nm_id: 12345,
+    nm_id: '12345',
     title: 'Test Product',
     current_price: 1500,
     min_price: 1200,
@@ -65,7 +67,11 @@ describe('Sentinel Advanced Scenarios', () => {
       // Live price is 1000, while min_price is 1200
       const livePrice = 1000;
 
-      const scan = detector.scanProductThreats(MOCK_PRODUCT as any, livePrice, 'Ozon');
+      const scan = detector.scanProductThreats(
+        MOCK_PRODUCT as unknown as DBProduct,
+        livePrice,
+        'Ozon'
+      );
 
       expect(scan.hasThreats).toBe(true);
       const stopLossThreat = scan.threats.find(t => t.type === ThreatType.COMPETITOR_PRICE_DROP);
@@ -73,10 +79,16 @@ describe('Sentinel Advanced Scenarios', () => {
       expect(stopLossThreat?.severity).toBe('critical');
 
       // Test Defense Execution
-      const summary = { actionsTaken: 0, errors: [] } as any;
+      const summary: SentinelRunResult = {
+        actionsTaken: 0,
+        errors: [],
+        threatsDetected: 0,
+        usersProcessed: 0,
+        productsScanned: { wb: 0, ozon: 0 },
+      };
       await executor.executeDefense(
-        MOCK_USER as any,
-        MOCK_PRODUCT as any,
+        MOCK_USER as unknown as DBUser,
+        MOCK_PRODUCT as unknown as DBProduct,
         livePrice,
         'Ozon',
         summary,
@@ -97,7 +109,7 @@ describe('Sentinel Advanced Scenarios', () => {
       const livePrice = 1300;
 
       const scan = detector.scanProductThreats(
-        { ...MOCK_PRODUCT, current_price: 1300 } as any,
+        { ...MOCK_PRODUCT, current_price: 1300 } as unknown as DBProduct,
         livePrice,
         'Ozon'
       );
@@ -112,10 +124,16 @@ describe('Sentinel Advanced Scenarios', () => {
       const userWithZeroStock = { ...MOCK_USER, defense_mode: 'zero_stock' };
       const livePrice = 900; // Critical drop
 
-      const summary = { actionsTaken: 0, errors: [] } as any;
+      const summary: SentinelRunResult = {
+        actionsTaken: 0,
+        errors: [],
+        threatsDetected: 0,
+        usersProcessed: 0,
+        productsScanned: { wb: 0, ozon: 0 },
+      };
       await executor.executeDefense(
-        userWithZeroStock as any,
-        { ...MOCK_PRODUCT, current_price: 950 } as any,
+        userWithZeroStock as unknown as DBUser,
+        { ...MOCK_PRODUCT, current_price: 950 } as unknown as DBProduct,
         livePrice,
         'Ozon',
         summary,
@@ -140,7 +158,11 @@ describe('Sentinel Advanced Scenarios', () => {
       };
       const livePrice = 1050; // Below effective 1100, but above 1000.
 
-      const scan = detector.scanProductThreats(productWithBuffer as any, livePrice, 'Ozon');
+      const scan = detector.scanProductThreats(
+        productWithBuffer as unknown as DBProduct,
+        livePrice,
+        'Ozon'
+      );
 
       expect(scan.hasThreats).toBe(true);
       const stopLossThreat = scan.threats.find(t => t.type === ThreatType.COMPETITOR_PRICE_DROP);
@@ -153,7 +175,11 @@ describe('Sentinel Advanced Scenarios', () => {
       // DB: 1500, Live: 700.
       const livePrice = 700;
 
-      const scan = detector.scanProductThreats(MOCK_PRODUCT as any, livePrice, 'Ozon');
+      const scan = detector.scanProductThreats(
+        MOCK_PRODUCT as unknown as DBProduct,
+        livePrice,
+        'Ozon'
+      );
 
       expect(scan.hasThreats).toBe(true);
       expect(scan.threats.some(t => t.type === ThreatType.DB_PRICE_MISMATCH)).toBe(true);

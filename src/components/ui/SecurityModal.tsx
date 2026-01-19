@@ -1,9 +1,20 @@
 // ============================================
-// NeuroGUARDIAN — Security Modal Component
-// Detailed security information for users
+// NeuroGUARDIAN — Security Modal Component V6.0
+// Concise, Space-Efficient, Accordion-Style
 // ============================================
 
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Shield,
+  Lock,
+  EyeOff,
+  Server,
+  ChevronDown,
+  ChevronUp,
+  X,
+  ExternalLink,
+} from 'lucide-react';
 
 interface SecurityModalProps {
   isOpen: boolean;
@@ -11,7 +22,58 @@ interface SecurityModalProps {
 }
 
 export function SecurityModal({ isOpen, onClose }: SecurityModalProps) {
+  const [openSection, setOpenSection] = useState<number | null>(0);
+
   if (!isOpen) return null;
+
+  const sections = [
+    {
+      id: 1,
+      title: 'Ваши ключи под защитой',
+      icon: <Lock className="w-5 h-5 text-emerald-600" />,
+      content: (
+        <div className="text-sm text-slate-600 space-y-2">
+          <p>
+            Мы используем шифрование <strong>AES-256-GCM</strong> (банковский стандарт). Ключи
+            шифруются перед сохранением и никогда не передаются третьим лицам.
+          </p>
+          <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 bg-emerald-50 p-2 rounded-lg">
+            <Shield className="w-3 h-3" />
+            <span>Только для мониторинга ваших товаров</span>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: 2,
+      title: 'Безопасность данных',
+      icon: <Server className="w-5 h-5 text-indigo-600" />,
+      content: (
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="p-2 bg-slate-50 rounded-lg text-center border border-slate-100">
+            <span className="block font-bold text-slate-900">SSL/TLS 1.3</span>
+            <span className="text-slate-400">Шифрование канала</span>
+          </div>
+          <div className="p-2 bg-slate-50 rounded-lg text-center border border-slate-100">
+            <span className="block font-bold text-slate-900">Vercel Edge</span>
+            <span className="text-slate-400">Защита от DDoS</span>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: 3,
+      title: 'Приватность и Анонимность',
+      icon: <EyeOff className="w-5 h-5 text-slate-600" />,
+      content: (
+        <ul className="text-xs text-slate-500 space-y-2 list-disc list-inside">
+          <li>Мы не продаем данные.</li>
+          <li>Мы не храним данные банковских карт (обработка через ЮKassa).</li>
+          <li>Мы не делаем действий на маркетплейсах без вашего ведома.</li>
+        </ul>
+      ),
+    },
+  ];
 
   return (
     <AnimatePresence>
@@ -19,285 +81,99 @@ export function SecurityModal({ isOpen, onClose }: SecurityModalProps) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/30 backdrop-blur-sm"
+        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/40 backdrop-blur-sm"
         onClick={onClose}
       >
         <motion.div
           initial={{ y: '100%' }}
           animate={{ y: 0 }}
           exit={{ y: '100%' }}
-          transition={{ type: 'spring', damping: 25 }}
-          className="w-full max-w-lg bg-white rounded-t-3xl sm:rounded-2xl border-t sm:border border-emerald-200 overflow-hidden max-h-[90vh] overflow-y-auto shadow-xl"
+          transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+          className="w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden"
           onClick={e => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="sticky top-0 bg-gradient-to-r from-emerald-50 to-teal-50 backdrop-blur-sm p-4 border-b border-emerald-200 flex items-center justify-between z-10">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-white z-10 sticky top-0">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
-                <svg
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  className="text-emerald-400"
-                >
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                  <path d="m9 12 2 2 4-4" />
-                </svg>
+              <div className="p-2 bg-emerald-50 rounded-xl">
+                <Shield className="w-5 h-5 text-emerald-600" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-slate-900">Безопасность</h2>
-                <p className="text-xs text-emerald-600">Как мы защищаем ваши данные</p>
+                <h2 className="text-lg font-bold text-slate-900">Безопасность</h2>
+                <p className="text-xs text-emerald-600 font-medium">Ваши данные защищены</p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
+              className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-600"
+              aria-label="Закрыть"
             >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path d="M18 6L6 18M6 6l12 12" />
-              </svg>
+              <X className="w-5 h-5" />
             </button>
           </div>
 
           {/* Content */}
-          <div className="p-4 space-y-6">
-            {/* Trust Banner */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="p-4 bg-gradient-to-r from-emerald-100 to-teal-100 border border-emerald-200 rounded-2xl text-center"
-            >
-              <motion.div
-                className="text-4xl mb-2"
-                animate={{ scale: [1, 1.1, 1] }}
-                transition={{ duration: 2, repeat: Infinity }}
-              >
-                🛡️
-              </motion.div>
-              <h3 className="text-lg font-bold text-slate-900 mb-1">Ваши данные под защитой</h3>
-              <p className="text-sm text-emerald-700">
-                Шифрование AES-256-GCM — банковский стандарт
+          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50">
+            {/* Trust Badge */}
+            <div className="flex flex-col items-center justify-center py-6 text-center">
+              <div className="w-16 h-16 bg-linear-to-br from-emerald-100 to-teal-100 rounded-full flex items-center justify-center mb-3 shadow-inner">
+                <Lock className="w-8 h-8 text-emerald-600" />
+              </div>
+              <h3 className="text-base font-bold text-slate-800">Банковский уровень защиты</h3>
+              <p className="text-xs text-slate-500 max-w-[200px]">
+                Все чувствительные данные шифруются и хранятся в защищенном контуре.
               </p>
-            </motion.div>
+            </div>
 
-            {/* API Keys Section */}
-            <motion.section
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="bg-white border border-slate-200 rounded-2xl p-4"
-            >
-              <h3 className="text-base font-bold text-slate-900 mb-3 flex items-center gap-2">
-                <span className="text-2xl">🔑</span>
-                Ваши API ключи
-              </h3>
+            {/* Accordion Sections */}
+            <div className="space-y-2">
+              {sections.map((section, idx) => (
+                <div
+                  key={section.id}
+                  className="bg-white border boundary-slate-200 rounded-xl overflow-hidden shadow-sm"
+                >
+                  <button
+                    onClick={() => setOpenSection(openSection === idx ? null : idx)}
+                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      {section.icon}
+                      <span className="text-sm font-bold text-slate-700">{section.title}</span>
+                    </div>
+                    {openSection === idx ? (
+                      <ChevronUp className="w-4 h-4 text-slate-400" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-slate-400" />
+                    )}
+                  </button>
+                  <AnimatePresence>
+                    {openSection === idx && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="px-4 pb-4 pt-0"
+                      >
+                        <div className="pt-2 border-t border-slate-100">{section.content}</div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              ))}
+            </div>
 
-              <div className="space-y-3 text-sm">
-                <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
-                  <span className="text-emerald-500 mt-0.5">✓</span>
-                  <div>
-                    <p className="font-medium text-slate-900">Шифрование AES-256-GCM</p>
-                    <p className="text-slate-500">
-                      API ключи шифруются перед сохранением в базу данных. Даже при утечке БД ключи
-                      останутся защищены
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
-                  <span className="text-emerald-500 mt-0.5">✓</span>
-                  <div>
-                    <p className="font-medium text-slate-900">Шифрование при передаче</p>
-                    <p className="text-slate-500">
-                      Все данные передаются по HTTPS с TLS 1.3 — это современный стандарт банков
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
-                  <span className="text-emerald-500 mt-0.5">✓</span>
-                  <div>
-                    <p className="font-medium text-slate-900">Только для ваших товаров</p>
-                    <p className="text-slate-500">
-                      Ключи используются исключительно для мониторинга и защиты ваших товаров
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
-                  <span className="text-emerald-500 mt-0.5">✓</span>
-                  <div>
-                    <p className="font-medium text-slate-900">Никаких третьих лиц</p>
-                    <p className="text-slate-500">
-                      Ваши ключи никогда не передаются посторонним. Только вы и наша система
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </motion.section>
-
-            {/* Data Protection */}
-            <motion.section
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="bg-white border border-slate-200 rounded-2xl p-4"
-            >
-              <h3 className="text-base font-bold text-slate-900 mb-3 flex items-center gap-2">
-                <span className="text-2xl">🔐</span>
-                Защита данных
-              </h3>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 bg-slate-50 rounded-xl text-center border border-slate-200">
-                  <div className="text-2xl mb-1">🔒</div>
-                  <p className="text-xs text-slate-900 font-medium">SSL/TLS</p>
-                  <p className="text-xs text-slate-500">шифрование</p>
-                </div>
-                <div className="p-3 bg-slate-50 rounded-xl text-center border border-slate-200">
-                  <div className="text-2xl mb-1">🌐</div>
-                  <p className="text-xs text-slate-900 font-medium">Vercel Edge</p>
-                  <p className="text-xs text-slate-500">CDN защита</p>
-                </div>
-                <div className="p-3 bg-slate-50 rounded-xl text-center border border-slate-200">
-                  <div className="text-2xl mb-1">📱</div>
-                  <p className="text-xs text-slate-900 font-medium">Telegram</p>
-                  <p className="text-xs text-slate-500">авторизация</p>
-                </div>
-                <div className="p-3 bg-slate-50 rounded-xl text-center border border-slate-200">
-                  <div className="text-2xl mb-1">💳</div>
-                  <p className="text-xs text-slate-900 font-medium">ЮKassa</p>
-                  <p className="text-xs text-slate-500">PCI DSS</p>
-                </div>
-              </div>
-            </motion.section>
-
-            {/* What We Collect */}
-            <motion.section
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="bg-white border border-slate-200 rounded-2xl p-4"
-            >
-              <h3 className="text-base font-bold text-slate-900 mb-3 flex items-center gap-2">
-                <span className="text-2xl">📋</span>
-                Какие данные мы храним
-              </h3>
-
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between items-center p-2 bg-slate-50 rounded-lg border border-slate-200">
-                  <span className="text-slate-600">Telegram ID</span>
-                  <span className="text-xs text-emerald-600 px-2 py-0.5 bg-emerald-50 rounded-full">
-                    для входа
-                  </span>
-                </div>
-                <div className="flex justify-between items-center p-2 bg-slate-50 rounded-lg border border-slate-200">
-                  <span className="text-slate-600">Имя пользователя</span>
-                  <span className="text-xs text-emerald-600 px-2 py-0.5 bg-emerald-50 rounded-full">
-                    приветствие
-                  </span>
-                </div>
-                <div className="flex justify-between items-center p-2 bg-slate-50 rounded-lg border border-slate-200">
-                  <span className="text-slate-600">API ключи WB/Ozon</span>
-                  <span className="text-xs text-emerald-600 px-2 py-0.5 bg-emerald-50 rounded-full">
-                    защита товаров
-                  </span>
-                </div>
-                <div className="flex justify-between items-center p-2 bg-slate-50 rounded-lg border border-slate-200">
-                  <span className="text-slate-600">Список товаров</span>
-                  <span className="text-xs text-emerald-600 px-2 py-0.5 bg-emerald-50 rounded-full">
-                    мониторинг
-                  </span>
-                </div>
-              </div>
-            </motion.section>
-
-            {/* What We DON'T Do */}
-            <motion.section
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-              className="p-4 bg-rose-50 border border-rose-200 rounded-2xl"
-            >
-              <h3 className="text-base font-bold text-rose-600 mb-3 flex items-center gap-2">
-                <span className="text-2xl">🚫</span>
-                Мы НИКОГДА не делаем
-              </h3>
-
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="text-rose-500">✕</span>
-                  <span className="text-rose-600">Не продаём ваши данные</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="text-rose-500">✕</span>
-                  <span className="text-rose-600">Не передаём API ключи третьим лицам</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="text-rose-500">✕</span>
-                  <span className="text-rose-600">Не храним данные банковских карт</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="text-rose-500">✕</span>
-                  <span className="text-rose-600">Не используем данные для рекламы</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="text-rose-500">✕</span>
-                  <span className="text-rose-600">Не делаем операций без вашего ведома</span>
-                </div>
-              </div>
-            </motion.section>
-
-            {/* Simple Explanation */}
-            <motion.section
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
-              className="p-4 bg-blue-50 border border-blue-200 rounded-2xl"
-            >
-              <h3 className="text-base font-bold text-blue-600 mb-3 flex items-center gap-2">
-                <span className="text-2xl">💡</span>
-                Простыми словами
-              </h3>
-
-              <p className="text-sm text-blue-700 leading-relaxed">
-                Представьте, что ваши API ключи лежат в сейфе, к которому есть доступ только у вас и
-                у нашего робота-защитника. Робот использует ключи только чтобы следить за ценами и
-                защищать ваши товары от демпинга. Когда вы закрываете приложение — сейф остаётся на
-                замке. Никто другой не может туда заглянуть.
-              </p>
-            </motion.section>
-
-            {/* Contact */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.6 }}
-              className="text-center pt-2"
-            >
-              <p className="text-sm text-slate-500 mb-2">Есть вопросы о безопасности?</p>
+            {/* Footer Link */}
+            <div className="pt-4 text-center">
               <a
                 href="https://t.me/Vyacheslav_Neuro"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-xl text-blue-600 hover:bg-blue-100 transition-colors"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-700"
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z" />
-                </svg>
-                Написать в поддержку
+                <span>Задать вопрос о безопасности</span>
+                <ExternalLink className="w-3 h-3" />
               </a>
-            </motion.div>
+            </div>
           </div>
         </motion.div>
       </motion.div>
