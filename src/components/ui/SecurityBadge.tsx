@@ -14,7 +14,7 @@ export function SecurityBadge({ compact = false }: { compact?: boolean }) {
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center gap-2 px-3 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl cursor-pointer"
+        className="flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-xl cursor-pointer"
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <svg
@@ -24,12 +24,12 @@ export function SecurityBadge({ compact = false }: { compact?: boolean }) {
           fill="none"
           stroke="currentColor"
           strokeWidth="2"
-          className="text-emerald-400"
+          className="text-emerald-600"
         >
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
           <path d="m9 12 2 2 4-4" />
         </svg>
-        <span className="text-xs text-emerald-400 font-medium">SSL защита</span>
+        <span className="text-xs text-emerald-600 font-medium">SSL защита</span>
       </motion.div>
     );
   }
@@ -38,11 +38,11 @@ export function SecurityBadge({ compact = false }: { compact?: boolean }) {
     <motion.section
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="glass-panel p-6 border-emerald-500/30 bg-emerald-500/5"
+      className="bg-emerald-50 p-6 border border-emerald-200 rounded-2xl"
     >
       <div className="flex items-start gap-4">
         {/* Shield Icon */}
-        <div className="shrink-0 w-14 h-14 rounded-2xl bg-emerald-500/20 flex items-center justify-center">
+        <div className="shrink-0 w-14 h-14 rounded-2xl bg-emerald-100 flex items-center justify-center">
           <svg
             width="28"
             height="28"
@@ -50,7 +50,7 @@ export function SecurityBadge({ compact = false }: { compact?: boolean }) {
             fill="none"
             stroke="currentColor"
             strokeWidth="2"
-            className="text-emerald-400"
+            className="text-emerald-500"
           >
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             <path d="m9 12 2 2 4-4" />
@@ -58,7 +58,7 @@ export function SecurityBadge({ compact = false }: { compact?: boolean }) {
         </div>
 
         <div className="flex-1">
-          <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
+          <h3 className="text-lg font-bold text-slate-900 mb-2 flex items-center gap-2">
             🔒 Ваши данные защищены
           </h3>
 
@@ -67,26 +67,26 @@ export function SecurityBadge({ compact = false }: { compact?: boolean }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div className="flex items-center gap-2 text-sm">
                 <span className="text-emerald-400">✓</span>
-                <span className="text-zinc-400">SSL/TLS шифрование</span>
+                <span className="text-slate-500">SSL/TLS шифрование</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <span className="text-emerald-400">✓</span>
-                <span className="text-zinc-400">Vercel Edge Network</span>
+                <span className="text-slate-500">Vercel Edge Network</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <span className="text-emerald-400">✓</span>
-                <span className="text-zinc-400">PostgreSQL в изоляции</span>
+                <span className="text-slate-500">PostgreSQL в изоляции</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <span className="text-emerald-400">✓</span>
-                <span className="text-zinc-400">Telegram авторизация</span>
+                <span className="text-slate-500">Telegram авторизация</span>
               </div>
             </div>
 
             {/* Collapsible details */}
             <button
               onClick={() => setIsExpanded(!isExpanded)}
-              className="flex items-center gap-1 text-sm text-amber-400 hover:text-amber-300 transition-colors"
+              className="flex items-center gap-1 text-sm text-amber-600 hover:text-amber-500 transition-colors"
             >
               <span>{isExpanded ? 'Скрыть детали' : 'Как мы храним ваши данные?'}</span>
               <motion.svg
@@ -107,11 +107,11 @@ export function SecurityBadge({ compact = false }: { compact?: boolean }) {
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: 'auto', opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
-                className="mt-3 pt-3 border-t border-white/5 space-y-4 text-sm text-zinc-500"
+                className="mt-3 pt-3 border-t border-emerald-200 space-y-4 text-sm text-slate-500"
               >
                 {/* API Keys */}
                 <div>
-                  <h4 className="font-medium text-white mb-2 flex items-center gap-2">
+                  <h4 className="font-medium text-slate-900 mb-2 flex items-center gap-2">
                     <span>🔑</span> API ключи WB и Ozon
                   </h4>
                   <ul className="space-y-1 pl-6">
@@ -125,7 +125,7 @@ export function SecurityBadge({ compact = false }: { compact?: boolean }) {
 
                 {/* User Data */}
                 <div>
-                  <h4 className="font-medium text-white mb-2 flex items-center gap-2">
+                  <h4 className="font-medium text-slate-900 mb-2 flex items-center gap-2">
                     <span>👤</span> Данные пользователя
                   </h4>
                   <ul className="space-y-1 pl-6">
@@ -137,7 +137,7 @@ export function SecurityBadge({ compact = false }: { compact?: boolean }) {
 
                 {/* Infrastructure */}
                 <div>
-                  <h4 className="font-medium text-white mb-2 flex items-center gap-2">
+                  <h4 className="font-medium text-slate-900 mb-2 flex items-center gap-2">
                     <span>🏗️</span> Инфраструктура
                   </h4>
                   <ul className="space-y-1 pl-6">
@@ -149,9 +149,9 @@ export function SecurityBadge({ compact = false }: { compact?: boolean }) {
                 </div>
 
                 {/* What we DON'T do */}
-                <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl">
-                  <h4 className="font-medium text-red-400 mb-2">❌ Мы НЕ:</h4>
-                  <ul className="space-y-1 text-red-300/80">
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl">
+                  <h4 className="font-medium text-rose-600 mb-2">❌ Мы НЕ:</h4>
+                  <ul className="space-y-1 text-rose-600">
                     <li>• Не продаём ваши данные</li>
                     <li>• Не передаём API ключи третьим лицам</li>
                     <li>• Не храним данные банковских карт</li>
@@ -161,11 +161,11 @@ export function SecurityBadge({ compact = false }: { compact?: boolean }) {
 
                 {/* Delete Data */}
                 <div className="text-center pt-2">
-                  <p className="text-zinc-600 text-[10px] font-bold uppercase tracking-widest">
+                  <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">
                     Хотите удалить все свои данные? Напишите нам:{' '}
                     <a
                       href="https://t.me/Vyacheslav_Neuro"
-                      className="text-amber-400 hover:text-amber-300"
+                      className="text-amber-600 hover:text-amber-500"
                     >
                       @Vyacheslav_Neuro
                     </a>

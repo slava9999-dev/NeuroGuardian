@@ -105,7 +105,7 @@ export function BulkStopLossModal({ isOpen, onClose }: BulkStopLossModalProps) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4"
+          className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4"
           onClick={handleClose}
         >
           <motion.div
@@ -114,27 +114,27 @@ export function BulkStopLossModal({ isOpen, onClose }: BulkStopLossModalProps) {
             exit={{ opacity: 0, y: 100 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             onClick={e => e.stopPropagation()}
-            className="w-full max-w-md bg-zinc-900 rounded-t-3xl sm:rounded-3xl border border-white/5 overflow-hidden shadow-2xl"
+            className="w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl border border-slate-200 overflow-hidden shadow-xl"
           >
             {/* Header */}
-            <div className="p-6 pb-4 border-b border-white/5">
+            <div className="p-6 pb-4 border-b border-slate-200">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center shadow-[0_0_20px_var(--color-primary-dim)]">
+                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shadow-[0_0_20px_var(--color-primary-dim)]">
                     <span className="text-2xl">🛡️</span>
                   </div>
                   <div>
-                    <h2 className="text-xl font-black italic tracking-tighter uppercase text-white">
+                    <h2 className="text-xl font-black italic tracking-tighter uppercase text-slate-900">
                       Массовая защита
                     </h2>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
                       Включить Сторожа для всех товаров
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={handleClose}
-                  className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors"
+                  className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors"
                 >
                   <svg
                     width="16"
@@ -143,7 +143,7 @@ export function BulkStopLossModal({ isOpen, onClose }: BulkStopLossModalProps) {
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="2"
-                    className="text-stone-400"
+                    className="text-slate-400"
                   >
                     <line x1="18" y1="6" x2="6" y2="18" />
                     <line x1="6" y1="6" x2="18" y2="18" />
@@ -162,17 +162,17 @@ export function BulkStopLossModal({ isOpen, onClose }: BulkStopLossModalProps) {
                   className="text-center py-4"
                 >
                   <motion.div
-                    className="w-20 h-20 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-4"
+                    className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4"
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     transition={{ type: 'spring', delay: 0.2 }}
                   >
                     <span className="text-4xl">✅</span>
                   </motion.div>
-                  <h3 className="text-xl font-black italic uppercase text-white mb-2 tracking-tighter">
+                  <h3 className="text-xl font-black italic uppercase text-slate-900 mb-2 tracking-tighter">
                     Защита установлена!
                   </h3>
-                  <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-2">
+                  <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-2">
                     Обновлено товаров:{' '}
                     <span className="text-emerald-400 font-black">{result.success}</span>
                   </p>
@@ -192,18 +192,20 @@ export function BulkStopLossModal({ isOpen, onClose }: BulkStopLossModalProps) {
                 // Setup state
                 <>
                   {/* Info banner */}
-                  <div className="mb-6 p-4 rounded-xl bg-primary/5 border border-primary/20">
+                  <div className="mb-6 p-4 rounded-xl bg-primary/10 border border-primary/20">
                     <div className="flex items-start gap-3">
                       <span className="text-xl">💡</span>
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-tight text-primary">
+                        <p className="text-[10px] font-bold uppercase tracking-tight text-slate-700">
                           {productsToUpdate === 0 ? (
                             'Все товары уже под защитой Сторожа!'
                           ) : (
                             <>
-                              <span className="font-black text-white">{productsToUpdate}</span>{' '}
+                              <span className="font-black text-slate-900">{productsToUpdate}</span>{' '}
                               товаров без защиты. Установим минимальную цену на{' '}
-                              <span className="font-black text-white">{selectedPercentage}%</span>{' '}
+                              <span className="font-black text-slate-900">
+                                {selectedPercentage}%
+                              </span>{' '}
                               ниже текущей.
                             </>
                           )}
@@ -216,7 +218,7 @@ export function BulkStopLossModal({ isOpen, onClose }: BulkStopLossModalProps) {
                     <>
                       {/* Percentage selector */}
                       <div className="mb-6">
-                        <label className="block text-[10px] font-black text-zinc-600 uppercase tracking-widest mb-3 px-1">
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 px-1">
                           Снижение цены от текущей
                         </label>
                         <div className="grid grid-cols-6 gap-2">
@@ -229,8 +231,8 @@ export function BulkStopLossModal({ isOpen, onClose }: BulkStopLossModalProps) {
                               }}
                               className={`py-2 rounded-xl text-sm font-black transition-all ${
                                 selectedPercentage === pct
-                                  ? 'bg-primary text-black'
-                                  : 'bg-white/5 text-zinc-500 hover:bg-white/10'
+                                  ? 'bg-primary text-white'
+                                  : 'bg-white text-slate-500 hover:bg-slate-50'
                               }`}
                             >
                               -{pct}%
@@ -242,23 +244,23 @@ export function BulkStopLossModal({ isOpen, onClose }: BulkStopLossModalProps) {
                       {/* Preview */}
                       {previewProducts.length > 0 && (
                         <div className="mb-6">
-                          <label className="block text-sm font-medium text-stone-300 mb-3">
+                          <label className="block text-sm font-medium text-slate-500 mb-3">
                             Предпросмотр ({previewProducts.length} из {productsToUpdate})
                           </label>
                           <div className="space-y-2">
                             {previewProducts.map((p, i) => (
                               <div
                                 key={i}
-                                className="p-3 rounded-xl bg-white/2 border border-white/5"
+                                className="p-3 rounded-xl bg-white border border-slate-200"
                               >
-                                <p className="text-sm text-white font-black italic uppercase tracking-tight mb-1">
+                                <p className="text-sm text-slate-900 font-black italic uppercase tracking-tight mb-1">
                                   {p.title}
                                 </p>
                                 <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest">
-                                  <span className="text-zinc-600">
+                                  <span className="text-slate-500">
                                     {p.currentPrice.toLocaleString('ru-RU')} ₽
                                   </span>
-                                  <span className="text-zinc-700">→</span>
+                                  <span className="text-slate-400">→</span>
                                   <span className="text-primary">
                                     min {p.newMinPrice.toLocaleString('ru-RU')} ₽
                                   </span>
@@ -266,7 +268,7 @@ export function BulkStopLossModal({ isOpen, onClose }: BulkStopLossModalProps) {
                               </div>
                             ))}
                             {productsToUpdate > 3 && (
-                              <p className="text-stone-500 text-xs text-center">
+                              <p className="text-slate-500 text-xs text-center">
                                 и ещё {productsToUpdate - 3} товаров...
                               </p>
                             )}
@@ -280,7 +282,7 @@ export function BulkStopLossModal({ isOpen, onClose }: BulkStopLossModalProps) {
                   <div className="flex gap-3">
                     <button
                       onClick={handleClose}
-                      className="flex-1 py-4 rounded-xl bg-white/5 text-zinc-500 font-black text-[10px] uppercase tracking-[0.2em] hover:bg-white/10 transition-all"
+                      className="flex-1 py-4 rounded-xl bg-white text-slate-500 border border-slate-200 font-black text-[10px] uppercase tracking-[0.2em] hover:bg-slate-50 transition-all"
                     >
                       Отмена
                     </button>
@@ -289,14 +291,14 @@ export function BulkStopLossModal({ isOpen, onClose }: BulkStopLossModalProps) {
                       disabled={isProcessing || productsToUpdate === 0}
                       className={`flex-1 py-4 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 active:scale-95 ${
                         productsToUpdate === 0
-                          ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
-                          : 'bg-white text-black hover:bg-primary'
+                          ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                          : 'bg-primary text-white hover:brightness-110'
                       }`}
                     >
                       {isProcessing ? (
                         <>
                           <motion.div
-                            className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full"
+                            className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full"
                             animate={{ rotate: 360 }}
                             transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                           />

@@ -273,7 +273,7 @@ export function PaymentModal({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/90 backdrop-blur-md"
+        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/30 backdrop-blur-md"
         onClick={handleClose}
       >
         <motion.div
@@ -281,7 +281,7 @@ export function PaymentModal({
           animate={{ y: 0 }}
           exit={{ y: '100%' }}
           transition={{ type: 'spring', damping: 25 }}
-          className="w-full max-w-lg bg-stone-900 rounded-t-3xl sm:rounded-2xl border-t sm:border border-stone-700 overflow-hidden max-h-[90vh] flex flex-col"
+          className="w-full max-w-lg bg-white rounded-t-3xl sm:rounded-2xl border-t sm:border border-slate-200 overflow-hidden max-h-[90vh] flex flex-col shadow-xl"
           onClick={e => e.stopPropagation()}
         >
           {/* SUCCESS SCREEN */}
@@ -291,7 +291,7 @@ export function PaymentModal({
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ type: 'spring', delay: 0.1 }}
-                className="w-24 h-24 mb-6 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/30"
+                className="w-24 h-24 mb-6 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-200"
               >
                 <svg
                   width="48"
@@ -305,9 +305,9 @@ export function PaymentModal({
                   <path d="M20 6L9 17l-5-5" />
                 </svg>
               </motion.div>
-              <h2 className="text-2xl font-bold text-white mb-2">Оплата прошла успешно!</h2>
-              <p className="text-stone-400 mb-8">
-                Тариф <span className="text-white font-bold">{activatedPlan?.name}</span>{' '}
+              <h2 className="text-2xl font-bold text-slate-900 mb-2">Оплата прошла успешно!</h2>
+              <p className="text-slate-500 mb-8">
+                Тариф <span className="text-slate-900 font-bold">{activatedPlan?.name}</span>{' '}
                 активирован на {activatedPlan?.durationDays} дней.
               </p>
               <button
@@ -323,13 +323,13 @@ export function PaymentModal({
           ) : (
             <>
               {/* Header */}
-              <div className="shrink-0 bg-stone-900 p-4 border-b border-stone-800 flex items-center justify-between z-10">
-                <h2 className="text-lg font-bold text-white">
+              <div className="shrink-0 bg-white p-4 border-b border-slate-200 flex items-center justify-between z-10">
+                <h2 className="text-lg font-bold text-slate-900">
                   {showWidget ? 'Оплата картой' : 'Оформление подписки'}
                 </h2>
                 <button
                   onClick={handleClose}
-                  className="p-2 rounded-full hover:bg-stone-800 text-stone-400 hover:text-white transition-colors"
+                  className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-900 transition-colors"
                 >
                   <svg
                     width="24"
@@ -359,11 +359,11 @@ export function PaymentModal({
                   <div className="space-y-4">
                     {/* Show Summary Card instead of list IF plan is already selected */}
                     {selectedPlanId && selectedPlanDetails ? (
-                      <div className="p-5 rounded-2xl bg-stone-800/50 border border-stone-700">
+                      <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200">
                         <div className="flex justify-between items-start mb-4">
                           <div>
-                            <p className="text-stone-400 text-sm mb-1">Выбранный тариф</p>
-                            <h3 className="text-xl font-bold text-white">
+                            <p className="text-slate-500 text-sm mb-1">Выбранный тариф</p>
+                            <h3 className="text-xl font-bold text-slate-900">
                               {selectedPlanDetails.name}
                             </h3>
                           </div>
@@ -371,7 +371,7 @@ export function PaymentModal({
                             <span className="block text-2xl font-bold text-amber-500">
                               {selectedPlanDetails.price} ₽
                             </span>
-                            <span className="text-xs text-stone-500">
+                            <span className="text-xs text-slate-400">
                               /{selectedPlanDetails.durationDays === 365 ? 'год' : 'мес'}
                             </span>
                           </div>
@@ -379,7 +379,7 @@ export function PaymentModal({
 
                         <div className="space-y-2 mb-4">
                           {selectedPlanDetails.features.slice(0, 3).map((f, i) => (
-                            <div key={i} className="flex items-center gap-2 text-sm text-stone-300">
+                            <div key={i} className="flex items-center gap-2 text-sm text-slate-600">
                               <span className="text-emerald-500">✓</span> {f}
                             </div>
                           ))}
@@ -387,7 +387,7 @@ export function PaymentModal({
 
                         <button
                           onClick={() => setSelectedPlanId(null)}
-                          className="text-sm text-stone-500 hover:text-white underline transition-colors"
+                          className="text-sm text-slate-500 hover:text-slate-900 underline transition-colors"
                         >
                           Выбрать другой тариф
                         </button>
@@ -396,7 +396,7 @@ export function PaymentModal({
                       /* Plan List (Only if no plan selected) */
                       <div className="space-y-3">
                         {isLoadingPlans ? (
-                          <div className="py-10 text-center text-stone-500">
+                          <div className="py-10 text-center text-slate-500">
                             Загрузка тарифов...
                           </div>
                         ) : (
@@ -404,13 +404,13 @@ export function PaymentModal({
                             <button
                               key={plan.id}
                               onClick={() => handleSelectPlan(plan.id)}
-                              className="w-full p-4 rounded-xl bg-stone-800 border-2 border-transparent hover:border-stone-600 transition-all text-left flex justify-between items-center"
+                              className="w-full p-4 rounded-xl bg-white border-2 border-slate-200 hover:border-slate-300 transition-all text-left flex justify-between items-center"
                             >
                               <div>
-                                <div className="font-bold text-white">{plan.name}</div>
-                                <div className="text-sm text-stone-400">{plan.price} ₽</div>
+                                <div className="font-bold text-slate-900">{plan.name}</div>
+                                <div className="text-sm text-slate-500">{plan.price} ₽</div>
                               </div>
-                              <div className="w-5 h-5 rounded-full border-2 border-stone-600" />
+                              <div className="w-5 h-5 rounded-full border-2 border-slate-300" />
                             </button>
                           ))
                         )}
@@ -418,7 +418,7 @@ export function PaymentModal({
                     )}
 
                     {error && (
-                      <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm text-center">
+                      <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-600 text-sm text-center">
                         {error}
                         {fallbackUrl && (
                           <a
@@ -438,7 +438,7 @@ export function PaymentModal({
 
               {/* Footer Actions */}
               {!showWidget && (
-                <div className="shrink-0 p-4 bg-stone-900 border-t border-stone-800">
+                <div className="shrink-0 p-4 bg-white border-t border-slate-200">
                   <button
                     onClick={handlePayment}
                     disabled={!selectedPlanId || isProcessing}
@@ -446,8 +446,8 @@ export function PaymentModal({
                       w-full py-4 rounded-xl font-bold text-lg transition-all flex items-center justify-center gap-2
                       ${
                         selectedPlanId && !isProcessing
-                          ? 'bg-amber-500 text-stone-900 hover:bg-amber-400 shadow-lg shadow-amber-500/20'
-                          : 'bg-stone-800 text-stone-500 cursor-not-allowed'
+                          ? 'bg-amber-500 text-white hover:bg-amber-400 shadow-lg shadow-amber-200'
+                          : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                       }
                     `}
                   >
@@ -456,9 +456,9 @@ export function PaymentModal({
                       : `Оплатить ${selectedPlanDetails?.price || ''} ₽`}
                   </button>
 
-                  <p className="text-center text-[10px] text-stone-500 mt-3 px-4">
+                  <p className="text-center text-[10px] text-slate-500 mt-3 px-4">
                     Нажимая кнопку, вы соглашаетесь с условиями{' '}
-                    <a href="#" className="text-stone-400 hover:text-white">
+                    <a href="#" className="text-slate-400 hover:text-slate-900">
                       оферты
                     </a>{' '}
                     и рекуррентных платежей.

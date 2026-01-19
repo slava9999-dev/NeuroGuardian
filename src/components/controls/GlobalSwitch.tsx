@@ -35,7 +35,7 @@ export function GlobalSwitch({ compact = false }: GlobalSwitchProps) {
           ${
             protectionEnabled
               ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-              : 'bg-stone-700/50 text-stone-400 border border-stone-600/50'
+              : 'bg-slate-100 text-slate-500 border border-slate-200'
           }
         `}
       >
@@ -60,12 +60,12 @@ export function GlobalSwitch({ compact = false }: GlobalSwitchProps) {
 
   // Full version
   return (
-    <div className="glass-panel p-6 rounded-2xl">
+    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
       {/* Status Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-lg font-semibold text-white">Защита маржи</h2>
-          <p className="text-sm text-stone-400">
+          <h2 className="text-lg font-semibold text-slate-900">Защита маржи</h2>
+          <p className="text-sm text-slate-500">
             {protectionEnabled ? 'Система активна — мониторинг 24/7' : 'Система отключена'}
           </p>
         </div>
@@ -85,7 +85,7 @@ export function GlobalSwitch({ compact = false }: GlobalSwitchProps) {
           ${
             protectionEnabled
               ? 'bg-linear-to-r from-emerald-600 to-emerald-500'
-              : 'bg-linear-to-r from-stone-700 to-stone-600'
+              : 'bg-linear-to-r from-slate-100 to-slate-50 border border-slate-200'
           }
         `}
       >
@@ -100,7 +100,7 @@ export function GlobalSwitch({ compact = false }: GlobalSwitchProps) {
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className={`text-white transition-transform duration-300 ${protectionEnabled ? 'scale-110' : ''}`}
+            className={`transition-transform duration-300 ${protectionEnabled ? 'text-white scale-110' : 'text-slate-600'}`}
           >
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             {protectionEnabled && <path d="m9 12 2 2 4-4" />}
@@ -109,10 +109,12 @@ export function GlobalSwitch({ compact = false }: GlobalSwitchProps) {
 
         {/* Status text */}
         <div className="flex-1 text-right">
-          <div className="text-xl font-bold text-white tracking-wider">
+          <div
+            className={`text-xl font-bold tracking-wider ${protectionEnabled ? 'text-white' : 'text-slate-700'}`}
+          >
             {protectionEnabled ? 'ЗАЩИТА АКТИВНА' : 'ЗАЩИТА ОТКЛЮЧЕНА'}
           </div>
-          <div className="text-sm text-white/70">
+          <div className={`text-sm ${protectionEnabled ? 'text-white/80' : 'text-slate-500'}`}>
             {protectionEnabled ? 'Выключить мониторинг' : 'Включить защиту'}
           </div>
         </div>
@@ -125,8 +127,8 @@ export function GlobalSwitch({ compact = false }: GlobalSwitchProps) {
 
       {/* Subscription warning */}
       {isDisabled && (
-        <div className="mt-4 p-3 bg-amber-500/20 border border-amber-500/30 rounded-xl">
-          <p className="text-sm text-amber-400 text-center">
+        <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+          <p className="text-sm text-amber-600 text-center">
             ⚠️ Активируйте подписку для включения защиты
           </p>
         </div>

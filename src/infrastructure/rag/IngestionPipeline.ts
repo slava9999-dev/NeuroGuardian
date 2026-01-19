@@ -25,6 +25,8 @@ export interface IngestionResult {
   source: string;
   documentsProcessed: number;
   chunksCreated: number;
+  successfulFiles: string[];
+  failedFiles: string[];
   errors: string[];
   duration: number;
 }
@@ -109,6 +111,8 @@ export class KnowledgeIngestionPipeline {
       source: dirPath,
       documentsProcessed: 0,
       chunksCreated: 0,
+      successfulFiles: [],
+      failedFiles: [],
       errors: [],
       duration: 0,
     };
@@ -124,8 +128,12 @@ export class KnowledgeIngestionPipeline {
           const fileResult = await this.ingestFile(filePath, defaultNamespace);
           result.documentsProcessed++;
           result.chunksCreated += fileResult;
+          result.successfulFiles.push(path.basename(filePath));
+          // Throttle to prevent IO saturation/rate limits
+          await new Promise(resolve => setTimeout(resolve, 100));
         } catch (error) {
           const errorMsg = error instanceof Error ? error.message : String(error);
+          result.failedFiles.push(path.basename(filePath));
           result.errors.push(`${filePath}: ${errorMsg}`);
           logger.error(`[Ingestion] Error processing ${filePath}:`, error);
         }
@@ -202,6 +210,8 @@ export class KnowledgeIngestionPipeline {
           source: source.path,
           documentsProcessed: 0,
           chunksCreated: 0,
+          successfulFiles: [],
+          failedFiles: [path.basename(source.path)],
           errors: [`Path not found: ${source.path}`],
           duration: 0,
         });
@@ -222,6 +232,8 @@ export class KnowledgeIngestionPipeline {
             source: source.path,
             documentsProcessed: 1,
             chunksCreated: chunks,
+            successfulFiles: [path.basename(source.path)],
+            failedFiles: [],
             errors: [],
             duration: Date.now() - startTime,
           });
@@ -230,6 +242,8 @@ export class KnowledgeIngestionPipeline {
             source: source.path,
             documentsProcessed: 0,
             chunksCreated: 0,
+            successfulFiles: [],
+            failedFiles: [path.basename(source.path)],
             errors: [error instanceof Error ? error.message : String(error)],
             duration: Date.now() - startTime,
           });

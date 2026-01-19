@@ -10,40 +10,40 @@
 
 /* stylelint-disable at-rule-no-unknown */
 @theme {
-  /* Background: Premium Dark (Command Center) */
-  --color-background: #09090b; /* Zinc-950 */
-  --color-surface: #18181b;    /* Zinc-900 */
-  --color-surface-hl: #27272a; /* Zinc-800 */
-  --color-surface-dim: #3f3f46; /* Zinc-700 */
+  /* Background: Soft Light (Command Center) */
+  --color-background: #f8fafc; /* Slate-50 */
+  --color-surface: #ffffff;    /* White */
+  --color-surface-hl: #f1f5f9; /* Slate-100 */
+  --color-surface-dim: #e2e8f0; /* Slate-200 */
 
-  /* Primary: Cosmic Indigo/Violet */
-  --color-primary: #8b5cf6;    /* Violet-500 */
-  --color-primary-glow: #a78bfa; /* Violet-400 */
-  --color-primary-dim: rgba(139, 92, 246, 0.1);
-  --color-primary-border: rgba(139, 92, 246, 0.2);
+  /* Primary: Friendly Indigo */
+  --color-primary: #6366f1;    /* Indigo-500 */
+  --color-primary-glow: #818cf8; /* Indigo-400 */
+  --color-primary-dim: rgba(99, 102, 241, 0.12);
+  --color-primary-border: rgba(99, 102, 241, 0.25);
 
   /* Tactical Colors */
   --color-success: #10b981;    /* Emerald-500 */
-  --color-success-dim: rgba(16, 185, 129, 0.1);
+  --color-success-dim: rgba(16, 185, 129, 0.12);
   --color-warning: #f59e0b;    /* Amber-500 */
   --color-danger: #ef4444;     /* Red-500 */
   --color-info: #3b82f6;       /* Blue-500 */
 
-  /* Typography: Ultra-High Contrast */
-  --color-text-main: #fafafa;  /* Zinc-50 */
-  --color-text-dim: #a1a1aa;   /* Zinc-400 */
-  --color-text-muted: #52525b; /* Zinc-600 */
+  /* Typography: High Contrast */
+  --color-text-main: #0f172a;  /* Slate-900 */
+  --color-text-dim: #475569;   /* Slate-600 */
+  --color-text-muted: #94a3b8; /* Slate-400 */
 
-  /* Glass Effect (Cyber Noir) */
-  --glass-bg: rgba(24, 24, 27, 0.8);
-  --glass-border: rgba(63, 63, 70, 0.5);
-  --glass-border-hover: rgba(139, 92, 246, 0.4);
-  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+  /* Glass Effect (Light) */
+  --glass-bg: rgba(255, 255, 255, 0.75);
+  --glass-border: rgba(148, 163, 184, 0.35);
+  --glass-border-hover: rgba(99, 102, 241, 0.35);
+  --glass-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
 
   /* Refined Shadows */
-  --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.5);
-  --shadow-card-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.7);
-  --shadow-neon: 0 0 20px rgba(139, 92, 246, 0.15);
+  --shadow-card: 0 1px 3px 0 rgba(15, 23, 42, 0.08);
+  --shadow-card-hover: 0 12px 20px -10px rgba(15, 23, 42, 0.25);
+  --shadow-neon: 0 0 16px rgba(99, 102, 241, 0.2);
 
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-display: 'Outfit', system-ui, sans-serif;
@@ -79,9 +79,9 @@ html {
 /* Cosmic Background */
 .bg-cosmic {
   background: 
-    radial-gradient(circle at 0% 0%, rgba(139, 92, 246, 0.05) 0%, transparent 50%),
-    radial-gradient(circle at 100% 100%, rgba(16, 185, 129, 0.05) 0%, transparent 50%),
-    linear-gradient(to bottom, #09090b, #111114);
+    radial-gradient(circle at 0% 0%, rgba(99, 102, 241, 0.08) 0%, transparent 55%),
+    radial-gradient(circle at 100% 100%, rgba(16, 185, 129, 0.06) 0%, transparent 55%),
+    linear-gradient(to bottom, #f8fafc, #eef2f7);
   position: fixed;
   inset: 0;
   z-index: -2;
@@ -174,10 +174,10 @@ html {
    🎭 HUD & INTERFACE
    ============================================ */
 .nav-glass {
-  background: rgba(9, 9, 11, 0.85);
+  background: rgba(248, 250, 252, 0.85);
   backdrop-filter: blur(24px);
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.5);
+  border-top: 1px solid rgba(148, 163, 184, 0.25);
+  box-shadow: 0 -10px 30px rgba(15, 23, 42, 0.08);
 }
 
 .shimmer-text {
@@ -195,4 +195,3 @@ html {
 
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-

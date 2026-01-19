@@ -63,11 +63,13 @@ export interface EmbeddingProvider {
 export class OpenAIEmbeddingProvider implements EmbeddingProvider {
   private apiKey: string;
   private model: string;
+  private baseUrl: string;
   public dimensions: number;
 
   constructor(options?: { model?: string }) {
-    this.apiKey = process.env.OPENAI_API_KEY || '';
+    this.apiKey = process.env.OPENAI_API_KEY || process.env.AI_GATEWAY_API_KEY || '';
     this.model = options?.model || 'text-embedding-3-small';
+    this.baseUrl = process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
     this.dimensions = 1536;
   }
 
@@ -81,7 +83,11 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
       throw new Error('OPENAI_API_KEY not configured');
     }
 
-    const response = await fetch('https://api.openai.com/v1/embeddings', {
+    // Ensure baseUrl doesn't end with slash to avoid double slash
+    const base = this.baseUrl.endsWith('/') ? this.baseUrl.slice(0, -1) : this.baseUrl;
+    const url = `${base}/embeddings`;
+
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
@@ -95,7 +101,7 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`OpenAI Embedding API error: ${error}`);
+      throw new Error(`OpenAI Embedding API error (${url}): ${error}`);
     }
 
     const data = (await response.json()) as {
@@ -158,6 +164,91 @@ export class GeminiEmbeddingProvider implements EmbeddingProvider {
 }
 
 // ============================================
+// HuggingFace Embedding Provider
+// ============================================
+
+export class HuggingFaceEmbeddingProvider implements EmbeddingProvider {
+  private apiKey: string;
+  private model: string;
+  public dimensions: number;
+
+  constructor(options?: { model?: string }) {
+    this.apiKey = process.env.HUGGINGFACE_API_KEY || '';
+    // SOTA Multilingual model (1024 dims)
+    this.model = options?.model || 'intfloat/multilingual-e5-large';
+    this.dimensions = 1024;
+  }
+
+  async embed(text: string): Promise<number[]> {
+    const embeddings = await this.embedBatch([text]);
+    return embeddings[0];
+  }
+
+  async embedBatch(texts: string[]): Promise<number[][]> {
+    if (!this.apiKey) {
+      throw new Error('HUGGINGFACE_API_KEY not configured');
+    }
+
+    const maxRetries = 3;
+    let attempt = 0;
+
+    while (attempt < maxRetries) {
+      attempt++;
+      try {
+        const response = await fetch(
+          `https://router.huggingface.co/hf-inference/models/${this.model}`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${this.apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              inputs: texts,
+              options: { wait_for_model: true },
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          // Retry on gateway errors or model loading
+          if ((response.status === 504 || response.status === 503) && attempt < maxRetries) {
+            const delay = Math.pow(2, attempt) * 1000;
+            logger.warn(
+              `[HF-Embed] Attempt ${attempt} failed with ${response.status}. Retrying in ${delay}ms...`
+            );
+            await new Promise(r => setTimeout(r, delay));
+            continue;
+          }
+          throw new Error(`HuggingFace API error: ${response.status} ${errorText.slice(0, 500)}`);
+        }
+
+        const data = await response.json();
+
+        if (Array.isArray(data) && data.length > 0) {
+          if (typeof data[0] === 'number') {
+            return [data as number[]];
+          }
+          return data as number[][];
+        }
+
+        throw new Error('Invalid response format from HuggingFace');
+      } catch (error) {
+        if (attempt >= maxRetries) throw error;
+        const delay = Math.pow(2, attempt) * 1000;
+        logger.warn(`[HF-Embed] Network error on attempt ${attempt}. Retrying in ${delay}ms...`, {
+          error,
+        });
+        await new Promise(r => setTimeout(r, delay));
+      }
+    }
+
+    throw new Error('HuggingFace embedding retries exhausted');
+  }
+}
+
+// ============================================
 // Vector Store Service
 // ============================================
 
@@ -177,6 +268,11 @@ export class VectorStore {
     if (envProvider === 'gemini') {
       this.embeddingProvider = new GeminiEmbeddingProvider();
       logger.info('[VectorStore] Using Gemini embeddings (768 dims, enforced by RAG_PROVIDER)');
+    } else if (envProvider === 'huggingface') {
+      this.embeddingProvider = new HuggingFaceEmbeddingProvider();
+      logger.info(
+        `[VectorStore] Using HuggingFace embeddings (${this.embeddingProvider.dimensions} dims)`
+      );
     } else if (process.env.OPENAI_API_KEY && envProvider !== 'gemini') {
       // Default to OpenAI only if available and not explicitly set to gemini
       this.embeddingProvider = new OpenAIEmbeddingProvider();
@@ -185,6 +281,13 @@ export class VectorStore {
       this.embeddingProvider = new GeminiEmbeddingProvider();
       logger.info('[VectorStore] Using Gemini embeddings (768 dims)');
     }
+  }
+
+  /**
+   * Get current embedding dimensions
+   */
+  get dimensions(): number {
+    return this.embeddingProvider.dimensions;
   }
 
   /**
@@ -263,31 +366,74 @@ export class VectorStore {
   }
 
   /**
-   * Add multiple documents in batch
+   * Add multiple documents in batch using optimized bulk INSERT
    */
   async addDocuments(docs: EmbeddingDocument[]): Promise<number[]> {
-    // Generate embeddings for docs without them
-    const textsToEmbed = docs.filter(d => !d.embedding).map(d => d.content);
+    if (docs.length === 0) return [];
 
-    if (textsToEmbed.length > 0) {
-      const embeddings = await this.embeddingProvider.embedBatch(textsToEmbed);
-      let embeddingIndex = 0;
-      for (const doc of docs) {
-        if (!doc.embedding) {
-          doc.embedding = embeddings[embeddingIndex++];
-        }
-      }
+    await this.init();
+
+    // 1. Generate embeddings for docs without them
+    const docsToEmbed = docs.filter(d => !d.embedding);
+    if (docsToEmbed.length > 0) {
+      const texts = docsToEmbed.map(d => d.content);
+      const embeddings = await this.embeddingProvider.embedBatch(texts);
+      docsToEmbed.forEach((doc, i) => {
+        doc.embedding = embeddings[i];
+      });
     }
 
-    // Insert all documents
-    const ids: number[] = [];
-    for (const doc of docs) {
-      const id = await this.addDocument(doc);
-      ids.push(id);
-    }
+    // 2. Prepare bulk insert
+    // We use a single query for all documents to minimize connection overhead
+    try {
+      const valuePlaceholders: string[] = [];
+      const queryValues: any[] = [];
 
-    logger.info(`[VectorStore] Added ${ids.length} documents`);
-    return ids;
+      docs.forEach((doc, i) => {
+        const offset = i * 7;
+        valuePlaceholders.push(
+          `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}::vector, $${offset + 7}::jsonb)`
+        );
+
+        queryValues.push(
+          doc.namespace,
+          doc.sourceFile,
+          doc.chunkIndex,
+          doc.title || null,
+          doc.content,
+          // Force [1,2,3] string format for pgvector casting
+          JSON.stringify(doc.embedding),
+          JSON.stringify(doc.metadata || {})
+        );
+      });
+
+      const queryText = `
+        INSERT INTO knowledge_embeddings (
+          namespace, source_file, chunk_index, title, content, embedding, metadata
+        ) VALUES ${valuePlaceholders.join(', ')}
+        ON CONFLICT (namespace, source_file, chunk_index) 
+        DO UPDATE SET
+          title = EXCLUDED.title,
+          content = EXCLUDED.content,
+          embedding = EXCLUDED.embedding,
+          metadata = EXCLUDED.metadata,
+          updated_at = now()
+        RETURNING id
+      `;
+
+      const result = await sql.unsafe(queryText, queryValues);
+      const ids = result.rows.map(r => r.id);
+
+      logger.info(`[VectorStore] Bulk added ${ids.length} documents from ${docs[0].sourceFile}`);
+      return ids;
+    } catch (error) {
+      logger.error('[VectorStore] Bulk insert failed', {
+        file: docs[0]?.sourceFile,
+        count: docs.length,
+        error,
+      });
+      throw error;
+    }
   }
 
   /**
@@ -390,6 +536,9 @@ export class VectorStore {
     const embeddingStr = JSON.stringify(embedding);
     let result;
 
+    // We use ts_rank_cd with normalization (32) to rank by density and normalize by document length
+    // This helps prevent text scores from completely dominating the vector scores
+    // The query maps 'russian' configuration for stemming
     if (namespaces && namespaces.length > 0) {
       result = await sql`
         SELECT 
@@ -398,9 +547,9 @@ export class VectorStore {
           title,
           content,
           1 - (embedding <=> ${embeddingStr}::vector) as vector_score,
-          ts_rank(to_tsvector('russian', content), plainto_tsquery('russian', ${query})) as text_score,
+          ts_rank_cd(to_tsvector('russian', content), plainto_tsquery('russian', ${query}), 32) as text_score,
           (${vectorWeight} * (1 - (embedding <=> ${embeddingStr}::vector))) + 
-          (${textWeight} * ts_rank(to_tsvector('russian', content), plainto_tsquery('russian', ${query}))) as combined_score,
+          (${textWeight} * ts_rank_cd(to_tsvector('russian', content), plainto_tsquery('russian', ${query}), 32)) as combined_score,
           metadata
         FROM knowledge_embeddings
         WHERE namespace = ANY(${namespaces}::text[])
@@ -415,9 +564,9 @@ export class VectorStore {
           title,
           content,
           1 - (embedding <=> ${embeddingStr}::vector) as vector_score,
-          ts_rank(to_tsvector('russian', content), plainto_tsquery('russian', ${query})) as text_score,
+          ts_rank_cd(to_tsvector('russian', content), plainto_tsquery('russian', ${query}), 32) as text_score,
           (${vectorWeight} * (1 - (embedding <=> ${embeddingStr}::vector))) + 
-          (${textWeight} * ts_rank(to_tsvector('russian', content), plainto_tsquery('russian', ${query}))) as combined_score,
+          (${textWeight} * ts_rank_cd(to_tsvector('russian', content), plainto_tsquery('russian', ${query}), 32)) as combined_score,
           metadata
         FROM knowledge_embeddings
         ORDER BY combined_score DESC

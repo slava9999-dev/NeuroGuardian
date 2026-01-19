@@ -125,11 +125,11 @@ export function AgentPage() {
               <h2 className="text-[10px] font-black tracking-[0.5em] text-primary/40 uppercase">
                 ЯДРО СИСТЕМЫ: АКТИВНО
               </h2>
-              <h1 className="text-4xl font-black tracking-tighter italic uppercase text-white">
+              <h1 className="text-4xl font-black tracking-tighter italic uppercase text-slate-900">
                 ПРИВЕТ, {firstName}
               </h1>
-              <p className="text-zinc-400 text-sm font-medium tracking-tight max-w-[260px] mx-auto">
-                Бортовая ИИ-система NeuroGUARDIAN готова к защите Вашей прибыли.
+              <p className="text-slate-500 text-sm font-medium tracking-tight max-w-[300px] mx-auto">
+                Я — Виктор. Помогаю защищать маржу, следить за ценами и делать продажи стабильными.
               </p>
             </div>
 
@@ -146,14 +146,14 @@ export function AgentPage() {
                 onClick={() => handleSendMessage('статистика продаж')}
               />
               <QuickActionButton
-                icon={<Calculator className="w-4 h-4 text-zinc-500" />}
+                icon={<Calculator className="w-4 h-4 text-slate-500" />}
                 label="ЭКОНОМИКА"
-                onClick={() => handleSendMessage('юнит-экономика')}
+                onClick={() => handleSendMessage('рассчитай юнит-экономику')}
               />
               <QuickActionButton
                 icon={<Package className="w-4 h-4 text-warning" />}
                 label="КОНКУРЕНТЫ"
-                onClick={() => handleSendMessage('анализ конкурентов')}
+                onClick={() => handleSendMessage('сравни цены с конкурентами')}
               />
             </div>
           </motion.div>
@@ -162,17 +162,17 @@ export function AgentPage() {
 
       {/* Messages Header */}
       {hasMessages && (
-        <header className="fixed top-0 left-0 right-0 z-50 nav-glass p-4 py-3 flex items-center justify-between border-b border-white/5">
+        <header className="fixed top-0 left-0 right-0 z-50 nav-glass p-4 py-3 flex items-center justify-between border-b border-slate-200/70">
           <div className="flex items-center gap-3">
             <ViktorCore size="sm" />
             <div className="flex flex-col">
-              <span className="text-xs font-black tracking-wider text-white">ВИКТОР V5</span>
+              <span className="text-xs font-black tracking-wider text-slate-900">ВИКТОР</span>
               <div className="flex items-center gap-1.5">
                 <div
                   className={`w-1.5 h-1.5 rounded-full ${isProcessing ? 'bg-primary animate-pulse' : 'bg-success shadow-[0_0_8px_var(--color-success)]'}`}
                 />
-                <span className="text-[10px] text-zinc-500 font-bold uppercase">
-                  {isProcessing ? 'Обработка данных...' : 'Квантовый Анализ'}
+                <span className="text-[10px] text-slate-500 font-bold uppercase">
+                  {isProcessing ? 'Формирую ответ...' : 'Онлайн'}
                 </span>
               </div>
             </div>
@@ -182,9 +182,9 @@ export function AgentPage() {
               hapticFeedback('medium');
               clearMessages();
             }}
-            className="px-4 py-2 rounded-xl bg-white/2 border border-white/10 text-[10px] font-black text-zinc-500 hover:text-white transition-all uppercase tracking-widest"
+            className="px-4 py-2 rounded-xl bg-white/70 border border-slate-200 text-[10px] font-black text-slate-500 hover:text-slate-900 transition-all uppercase tracking-widest"
           >
-            СБРОС
+            СБРОС ЧАТА
           </button>
         </header>
       )}
@@ -201,9 +201,9 @@ export function AgentPage() {
 
       {/* Input Bar */}
       <div className="fixed bottom-0 left-0 right-0 p-6 bg-linear-to-t from-background via-background/90 to-transparent z-50 safe-area-inset-bottom">
-        <div className="max-w-xl mx-auto flex items-end gap-3 glass-panel p-2 border border-white/5 rounded-3xl shadow-2xl">
+        <div className="max-w-xl mx-auto flex items-end gap-3 bg-white/80 p-2 border border-slate-200 rounded-3xl shadow-xl">
           <button
-            className="p-3 text-zinc-600 hover:text-white transition-all"
+            className="p-3 text-slate-500 hover:text-slate-900 transition-all"
             onClick={() => fileInputRef.current?.click()}
             aria-label="Загрузить файл"
           >
@@ -213,8 +213,8 @@ export function AgentPage() {
             ref={inputRef}
             value={inputValue}
             onChange={e => setInputValue(e.target.value)}
-            placeholder={isListening ? 'СЛУШАЮ...' : 'Ваша команда Виктору...'}
-            className="flex-1 bg-transparent text-white px-2 py-3.5 text-sm focus:outline-none resize-none max-h-32 min-h-[48px] font-medium placeholder:text-zinc-700"
+            placeholder={isListening ? 'СЛУШАЮ...' : 'Напишите Виктору. Например: "проверь цены"'}
+            className="flex-1 bg-transparent text-slate-900 px-2 py-3.5 text-sm focus:outline-none resize-none max-h-32 min-h-[48px] font-medium placeholder:text-slate-400"
             onKeyDown={e => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -227,14 +227,14 @@ export function AgentPage() {
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               onClick={() => handleSendMessage(inputValue)}
-              className="p-3 bg-primary rounded-2xl text-black shadow-lg"
+              className="p-3 bg-primary rounded-2xl text-white shadow-lg shadow-primary/30 hover:brightness-110"
               aria-label="Отправить"
             >
               <Send className="w-5 h-5 fill-current" />
             </motion.button>
           ) : (
             <button
-              className={`p-3 rounded-2xl transition-all ${isListening ? 'bg-danger text-white animate-pulse' : 'text-zinc-600 hover:text-white'}`}
+              className={`p-3 rounded-2xl transition-all ${isListening ? 'bg-danger text-white animate-pulse' : 'text-slate-500 hover:text-slate-900'}`}
               aria-label="Голосовой ввод"
             >
               <Mic className="w-5 h-5" />
@@ -251,14 +251,14 @@ export function AgentPage() {
 // Subcomponents
 function LoadingDots() {
   return (
-    <div className="flex gap-4 items-center px-5 py-3.5 rounded-2xl bg-primary/2 border border-primary/10 max-w-[85%]">
+    <div className="flex gap-4 items-center px-5 py-3.5 rounded-2xl bg-white border border-primary/20 max-w-[85%]">
       <div className="flex gap-1.5">
         <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" />
         <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce delay-100" />
         <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce delay-200" />
       </div>
-      <span className="text-[10px] font-black text-primary/60 uppercase tracking-widest">
-        Квантовое ядро...
+      <span className="text-[10px] font-black text-primary/70 uppercase tracking-widest">
+        Виктор анализирует...
       </span>
     </div>
   );
@@ -275,8 +275,8 @@ function MessageUI({ message }: { message: ChatMessage }) {
       <div
         className={`px-5 py-3.5 rounded-[22px] text-[15px] leading-relaxed font-medium shadow-xl border ${
           isUser
-            ? 'bg-primary text-black border-transparent rounded-br-none shadow-[0_8px_20px_var(--color-primary-dim)]'
-            : 'bg-zinc-800 border-zinc-700/50 text-white rounded-bl-none'
+            ? 'bg-primary text-white border-transparent rounded-br-none shadow-[0_8px_20px_var(--color-primary-dim)]'
+            : 'bg-white border-slate-200 text-slate-800 rounded-bl-none'
         }`}
       >
         <div
@@ -284,8 +284,8 @@ function MessageUI({ message }: { message: ChatMessage }) {
         />
       </div>
       <div className="flex items-center gap-2 px-1">
-        <span className="text-[9px] font-black italic text-zinc-600 uppercase tracking-widest">
-          {isUser ? 'СЭР' : 'ВИКТОР'} •{' '}
+        <span className="text-[9px] font-black italic text-slate-400 uppercase tracking-widest">
+          {isUser ? 'ПОЛЬЗОВАТЕЛЬ' : 'ВИКТОР'} •{' '}
           {new Date(message.timestamp).toLocaleTimeString([], {
             hour: '2-digit',
             minute: '2-digit',
@@ -306,7 +306,7 @@ function QuickActionButton({ icon, label, onClick }: QuickActionButtonProps) {
   return (
     <motion.button
       onClick={onClick}
-      className="flex items-center gap-3 px-4 py-4 rounded-2xl bg-white/2 border border-white/5 text-zinc-500 hover:text-white hover:bg-white/5 transition-all text-[11px] font-black uppercase tracking-wider"
+      className="flex items-center gap-3 px-4 py-4 rounded-2xl bg-white border border-slate-200 text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-all text-[11px] font-black uppercase tracking-wider"
       whileTap={{ scale: 0.96 }}
     >
       {icon} <span>{label}</span>
@@ -316,7 +316,7 @@ function QuickActionButton({ icon, label, onClick }: QuickActionButtonProps) {
 
 function formatMessage(content: string): string {
   return content
-    .replace(/\*\*(.*?)\*\*/g, '<span class="font-black text-white">$1</span>')
+    .replace(/\*\*(.*?)\*\*/g, '<span class="font-black text-slate-900">$1</span>')
     .replace(/\n\n/g, '<br/><br/>')
     .replace(/\n/g, '<br/>');
 }

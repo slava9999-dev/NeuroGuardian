@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react';
 import { SentinelStatusBadge } from './SentinelStatusBadge';
 import { getInitData } from '../../lib/telegram';
+import { motion } from 'framer-motion';
 
 // --- Types ---
 interface ActiveThreat {
@@ -131,15 +132,15 @@ export function SentinelDashboard() {
   return (
     <div className="space-y-6">
       {/* Header & Controls */}
-      <div className="flex justify-between items-center bg-white/2 p-5 rounded-2xl border border-white/5">
+      <div className="flex justify-between items-center bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
         <div>
-          <h2 className="text-xl font-black italic tracking-tighter uppercase flex items-center gap-3 text-white">
+          <h2 className="text-xl font-black italic tracking-tighter uppercase flex items-center gap-3 text-slate-900">
             🛡️ Центр Защиты
             <span className="text-[9px] bg-primary text-black font-black px-2 py-0.5 rounded-md tracking-widest">
               LIVE
             </span>
           </h2>
-          <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">
+          <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">
             Мониторинг {data.monitoredProducts} товаров • Сканировано:{' '}
             {formatTime(data.lastScanTime)}
           </div>
@@ -147,8 +148,8 @@ export function SentinelDashboard() {
         <button
           onClick={handleScanNow}
           disabled={isScanning}
-          className={`px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all shadow-xl
-            ${isScanning ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' : 'bg-white text-black hover:bg-primary active:scale-95'}
+          className={`px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all shadow-sm
+            ${isScanning ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white text-slate-900 hover:bg-primary hover:text-white border border-slate-200 active:scale-95'}
           `}
         >
           {isScanning ? '🎞️ Сканирование...' : '⚡ Сканировать сейчас'}
@@ -160,12 +161,12 @@ export function SentinelDashboard() {
 
       {/* Active Threats Warning */}
       {data.activeThreats.count > 0 ? (
-        <div className="bg-rose-500/5 border border-rose-500/20 p-5 rounded-2xl">
+        <div className="bg-rose-50 border border-rose-200 p-5 rounded-2xl shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-rose-400 font-black italic uppercase tracking-tight flex items-center gap-3">
+            <h3 className="text-rose-700 font-black italic uppercase tracking-tight flex items-center gap-3">
               🚨 Активные Угрозы ({data.activeThreats.count})
             </h3>
-            <span className="text-[9px] text-rose-500 font-black bg-rose-500/10 px-2 py-1 rounded uppercase tracking-widest">
+            <span className="text-[9px] text-rose-600 font-black bg-rose-100 px-2 py-1 rounded uppercase tracking-widest">
               Критический статус
             </span>
           </div>
@@ -173,21 +174,21 @@ export function SentinelDashboard() {
             {data.activeThreats.items.map((threat, idx) => (
               <div
                 key={idx}
-                className="bg-white/2 p-4 rounded-xl border border-white/5 flex justify-between items-center"
+                className="bg-white p-4 rounded-xl border border-slate-200 flex justify-between items-center shadow-sm"
               >
                 <div>
-                  <div className="text-sm font-black italic text-zinc-100 uppercase tracking-tight">
+                  <div className="text-sm font-black italic text-slate-900 uppercase tracking-tight">
                     {threat.productTitle}
                   </div>
-                  <div className="text-[10px] text-rose-500 font-bold uppercase mt-1">
+                  <div className="text-[10px] text-rose-600 font-bold uppercase mt-1">
                     {threat.message}
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-sm font-black text-white">
+                  <div className="text-sm font-black text-slate-900">
                     {formatPrice(threat.currentPrice)}
                   </div>
-                  <div className="text-[10px] text-zinc-500 font-bold uppercase mt-0.5">
+                  <div className="text-[10px] text-slate-500 font-bold uppercase mt-0.5">
                     Мин: {formatPrice(threat.minPrice)}
                   </div>
                 </div>
@@ -196,15 +197,15 @@ export function SentinelDashboard() {
           </div>
         </div>
       ) : (
-        <div className="bg-emerald-500/5 border border-emerald-500/20 p-5 rounded-2xl flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center text-2xl shadow-[0_0_20px_rgba(16,185,129,0.1)]">
+        <div className="bg-emerald-50 border border-emerald-200 p-5 rounded-2xl flex items-center gap-4 shadow-sm">
+          <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center text-2xl shadow-[0_0_15px_rgba(16,185,129,0.1)]">
             ✅
           </div>
           <div>
-            <div className="font-black italic uppercase text-emerald-400 text-sm tracking-tight">
+            <div className="font-black italic uppercase text-emerald-700 text-sm tracking-tight">
               Угроз не обнаружено
             </div>
-            <div className="text-[10px] text-zinc-500 font-bold uppercase mt-1">
+            <div className="text-[10px] text-slate-500 font-bold uppercase mt-1">
               Все товары продаются выше минимальной цены
             </div>
           </div>
@@ -240,52 +241,52 @@ export function SentinelDashboard() {
       </div>
 
       {/* Recent Actions List */}
-      <div className="bg-white/2 rounded-2xl border border-white/5 overflow-hidden">
-        <div className="px-5 py-4 border-b border-white/5 bg-white/2 flex justify-between items-center">
-          <h3 className="font-black italic uppercase tracking-widest text-[10px] text-zinc-500">
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+        <div className="px-5 py-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+          <h3 className="font-black italic uppercase tracking-widest text-[10px] text-slate-600">
             📋 Последние действия
           </h3>
-          <span className="text-[9px] font-mono text-zinc-700 uppercase">Archive Logs</span>
+          <span className="text-[9px] font-mono text-slate-500 uppercase">Archive Logs</span>
         </div>
         <div className="max-h-96 overflow-y-auto no-scrollbar">
           {data.recentActions.length === 0 ? (
-            <div className="p-12 text-center text-zinc-600 font-black uppercase text-[10px] tracking-widest bg-white/1">
+            <div className="p-12 text-center text-slate-500 font-black uppercase text-[10px] tracking-widest bg-slate-50">
               Нет недавних действий
             </div>
           ) : (
-            <div className="divide-y divide-white/2">
+            <div className="divide-y divide-slate-100">
               {data.recentActions.map(action => (
                 <div
                   key={action.id}
-                  className="p-4 hover:bg-white/1 transition-all flex gap-4 items-center group"
+                  className="p-4 hover:bg-slate-50 transition-all flex gap-4 items-center group"
                 >
                   <div className="text-2xl group-hover:scale-110 transition-transform">
                     {action.success ? (action.action.includes('Stock') ? '📦' : '🛡️') : '⚠️'}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-black italic text-zinc-100 truncate group-hover:text-white transition-colors">
+                    <div className="text-sm font-black italic text-slate-900 truncate group-hover:text-slate-700 transition-colors">
                       {action.productTitle}
                     </div>
                     <div className="flex gap-2 text-[10px] font-bold uppercase tracking-tight mt-1">
                       <span
                         className={`px-1.5 py-0.5 rounded-md ${
                           action.marketplace === 'WB'
-                            ? 'bg-purple-500/20 text-purple-400 border border-purple-500/20'
-                            : 'bg-blue-500/20 text-blue-400 border border-blue-500/20'
+                            ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                            : 'bg-blue-100 text-blue-700 border border-blue-200'
                         }`}
                       >
                         {action.marketplace}
                       </span>
-                      <span className="text-zinc-500 group-hover:text-zinc-400 transition-colors">
+                      <span className="text-slate-500 group-hover:text-slate-600 transition-colors">
                         {action.threatType}
                       </span>
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm font-black text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.1)]">
+                    <div className="text-sm font-black text-emerald-600 shadow-[0_0_10px_rgba(16,185,129,0.1)]">
                       {action.savedAmount > 0 ? `+${formatPrice(action.savedAmount)}` : 'Защищён'}
                     </div>
-                    <div className="text-[9px] font-mono text-zinc-600 uppercase mt-1">
+                    <div className="text-[9px] font-mono text-slate-500 uppercase mt-1">
                       {formatTime(action.createdAt)}
                     </div>
                   </div>
@@ -314,20 +315,19 @@ function StatCard({
 }) {
   const colorMap: Record<string, string> = {
     green:
-      'text-emerald-400 bg-emerald-500/5 border-emerald-500/20 shadow-[0_4px_15px_rgba(16,185,129,0.05)]',
-    red: 'text-rose-400 bg-rose-500/5 border-rose-500/20 shadow-[0_4px_15px_rgba(244,63,94,0.05)]',
-    orange:
-      'text-amber-400 bg-amber-500/5 border-amber-500/20 shadow-[0_4px_15px_rgba(245,158,11,0.05)]',
-    blue: 'text-blue-400 bg-blue-500/5 border-blue-500/20 shadow-[0_4px_15px_rgba(59,130,246,0.05)]',
+      'text-emerald-600 bg-emerald-50 border-emerald-200 shadow-[0_4px_15px_rgba(16,185,129,0.08)]',
+    red: 'text-rose-600 bg-rose-50 border-rose-200 shadow-[0_4px_15px_rgba(244,63,94,0.08)]',
+    orange: 'text-amber-600 bg-amber-50 border-amber-200 shadow-[0_4px_15px_rgba(245,158,11,0.08)]',
+    blue: 'text-blue-600 bg-blue-50 border-blue-200 shadow-[0_4px_15px_rgba(59,130,246,0.08)]',
   };
 
   return (
     <div
-      className={`p-4 rounded-2xl border transition-all hover:scale-105 ${colorMap[color] || 'bg-white/2 border-white/5'}`}
+      className={`p-4 rounded-2xl border transition-all hover:scale-105 hover:shadow-lg ${colorMap[color] || 'bg-white border-slate-200 shadow-sm'}`}
     >
       <div className="text-2xl mb-2">{icon}</div>
-      <div className="text-xl font-black italic tracking-tighter text-white">{value}</div>
-      <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500 mt-1">
+      <div className="text-xl font-black italic tracking-tighter text-slate-900">{value}</div>
+      <div className="text-[9px] font-black uppercase tracking-widest text-slate-600 mt-1">
         {label}
       </div>
     </div>

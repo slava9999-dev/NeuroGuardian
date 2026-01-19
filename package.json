@@ -48,7 +48,9 @@
     "test:agent:verbose": "npx tsx tests/agent/run-professional-tests.ts --verbose",
     "test:agent:setup": "npx tsx tests/agent/run-professional-tests.ts --setup",
     "test:agent:cleanup": "npx tsx tests/agent/run-professional-tests.ts --cleanup",
-    "medic": "npx tsx scripts/neuro-medic.ts"
+    "medic": "npx tsx scripts/neuro-medic.ts",
+    "rag:migrate": "npx tsx scripts/rag-migrate.ts",
+    "rag:ingest": "npx tsx scripts/rag-ingest.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.46",

@@ -21,12 +21,12 @@ function getPool(): pkg.Pool {
 
   const connectionString = config.POSTGRES_URL.replace(/\r/g, '').trim();
 
-  // Force SSL settings for stability on Node 25+ / Neon
+  // Optimized for Neon/Vercel Postgres with Node 25+
   const poolConfig: PoolConfig = {
     connectionString,
-    ssl: { rejectUnauthorized: false }, // Force accept certs
-    max: 1, // Force sequential execution to prevent connection drops
-    idleTimeoutMillis: 5000, // Close idle quickly
+    ssl: { rejectUnauthorized: false },
+    max: 10, // Increased for concurrency
+    idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000,
     keepAlive: true,
   };
@@ -34,10 +34,8 @@ function getPool(): pkg.Pool {
   _pool = new Pool(poolConfig);
 
   _pool.on('error', (err: Error) => {
-    // Ignore terminated connections (common in serverless/lambdas)
-    if (!err.message.includes('terminated') && !err.message.includes('ECONNRESET')) {
-      console.error('[Database] Global Pool Error:', err.message);
-    }
+    // Avoid crashing on pool errors
+    logger.warn('[Database] Pool Error', { error: err.message });
   });
 
   return _pool;
@@ -48,7 +46,7 @@ function getPool(): pkg.Pool {
  */
 async function executeWithRetry(text: string, values: unknown[]): Promise<QueryResult> {
   const pool = getPool();
-  const retries = 3; // Lower retries for faster debugging
+  const retries = 5;
   let attempt = 0;
 
   while (attempt < retries) {
@@ -56,12 +54,23 @@ async function executeWithRetry(text: string, values: unknown[]): Promise<QueryR
     let client: PoolClient | null = null;
 
     try {
-      // 1. Dedicated connection with detailed error capture
       client = await pool.connect();
 
-      // 2. Execute with standard PG timeout (90s)
-      const res = await client.query(text, values);
-      return res;
+      // Handle the unhandled 'error' event on the client itself
+      // which often causes "Connection terminated unexpectedly" to crash the process
+      const errorListener = (err: Error) => {
+        logger.debug('[Database] Client socket error during execution', { error: err.message });
+      };
+      client.on('error', errorListener);
+
+      try {
+        const res = await client.query(text, values);
+        client.removeListener('error', errorListener);
+        return res;
+      } catch (err) {
+        client.removeListener('error', errorListener);
+        throw err;
+      }
     } catch (error: unknown) {
       const err = error as Error;
       const msg = err.message || String(error);
@@ -71,26 +80,26 @@ async function executeWithRetry(text: string, values: unknown[]): Promise<QueryR
         msg.includes('terminated') ||
         msg.includes('RESET') ||
         msg.includes('SSL') ||
-        msg.includes('ECONNRESET');
+        msg.includes('ECONNRESET') ||
+        msg.includes('socket') ||
+        msg.includes('connection');
 
       if (isTransient && attempt < retries) {
-        console.error(
-          `[Database] ⚠️ Attempt ${attempt} failed: ${msg}. Stack: ${err.stack?.split('\n')[1]}`
-        );
-        await new Promise(r => setTimeout(r, 500)); // Quicker retry
+        const delay = attempt * 1000;
+        logger.warn(`[Database] ⚠️ Attempt ${attempt} failed: ${msg}. Retrying in ${delay}ms...`);
+        await new Promise(r => setTimeout(r, delay));
         continue;
       }
 
-      // Log full error for terminal debugging
-      console.error('[Database] ❌ Critical DB Error:', {
+      logger.error('[Database] ❌ Critical DB Error:', {
         message: msg,
-        query: text.substring(0, 100) + '...',
+        query: text.substring(0, 100),
         attempt,
       });
       throw error;
     } finally {
       if (client) {
-        client.release(true); // Force destroy connection on error/finish to ensure fresh start
+        client.release(); // Return to pool instead of destroying
       }
     }
   }

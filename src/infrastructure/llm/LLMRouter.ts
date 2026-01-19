@@ -2,6 +2,7 @@ import type { LLMProvider, LLMMessage, LLMResponse } from './LLMProvider.js';
 import { getLLMConfig } from '../../core/config/llm.config.js';
 import { OpenRouterProvider } from './OpenRouterProvider.js';
 import { OpenAIProvider } from './OpenAIProvider.js';
+import { HuggingFaceProvider } from './HuggingFaceProvider.js';
 
 export class LLMRouter {
   private providers: LLMProvider[] = [];
@@ -19,24 +20,28 @@ export class LLMRouter {
 
     try {
       const config = await getLLMConfig();
-      // Initialize based on config provider
-      if (config.provider === 'openrouter') {
-        this.providers.push(new OpenRouterProvider());
-        // Fallback: if we have openai key, add it?
-        // For now, adhere to explicit config choice for primary
-      } else if (config.provider === 'openai') {
-        this.providers.push(new OpenAIProvider());
-      } else {
-        // Default to OpenRouter if unknown or not set?
-        // Or throw
-        console.warn(`Unknown LLM provider in config: ${config.provider}`);
+
+      // PRIORITIZE HuggingFace if key is present (High quality PRO subscription)
+      if (process.env.HUGGINGFACE_API_KEY) {
+        this.providers.push(new HuggingFaceProvider());
+        console.log('[LLMRouter] Using HuggingFace PRO (Qwen 2.5) as primary provider');
       }
 
-      // Add backup providers if keys available?
-      // Logic for backup keys would need to be in config or fetched here.
-      // Keeping it simple: 1 provider from config for now + explicit injects.
+      // Add secondary/fallback providers
+      if (config.provider === 'openrouter' && !process.env.HUGGINGFACE_API_KEY) {
+        this.providers.push(new OpenRouterProvider());
+      } else if (config.provider === 'openai' && !process.env.HUGGINGFACE_API_KEY) {
+        this.providers.push(new OpenAIProvider());
+      }
+
+      // Fallback to OpenRouter if HF isn't available
+      if (this.providers.length === 0) {
+        this.providers.push(new OpenRouterProvider());
+      }
     } catch (e) {
       console.warn('Failed to initialize LLM config', e);
+      // Absolute fallback
+      this.providers.push(new OpenRouterProvider());
     }
     this.initialized = true;
   }

@@ -142,23 +142,23 @@ export function BulkUpdateCostsModal({ isOpen, onClose }: BulkUpdateCostsModalPr
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50"
+            className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-50"
             onClick={onClose}
           />
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed inset-x-4 top-[10%] bottom-[10%] md:inset-x-auto md:w-[600px] md:left-1/2 md:-translate-x-1/2 bg-zinc-900 rounded-2xl border border-white/5 shadow-2xl z-50 overflow-hidden flex flex-col"
+            className="fixed inset-x-4 top-[10%] bottom-[10%] md:inset-x-auto md:w-[600px] md:left-1/2 md:-translate-x-1/2 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 overflow-hidden flex flex-col"
           >
             {/* Header */}
-            <div className="p-4 border-b border-white/5 flex justify-between items-center bg-zinc-900">
-              <h2 className="text-xl font-black italic tracking-tighter uppercase text-white">
+            <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-white">
+              <h2 className="text-xl font-black italic tracking-tighter uppercase text-slate-900">
                 📦 Массовая себестоимость
               </h2>
               <button
                 onClick={onClose}
-                className="text-zinc-600 hover:text-white transition-colors"
+                className="text-slate-400 hover:text-slate-900 transition-colors"
               >
                 ✕
               </button>
@@ -168,7 +168,7 @@ export function BulkUpdateCostsModal({ isOpen, onClose }: BulkUpdateCostsModalPr
             <div className="flex-1 overflow-y-auto p-4">
               {step === 'input' ? (
                 <div className="space-y-4">
-                  <div className="bg-primary/5 border border-primary/20 p-4 rounded-xl text-[10px] font-bold uppercase tracking-widest text-primary leading-relaxed">
+                  <div className="bg-primary/10 border border-primary/20 p-4 rounded-xl text-[10px] font-bold uppercase tracking-widest text-slate-700 leading-relaxed">
                     <p className="font-black mb-1">Как использовать:</p>
                     <p>Скопируйте данные из Excel (Артикул и Цена) и вставьте сюда.</p>
                     <p className="mt-1 opacity-50 font-mono tracking-tight text-[9px]">
@@ -180,7 +180,7 @@ export function BulkUpdateCostsModal({ isOpen, onClose }: BulkUpdateCostsModalPr
                     value={textInput}
                     onChange={e => setTextInput(e.target.value)}
                     placeholder={`123456\t500\n789012\t1200\n...`}
-                    className="w-full h-64 bg-black border border-white/5 rounded-2xl p-4 text-zinc-100 font-mono text-sm focus:border-primary/50 outline-none resize-none shadow-xl"
+                    className="w-full h-64 bg-white border border-slate-200 rounded-2xl p-4 text-slate-900 font-mono text-sm focus:border-primary/50 outline-none resize-none shadow-sm"
                   />
 
                   {error && (
@@ -189,36 +189,34 @@ export function BulkUpdateCostsModal({ isOpen, onClose }: BulkUpdateCostsModalPr
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <div className="flex justify-between items-center text-sm text-stone-400">
+                  <div className="flex justify-between items-center text-sm text-slate-500">
                     <span>Распознано товаров: {parsedUpdates.length}</span>
                     <button
                       onClick={() => setStep('input')}
-                      className="text-blue-400 hover:underline"
+                      className="text-primary hover:underline"
                     >
                       Назад к вводу
                     </button>
                   </div>
 
-                  <div className="border border-white/5 rounded-2xl overflow-hidden shadow-2xl">
+                  <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
                     <table className="w-full text-[10px] text-left">
-                      <thead className="bg-white/5 text-zinc-600 uppercase tracking-widest font-black">
+                      <thead className="bg-slate-50 text-slate-500 uppercase tracking-widest font-black">
                         <tr>
                           <th className="p-4">Товар</th>
                           <th className="p-4 text-right">Было</th>
                           <th className="p-4 text-right">Станет</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-white/2">
+                      <tbody className="divide-y divide-slate-100">
                         {parsedUpdates.map(u => (
-                          <tr key={u.id} className="hover:bg-stone-800/50">
-                            <td className="p-3 text-white truncate max-w-[200px]">
+                          <tr key={u.id} className="hover:bg-slate-50">
+                            <td className="p-3 text-slate-900 truncate max-w-[200px]">
                               {u.title}
-                              <div className="text-xs text-stone-500">{u.id}</div>
+                              <div className="text-xs text-slate-400">{u.id}</div>
                             </td>
-                            <td className="p-3 text-right text-stone-400">{u.oldCost} ₽</td>
-                            <td className="p-3 text-right font-bold text-blue-400">
-                              {u.newCost} ₽
-                            </td>
+                            <td className="p-3 text-right text-slate-500">{u.oldCost} ₽</td>
+                            <td className="p-3 text-right font-bold text-primary">{u.newCost} ₽</td>
                           </tr>
                         ))}
                       </tbody>
@@ -226,7 +224,7 @@ export function BulkUpdateCostsModal({ isOpen, onClose }: BulkUpdateCostsModalPr
                   </div>
 
                   {error && (
-                    <div className="text-orange-400 text-sm bg-orange-500/10 p-2 rounded">
+                    <div className="text-orange-500 text-sm bg-orange-50 p-2 rounded border border-orange-200">
                       {error}
                     </div>
                   )}
@@ -235,12 +233,12 @@ export function BulkUpdateCostsModal({ isOpen, onClose }: BulkUpdateCostsModalPr
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-white/5 bg-zinc-900 safe-area-bottom">
+            <div className="p-4 border-t border-slate-200 bg-white safe-area-bottom">
               {step === 'input' ? (
                 <button
                   onClick={handleParse}
                   disabled={!textInput.trim()}
-                  className="w-full py-4 bg-white text-black font-black text-[10px] uppercase tracking-[0.2em] rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 shadow-xl hover:bg-primary"
+                  className="w-full py-4 bg-primary text-white font-black text-[10px] uppercase tracking-[0.2em] rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 shadow-sm hover:brightness-110"
                 >
                   Распознать
                 </button>
@@ -248,7 +246,7 @@ export function BulkUpdateCostsModal({ isOpen, onClose }: BulkUpdateCostsModalPr
                 <button
                   onClick={handleSave}
                   disabled={loading}
-                  className="w-full py-4 bg-primary text-black font-black text-[10px] uppercase tracking-[0.2em] rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 active:scale-95 shadow-xl"
+                  className="w-full py-4 bg-primary text-white font-black text-[10px] uppercase tracking-[0.2em] rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 active:scale-95 shadow-sm"
                 >
                   {loading ? (
                     '💾 СОХРАНЕНИЕ...'

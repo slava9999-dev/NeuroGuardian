@@ -112,7 +112,7 @@ export function LogHistory({ isOpen, onClose }: LogHistoryProps) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center"
+          className="fixed inset-0 bg-slate-900/30 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center"
           onClick={onClose}
         >
           <motion.div
@@ -121,27 +121,27 @@ export function LogHistory({ isOpen, onClose }: LogHistoryProps) {
             exit={{ opacity: 0, y: 100 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             onClick={e => e.stopPropagation()}
-            className="w-full max-w-lg max-h-[85vh] bg-zinc-900 rounded-t-3xl sm:rounded-3xl border border-white/5 overflow-hidden shadow-2xl flex flex-col"
+            className="w-full max-w-lg max-h-[85vh] bg-white rounded-t-3xl sm:rounded-3xl border border-slate-200 overflow-hidden shadow-xl flex flex-col"
           >
             {/* Header */}
-            <div className="p-6 pb-4 border-b border-white/5 shrink-0">
+            <div className="p-6 pb-4 border-b border-slate-200 shrink-0">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center shadow-[0_0_20px_var(--color-primary-dim)]">
+                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shadow-[0_0_20px_var(--color-primary-dim)]">
                     <span className="text-2xl">📊</span>
                   </div>
                   <div>
-                    <h2 className="text-xl font-black italic tracking-tighter uppercase text-white">
+                    <h2 className="text-xl font-black italic tracking-tighter uppercase text-slate-900">
                       История защиты
                     </h2>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
                       Защита цен
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={onClose}
-                  className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors"
+                  className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors"
                 >
                   <svg
                     width="16"
@@ -150,7 +150,7 @@ export function LogHistory({ isOpen, onClose }: LogHistoryProps) {
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="2.5"
-                    className="text-zinc-600"
+                    className="text-slate-400"
                   >
                     <line x1="18" y1="6" x2="6" y2="18" />
                     <line x1="6" y1="6" x2="18" y2="18" />
@@ -169,8 +169,8 @@ export function LogHistory({ isOpen, onClose }: LogHistoryProps) {
                     }}
                     className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
                       selectedPeriod === option.value
-                        ? 'bg-primary text-black'
-                        : 'bg-white/5 text-zinc-500 hover:bg-white/10'
+                        ? 'bg-primary text-white'
+                        : 'bg-white text-slate-500 hover:bg-slate-50'
                     }`}
                   >
                     {option.label}
@@ -181,29 +181,29 @@ export function LogHistory({ isOpen, onClose }: LogHistoryProps) {
 
             {/* Summary */}
             {summary && !isLoading && (
-              <div className="px-6 py-4 border-b border-white/5 shrink-0">
+              <div className="px-6 py-4 border-b border-slate-200 shrink-0">
                 <div className="grid grid-cols-3 gap-3">
-                  <div className="text-center p-3 rounded-xl bg-white/2 border border-white/5">
+                  <div className="text-center p-3 rounded-xl bg-white border border-slate-200">
                     <div className="text-xl font-black italic tracking-tighter text-primary">
                       {summary.totalTriggers}
                     </div>
-                    <div className="text-[9px] font-bold uppercase tracking-widest text-zinc-600">
+                    <div className="text-[9px] font-bold uppercase tracking-widest text-slate-500">
                       Срабатываний
                     </div>
                   </div>
-                  <div className="text-center p-3 rounded-xl bg-white/2 border border-white/5">
+                  <div className="text-center p-3 rounded-xl bg-white border border-slate-200">
                     <div className="text-xl font-black italic tracking-tighter text-emerald-400">
                       {summary.totalSaved > 0 ? `${(summary.totalSaved / 1000).toFixed(1)}k` : '0'}
                     </div>
-                    <div className="text-[9px] font-bold uppercase tracking-widest text-zinc-600">
+                    <div className="text-[9px] font-bold uppercase tracking-widest text-slate-500">
                       Спасено ₽
                     </div>
                   </div>
-                  <div className="text-center p-3 rounded-xl bg-white/2 border border-white/5">
+                  <div className="text-center p-3 rounded-xl bg-white border border-slate-200">
                     <div className="text-xl font-black italic tracking-tighter text-amber-400">
                       {summary.uniqueProducts}
                     </div>
-                    <div className="text-[9px] font-bold uppercase tracking-widest text-zinc-600">
+                    <div className="text-[9px] font-bold uppercase tracking-widest text-slate-500">
                       Товаров
                     </div>
                   </div>
@@ -220,7 +220,7 @@ export function LogHistory({ isOpen, onClose }: LogHistoryProps) {
                     animate={{ rotate: 360 }}
                     transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                   />
-                  <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest mt-4">
+                  <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-4">
                     Загрузка...
                   </p>
                 </div>
@@ -230,7 +230,7 @@ export function LogHistory({ isOpen, onClose }: LogHistoryProps) {
                   <p className="text-red-400">{error}</p>
                   <button
                     onClick={fetchLogs}
-                    className="mt-4 px-4 py-2 rounded-xl bg-stone-800 text-stone-300 hover:bg-stone-700 transition-colors"
+                    className="mt-4 px-4 py-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
                   >
                     Попробовать снова
                   </button>
@@ -238,8 +238,8 @@ export function LogHistory({ isOpen, onClose }: LogHistoryProps) {
               ) : logs.length === 0 ? (
                 <div className="text-center py-12">
                   <span className="text-4xl mb-4 block">🛡️</span>
-                  <p className="text-stone-400 font-medium">Пока нет срабатываний</p>
-                  <p className="text-stone-500 text-sm mt-2">
+                  <p className="text-slate-500 font-medium">Пока нет срабатываний</p>
+                  <p className="text-slate-400 text-sm mt-2">
                     NeuroGuardian AI отслеживает цены ваших товаров
                   </p>
                 </div>
@@ -253,7 +253,7 @@ export function LogHistory({ isOpen, onClose }: LogHistoryProps) {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.05 }}
-                        className="p-4 rounded-xl bg-white/2 border border-white/5"
+                        className="p-4 rounded-xl bg-white border border-slate-200"
                       >
                         <div className="flex items-start gap-3">
                           {/* Action icon */}
@@ -266,7 +266,7 @@ export function LogHistory({ isOpen, onClose }: LogHistoryProps) {
                           {/* Content */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-2">
-                              <p className="text-sm font-medium text-white truncate">
+                              <p className="text-sm font-medium text-slate-900 truncate">
                                 {log.productTitle || log.productId}
                               </p>
                               <span
@@ -277,22 +277,22 @@ export function LogHistory({ isOpen, onClose }: LogHistoryProps) {
                             </div>
 
                             <div className="flex items-center gap-2 mt-1 text-xs">
-                              <span className="text-stone-500">Цена:</span>
-                              <span className="text-red-400 line-through">
+                              <span className="text-slate-500">Цена:</span>
+                              <span className="text-rose-500 line-through">
                                 {log.detectedPrice.toLocaleString('ru-RU')} ₽
                               </span>
-                              <span className="text-stone-500">→</span>
-                              <span className="text-amber-400 font-medium">
+                              <span className="text-slate-400">→</span>
+                              <span className="text-amber-600 font-medium">
                                 min {log.minPrice.toLocaleString('ru-RU')} ₽
                               </span>
                             </div>
 
                             <div className="flex items-center justify-between mt-2">
-                              <span className="text-xs text-stone-500">
+                              <span className="text-xs text-slate-400">
                                 {formatDate(log.createdAt)}
                               </span>
                               {log.savedAmount > 0 && (
-                                <span className="text-xs font-medium text-emerald-400">
+                                <span className="text-xs font-medium text-emerald-600">
                                   +{log.savedAmount.toLocaleString('ru-RU')} ₽ сохранено
                                 </span>
                               )}
@@ -307,10 +307,10 @@ export function LogHistory({ isOpen, onClose }: LogHistoryProps) {
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-white/5 shrink-0">
+            <div className="p-4 border-t border-slate-200 shrink-0">
               <button
                 onClick={onClose}
-                className="w-full py-4 rounded-xl bg-white/5 text-zinc-500 font-black text-[10px] uppercase tracking-[0.2em] hover:bg-white/10 transition-all"
+                className="w-full py-4 rounded-xl bg-white text-slate-500 border border-slate-200 font-black text-[10px] uppercase tracking-[0.2em] hover:bg-slate-50 transition-all"
               >
                 Закрыть
               </button>
