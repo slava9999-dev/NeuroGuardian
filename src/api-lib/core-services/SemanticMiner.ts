@@ -1,4 +1,23 @@
 import { sql } from '../services/database.js';
+import { LLMResponse } from '../../infrastructure/llm/LLMProvider.js';
+
+interface WbProductApi {
+  id: number;
+  name: string;
+  sizes?: Array<{ price?: { total?: number }; product?: number }>;
+  salePriceU?: number;
+  priceU?: number;
+  reviewRating?: number;
+  feedbacks?: number;
+  root?: number;
+}
+
+interface WbFeedback {
+  id: string;
+  productValuation: number;
+  text: string;
+  createdDate: string;
+}
 import { geminiPro } from '../../infrastructure/llm/GeminiProvider.js';
 import { logger } from '../lib/logger.js';
 import { fetchWithRetry } from '../lib/index.js';
@@ -272,7 +291,7 @@ export class SemanticMiner {
         }
       }
 
-      return products.slice(0, this.defaultCompetitorLimit).map((p: any) => ({
+      return products.slice(0, this.defaultCompetitorLimit).map((p: WbProductApi) => ({
         marketplace: 'wb' as const,
         externalId: String(p.id),
         title: p.name,
@@ -473,7 +492,7 @@ export class SemanticMiner {
       }
 
       const data = await response.json();
-      const feedbacks = (data.feedbacks || []) as any[];
+      const feedbacks = (data.feedbacks || []) as WbFeedback[];
 
       return feedbacks.slice(0, this.reviewsToAnalyze).map(f => ({
         reviewId: String(f.id),
@@ -600,7 +619,7 @@ export class SemanticMiner {
   private async callGeminiWithRetry(
     messages: { role: 'system' | 'user' | 'assistant' | 'tool'; content: string }[],
     config?: Record<string, unknown>
-  ): Promise<any> {
+  ): Promise<LLMResponse> {
     const maxRetries = 3;
     let attempt = 0;
     let waitTime = 65000; // start with 65s
@@ -631,6 +650,7 @@ export class SemanticMiner {
         throw error; // Throw other errors immediately
       }
     }
+    throw new Error('Failed to complete request after retries');
   }
 
   async injectTrendingKeywords(productId: string, trendingKeywords: string[]): Promise<void> {

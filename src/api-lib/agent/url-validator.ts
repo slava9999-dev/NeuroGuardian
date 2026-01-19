@@ -84,7 +84,7 @@ export function validateUrl(rawUrl: string): ValidatedLink {
     }
 
     return { url: cleanedUrl, isValid: true, domain: host };
-  } catch (error) {
+  } catch {
     return { url: rawUrl, isValid: false, reason: 'URL parsing error' };
   }
 }

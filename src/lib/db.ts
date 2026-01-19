@@ -1,5 +1,5 @@
 export const db = {
-  query: async (text: string, params?: any[]) => {
+  query: async (text: string, params?: unknown[]) => {
     // This is a wrapper to make it look like a standard pg client
     // @vercel/postgres uses tagged templates mostly, but supports query method too on the client.
     // However, `sql` is the recommended way.

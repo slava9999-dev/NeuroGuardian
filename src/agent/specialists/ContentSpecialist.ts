@@ -175,7 +175,11 @@ export class ContentSpecialist extends BaseSpecialist {
         }
       }
 
-      const prompt = this.buildContentPrompt(product, request as any, visionData);
+      const prompt = this.buildContentPrompt(
+        product,
+        request as unknown as ContentGenerationRequest,
+        visionData
+      );
 
       const textResponse = await geminiFlash.complete(
         [
@@ -220,7 +224,11 @@ export class ContentSpecialist extends BaseSpecialist {
     }
   }
 
-  private buildContentPrompt(product: any, request: any, visionData: string): string {
+  private buildContentPrompt(
+    product: any, // eslint-disable-line @typescript-eslint/no-explicit-any
+    request: ContentGenerationRequest,
+    visionData: string
+  ): string {
     return `Generate ${request.platform} post for ${product.title} in ${request.style || 'professional'} style.
     Price: ${product.current_price} RUB. Marketplace: ${product.marketplace}.
     Vision AI Data: ${visionData}

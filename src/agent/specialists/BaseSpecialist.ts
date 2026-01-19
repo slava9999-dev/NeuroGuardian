@@ -114,7 +114,7 @@ export abstract class BaseSpecialist {
       // 5. Execute tools if called (Safety Check!)
       const toolResults: (ToolResult & { tool: string })[] = [];
       let requiresConfirmation = false;
-      const pendingActions: any[] = [];
+      const pendingActions: { tool: string; args: Record<string, unknown>; reason: string }[] = [];
 
       if (response.toolCalls && response.toolCalls.length > 0) {
         for (const toolCall of response.toolCalls) {

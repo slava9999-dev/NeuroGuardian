@@ -42,22 +42,34 @@ async function fetchWbReviews(apiKey: string, params: GetReviewsParams): Promise
       {
         headers: { Authorization: apiKey },
       }
-    )) as any;
+    )) as { data?: { feedbacks: unknown[] } };
 
     const items = response.data?.feedbacks || [];
 
-    return items.map((item: any) => ({
-      id: item.id,
-      marketplace: 'WB',
-      product_id: String(item.nmId),
-      product_title: item.productName || item.productValuation,
-      rating: item.productValuation,
-      text: item.text,
-      created_at: item.createdDate,
-      author_name: item.userName,
-      status: item.answer ? 'replied' : 'new',
-      answer: item.answer ? item.answer.text : undefined,
-    }));
+    return items.map((item: unknown) => {
+      const i = item as {
+        id: string;
+        nmId: unknown;
+        productName?: string;
+        productValuation?: number;
+        text: string;
+        createdDate: string;
+        userName: string;
+        answer?: { text: string };
+      };
+      return {
+        id: i.id,
+        marketplace: 'WB',
+        product_id: String(i.nmId),
+        product_title: i.productName || String(i.productValuation || ''),
+        rating: i.productValuation || 0,
+        text: i.text,
+        created_at: i.createdDate,
+        author_name: i.userName,
+        status: i.answer ? 'replied' : 'new',
+        answer: i.answer ? i.answer.text : undefined,
+      };
+    });
   } catch (error) {
     logger.error('WB Reviews Error:', error);
     return [];
@@ -90,22 +102,33 @@ async function fetchOzonReviews(
         'Api-Key': apiKey,
         'Content-Type': 'application/json',
       },
-    })) as any;
+    })) as { result?: unknown[] };
 
     const items = response.result || [];
 
-    return items.map((item: any) => ({
-      id: item.id,
-      marketplace: 'Ozon',
-      product_id: item.sku,
-      rating: item.rating,
-      text: item.text,
-      created_at: item.created_at,
-      author_name: 'Покупатель Ozon',
-      status: item.interaction_status === 'PROCESSED' ? 'replied' : 'new',
-    }));
-  } catch (error: any) {
-    logger.warn('Ozon Reviews API Error:', { error: error.message });
+    return items.map((item: unknown) => {
+      const i = item as {
+        id: string;
+        sku: unknown;
+        rating: number;
+        text: string;
+        created_at: string;
+        interaction_status: string;
+      };
+      return {
+        id: i.id,
+        marketplace: 'Ozon',
+        product_id: String(i.sku),
+        rating: i.rating,
+        text: i.text,
+        created_at: i.created_at,
+        author_name: 'Покупатель Ozon',
+        status: i.interaction_status === 'PROCESSED' ? 'replied' : 'new',
+      };
+    });
+  } catch (error: unknown) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    logger.warn('Ozon Reviews API Error:', { error: errorMsg });
     return [];
   }
 }

@@ -131,8 +131,8 @@ export class OzonClient {
     return data.result.items || [];
   }
 
-  async updatePrices(updates: OzonPriceUpdate[]): Promise<any> {
-    if (!this.config.apiKey) return;
+  async updatePrices(updates: OzonPriceUpdate[]): Promise<Record<string, unknown>> {
+    if (!this.config.apiKey) return {};
     await this.rateLimiter.acquire();
 
     const response = await fetch(`${this.config.baseUrl}/v1/product/import/prices`, {

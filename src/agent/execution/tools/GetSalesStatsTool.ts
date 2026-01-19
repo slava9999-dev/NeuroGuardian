@@ -51,7 +51,14 @@ export const getSalesStatsTool = defineTool<GetSalesStatsArgs>({
 
       let totalOrders = 0;
       let totalRevenue = 0;
-      const byMarketplace: any[] = [];
+      interface MarketplaceStats {
+        marketplace: string;
+        orders: number;
+        revenue: number;
+        returns: number;
+        avgOrderValue: number;
+      }
+      const byMarketplace: MarketplaceStats[] = [];
 
       if (localResult.rows.length > 0) {
         for (const row of localResult.rows) {

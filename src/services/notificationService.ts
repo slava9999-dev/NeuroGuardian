@@ -11,9 +11,9 @@ interface Alert {
   type: string;
   urgency: 'low' | 'medium' | 'high' | 'critical';
   message?: string;
-  product?: any;
-  analysis?: any;
-  data?: any;
+  product?: Record<string, unknown>;
+  analysis?: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  data?: unknown;
 }
 
 export class NotificationService {
@@ -40,7 +40,7 @@ export class NotificationService {
     await this.logNotification(alert);
 
     // If associated with user product, send to user
-    if (alert.product?.userId) {
+    if (alert.product?.userId && typeof alert.product.userId === 'number') {
       const userChatId = await this.getUserChatId(alert.product.userId);
       if (userChatId) {
         await this.sendMessage(userChatId, message);
@@ -112,7 +112,7 @@ export class NotificationService {
         this.config.userChatIds.set(userId, result.rows[0].telegram_chat_id);
         return result.rows[0].telegram_chat_id;
       }
-    } catch (e) {
+    } catch {
       // ignore db errors
     }
 

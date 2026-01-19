@@ -62,7 +62,9 @@ vi.mock('../../src/api-lib/services/competitor-monitor.js', () => ({
 }));
 
 // Mock index.js to re-export mocks
-vi.mock('../../src/api-lib/services/index.js', async importOriginal => {
+vi.mock('../../src/api-lib/services/index.js', async () => {
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore
   const marketplace = await import('../../src/api-lib/services/marketplace.js');
   const database = await import('../../src/api-lib/services/database.js');
   const notifications = await import('../../src/api-lib/services/notifications.js');
@@ -120,13 +122,14 @@ vi.mock('../../src/sentinel/SentinelOrchestrator.js', () => ({
 }));
 
 // Mock fetch globally for Telegram alerts
-global.fetch = vi.fn(() =>
-  Promise.resolve({
-    ok: true,
-    json: () => Promise.resolve({ success: true }),
-    text: () => Promise.resolve('ok'),
-  })
-) as any;
+global.fetch = vi.fn(
+  () =>
+    Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({ success: true }),
+      text: () => Promise.resolve('ok'),
+    }) as unknown as any // eslint-disable-line @typescript-eslint/no-explicit-any
+);
 
 // Now import the functions to test (using relative path from test file)
 import { handleCheckPrices } from '../../src/api-lib/handlers/sentinel.js';
@@ -151,7 +154,8 @@ describe('Sentinel Protection Logic', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Default SQL response to avoid crashes on unmocked calls (like price_rules)
-    vi.mocked(sql).mockResolvedValue({ rows: [] } as any);
+
+    vi.mocked(sql).mockResolvedValue({ rows: [] } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
     process.env.CRON_SECRET = 'super-secret';
     process.env.ADMIN_API_KEY = 'admin-key';
@@ -164,18 +168,23 @@ describe('Sentinel Protection Logic', () => {
       headers: { authorization: 'Bearer super-secret' },
       query: {},
       method: 'GET',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any;
     const res = {
       status: vi.fn().mockReturnThis(),
       json: vi.fn().mockReturnThis(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any;
 
     // 2. Mock DB calls
     // Fetch users
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(sql).mockResolvedValueOnce({ rows: [MOCK_USER] } as any);
     // Fetch keys
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(dbService.getMarketplaceKeys).mockResolvedValue(MOCK_KEYS as any);
     // Fetch monitored products (All together now)
+
     vi.mocked(sql).mockResolvedValueOnce({
       rows: [
         {
@@ -189,6 +198,7 @@ describe('Sentinel Protection Logic', () => {
           updated_at: new Date(Date.now() - 3600000).toISOString(),
         },
       ],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
 
     // 3. Mock Live Price Check
@@ -220,10 +230,14 @@ describe('Sentinel Protection Logic', () => {
     const req = {
       headers: { authorization: 'Bearer super-secret' },
       query: {},
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res = { status: vi.fn().mockReturnThis(), json: vi.fn() } as any;
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(sql).mockResolvedValueOnce({ rows: [MOCK_USER] } as any);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(dbService.getMarketplaceKeys).mockResolvedValue(MOCK_KEYS as any);
 
     const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
@@ -241,6 +255,7 @@ describe('Sentinel Protection Logic', () => {
           updated_at: fiveMinsAgo,
         },
       ],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
 
     const livePrices = new Map([[12345, 800]]);
@@ -255,7 +270,9 @@ describe('Sentinel Protection Logic', () => {
     const req = {
       headers: { authorization: 'Bearer super-secret' },
       query: {},
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const res = { status: vi.fn().mockReturnThis(), json: vi.fn() } as any;
 
     await handleCheckPrices(req, res);

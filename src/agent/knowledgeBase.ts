@@ -25,7 +25,12 @@ export interface AgentContext {
 export interface VerificationResult {
   totalDocuments: number;
   bySource: Record<string, number>;
-  outdated: any[];
+  outdated: {
+    id: string;
+    title: string;
+    lastUpdated: Date;
+    daysOld: number;
+  }[];
   missing: string[];
   lastVerified: Date;
 }
@@ -173,7 +178,7 @@ export class AgentKnowledgeBase {
       // Placeholder for DB loading if needed
       // Since we don't have the table schema fully confirmed or populated, we skip or use try/catch
       // const result = await db.query('SELECT * FROM knowledge_documents WHERE active = true');
-    } catch (e) {
+    } catch {
       // Ignore DB errors for now as we rely on file docs for the checklist
     }
   }

@@ -11,7 +11,7 @@ export interface RealPriceInfo {
   rating?: number;
   reviewCount?: number;
   error?: string;
-  raw?: any; // Raw data for debugging
+  raw?: unknown; // Raw data for debugging
 }
 
 export class PriceParserService {
@@ -82,7 +82,7 @@ export class PriceParserService {
             }
           }
         }
-      } catch (e) {
+      } catch {
         // ignore and try next
       }
     }

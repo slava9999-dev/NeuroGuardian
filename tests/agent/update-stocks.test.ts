@@ -62,6 +62,7 @@ describe('executeUpdateStocks', () => {
   });
 
   it('should prepare stock updates for valid products', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(dbService.getProductsByUserId).mockResolvedValue(MOCK_PRODUCTS as any);
 
     const result = await updateStocksTool.execute(MOCK_USER_ID, {
@@ -70,9 +71,10 @@ describe('executeUpdateStocks', () => {
     });
 
     expect(result.success).toBe(true);
-    const data = result.data as any;
-    expect(data.updates).toHaveLength(1);
-    expect(data.updates[0]).toMatchObject({
+    const data = result.data as Record<string, unknown>;
+    const updates = data.updates as Array<Record<string, unknown>>;
+    expect(updates).toHaveLength(1);
+    expect(updates[0]).toMatchObject({
       product_id: 'wb-product-1',
       title: 'WB Item',
       newStock: 100,
@@ -82,6 +84,7 @@ describe('executeUpdateStocks', () => {
   });
 
   it('should handle multiple products and mixed marketplaces if requested correctly', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(dbService.getProductsByUserId).mockResolvedValue(MOCK_PRODUCTS as any);
 
     const result = await updateStocksTool.execute(MOCK_USER_ID, {
@@ -90,8 +93,9 @@ describe('executeUpdateStocks', () => {
     });
 
     expect(result.success).toBe(true);
-    const data = result.data as any;
-    expect(data.updates[0]).toMatchObject({
+    const data = result.data as Record<string, unknown>;
+    const updates = data.updates as Array<Record<string, unknown>>;
+    expect(updates[0]).toMatchObject({
       product_id: 'ozon-product-2',
       title: 'Ozon Item',
       newStock: 0,
@@ -101,6 +105,7 @@ describe('executeUpdateStocks', () => {
   });
 
   it('should return error if no products matched', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(dbService.getProductsByUserId).mockResolvedValue(MOCK_PRODUCTS as any);
 
     const result = await updateStocksTool.execute(MOCK_USER_ID, {
@@ -124,6 +129,7 @@ describe('executeUpdateStocks', () => {
 
   it('should fail if marketplace is missing or invalid', async () => {
     const result = await updateStocksTool.execute(MOCK_USER_ID, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       marketplace: 'AliExpress' as any,
       products: [{ product_id: 'wb-1', new_stock: 10 }],
     });

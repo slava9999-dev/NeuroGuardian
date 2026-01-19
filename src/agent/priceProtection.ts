@@ -38,7 +38,13 @@ interface ExecutionResult {
   updated: number;
   alerts: number;
   errors: number;
-  details: any[];
+  details: {
+    product: string;
+    action: string;
+    oldPrice: number;
+    newPrice: number;
+    reason: string;
+  }[];
 }
 
 export class PriceProtectionAgent {
@@ -225,7 +231,7 @@ export class PriceProtectionAgent {
           } else {
             results.errors++;
           }
-        } catch (error) {
+        } catch {
           results.errors++;
         }
       } else {
@@ -244,7 +250,7 @@ export class PriceProtectionAgent {
     return results;
   }
 
-  private async logExecution(results: any, durationMs: number): Promise<void> {
+  private async logExecution(results: ExecutionResult, durationMs: number): Promise<void> {
     try {
       await db.query(
         `

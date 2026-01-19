@@ -46,9 +46,10 @@ export async function getOverview(_req: Request): Promise<Response> {
       }),
       { status: 200, headers: { 'Content-Type': 'application/json' } }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Dashboard Overview Error:', error);
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return new Response(JSON.stringify({ error: errorMessage }), { status: 500 });
   }
 }
 
@@ -76,8 +77,9 @@ export async function getPriceHistory(req: Request): Promise<Response> {
     );
 
     return new Response(JSON.stringify(history.rows), { status: 200 });
-  } catch (error: any) {
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return new Response(JSON.stringify({ error: errorMessage }), { status: 500 });
   }
 }
 
@@ -111,7 +113,8 @@ export async function getAgentStatus(_req: Request): Promise<Response> {
       }),
       { status: 200 }
     );
-  } catch (error: any) {
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return new Response(JSON.stringify({ error: errorMessage }), { status: 500 });
   }
 }

@@ -310,12 +310,15 @@ export async function orchestrateV4(
   const simpleResponse = await handleSimpleIntent(message, context);
 
   // Safely check if simpleResponse is a string (legacy) or an object (future)
-  if (simpleResponse && (typeof simpleResponse === 'string' || (simpleResponse as any).success)) {
+  if (
+    simpleResponse &&
+    (typeof simpleResponse === 'string' || (simpleResponse as Record<string, unknown>).success)
+  ) {
     console.log('[Orchestrator V4] Simple intent matched, returning personalized response');
     const msg =
       typeof simpleResponse === 'string'
         ? simpleResponse
-        : (simpleResponse as any).message || 'Hello';
+        : (simpleResponse as { message: string }).message || 'Hello';
     return createSimpleResult(msg, startTime);
   }
   console.log('[Orchestrator V4] No simple intent match, proceeding to planning phase');

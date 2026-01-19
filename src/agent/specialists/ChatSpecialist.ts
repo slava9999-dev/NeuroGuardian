@@ -125,7 +125,7 @@ export class ChatSpecialist extends BaseSpecialist {
         tokensUsed,
         latencyMs,
       };
-    } catch (_error) {
+    } catch {
       const latencyMs = Date.now() - startTime;
 
       return {

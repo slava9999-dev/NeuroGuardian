@@ -140,7 +140,8 @@ export class VisionService {
 
     try {
       // 1. Check CACHE
-      const { createHash } = await import('crypto');
+      const crypto = await import('crypto');
+      const createHash = crypto.createHash;
       const { sql } = await import('../api-lib/services/database.js');
 
       // Create a unique hash for the image request
@@ -245,7 +246,7 @@ export class VisionService {
         }
       );
 
-      const data = responseBody as any;
+      const data = responseBody as { candidates?: { content?: { parts?: { text: string }[] } }[] };
       const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
       // Parse JSON response

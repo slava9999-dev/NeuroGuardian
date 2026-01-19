@@ -17,7 +17,7 @@ export function findProductMatch(query: string, products: DBProduct[]): DBProduc
     p =>
       p.product_id.toLowerCase() === normalizedQuery ||
       String(p.nm_id) === normalizedQuery ||
-      (p as any).vendor_code?.toLowerCase() === normalizedQuery
+      (p as { vendor_code?: string }).vendor_code?.toLowerCase() === normalizedQuery
   );
   if (exactIdMatch) return exactIdMatch;
 

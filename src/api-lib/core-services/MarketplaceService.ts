@@ -145,8 +145,10 @@ export class MarketplaceService {
             prices.set(id, price);
           }
         }
-      } catch (err: any) {
-        errors.push(`WB Circuit Breaker: ${err.message}`);
+      } catch (error: unknown) {
+        errors.push(
+          `WB Circuit Breaker: ${error instanceof Error ? error.message : String(error)}`
+        );
       }
       return { prices, errors: errors.length > 0 ? errors : undefined };
     }
@@ -173,8 +175,10 @@ export class MarketplaceService {
         for (const [id, price] of ozonPrices.entries()) {
           prices.set(id, price);
         }
-      } catch (err: any) {
-        errors.push(`Ozon Circuit Breaker: ${err.message}`);
+      } catch (error: unknown) {
+        errors.push(
+          `Ozon Circuit Breaker: ${error instanceof Error ? error.message : String(error)}`
+        );
       }
       return { prices, errors: errors.length > 0 ? errors : undefined };
     }

@@ -121,7 +121,9 @@ export class StateManager {
       }
     }
     if (data && typeof data === 'object' && data !== null && 'createdAt' in data) {
-      (data as Record<string, unknown>).createdAt = new Date(String((data as any).createdAt));
+      (data as Record<string, unknown>).createdAt = new Date(
+        String((data as Record<string, unknown>).createdAt)
+      );
     }
     return data;
   }

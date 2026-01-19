@@ -3,7 +3,7 @@
 // КРИТИЧЕСКИЙ: Тестирование на уязвимости
 // ============================================
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { sanitizeInput, isValidPrice } from '../../src/api-lib/lib/validation.js';
 import { RateLimiter } from '../../src/lib/rateLimiter.js';
 import fs from 'fs';
@@ -14,15 +14,6 @@ import path from 'path';
 // ============================================
 
 describe('SQL Injection Prevention', () => {
-  const sqlInjectionPayloads = [
-    "'; DROP TABLE users; --",
-    "1' OR '1'='1",
-    '1; DELETE FROM products WHERE 1=1;',
-    "' UNION SELECT * FROM users --",
-    "admin'--",
-    "1' WAITFOR DELAY '0:0:5'--",
-  ];
-
   it('should sanitize user input (HTML escape does not prevent SQL, but parameterized queries do)', () => {
     // sanitizeInput is for XSS prevention, not SQL injection
     // SQL injection is prevented by using tagged template literals sql`...${var}...`

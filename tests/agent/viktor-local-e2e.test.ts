@@ -130,9 +130,9 @@ describe('Viktor AI Agent LOCAL E2E Tests', () => {
     // 🩹 FIX: Restore global.fetch (broken by tests/setup.ts)
     try {
       const { fetch } = await import('undici');
-      global.fetch = fetch as any;
+      global.fetch = fetch as unknown as typeof global.fetch;
       console.log('✅ Global fetch restored using undici');
-    } catch (e) {
+    } catch {
       console.warn('⚠️ Could not restore global.fetch via undici');
     }
 

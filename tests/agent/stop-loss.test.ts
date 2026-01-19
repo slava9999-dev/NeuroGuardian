@@ -30,6 +30,7 @@ describe('executeSetStopLoss', () => {
   });
 
   it('should calculate stop-loss by absolute price', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(dbService.getFilteredProducts).mockResolvedValue([MOCK_PRODUCT] as any);
 
     const result = await setStopLossTool.execute(MOCK_USER_ID, {
@@ -47,6 +48,7 @@ describe('executeSetStopLoss', () => {
   });
 
   it('should calculate stop-loss by percentage', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(dbService.getFilteredProducts).mockResolvedValue([MOCK_PRODUCT] as any);
 
     const result = await setStopLossTool.execute(MOCK_USER_ID, {
@@ -63,6 +65,7 @@ describe('executeSetStopLoss', () => {
   });
 
   it('should use default 10% if no price or percentage provided', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(dbService.getFilteredProducts).mockResolvedValue([MOCK_PRODUCT] as any);
 
     const result = await setStopLossTool.execute(MOCK_USER_ID, {
@@ -78,6 +81,7 @@ describe('executeSetStopLoss', () => {
   });
 
   it('should return error if product not found', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(dbService.getFilteredProducts).mockResolvedValue([] as any);
 
     const result = await setStopLossTool.execute(MOCK_USER_ID, {
@@ -93,6 +97,7 @@ describe('executeSetStopLoss', () => {
     // missing product_id
     const result = await setStopLossTool.execute(MOCK_USER_ID, {
       min_price: 500,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
 
     expect(result.success).toBe(false);

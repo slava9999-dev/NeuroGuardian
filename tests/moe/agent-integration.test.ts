@@ -4,7 +4,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 // Mock dependencies
 vi.mock('../../src/api-lib/lib/index.js', () => ({
-  sanitizeInput: (input: any) => input,
+  sanitizeInput: (input: unknown) => input,
   decryptApiKey: (key: string) => `decrypted_${key}`,
   checkRateLimit: vi.fn(),
   isSubscriptionActive: vi.fn(),
@@ -14,7 +14,9 @@ vi.mock('../../src/api-lib/lib/index.js', () => ({
 describe('Agent V4 Handler - MoE Integration', () => {
   let req: Partial<VercelRequest>;
   let res: Partial<VercelResponse>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let jsonMock: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let statusMock: any;
 
   beforeEach(() => {
@@ -33,6 +35,7 @@ describe('Agent V4 Handler - MoE Integration', () => {
   });
 
   it('should include MoE status in agent status response', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await handleAgentV4Status(req as any, res as any);
 
     expect(jsonMock).toHaveBeenCalledWith(
@@ -51,6 +54,7 @@ describe('Agent V4 Handler - MoE Integration', () => {
   it('should reflect disabled MoE status', async () => {
     process.env.MOE_ROUTING_ENABLED = 'false';
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await handleAgentV4Status(req as any, res as any);
 
     expect(jsonMock).toHaveBeenCalledWith(
@@ -66,6 +70,7 @@ describe('Agent V4 Handler - MoE Integration', () => {
   it('should reflect force local config', async () => {
     process.env.FORCE_LOCAL_INFERENCE = 'true';
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await handleAgentV4Status(req as any, res as any);
 
     expect(jsonMock).toHaveBeenCalledWith(

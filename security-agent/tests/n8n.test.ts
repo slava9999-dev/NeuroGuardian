@@ -212,7 +212,9 @@ describe('N8nGuardian', () => {
       };
 
       // Access private method via type assertion for testing
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const hash1 = (guardian as any).hashWorkflowContent(workflow1);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const hash2 = (guardian as any).hashWorkflowContent(workflow2);
 
       expect(hash1).toBe(hash2); // Same because id and timestamps are normalized
@@ -229,7 +231,9 @@ describe('N8nGuardian', () => {
         nodes: [{ name: 'Node2' }],
       };
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const hash1 = (guardian as any).hashWorkflowContent(workflow1);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const hash2 = (guardian as any).hashWorkflowContent(workflow2);
 
       expect(hash1).not.toBe(hash2);

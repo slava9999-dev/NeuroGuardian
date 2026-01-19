@@ -90,7 +90,7 @@ export class PricingSpecialist extends BaseSpecialist {
           lines.push('\n## СПРАВОЧНАЯ ИНФОРМАЦИЯ (RAG):');
           lines.push(ragContext.formattedContext);
         }
-      } catch (error) {
+      } catch {
         // Silently fail RAG
       }
     }

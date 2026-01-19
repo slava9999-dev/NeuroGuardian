@@ -17,7 +17,15 @@ export const getLowMarginProductsTool = defineTool({
 
     const { calculateUnitEconomics, estimateCostPrice } =
       await import('../../../api-lib/services/unit-economics.js');
-    const results: any[] = []; // Explicitly typed to avoid 'never' inference
+    interface LowMarginResult {
+      title: string | null;
+      marketplace: string | null;
+      price: number | null;
+      margin: number;
+      profit: number;
+      status: string;
+    }
+    const results: LowMarginResult[] = []; // Explicitly typed to avoid 'never' inference
 
     for (const p of filtered) {
       let costPrice = p.cost_price || 0;

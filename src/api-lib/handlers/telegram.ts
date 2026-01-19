@@ -139,7 +139,7 @@ async function sendTelegramVoice(
 
     const response = await fetch(`${TELEGRAM_API}${token}/sendVoice`, {
       method: 'POST',
-      body: formData as any,
+      body: formData,
     });
 
     if (!response.ok) {

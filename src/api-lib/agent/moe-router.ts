@@ -241,12 +241,12 @@ async function classifyWithLLM(
       confidence: parsed.confidence || 0.7,
       reasoning: parsed.reasoning,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     const latency = Date.now() - startTime;
     const source = useLocal ? 'local' : 'cloud';
 
     logger.warn(`[MoE] ${source} classification failed`, {
-      error: error.message,
+      error: error instanceof Error ? error.message : String(error),
       latencyMs: latency,
     });
 
@@ -414,11 +414,11 @@ export async function checkLocalLLMHealth(): Promise<{
       healthy: true,
       latencyMs: Date.now() - startTime,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
       healthy: false,
       latencyMs: Date.now() - startTime,
-      error: error.message,
+      error: error instanceof Error ? error.message : String(error),
     };
   }
 }

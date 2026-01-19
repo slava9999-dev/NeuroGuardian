@@ -28,7 +28,14 @@ export const updateStocksTool = defineTool({
     const validatedArgs = validation.data;
 
     const products = await getProductsByUserId(userId, validatedArgs.account_id);
-    const updates: any[] = [];
+    interface StockUpdate {
+      product_id: string;
+      title: string;
+      marketplace: string | null;
+      currentStock: number;
+      newStock: number;
+    }
+    const updates: StockUpdate[] = [];
 
     for (const item of validatedArgs.products) {
       const filtered = filterProducts(products, validatedArgs.marketplace, item.product_id);

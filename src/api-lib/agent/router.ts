@@ -158,7 +158,7 @@ export async function routeMessage(
       throw new Error(`Router API error: ${response.status}`);
     }
 
-    const data = (await response.json()) as any;
+    const data = (await response.json()) as { choices: Array<{ message: { content: string } }> };
     const content = data.choices[0]?.message?.content;
 
     if (!content) {

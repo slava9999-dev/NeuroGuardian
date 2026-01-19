@@ -19,7 +19,7 @@ import type { AuditLogger } from './audit.js';
 // Schemas
 // ============================================
 
-const SASTFindingSchema = z.object({
+export const SASTFindingSchema = z.object({
   file: z.string(),
   line: z.number(),
   column: z.number().optional(),
@@ -30,7 +30,7 @@ const SASTFindingSchema = z.object({
   code: z.string().optional(), // Code snippet
 });
 
-const CoverageReportSchema = z.object({
+export const CoverageReportSchema = z.object({
   file: z.string(),
   lines: z.object({
     total: z.number(),
@@ -65,7 +65,7 @@ const CanaryMetricsSchema = z.object({
   baseline_p95_latency_ms: z.number(),
 });
 
-const RegressionDetectionSchema = z.object({
+export const RegressionDetectionSchema = z.object({
   id: z.string(),
   detectedAt: z.string().datetime(),
   type: z.enum(['security', 'performance', 'availability']),

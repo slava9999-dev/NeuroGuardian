@@ -68,7 +68,7 @@ export class SupportSpecialist extends BaseSpecialist {
           lines.push('\n## РЕЛЕВАНТНЫЕ ЗНАНИЯ (RAG):');
           lines.push(ragContext.formattedContext);
         }
-      } catch (error) {
+      } catch {
         // Silently fail RAG to not break flow
       }
     }

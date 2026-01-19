@@ -46,7 +46,7 @@ export class LLMRouter {
     this.initialized = true;
   }
 
-  async complete(messages: LLMMessage[], options?: any): Promise<LLMResponse> {
+  async complete(messages: LLMMessage[], options?: Record<string, unknown>): Promise<LLMResponse> {
     await this.ensureInitialized();
 
     if (this.providers.length === 0) {

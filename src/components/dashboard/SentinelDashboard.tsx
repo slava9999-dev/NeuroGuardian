@@ -6,7 +6,6 @@
 import { useEffect, useState } from 'react';
 import { SentinelStatusBadge } from './SentinelStatusBadge';
 import { getInitData } from '../../lib/telegram';
-import { motion } from 'framer-motion';
 
 // --- Types ---
 interface ActiveThreat {

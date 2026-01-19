@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // ============================================
@@ -38,7 +38,7 @@ interface MoEHealth {
 interface OpsEvent {
   id: number; // Changed to number to match DB
   event_type: string;
-  payload: any;
+  payload: Record<string, unknown>;
   created_at: string;
   user_id?: number;
 }
@@ -82,18 +82,21 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
   // API CALLS
   // ============================================
 
-  const apiFetch = async (endpoint: string) => {
-    const res = await fetch(endpoint, {
-      headers: { 'X-Admin-Key': adminKey },
-    });
-    if (res.status === 401 || res.status === 403) {
-      setIsAuthenticated(false);
-      throw new Error('Unauthorized');
-    }
-    return res.json();
-  };
+  const apiFetch = useCallback(
+    async (endpoint: string) => {
+      const res = await fetch(endpoint, {
+        headers: { 'X-Admin-Key': adminKey },
+      });
+      if (res.status === 401 || res.status === 403) {
+        setIsAuthenticated(false);
+        throw new Error('Unauthorized');
+      }
+      return res.json();
+    },
+    [adminKey]
+  );
 
-  const fetchOverview = async () => {
+  const fetchOverview = useCallback(async () => {
     setLoading(true);
     try {
       const data = await apiFetch('/api?action=ops-overview');
@@ -103,9 +106,9 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [apiFetch]);
 
-  const fetchClients = async () => {
+  const fetchClients = useCallback(async () => {
     setLoading(true);
     try {
       const data = await apiFetch(`/api?action=ops-clients&page=${clientsPage}&limit=20`);
@@ -115,9 +118,9 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [apiFetch, clientsPage]);
 
-  const fetchAudit = async () => {
+  const fetchAudit = useCallback(async () => {
     setLoading(true);
     try {
       // Re-using ops-events for now, or ops-audit endpoint
@@ -128,9 +131,9 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [apiFetch]);
 
-  const fetchMoEHealth = async () => {
+  const fetchMoEHealth = useCallback(async () => {
     setLoading(true);
     try {
       const data = await apiFetch('/api?action=moe-health');
@@ -140,7 +143,7 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [apiFetch]);
 
   // ============================================
   // EFFECTS
@@ -164,7 +167,15 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
       const interval = setInterval(fetchMoEHealth, 15000);
       return () => clearInterval(interval);
     }
-  }, [activeTab, isAuthenticated, clientsPage]);
+  }, [
+    activeTab,
+    isAuthenticated,
+    clientsPage,
+    fetchOverview,
+    fetchClients,
+    fetchAudit,
+    fetchMoEHealth,
+  ]);
 
   // ============================================
   // HANDLERS
@@ -194,7 +205,7 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
         console.error(`Error: ${data.error}`);
         alert(`Ошибка: ${data.error}`);
       }
-    } catch (e) {
+    } catch {
       alert('Ошибка сети или сервера');
     } finally {
       setActionLoading(null);
@@ -214,7 +225,7 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
           className="w-full max-w-sm"
         >
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent mb-2">
+            <h1 className="text-3xl font-bold bg-linear-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent mb-2">
               Админ Панель
             </h1>
             <p className="text-stone-500 text-sm">Вход только для авторизованных операторов</p>
@@ -255,7 +266,7 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
       {/* HEADER */}
       <header className="sticky top-0 bg-stone-950/80 backdrop-blur-md border-b border-stone-800 p-4 z-20 flex justify-between items-center">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center font-bold text-white">
+          <div className="w-8 h-8 rounded-lg bg-linear-to-br from-violet-600 to-indigo-600 flex items-center justify-center font-bold text-white">
             N
           </div>
           <h1 className="text-lg font-bold text-stone-200">Админ Панель</h1>
@@ -686,7 +697,14 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
 // HELPER COMPONENTS
 // ============================================
 
-function TabButton({ active, onClick, icon, label }: any) {
+interface TabButtonProps {
+  active: boolean;
+  onClick: () => void;
+  icon: string;
+  label: string;
+}
+
+function TabButton({ active, onClick, icon, label }: TabButtonProps) {
   return (
     <button
       onClick={onClick}
@@ -702,7 +720,16 @@ function TabButton({ active, onClick, icon, label }: any) {
   );
 }
 
-function StatCard({ label, value, trend, subvalue, trendUp, color = 'blue' }: any) {
+interface StatCardProps {
+  label: string;
+  value: number;
+  trend?: string;
+  subvalue?: string;
+  trendUp?: boolean;
+  color?: string;
+}
+
+function StatCard({ label, value, trend, subvalue, trendUp, color = 'blue' }: StatCardProps) {
   return (
     <div className="p-5 bg-stone-900/50 rounded-2xl border border-stone-800 hover:border-stone-700 transition-colors relative overflow-hidden group">
       <div
@@ -728,7 +755,13 @@ function StatCard({ label, value, trend, subvalue, trendUp, color = 'blue' }: an
   );
 }
 
-function StatusCard({ label, status, detail }: any) {
+interface StatusCardProps {
+  label: string;
+  status: string;
+  detail: string;
+}
+
+function StatusCard({ label, status, detail }: StatusCardProps) {
   const isHealthy = status === 'healthy';
   return (
     <div className="p-5 bg-stone-900/50 rounded-2xl border border-stone-800 hover:border-stone-700 transition-colors">
@@ -747,7 +780,7 @@ function StatusCard({ label, status, detail }: any) {
 }
 
 function Badge({ status }: { status: string }) {
-  const styles: any = {
+  const styles: Record<string, string> = {
     active: 'bg-emerald-900/30 text-emerald-400 border-emerald-800',
     inactive: 'bg-stone-800 text-stone-500 border-stone-700',
     error: 'bg-red-900/30 text-red-400 border-red-800',
@@ -762,7 +795,7 @@ function Badge({ status }: { status: string }) {
 }
 
 function PlatformIcon({ name }: { name: string }) {
-  const colors: any = {
+  const colors: Record<string, string> = {
     WB: 'bg-fuchsia-900/40 text-fuchsia-300 border-fuchsia-800',
     OZ: 'bg-blue-900/40 text-blue-300 border-blue-800',
   };

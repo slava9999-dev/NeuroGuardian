@@ -13,13 +13,15 @@ export const getSystemLogsTool = defineTool({
     // Admin check
     const user = await getUserById(userId);
     const adminId = process.env.ADMIN_TELEGRAM_ID;
-    const isAdmin =
-      (user as any)?.role === 'admin' || (adminId && String(userId) === String(adminId));
+    const userRole = (user as unknown as Record<string, unknown>)?.role;
+    const isAdmin = userRole === 'admin' || (adminId && String(userId) === String(adminId));
 
     if (!isAdmin)
       return { success: false, error: '⛔ Доступ запрещен. Требуются права администратора.' };
 
-    const logs = await getSystemEvents(args.limit || 20, { userId: (args as any).user_id });
+    const logs = await getSystemEvents(args.limit || 20, {
+      userId: (args as { user_id?: number }).user_id,
+    });
 
     return {
       success: true,

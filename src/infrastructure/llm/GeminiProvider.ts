@@ -95,9 +95,17 @@ export class GeminiProvider implements LLMProvider {
 
         // 1. Extract System Prompt
         const systemMsg = messages.find(m => m.role === 'system');
+
         const systemInstruction = systemMsg
           ? {
-              parts: [{ text: systemMsg.content }],
+              parts: [
+                {
+                  text:
+                    typeof systemMsg.content === 'string'
+                      ? systemMsg.content
+                      : JSON.stringify(systemMsg.content),
+                },
+              ],
             }
           : undefined;
 
@@ -107,10 +115,16 @@ export class GeminiProvider implements LLMProvider {
           .filter(m => m.role !== 'system')
           .map(m => ({
             role: m.role === 'tool' ? 'user' : m.role === 'assistant' ? 'model' : 'user',
-            parts: [{ text: m.content }],
+            parts: [
+              { text: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) },
+            ],
           }));
 
-        const requestBody: any = {
+        const requestBody: {
+          contents: { role: string; parts: { text: string }[] }[];
+          generationConfig: { temperature?: number; maxOutputTokens?: number };
+          systemInstruction?: { parts: { text: string }[] };
+        } = {
           contents: contents,
           generationConfig: {
             temperature: config.temperature,
@@ -253,14 +267,27 @@ export class GeminiProvider implements LLMProvider {
 
         // Extract System Prompt
         const systemMsg = messages.find(m => m.role === 'system');
-        const systemInstruction = systemMsg ? { parts: [{ text: systemMsg.content }] } : undefined;
+        const systemInstruction = systemMsg
+          ? {
+              parts: [
+                {
+                  text:
+                    typeof systemMsg.content === 'string'
+                      ? systemMsg.content
+                      : JSON.stringify(systemMsg.content),
+                },
+              ],
+            }
+          : undefined;
 
         // Convert messages to Google format
         const contents = messages
           .filter(m => m.role !== 'system')
           .map(m => ({
             role: m.role === 'assistant' ? 'model' : 'user',
-            parts: [{ text: m.content }],
+            parts: [
+              { text: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) },
+            ],
           }));
 
         // Convert OpenAI tools format to Google format

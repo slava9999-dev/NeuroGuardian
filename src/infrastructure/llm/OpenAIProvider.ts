@@ -4,7 +4,15 @@ import { getLLMConfig } from '../../core/config/llm.config.js';
 export class OpenAIProvider implements LLMProvider {
   name = 'openai';
 
-  async complete(messages: LLMMessage[], options: any = {}): Promise<LLMResponse> {
+  async complete(
+    messages: LLMMessage[],
+    options: {
+      model?: string;
+      temperature?: number;
+      maxTokens?: number;
+      jsonMode?: boolean;
+    } = {}
+  ): Promise<LLMResponse> {
     const config = await getLLMConfig();
     const apiKey = config.apiKey;
     const model = options.model || 'gpt-4o';
@@ -29,7 +37,10 @@ export class OpenAIProvider implements LLMProvider {
       throw new Error(`OpenAI API Error: ${response.status} ${errorText}`);
     }
 
-    const data = (await response.json()) as any;
+    const data = (await response.json()) as {
+      choices: { message: { content: string } }[];
+      usage: { total_tokens: number };
+    };
     const content = data.choices[0]?.message?.content || '';
     const tokensUsed = data.usage?.total_tokens || 0;
 

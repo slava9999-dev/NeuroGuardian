@@ -112,7 +112,7 @@ export class ProductsSpecialist extends BaseSpecialist {
             lines.push(`- ${row.marketplace}: ${row.count} шт (защищено: ${row.protected})`);
           }
         }
-      } catch (_e) {
+      } catch {
         // Ignore DB errors, continue with minimal context
       }
     }
@@ -129,7 +129,7 @@ export class ProductsSpecialist extends BaseSpecialist {
           lines.push('\n## СПРАВОЧНАЯ ИНФОРМАЦИЯ (RAG):');
           lines.push(ragContext.formattedContext);
         }
-      } catch (error) {
+      } catch {
         // Silently fail RAG
       }
     }

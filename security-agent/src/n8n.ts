@@ -21,7 +21,7 @@ import type { AuditLogger } from './audit.js';
 // Schemas
 // ============================================
 
-const WorkflowSignatureSchema = z.object({
+export const WorkflowSignatureSchema = z.object({
   workflowId: z.string(),
   workflowName: z.string(),
   contentHash: z.string(), // SHA-256 of workflow JSON
@@ -149,7 +149,7 @@ export class N8nGuardian {
       if (existingKey.value) {
         return existingKey.value;
       }
-    } catch (error) {
+    } catch {
       console.log('[N8nGuardian] No existing signing key, generating new one...');
     }
 
@@ -455,7 +455,7 @@ export class N8nGuardian {
       if (stored.value) {
         return JSON.parse(stored.value);
       }
-    } catch (error) {
+    } catch {
       // Signature not found or expired
     }
 

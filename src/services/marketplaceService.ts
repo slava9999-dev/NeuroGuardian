@@ -48,15 +48,16 @@ export class MarketplaceService extends EventEmitter {
     try {
       const [cards, prices] = await Promise.all([this.wb.getProducts(), this.wb.getPrices()]);
 
-      const priceMap = new Map(prices.map((p: any) => [p.nmId, p]));
+      const priceMap = new Map(prices.map(p => [p.nmId, p]));
+      type WbCard = { nmID: number; title: string; stocks?: { qty: number }[] };
 
-      return cards.map((card: any) => ({
+      return cards.map((card: WbCard) => ({
         id: `wb_${card.nmID}`,
         marketplace: 'wildberries',
         externalId: card.nmID.toString(),
         name: card.title || `Product ${card.nmID}`,
-        price: (priceMap.get(card.nmID) as any)?.price || 0,
-        stock: card.stocks?.reduce((sum: number, s: any) => sum + s.qty, 0) || 0,
+        price: (priceMap.get(card.nmID) as { price: number })?.price || 0,
+        stock: card.stocks?.reduce((sum: number, s: { qty: number }) => sum + s.qty, 0) || 0,
         lastUpdated: new Date(),
       }));
     } catch (error) {
@@ -77,12 +78,16 @@ export class MarketplaceService extends EventEmitter {
         this.ozon.getPrices(productIds),
       ]);
 
-      const infoMap = new Map(info.map((i: any) => [i.id, i]));
-      const priceMap = new Map(prices.map((p: any) => [p.product_id, p]));
+      type OzonProduct = { product_id: number; offer_id: string };
+      type OzonInfo = { id: number; name: string; stocks: { present: number } };
+      type OzonPrice = { product_id: number; price: { price: string; old_price: string } };
 
-      return products.map((product: any) => {
-        const productInfo = infoMap.get(product.product_id) as any;
-        const productPrice = priceMap.get(product.product_id) as any;
+      const infoMap = new Map(info.map((i: OzonInfo) => [i.id, i]));
+      const priceMap = new Map(prices.map((p: OzonPrice) => [p.product_id, p]));
+
+      return products.map((product: OzonProduct) => {
+        const productInfo = infoMap.get(product.product_id);
+        const productPrice = priceMap.get(product.product_id);
 
         return {
           id: `ozon_${product.product_id}`,
@@ -123,14 +128,16 @@ export class MarketplaceService extends EventEmitter {
       this.emit('priceUpdated', update);
 
       return true;
-    } catch (error: any) {
-      await this.logEvent('price_update_failed', { ...update, error: error.message });
+      return true;
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      await this.logEvent('price_update_failed', { ...update, error: errorMessage });
       this.emit('error', { ...update, error });
       return false;
     }
   }
 
-  private async logEvent(type: string, data: any): Promise<void> {
+  private async logEvent(type: string, data: unknown): Promise<void> {
     try {
       // NOTE: We use raw SQL or a query helper here.
       // Assuming 'ops_events' table exists from migration 012.
@@ -145,7 +152,7 @@ export class MarketplaceService extends EventEmitter {
       // But typically services shouldn't hard-depend on specific DB client instance path if it varies.
       // We'll skip DB write here in standard code to avoid compilation error if db module missing.
       // We will implement this properly when connecting PriceProtectionAgent which has db access.
-      logger.info(`[MarketplaceService] ${type}`, data);
+      logger.info(`[MarketplaceService] ${type}`, data as Record<string, unknown>);
     } catch (e) {
       logger.error('Failed to log event', e);
     }

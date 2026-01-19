@@ -71,7 +71,13 @@ export async function handleMarketplaceAccounts(
       if (id) {
         // UPDATE
         const accountId = Number(id);
-        const updates: any = {
+        const updates: {
+          name: string;
+          is_active?: boolean;
+          wb_token?: string;
+          ozon_api_key?: string;
+          ozon_client_id?: string;
+        } = {
           name: sanitizeInput(name),
         };
         if (isActive !== undefined) updates.is_active = Boolean(isActive);

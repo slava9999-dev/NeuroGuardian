@@ -27,7 +27,7 @@ if (process.env.SENTRY_DSN) {
 /**
  * Capture exception to monitoring system
  */
-export function captureException(error: unknown, context?: Record<string, any>): void {
+export function captureException(error: unknown, context?: Record<string, unknown>): void {
   if (process.env.SENTRY_DSN) {
     Sentry.withScope(scope => {
       if (context) {
@@ -53,7 +53,7 @@ export function captureException(error: unknown, context?: Record<string, any>):
 export function captureMessage(
   message: string,
   level: 'info' | 'warning' | 'error' | 'debug' | 'fatal' = 'info',
-  context?: Record<string, any>
+  context?: Record<string, unknown>
 ): void {
   if (process.env.SENTRY_DSN) {
     Sentry.withScope(scope => {

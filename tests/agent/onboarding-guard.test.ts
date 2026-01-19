@@ -10,8 +10,8 @@ vi.mock('../../src/api-lib/services/index', () => ({
 
 // 2. Mock Lib (Auth, RateLimit)
 vi.mock('../../src/api-lib/lib/index', () => ({
-  sanitizeInput: (s: any) => s,
-  decryptApiKey: (k: any) => k,
+  sanitizeInput: (s: unknown) => s,
+  decryptApiKey: (k: unknown) => k,
   checkRateLimit: vi.fn().mockResolvedValue({ allowed: true }),
   isSubscriptionActive: vi.fn().mockReturnValue(true),
   getSecret: vi.fn(),
@@ -44,6 +44,7 @@ vi.mock('../../src/api-lib/agent/orchestrator-v4', () => ({
 vi.mock('@neuroguardian/security-agent', () => ({
   getSecurityAgent: vi.fn().mockReturnValue({}),
   securityMiddleware: vi.fn().mockImplementation((_opts, handler) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return async (req: any, res: any) => {
       return handler(req, res);
     };
@@ -66,7 +67,9 @@ vi.mock('@vercel/kv', () => ({
 }));
 
 describe('Agent V4 Onboarding Guard', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let req: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let res: any;
 
   beforeEach(() => {
@@ -94,8 +97,8 @@ describe('Agent V4 Onboarding Guard', () => {
       subscription_active: true,
       api_key_wb: null,
       api_key_ozon: null,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
-
     await handleAgentV4(req, res);
 
     expect(res.json).toHaveBeenCalledTimes(1);
@@ -116,6 +119,7 @@ describe('Agent V4 Onboarding Guard', () => {
       subscription_active: true,
       api_key_wb: 'encrypted_wb_key',
       api_key_ozon: null,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
 
     const { orchestrateV4 } = await import('../../src/api-lib/agent/orchestrator-v4');
@@ -133,6 +137,7 @@ describe('Agent V4 Onboarding Guard', () => {
       subscription_active: true,
       api_key_wb: null,
       api_key_ozon: null,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
 
     req.body.message = 'Помощь'; // Special intent

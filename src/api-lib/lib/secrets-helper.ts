@@ -55,7 +55,7 @@ export async function getSecret(
       secretsCache.set(key, { value, expiresAt: Date.now() + CACHE_TTL_MS });
       return value;
     }
-  } catch (dbError) {
+  } catch {
     // console.warn failed to read from system_settings
   }
 

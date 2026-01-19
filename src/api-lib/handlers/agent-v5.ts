@@ -363,6 +363,7 @@ export const handleAgentV5Secure = securityMiddleware(
     auditEvent: 'agent.v5.execute',
     rateLimit: { limit: 20, windowSeconds: 60 },
   },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   handleAgentV5 as any
 );
 
@@ -373,5 +374,6 @@ export const handleAgentV5ConfirmSecure = securityMiddleware(
   {
     auditEvent: 'agent.v5.confirm',
   },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   handleAgentV5Confirm as any
 );

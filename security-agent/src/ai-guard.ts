@@ -26,14 +26,14 @@ const PromptValidationRequestSchema = z.object({
   model: z.string().default('gpt-4'),
 });
 
-const TokenBudgetSchema = z.object({
+export const TokenBudgetSchema = z.object({
   userId: z.string(),
   dailyLimit: z.number().int().positive().default(1000),
   currentUsage: z.number().int().nonnegative().default(0),
   resetAt: z.string().datetime(),
 });
 
-const CircuitBreakerStateSchema = z.object({
+export const CircuitBreakerStateSchema = z.object({
   state: z.enum(['closed', 'open', 'half_open']),
   failureCount: z.number().int().nonnegative(),
   lastFailureTime: z.string().datetime().optional(),

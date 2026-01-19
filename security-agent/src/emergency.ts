@@ -45,7 +45,7 @@ const IncidentSchema = z.object({
   metadata: z.record(z.unknown()).optional(),
 });
 
-const PlaybookSchema = z.object({
+export const PlaybookSchema = z.object({
   id: z.string(),
   name: z.string(),
   severity: IncidentSeveritySchema,
@@ -63,7 +63,7 @@ const PlaybookSchema = z.object({
   slaMinutes: z.number(), // Service Level Agreement response time
 });
 
-const LockdownStateSchema = z.object({
+export const LockdownStateSchema = z.object({
   active: z.boolean(),
   initiatedAt: z.string().datetime().optional(),
   initiatedBy: z.string().optional(),
