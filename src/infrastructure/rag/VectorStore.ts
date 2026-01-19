@@ -174,8 +174,8 @@ export class HuggingFaceEmbeddingProvider implements EmbeddingProvider {
 
   constructor(options?: { model?: string }) {
     this.apiKey = process.env.HUGGINGFACE_API_KEY || '';
-    // SOTA Multilingual model (1024 dims)
-    this.model = options?.model || 'intfloat/multilingual-e5-large';
+    // SOTA Multilingual model with instruction tuning (1024 dims)
+    this.model = options?.model || 'intfloat/multilingual-e5-large-instruct';
     this.dimensions = 1024;
   }
 

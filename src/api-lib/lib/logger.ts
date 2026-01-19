@@ -63,13 +63,29 @@ function isDebugEnabled(): boolean {
  * Format log message with context
  */
 function formatLog(level: LogLevel, message: string, context?: LogContext): string {
-  const timestamp = new Date().toISOString();
-  const levelUpper = level.toUpperCase().padEnd(5);
+  const isProduction =
+    process.env.NODE_ENV === 'production' ||
+    process.env.VERCEL_ENV === 'production' ||
+    process.env.NODE_ENV === 'staging';
 
+  const timestamp = new Date().toISOString();
+  const redactedContext = context ? redactSensitiveData(context) : undefined;
+
+  if (isProduction) {
+    // 2026 Standard: Pure JSON for structured logging
+    return JSON.stringify({
+      timestamp,
+      level,
+      message,
+      ...(typeof redactedContext === 'object' ? redactedContext : {}),
+    });
+  }
+
+  // Development: Human-readable format
+  const levelUpper = level.toUpperCase().padEnd(5);
   let logLine = `[${timestamp}] ${levelUpper} ${message}`;
 
-  if (context && Object.keys(context).length > 0) {
-    const redactedContext = redactSensitiveData(context);
+  if (redactedContext && Object.keys(redactedContext).length > 0) {
     logLine += ` ${JSON.stringify(redactedContext)}`;
   }
 

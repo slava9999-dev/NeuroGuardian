@@ -48,6 +48,44 @@ api.interceptors.response.use(
 );
 
 // ============================================
+// SWR CACHING STRATEGY
+// ============================================
+
+const swrCache = new Map<string, { data: unknown; timestamp: number }>();
+const SWR_TTL = 1000 * 60 * 5; // 5 minutes
+
+/**
+ * Enhanced fetch with Stale-While-Revalidate
+ */
+export async function fetchSWR<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+  const cached = swrCache.get(key);
+  const now = Date.now();
+
+  // If we have valid non-stale cache, return it immediately
+  if (cached && now - cached.timestamp < SWR_TTL / 2) {
+    return cached.data as T;
+  }
+
+  // If we have stale cache, return it but revalidate in background
+  if (cached) {
+    console.log(`[SWR] Serving stale content for ${key}...`);
+    // Revalidate in background
+    fetcher()
+      .then(freshData => {
+        swrCache.set(key, { data: freshData, timestamp: Date.now() });
+      })
+      .catch(err => console.warn(`[SWR] Revalidation failed for ${key}:`, err));
+
+    return cached.data as T;
+  }
+
+  // No cache, fetch and store
+  const data = await fetcher();
+  swrCache.set(key, { data, timestamp: Date.now() });
+  return data;
+}
+
+// ============================================
 // AUTH SERVICE
 // ============================================
 
@@ -216,12 +254,14 @@ export interface ProductData {
 
 export const productsApi = {
   getProducts: async (): Promise<{ success: boolean; products: ProductData[] }> => {
-    const initData = getInitData();
-    const response = await api.get('', {
-      params: { action: 'products' },
-      headers: { 'X-Init-Data': initData || '' },
+    return fetchSWR('products', async () => {
+      const initData = getInitData();
+      const response = await api.get('', {
+        params: { action: 'products' },
+        headers: { 'X-Init-Data': initData || '' },
+      });
+      return { success: true, products: response.data.products };
     });
-    return { success: true, products: response.data.products };
   },
 
   syncProducts: async (

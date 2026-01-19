@@ -1,0 +1,55 @@
+
+[1m[46m RUN [49m[22m [36mv3.2.4 [39m[90mC:/NeuroGUARDIAN[39m
+
+[90mstdout[2m | tests/security/security-agent.test.ts[2m > [22m[2mSecurityAgent Integration[2m > [22m[2mshould detect SQL injection attempts
+[22m[39m[SecurityAgent] Initializing...
+[SecretsGuard] Running in fallback mode (TEST/DEV)
+[AuditLogger] Connected to ClickHouse at localhost
+[N8nGuardian] Running in test mode, skipping key initialization
+[RegressionShield] Initialized
+[AIAgentGuard] Initialized
+[EmergencyResponse] Initialized
+
+[90mstdout[2m | tests/security/security-agent.test.ts[2m > [22m[2mSecurityAgent Integration[2m > [22m[2mshould detect SQL injection attempts
+[22m[39m[AuthorizationGuard] Local Redis not available, using local cache
+
+[90mstdout[2m | tests/security/security-agent.test.ts[2m > [22m[2mSecurityAgent Integration[2m > [22m[2mshould detect SQL injection attempts
+[22m[39m[SecurityAgent] Initialized successfully
+
+[90mstdout[2m | tests/security/security-agent.test.ts[2m > [22m[2mSecurityAgent Integration[2m > [22m[2mshould detect SQL injection attempts
+[22m[39m[AuditLogger] Event logged {
+  id: [32m'55dff5cc-8532-43d6-bc0e-55b4329fea9d'[39m,
+  event: [32m'security.injection_attempt'[39m,
+  category: [32m'security'[39m,
+  severity: [32m'critical'[39m,
+  userId: [32m'attacker_123'[39m,
+  traceId: [32m'e39c2b91-8d82-49ee-80d4-3c99578bcadc'[39m
+}
+
+[90mstdout[2m | tests/security/security-agent.test.ts[2m > [22m[2mSecurityAgent Integration[2m > [22m[2mshould detect XSS attempts
+[22m[39m[AuditLogger] Event logged {
+  id: [32m'e08faf11-9dda-4810-a6cb-bfabaa66d516'[39m,
+  event: [32m'security.injection_attempt'[39m,
+  category: [32m'security'[39m,
+  severity: [32m'critical'[39m,
+  userId: [32m'attacker_123'[39m,
+  traceId: [32m'f1a34126-3f12-4ff2-96ab-5871b1199ddd'[39m
+}
+
+[90mstdout[2m | tests/security/security-agent.test.ts[2m > [22m[2mSecurityAgent Integration[2m > [22m[2mshould detect NoSQL injection
+[22m[39m[AuditLogger] Event logged {
+  id: [32m'90c5ef86-53a6-4a43-9179-8aa2fd695b5a'[39m,
+  event: [32m'security.injection_attempt'[39m,
+  category: [32m'security'[39m,
+  severity: [32m'critical'[39m,
+  userId: [32m'attacker_123'[39m,
+  traceId: [32m'07b1f874-319c-4b50-b47c-0e4de941350d'[39m
+}
+
+ [32mтЬУ[39m tests/security/security-agent.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 97[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+[2m   Start at [22m 23:11:03
+[2m   Duration [22m 743ms[2m (transform 172ms, setup 36ms, collect 171ms, tests 97ms, environment 0ms, prepare 204ms)[22m
+

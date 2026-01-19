@@ -351,3 +351,27 @@ export class WorkflowSignatureError extends SecurityAgentError {
     this.name = 'WorkflowSignatureError';
   }
 }
+
+export class InjectionDetectedError extends SecurityAgentError {
+  constructor(userId: string, target: string, threatType: string) {
+    super(
+      `Malicious activity detected from user '${userId}' on '${target}': ${threatType}`,
+      'INJECTION_ATTEMPT',
+      403,
+      { userId, target, threatType }
+    );
+    this.name = 'InjectionDetectedError';
+  }
+}
+
+// ============================================
+// Pseudo-RASP (Runtime Protection) Types
+// ============================================
+
+export interface InputValidationOptions {
+  checkBody?: boolean;
+  checkQuery?: boolean;
+  checkParams?: boolean;
+  strict?: boolean;
+  blockedPatterns?: RegExp[];
+}

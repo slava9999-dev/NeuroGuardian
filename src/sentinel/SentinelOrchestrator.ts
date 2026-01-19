@@ -126,7 +126,8 @@ export class SentinelOrchestrator {
             errorMsg.includes('Unauthorized') ||
             errorMsg.includes('Unsupported state') ||
             errorMsg.includes('bad decrypt') ||
-            errorMsg.includes('authentication data')
+            errorMsg.includes('authentication data') ||
+            errorMsg.includes('not configured')
           ) {
             logger.warn(`Auth/Crypto failure for user ${user.id}, flagging account`, {
               userId: user.id,

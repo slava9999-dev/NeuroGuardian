@@ -6,7 +6,13 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@vercel/kv';
-import { sanitizeInput, checkRateLimit, isSubscriptionActive, getSecret } from '../lib/index.js';
+import {
+  sanitizeInput,
+  checkRateLimit,
+  isSubscriptionActive,
+  getSecret,
+  isFeatureEnabled,
+} from '../lib/index.js';
 
 import { getUserById, getProductsByUserId } from '../services/index.js';
 
@@ -21,8 +27,8 @@ import { registerAllTools } from '../../agent/execution/index.js'; // Register t
 // Multi-Agent Architecture (V6)
 import { multiAgentOrchestrator } from '../../agent/specialists/MultiAgentOrchestrator.js';
 
-// Feature flag for gradual rollout
-const USE_MULTI_AGENT = true; // process.env.USE_MULTI_AGENT === 'true';
+// Feature flag for gradual rollout - will be checked inside the handler
+const USE_MULTI_AGENT = process.env.USE_MULTI_AGENT === 'true';
 
 // Security
 import { securityMiddleware } from '@neuroguardian/security-agent';
@@ -151,15 +157,17 @@ export async function handleAgentV5(
     await getProductsByUserId(userId);
   }
 
-  // 6. Execute Orchestrator (V5 or Multi-Agent based on feature flag)
+  // 6. Execute Orchestrator (V5 or Multi-Agent based on dynamic feature flag)
   const context: OrchestratorContext = {
     userId,
     userName: user?.first_name || 'друг',
     isFirstContact: conversationHistory.length === 0,
   };
 
-  // Choose orchestrator based on feature flag
-  const result = USE_MULTI_AGENT
+  // Choose orchestrator based on dynamic feature flag (with 60s cache)
+  const currentUseMultiAgent = await isFeatureEnabled('multi_agent', USE_MULTI_AGENT);
+
+  const result = currentUseMultiAgent
     ? await multiAgentOrchestrator.orchestrate(message, context)
     : await agentOrchestratorV5.orchestrate(
         message,

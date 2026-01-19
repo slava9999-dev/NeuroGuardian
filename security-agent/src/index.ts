@@ -16,7 +16,7 @@ import { N8nGuardian } from './n8n.js';
 import { RegressionShield } from './regression.js';
 import { AIAgentGuard } from './ai-guard.js';
 import { EmergencyResponse } from './emergency.js';
-import type { SecurityAgentConfig } from './types.js';
+import { InjectionDetectedError, type SecurityAgentConfig } from './types.js';
 
 // Re-export all types
 export * from './types.js';
@@ -108,6 +108,15 @@ export class SecurityAgent {
   isInitialized(): boolean {
     return this.initialized;
   }
+
+  /**
+   * Create middleware using this agent's configuration
+   */
+  createMiddleware(options: SecurityMiddlewareOptions) {
+    return securityMiddleware(options, async (req: unknown, res: unknown) => {
+      return { success: true, req, res };
+    });
+  }
 }
 
 /**
@@ -197,7 +206,19 @@ export interface SecurityMiddlewareOptions {
   requiredPermissions?: string[];
   rateLimit?: { limit: number; windowSeconds: number };
   auditEvent?: string;
+  inputValidation?: import('./types.js').InputValidationOptions;
 }
+
+/**
+ * Common attack patterns for Pseudo-RASP protection
+ */
+const RASP_PATTERNS = {
+  SQL_INJECTION:
+    /select\s+.*\s+from|insert\s+into|update\s+.*\s+set|delete\s+from|drop\s+table|union\s+select/i,
+  XSS: /<script\b[^>]*>([\s\S]*?)<\/script>|on\w+\s*=\s*["'][^"']*["']/i,
+  SHELL_INJECTION: /;\s*(rm|cat|ls|grep|bash|sh|curl|wget)\b/i,
+  NOSQL_INJECTION: /\$where|\$regex|\$gt|\$lt|\$ne|\$in/i,
+};
 
 /**
  * Create middleware that enforces security policies
@@ -252,6 +273,38 @@ export function securityMiddleware<T extends (...args: unknown[]) => Promise<unk
 
       const context = createAuditContext(ctxReq);
       agent.audit.setContext(context);
+    }
+
+    // Pseudo-RASP: Input Validation
+    const validation = options.inputValidation || { checkBody: true, checkQuery: true };
+    const targets: Record<string, unknown> = {};
+    if (validation.checkBody && (req as { body?: unknown }).body)
+      targets.body = (req as { body: unknown }).body;
+    if (validation.checkQuery && (req as { query?: unknown }).query)
+      targets.query = (req as { query: unknown }).query;
+
+    for (const [targetName, content] of Object.entries(targets)) {
+      const serialized = JSON.stringify(content);
+      for (const [threatType, pattern] of Object.entries(RASP_PATTERNS)) {
+        if (pattern.test(serialized)) {
+          const error = new InjectionDetectedError(
+            req.userId || 'anonymous',
+            targetName,
+            threatType
+          );
+
+          // Log to audit system
+          await agent.audit.log({
+            event: 'security.injection_attempt',
+            category: 'security',
+            userId: req.userId || 'anonymous',
+            severity: 'critical',
+            metadata: { threatType, target: targetName, payload: serialized.slice(0, 100) },
+          });
+
+          throw error;
+        }
+      }
     }
 
     try {

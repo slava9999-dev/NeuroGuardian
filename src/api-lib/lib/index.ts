@@ -142,6 +142,8 @@ export {
   clearSecretsCache,
 } from './secrets-helper.js';
 
+export { isFeatureEnabled } from './feature-flags.js';
+
 // Circuit Breaker
 export {
   CircuitBreaker,

@@ -1,87 +1,77 @@
 # NeuroGUARDIAN — Project State
 
-## 📅 Last Updated: 2026-01-13
+## 📅 Last Updated: 2026-01-19
 
-## 🏷️ Current Version: v2.12.0-sentinel-stable
+## 🏷️ Current Version: v3.0.0-security-hardened
 
-## 🔴 СТАТУС: БОЕВОЙ РЕЖИМ — РЕЛИЗ 100 ПОЛЬЗОВАТЕЛЕЙ
+## 🟢 СТАТУС: БЕЗОПАСНОСТЬ УСИЛЕНА — Pseudo-RASP АКТИВИРОВАН
 
 ---
 
 ## ⚡ КРИТИЧЕСКАЯ ЦЕЛЬ
 
-> **ВЫКАТИТЬ РАБОЧИЙ ПРОДУКТ ДЛЯ 100 ТЕСТОВЫХ ПОЛЬЗОВАТЕЛЕЙ**
+> **ОБЕСПЕЧИТЬ МАКСИМАЛЬНУЮ ЗАЩИТУ ДАННЫХ И КОНТРОЛЬ НАД СИСТЕМОЙ**
 >
-> Это не игрушка. Это не демо. Это бизнес.
-> От этого зависит реальная семья и реальные финансы.
+> Проект перешел на уровень v3.0 с интегрированной защитой времени выполнения (RASP),
+> улучшенной наблюдаемостью (Sentry, JSON Logging) и динамическим управлением фичами.
 
 ---
 
 ## ✅ ЧТО ГОТОВО (Production Ready)
 
-| Компонент                 | Статус      | Проверено            |
-| ------------------------- | ----------- | -------------------- |
-| **Telegram Bot Webhook**  | ✅ Работает | Webhook настроен     |
-| **Sentinel Service**      | ✅ Готов    | Код стабилен         |
-| **WB Price Protection**   | ✅ Готов    | Цены в рублях        |
-| **Ozon Price Protection** | ✅ Готов    | V5 API               |
-| **Viktor AI Agent**       | ✅ Готов    | Memory интегрирована |
-| **Subscription System**   | ✅ Готов    | Tiers настроены      |
-| **YooKassa Integration**  | ✅ Готов    | Ключи в Vercel       |
-| **RAG Knowledge Base**    | ✅ Готов    | Gemini (768 dims)    |
-| **288 Unit Tests**        | ✅ Passing  | 0 failures           |
-| **TypeScript**            | ✅ Passing  | No errors            |
+| Компонент                 | Статус     | Проверено / Новое           |
+| ------------------------- | ---------- | --------------------------- |
+| **Security Agent (RASP)** | ✅ Активен | SQLi/XSS/NoSQLi Detection   |
+| **God Mode v2**           | ✅ Активен | Динамические Feature Flags  |
+| **Sentry Core**           | ✅ Активен | Frontend Error Tracking     |
+| **JSON Logging**          | ✅ Активен | Structured Logs for Cloud   |
+| **Edge MoE Classifier**   | ✅ Активен | Latency optimized           |
+| **SWR Caching**           | ✅ Активен | instant UI for Products     |
+| **Shield Audit**          | ✅ Активен | Secret Rotation Monitoring  |
+| **Sentinel Service**      | ✅ Готов   | Legacy + New Crypto support |
+| **WB/Ozon Protection**    | ✅ Готов   | V5 API + Serper fallback    |
 
 ---
 
 ## 🧪 ЧТО НУЖНО ПРОТЕСТИРОВАТЬ
 
-| Тест                          | Статус | Как проверить              |
-| ----------------------------- | ------ | -------------------------- |
-| Бот отвечает на сообщения     | ⏳     | Написать @NeuroGuardianBot |
-| Онбординг новых пользователей | ⏳     | /start в боте              |
-| Подключение WB ключей         | ⏳     | Ввести API ключ            |
-| Синхронизация товаров         | ⏳     | Кнопка "Sync"              |
-| Sentinel защита цен           | ⏳     | Установить min_price       |
-| Уведомления в Telegram        | ⏳     | Дождаться alert            |
-| Платёж через YooKassa         | ⏳     | Купить подписку            |
+| Тест                      | Статус | Как проверить              |
+| ------------------------- | ------ | -------------------------- |
+| Бот отвечает на сообщения | ✅     | Проверено в Smoke Test     |
+| God Mode Feature Toggle   | ✅     | Тестирование через UI      |
+| Pseudo-RASP Block         | ✅     | Security Integration Tests |
+| SWR Revalidation          | ⏳     | Проверка сетевых логов     |
+| Secret Rotation Warning   | ✅     | Unit Tests (SecretsGuard)  |
 
 ---
 
 ## 🐛 ИЗВЕСТНЫЕ ПРОБЛЕМЫ
 
-1. **LLM Model** — `llama-3.3-70b-versatile` может быть недоступен на Groq
-   - Fallback: шаблонные ответы работают
-2. **Локальная БД** — VPN/сетевые проблемы при локальной отладке
-   - Решение: тестировать через Production (Vercel)
+1. **Marketplace Flakiness** — WB API периодически возвращает 0 для OOS товаров (Test Robustness Fix применен).
+2. **Crypto Transition** — Старые ключи (Plaintext) требуют сброса для повышения секьюрности.
 
 ---
 
 ## 📊 МЕТРИКИ ГОТОВНОСТИ
 
 ```
-Тесты:           288/288 ✅
-TypeCheck:       PASSED  ✅
-Git Status:      CLEAN   ✅
-Launch Checklist: 85%    🟡
+Тесты Core:       295/295 ✅
+Security Tests:   PASSED  ✅
+TypeCheck:        PASSED  ✅
+Git Status:       CLEAN   ✅
+Sentry Health:    GREEN   ✅
 ```
 
 ---
 
 ## 🚀 ПЛАН ДЕЙСТВИЙ
 
-### Сегодня (2026-01-13):
+### Текущий спринт:
 
-1. ⏳ Тестирование через Telegram
-2. ⏳ Фикс найденных багов
-3. ⏳ Подготовка к релизу
-
-### Цель:
-
-- **100 тестовых пользователей**
-- **Работающий бот**
-- **Работающая защита цен**
-- **Работающие платежи**
+1. ✅ Интеграция Pseudo-RASP в middleware.
+2. ✅ Добавление вкладок управления в God Mode.
+3. ✅ Оптимизация производительности (Edge, SWR).
+4. ⏳ Финальная проверка CI/CD пайплайнов.
 
 ---
 
@@ -89,8 +79,9 @@ Launch Checklist: 85%    🟡
 
 - **App:** https://neuro-guardian.vercel.app
 - **API:** https://neuro-guardian.vercel.app/api
+- **God Mode:** (Restricted) /god-mode
 - **Bot:** @NeuroGuardianBot
 
 ---
 
-> **"Результат — это всё. Слова — это ничто."**
+> **"Безопасность — это не состояние, это процесс."**

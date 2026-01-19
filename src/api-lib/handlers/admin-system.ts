@@ -108,6 +108,17 @@ export async function handleAdminSystem(
           activeUsers24h: Number(activeUsers.rows[0]?.count || 0),
           errorsLastHour: Number(opsEvents.rows[0]?.count || 0),
         },
+        featureFlags: await (async () => {
+          try {
+            const flags =
+              await sql`SELECT key, value_bool FROM system_flags WHERE key LIKE 'feature_%'`;
+            return Object.fromEntries(
+              flags.rows.map(f => [f.key.replace('feature_', ''), f.value_bool])
+            );
+          } catch {
+            return {};
+          }
+        })(),
       });
     }
 
@@ -160,6 +171,25 @@ export async function handleAdminSystem(
         case 'clear_cache': {
           // Not implemented yet
           return res.json({ success: true, message: 'Cache cleared (mock)' });
+        }
+
+        case 'toggle_feature': {
+          const { feature, enabled } = req.body || {};
+          if (!feature) return res.status(400).json({ error: 'feature name required' });
+
+          await sql`CREATE TABLE IF NOT EXISTS system_flags (key TEXT PRIMARY KEY, value_bool BOOLEAN, updated_at TIMESTAMP DEFAULT NOW())`;
+
+          await sql`
+            INSERT INTO system_flags (key, value_bool, updated_at) 
+            VALUES (${`feature_${feature}`}, ${enabled}, NOW())
+            ON CONFLICT (key) DO UPDATE SET value_bool = EXCLUDED.value_bool, updated_at = NOW()
+          `;
+
+          return res.json({
+            success: true,
+            feature,
+            enabled,
+          });
         }
 
         default:

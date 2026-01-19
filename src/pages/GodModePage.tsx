@@ -46,6 +46,7 @@ interface SystemStats {
     activeUsers24h: number;
     errorsLastHour: number;
   };
+  featureFlags: Record<string, boolean>;
 }
 
 // ==========================================
@@ -114,7 +115,9 @@ export function GodModePage() {
   const [stats, setStats] = useState<SystemStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'sentinel' | 'map'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'sentinel' | 'map' | 'features'>(
+    'dashboard'
+  );
 
   // React Flow State (Mock topology for now)
   const [nodes, , onNodesChange] = useNodesState([
@@ -228,8 +231,8 @@ export function GodModePage() {
       {/* CONTENT */}
       <div className="pt-24 pb-24 px-6 max-w-7xl mx-auto">
         {/* TABS */}
-        <div className="flex gap-2 mb-8">
-          {['dashboard', 'map', 'sentinel'].map(tab => (
+        <div className="flex gap-2 mb-8 overflow-x-auto pb-2 no-scrollbar">
+          {['dashboard', 'map', 'sentinel', 'features'].map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab as 'dashboard' | 'sentinel' | 'map')}
@@ -361,6 +364,60 @@ export function GodModePage() {
                 </div>
                 <div className="text-stone-400"> &gt; Cycle complete. Duration: 1.2s</div>
               </div>
+            </motion.div>
+          )}
+          {activeTab === 'features' && stats && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="grid grid-cols-1 md:grid-cols-2 gap-6"
+            >
+              {[
+                {
+                  id: 'multi_agent',
+                  title: 'Multi-Agent Architecture (v5)',
+                  desc: 'Enables advanced reasoning and tool use via specialist agents.',
+                },
+                {
+                  id: 'edge_functions',
+                  title: 'Edge Function Execution',
+                  desc: 'Runs critical logic on Vercel Edge for lower latency.',
+                },
+                {
+                  id: 'auto_remediation',
+                  title: 'Security Auto-Remediation',
+                  desc: 'Automatically block IPs/users on suspicious activity.',
+                },
+                {
+                  id: 'stale_while_revalidate',
+                  title: 'SWR Caching Strategy',
+                  desc: 'Accelerates dashboard reads with background refreshes.',
+                },
+              ].map(flag => (
+                <div
+                  key={flag.id}
+                  className="bg-stone-900 border border-stone-800 p-6 rounded-xl flex items-center justify-between"
+                >
+                  <div>
+                    <h3 className="font-bold text-stone-200">{flag.title}</h3>
+                    <p className="text-xs text-stone-500 mt-1">{flag.desc}</p>
+                  </div>
+                  <button
+                    onClick={() =>
+                      triggerAction('toggle_feature', {
+                        feature: flag.id,
+                        enabled: !stats.featureFlags[flag.id],
+                      })
+                    }
+                    className={`w-12 h-6 rounded-full transition-colors relative ${stats.featureFlags[flag.id] ? 'bg-violet-500' : 'bg-stone-700'}`}
+                  >
+                    <div
+                      className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${stats.featureFlags[flag.id] ? (flag.id === 'multi_agent' || flag.id === 'edge_functions' ? 'translate-x-6' : 'translate-x-6') : 'translate-x-0'}`}
+                    />
+                  </button>
+                </div>
+              ))}
             </motion.div>
           )}
         </AnimatePresence>

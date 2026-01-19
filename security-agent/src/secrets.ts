@@ -344,19 +344,39 @@ export class SecretsGuard {
     try {
       const secretPath = `secret/metadata/neuroguardian/${key}`;
       const response = await this.client!.read(secretPath);
-      const createdTime = response.data.data.created_time;
+      const createdTime = response.data.data.created_time || response.data.data.updated_time;
       const currentVersion = response.data.data.current_version;
 
       return {
         key,
         createdAt: createdTime ? new Date(createdTime) : new Date(),
-        lastAccessedAt: new Date(), // Would come from our access log
+        lastAccessedAt: new Date(),
         accessCount: this.accessLog.get(key)?.count || 0,
         version: typeof currentVersion === 'number' ? currentVersion : 1,
       };
     } catch {
       return null;
     }
+  }
+
+  /**
+   * Verify if a secret needs rotation based on age (Automated Security Check)
+   */
+  async verifyRotation(key: string, maxAgeDays = 90): Promise<{ stale: boolean; ageDays: number }> {
+    const metadata = await this.getMetadata(key);
+    if (!metadata) return { stale: false, ageDays: 0 };
+
+    const ageMs = Date.now() - metadata.createdAt.getTime();
+    const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
+    const stale = ageDays >= maxAgeDays;
+
+    if (stale) {
+      console.warn(
+        `[SecretsGuard] ⚠️ SECRET ROTATION REQUIRED: '${key}' is ${ageDays} days old (Limit: ${maxAgeDays})`
+      );
+    }
+
+    return { stale, ageDays };
   }
 
   /**
