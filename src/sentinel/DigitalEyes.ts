@@ -1,5 +1,5 @@
-import { logger } from '../api-lib/lib/logger';
-import { geminiFlash } from '../infrastructure/llm/GeminiProvider';
+import { logger } from '../api-lib/lib/logger.js';
+import { geminiFlash } from '../infrastructure/llm/GeminiProvider.js';
 import * as cheerio from 'cheerio';
 
 interface EyesResult {
