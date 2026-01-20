@@ -71,7 +71,7 @@ export function LegalPage({ onBack }: LegalPageProps) {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="card p-5 mb-6 bg-gradient-to-r from-success-soft to-surface border-success/20"
+          className="card p-5 mb-6 bg-linear-to-r from-success-soft to-surface border-success/20"
         >
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
@@ -97,7 +97,7 @@ export function LegalPage({ onBack }: LegalPageProps) {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="card p-5 mb-6 bg-gradient-to-r from-warning-soft to-surface border-warning/20"
+          className="card p-5 mb-6 bg-linear-to-r from-warning-soft to-surface border-warning/20"
         >
           <div className="flex items-center gap-2 mb-2">
             <span className="badge badge-warning">Trial</span>
@@ -167,7 +167,7 @@ export function LegalPage({ onBack }: LegalPageProps) {
         {/* PRO Yearly - Best Value */}
         <motion.div
           whileHover={{ scale: 1.01 }}
-          className="card p-5 border-2 border-secondary/30 bg-gradient-to-br from-secondary/5 to-surface relative overflow-hidden"
+          className="card p-5 border-2 border-secondary/30 bg-linear-to-br from-secondary/5 to-surface relative overflow-hidden"
         >
           {/* Best Value Badge */}
           <div className="absolute top-0 right-0 bg-secondary text-white text-xs font-bold px-3 py-1 rounded-bl-xl">
@@ -301,7 +301,7 @@ export function LegalPage({ onBack }: LegalPageProps) {
         <details className="card overflow-hidden group">
           <summary className="p-4 cursor-pointer font-medium text-text-secondary hover:text-text-main transition-colors flex justify-between items-center">
             Юридическая информация
-            <ArrowLeft className="w-4 h-4 transform rotate-[-90deg] group-open:rotate-90 transition-transform" />
+            <ArrowLeft className="w-4 h-4 transform -rotate-90 group-open:rotate-90 transition-transform" />
           </summary>
           <div className="px-4 pb-4 text-xs text-text-muted space-y-1 border-t border-surface-dim pt-3">
             <p>ИП Дмитричев Александр Геннадьевич</p>

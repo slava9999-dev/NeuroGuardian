@@ -430,7 +430,7 @@ export function SettingsPage({
           ============================================ */}
       <section className="mb-8">
         <h2 className="section-title">👑 Подписка</h2>
-        <div className="card p-4 bg-gradient-to-br from-primary-dim to-surface">
+        <div className="card p-4 bg-linear-to-br from-primary-dim to-surface">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-xl bg-primary text-white">

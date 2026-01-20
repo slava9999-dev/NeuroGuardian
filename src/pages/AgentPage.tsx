@@ -274,7 +274,7 @@ export function AgentPage() {
 
       {/* Input Bar - FIXED: always visible at bottom */}
       <div
-        className="fixed bottom-0 left-0 right-0 z-50 bg-gradient-to-t from-background via-background to-transparent pt-6"
+        className="fixed bottom-0 left-0 right-0 z-50 bg-linear-to-t from-background via-background to-transparent pt-6"
         style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 16px)' }}
       >
         <div className="max-w-2xl mx-auto px-4">
