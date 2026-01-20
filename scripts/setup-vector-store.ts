@@ -62,11 +62,17 @@ async function main() {
   try {
     // Check available keys to determine dimension
     const ragProvider = process.env.RAG_PROVIDER?.toLowerCase();
-    const hasOpenAI = !!process.env.OPENAI_API_KEY && ragProvider !== 'gemini';
-    const hasGemini = !!process.env.GEMINI_API_KEY || !!process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    const hasHF = !!process.env.HUGGINGFACE_API_KEY && ragProvider === 'huggingface';
+    const hasOpenAI =
+      !!process.env.OPENAI_API_KEY && (ragProvider === 'openai' || (!ragProvider && !hasHF));
+    const hasGemini =
+      (!!process.env.GEMINI_API_KEY || !!process.env.GOOGLE_GENERATIVE_AI_API_KEY) &&
+      (ragProvider === 'gemini' || (!ragProvider && !hasHF && !hasOpenAI));
 
     let vectorDim = 1536; // Default
-    if (ragProvider === 'gemini') {
+    if (ragProvider === 'huggingface' || hasHF) {
+      vectorDim = 1024;
+    } else if (ragProvider === 'gemini') {
       vectorDim = 768;
     } else if (hasOpenAI) {
       vectorDim = 1536;
@@ -75,7 +81,7 @@ async function main() {
     }
 
     console.log(
-      `   ℹ️  Detected provider: ${ragProvider === 'gemini' ? 'Gemini (Forced)' : hasOpenAI ? 'OpenAI' : hasGemini ? 'Gemini' : 'None'}`
+      `   ℹ️  Detected provider: ${ragProvider === 'huggingface' || hasHF ? 'HuggingFace' : ragProvider === 'gemini' ? 'Gemini (Forced)' : hasOpenAI ? 'OpenAI' : hasGemini ? 'Gemini' : 'None'}`
     );
     console.log(`   ℹ️  Vector dimensions: ${vectorDim}`);
 
@@ -170,12 +176,16 @@ async function main() {
 
   // Check if we have embedding API key
   const ragProvider = process.env.RAG_PROVIDER?.toLowerCase();
-  const hasOpenAI = !!process.env.OPENAI_API_KEY && ragProvider !== 'gemini';
-  const hasGemini = !!process.env.GEMINI_API_KEY || !!process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+  const hasHF = !!process.env.HUGGINGFACE_API_KEY && ragProvider === 'huggingface';
+  const hasOpenAI =
+    !!process.env.OPENAI_API_KEY && (ragProvider === 'openai' || (!ragProvider && !hasHF));
+  const hasGemini =
+    (!!process.env.GEMINI_API_KEY || !!process.env.GOOGLE_GENERATIVE_AI_API_KEY) &&
+    (ragProvider === 'gemini' || (!ragProvider && !hasHF && !hasOpenAI));
 
-  if (!hasOpenAI && !hasGemini) {
+  if (!hasHF && !hasOpenAI && !hasGemini) {
     console.log('   ⚠️  No embedding API key found!');
-    console.log('   Set OPENAI_API_KEY or GEMINI_API_KEY to generate embeddings.');
+    console.log('   Set HUGGINGFACE_API_KEY, OPENAI_API_KEY or GEMINI_API_KEY.');
     console.log('');
     console.log(
       '   📌 Table structure is ready. Run this script again with API key to ingest documents.'
@@ -184,7 +194,7 @@ async function main() {
   }
 
   console.log(
-    `   Using ${ragProvider === 'gemini' ? 'Gemini' : hasOpenAI ? 'OpenAI' : 'Gemini'} for embeddings`
+    `   Using ${ragProvider === 'huggingface' || hasHF ? 'HuggingFace' : ragProvider === 'gemini' ? 'Gemini' : hasOpenAI ? 'OpenAI' : 'Gemini'} for embeddings`
   );
 
   try {

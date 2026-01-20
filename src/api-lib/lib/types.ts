@@ -176,11 +176,15 @@ export interface DBProduct {
   min_margin?: number | null; // INTEGER (Target Profit Margin in RUB)
   barcode?: string | null; // VARCHAR(255)
   category?: string | null; // VARCHAR(255)
-  // Dimensions & Weight (Jan 2026 - Logistics)
   width_cm?: number | null;
   height_cm?: number | null;
   depth_cm?: number | null;
   weight_kg?: number | null; // Float
+
+  // Hunter fields (Jan 2026)
+  competitor_url?: string | null;
+  competitor_price?: number | null; // INTEGER DEFAULT 0
+  price_strategy?: string | null; // 'passive' | 'aggressive:10'
 
   // SPP Buffer fields for smart stop-loss (Jan 2026)
   target_buyer_price?: number | null; // INTEGER — desired minimum price for buyer

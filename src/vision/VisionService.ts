@@ -184,7 +184,7 @@ export class VisionService {
               analyzed_at: new Date().toISOString(),
             };
           }
-        } catch (_dbErr) {
+        } catch {
           /* ignore */
         }
       }

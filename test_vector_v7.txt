@@ -1,0 +1,30 @@
+[2026-01-19T21:13:57.764Z] INFO  [VectorStore] Using HuggingFace embeddings (1024 dims)
+[DEBUG] VectorStore constructed with provider: HuggingFaceEmbeddingProvider
+Testing Vector Store with HF...
+[2026-01-19T21:13:58.292Z] INFO  [VectorStore] Initialized successfully
+[DEBUG-HF] Calling HF: https://router.huggingface.co/hf-inference/models/intfloat/multilingual-e5-large-instruct with 1 inputs
+[2026-01-19T21:13:58.293Z] INFO  [HF-Embed] Requesting 1 embeddings from intfloat/multilingual-e5-large-instruct
+[2026-01-19T21:13:59.467Z] INFO  [HF-Embed] Success: 1 vectors in 1174ms
+[DEBUG] Saving to DB: test_file, embedding length: 7574
+[2026-01-19T21:13:59.468Z] INFO  [VectorStore] Saving document to DB: test_file (chunk 0)
+node:events:486
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: Connection terminated unexpectedly
+    at Connection.<anonymous> (C:\NeuroGUARDIAN\node_modules\pg\lib\client.js:136:73)
+    at Object.onceWrapper (node:events:622:28)
+    at Connection.emit (node:events:508:28)
+    at Socket.<anonymous> (C:\NeuroGUARDIAN\node_modules\pg\lib\connection.js:62:12)
+    at Socket.emit (node:events:520:35)
+    at TCP.<anonymous> (node:net:346:12)
+Emitted 'error' event on Client instance at:
+    at Client._handleErrorEvent (C:\NeuroGUARDIAN\node_modules\pg\lib\client.js:350:10)
+    at Connection.<anonymous> (C:\NeuroGUARDIAN\node_modules\pg\lib\client.js:154:16)
+    at Object.onceWrapper (node:events:622:28)
+    at Connection.emit (node:events:508:28)
+    at Socket.<anonymous> (C:\NeuroGUARDIAN\node_modules\pg\lib\connection.js:62:12)
+    at Socket.emit (node:events:520:35)
+    at TCP.<anonymous> (node:net:346:12)
+
+Node.js v25.2.0

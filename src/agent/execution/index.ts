@@ -44,6 +44,9 @@ import { getMarketplaceInfoTool } from './tools/GetMarketplaceInfoTool.js';
 import { getCompetitorPriceTool } from './tools/GetCompetitorPriceTool.js';
 import { getRealPriceTool } from './tools/GetRealPriceTool.js';
 
+// Sentinel tools
+import { AddCompetitorMonitorTool, CheckSentinelStatusTool } from './tools/SentinelTools.js';
+
 // Admin
 import { getSystemLogsTool } from './tools/GetSystemLogsTool.js';
 
@@ -75,6 +78,10 @@ export function registerAllTools(): void {
   toolRegistry.register(updateProductSettingsTool);
   toolRegistry.register(syncCatalogTool);
   toolRegistry.register(generateProductImageTool);
+
+  // Sentinel tools
+  toolRegistry.register(AddCompetitorMonitorTool);
+  toolRegistry.register(CheckSentinelStatusTool);
 
   // Search tools
   toolRegistry.register(searchWebTool);
@@ -113,3 +120,4 @@ export { getLowMarginProductsTool } from './tools/GetLowMarginProductsTool.js';
 export { getRealPriceTool } from './tools/GetRealPriceTool.js';
 export { syncCatalogTool } from './tools/SyncCatalogTool.js';
 export { generateProductImageTool } from './tools/GenerateProductImageTool.js';
+export { AddCompetitorMonitorTool, CheckSentinelStatusTool } from './tools/SentinelTools.js';

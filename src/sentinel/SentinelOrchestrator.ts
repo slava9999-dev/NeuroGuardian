@@ -16,6 +16,7 @@ import { digitalEyes } from './DigitalEyes.js';
 import { sentinelPriceReporter } from './PriceReporter.js';
 import { notificationService } from '../api-lib/services/notifications.js';
 import { logger } from '../api-lib/lib/logger.js';
+import { MarketplaceService } from '../api-lib/core-services/MarketplaceService.js';
 
 export class SentinelOrchestrator {
   private priceMonitor: SentinelPriceMonitor;
@@ -23,13 +24,16 @@ export class SentinelOrchestrator {
   private defenseExecutor: SentinelDefenseExecutor;
   private reportGenerator: SentinelReportGenerator;
   private alertSender: SentinelAlertSender;
+  private marketplaceService: MarketplaceService;
 
   constructor() {
     this.priceMonitor = new SentinelPriceMonitor();
     this.threatDetector = new ThreatDetector();
     this.defenseExecutor = new SentinelDefenseExecutor();
     this.reportGenerator = new SentinelReportGenerator();
+    this.reportGenerator = new SentinelReportGenerator();
     this.alertSender = new SentinelAlertSender();
+    this.marketplaceService = new MarketplaceService();
   }
 
   /**
@@ -245,6 +249,9 @@ export class SentinelOrchestrator {
           estimated_buyer_price: r.estimatedBuyerPrice,
           marketplace_discount_percent: r.marketplaceDiscountPercent,
           updated_at: r.updatedAt,
+          competitor_url: r.competitorUrl,
+          competitor_price: r.competitorPrice,
+          price_strategy: r.priceStrategy,
         })) as unknown as DBProduct[];
 
         allProducts.push(...legacyRows);
@@ -280,6 +287,11 @@ export class SentinelOrchestrator {
     // BATTLE MODE: Optimized processing batch size
     const PRODUCT_BATCH_SIZE = 10;
     const priceUpdates: Array<{ id: number; currentPrice: number }> = [];
+
+    // 3. Hunter Mode (Aggressive Repricing)
+    // Run this BEFORE standard checks to ensure we are competitive first
+    // Use the mapped products but we need to ensure we access new fields via 'any' casting for now
+    await this.processCompetitorsHunter(Number(user.id), allProducts, Date.now());
 
     for (let i = 0; i < allProducts.length; i += PRODUCT_BATCH_SIZE) {
       const productBatch = allProducts.slice(i, i + PRODUCT_BATCH_SIZE);
@@ -548,6 +560,142 @@ export class SentinelOrchestrator {
       } catch (e) {
         logger.error('Failed to send periodic price report', e);
       }
+    }
+  }
+
+  /**
+   * Hunter Mode: Analyze competitors and adjust prices dynamically
+   */
+  private async processCompetitorsHunter(
+    userId: number,
+    productsList: DBProduct[],
+    startTime: number
+  ) {
+    // Filter active hunters
+    const hunters = productsList.filter(p => p.competitor_url && p.is_monitored);
+
+    if (hunters.length === 0) return;
+
+    logger.info(`[Hunter] Checking ${hunters.length} competitors for user ${userId}`);
+
+    // Limit concurrency to avoid overloading proxies/LLM
+    const chunkSize = 3;
+    for (let i = 0; i < hunters.length; i += chunkSize) {
+      // Watchdog
+      if (Date.now() - startTime > 45000) {
+        logger.warn('[Hunter] Time budget exceeded, skipping remaining competitors');
+        break;
+      }
+
+      const chunk = hunters.slice(i, i + chunkSize);
+      await Promise.all(chunk.map(p => this.huntOneProduct(userId, p)));
+    }
+  }
+
+  private async huntOneProduct(userId: number, product: DBProduct) {
+    if (!product.competitor_url) return;
+
+    try {
+      const mp = product.competitor_url.includes('ozon') ? 'Ozon' : 'WB';
+      // 1. Check Competitor Price
+      const eyesResult = await digitalEyes.gazeAtProduct(mp, product.competitor_url);
+
+      if (!eyesResult || !eyesResult.buyerPrice) {
+        return;
+      }
+
+      const compPrice = eyesResult.buyerPrice;
+
+      // 2. Update DB Knowledge (using schema imports)
+      if (compPrice !== product.competitor_price) {
+        await db
+          .update(products)
+          .set({ competitorPrice: compPrice, updatedAt: new Date() })
+          .where(eq(products.id, product.id));
+      }
+
+      // 3. Strategy Execution
+      const strategy = product.price_strategy || 'passive';
+
+      if (strategy.startsWith('aggressive')) {
+        const parts = strategy.split(':');
+        const diff = parts.length > 1 ? parseInt(parts[1]) : 10;
+
+        const myTargetPrice = compPrice - diff;
+        const myMinPrice = product.min_price || 0;
+
+        // Compare BUYER prices (roughly)
+        const myCurrentBuyerPrice = product.estimated_buyer_price || product.current_price;
+
+        if (myCurrentBuyerPrice > myTargetPrice) {
+          // Drop price
+          const delta = myCurrentBuyerPrice - myTargetPrice;
+          let newSellerPrice = (product.current_price || 0) - delta;
+
+          if (newSellerPrice >= myMinPrice) {
+            // Safe
+          } else {
+            newSellerPrice = myMinPrice;
+          }
+
+          // Only update if change is significant (> 0.5%)
+          if (
+            Math.abs(newSellerPrice - (product.current_price || 0)) / (product.current_price || 1) >
+            0.005
+          ) {
+            if (newSellerPrice > myMinPrice) {
+              logger.info(
+                `[Hunter] Undercutting! ${product.product_id}: ${myCurrentBuyerPrice} -> ${myTargetPrice}`
+              );
+
+              const sku =
+                mp === 'WB'
+                  ? Number(product.nm_id)
+                  : parseInt(product.product_id.replace('ozon-', ''));
+              if (!sku || isNaN(sku)) return;
+
+              await this.marketplaceService.updatePrices(userId, mp, [
+                { id: sku, price: newSellerPrice },
+              ]);
+
+              await notificationService.sendRawMessage(
+                userId,
+                `⚔️ **Hunter Attack!**\n\n` +
+                  `Снизил цену на **${product.title}**\n` +
+                  `📉 ${myCurrentBuyerPrice}₽ -> **~${myTargetPrice}₽** (SELLER: ${newSellerPrice}₽)\n` +
+                  `🎯 Конкурент: ${compPrice}₽\n` +
+                  `🔗 <a href="${product.competitor_url}">Товар конкурента</a>`,
+                undefined // no markup
+              );
+            } else {
+              // Hit Stop Loss
+              if ((product.current_price || 0) > myMinPrice * 1.01) {
+                // Drop to min price
+                const sku =
+                  mp === 'WB'
+                    ? Number(product.nm_id)
+                    : parseInt(product.product_id.replace('ozon-', ''));
+                if (!sku || isNaN(sku)) return;
+
+                await this.marketplaceService.updatePrices(userId, mp, [
+                  { id: sku, price: myMinPrice },
+                ]);
+
+                await notificationService.sendRawMessage(
+                  userId,
+                  `🛡️ **Sentinel Defense**\n\n` +
+                    `Конкурент демпингует (${compPrice}₽)!\n` +
+                    `Снизил до **Stop Loss (${myMinPrice}₽)**.\n` +
+                    `Ниже нельзя.`,
+                  undefined
+                );
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      logger.error(`[Hunter] Error processing product ${product.product_id}`, e);
     }
   }
 

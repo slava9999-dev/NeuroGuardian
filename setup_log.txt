@@ -1,0 +1,38 @@
+[2026-01-19T20:25:50.811Z] INFO  [VectorStore] Using HuggingFace embeddings (1024 dims)
+тХФтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХЧ
+тХС       NeuroGUARDIAN тАФ Vector Store Setup                   тХС
+тХЪтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХЭ
+
+ЁЯУб Step 1: Checking database connection...
+   тЬЕ Database connected at: 2026-01-19T20:25:51.062Z
+
+ЁЯФМ Step 2: Checking pgvector extension...
+   тЬЕ pgvector extension already enabled
+
+ЁЯУЛ Step 3: Creating knowledge_embeddings table...
+   тД╣я╕П  Detected provider: HuggingFace
+   тД╣я╕П  Vector dimensions: 1024
+   тЪая╕П  Table already exists.
+   ЁЯФД Dimension mismatch: Current 1532 vs Target 1024. Recreating table...
+[2026-01-19T20:26:10.600Z] WARN  [Database] тЪая╕П Attempt 1 failed: read ECONNRESET. Retrying in 1000ms...
+node:events:486
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: Connection terminated unexpectedly
+    at Connection.<anonymous> (C:\NeuroGUARDIAN\node_modules\pg\lib\client.js:136:73)
+    at Object.onceWrapper (node:events:622:28)
+    at Connection.emit (node:events:508:28)
+    at Socket.<anonymous> (C:\NeuroGUARDIAN\node_modules\pg\lib\connection.js:62:12)
+    at Socket.emit (node:events:520:35)
+    at TCP.<anonymous> (node:net:346:12)
+Emitted 'error' event on Client instance at:
+    at Client._handleErrorEvent (C:\NeuroGUARDIAN\node_modules\pg\lib\client.js:350:10)
+    at Connection.<anonymous> (C:\NeuroGUARDIAN\node_modules\pg\lib\client.js:154:16)
+    at Object.onceWrapper (node:events:622:28)
+    at Connection.emit (node:events:508:28)
+    at Socket.<anonymous> (C:\NeuroGUARDIAN\node_modules\pg\lib\connection.js:62:12)
+    at Socket.emit (node:events:520:35)
+    at TCP.<anonymous> (node:net:346:12)
+
+Node.js v25.2.0

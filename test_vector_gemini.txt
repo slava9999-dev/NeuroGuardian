@@ -1,0 +1,16 @@
+[2026-01-19T21:15:24.563Z] INFO  [VectorStore] Using Gemini embeddings (768 dims, enforced by RAG_PROVIDER)
+[DEBUG] VectorStore constructed with provider: GeminiEmbeddingProvider
+Testing Vector Store with HF...
+[2026-01-19T21:15:25.292Z] INFO  [VectorStore] Initialized successfully
+Vector Test Failed: Error: Gemini Embedding API error: {
+  "error": {
+    "code": 400,
+    "message": "User location is not supported for the API use.",
+    "status": "FAILED_PRECONDITION"
+  }
+}
+
+    at GeminiEmbeddingProvider.embed (C:\NeuroGUARDIAN\src\infrastructure\rag\VectorStore.ts:146:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async VectorStore.addDocument (C:\NeuroGUARDIAN\src\infrastructure\rag\VectorStore.ts:345:19)
+    at async testVector (C:\NeuroGUARDIAN\scripts\test-vector.ts:8:16)

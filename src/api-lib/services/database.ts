@@ -13,6 +13,7 @@ const { Pool } = pkg;
 import type { QueryResult, PoolConfig, PoolClient } from 'pg';
 
 import { config } from '../../infrastructure/config/env.js';
+import { logger, decryptApiKey } from '../lib/index.js';
 
 let _pool: pkg.Pool | null = null;
 
@@ -27,8 +28,9 @@ function getPool(): pkg.Pool {
     ssl: { rejectUnauthorized: false },
     max: 10, // Increased for concurrency
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
+    connectionTimeoutMillis: 30000,
     keepAlive: true,
+    statement_timeout: 60000, // 1 minute per query
   };
 
   _pool = new Pool(poolConfig);
@@ -46,7 +48,7 @@ function getPool(): pkg.Pool {
  */
 async function executeWithRetry(text: string, values: unknown[]): Promise<QueryResult> {
   const pool = getPool();
-  const retries = 5;
+  const retries = 3;
   let attempt = 0;
 
   while (attempt < retries) {
@@ -56,21 +58,11 @@ async function executeWithRetry(text: string, values: unknown[]): Promise<QueryR
     try {
       client = await pool.connect();
 
-      // Handle the unhandled 'error' event on the client itself
-      // which often causes "Connection terminated unexpectedly" to crash the process
-      const errorListener = (err: Error) => {
-        logger.debug('[Database] Client socket error during execution', { error: err.message });
-      };
-      client.on('error', errorListener);
+      // Ensure specific search path
+      await client.query('SET search_path TO public');
 
-      try {
-        const res = await client.query(text, values);
-        client.removeListener('error', errorListener);
-        return res;
-      } catch (err) {
-        client.removeListener('error', errorListener);
-        throw err;
-      }
+      const res = await client.query(text, values);
+      return res;
     } catch (error: unknown) {
       const err = error as Error;
       const msg = err.message || String(error);
@@ -85,21 +77,20 @@ async function executeWithRetry(text: string, values: unknown[]): Promise<QueryR
         msg.includes('connection');
 
       if (isTransient && attempt < retries) {
-        const delay = attempt * 1000;
-        logger.warn(`[Database] ⚠️ Attempt ${attempt} failed: ${msg}. Retrying in ${delay}ms...`);
-        await new Promise(r => setTimeout(r, delay));
+        logger.warn(`[Database] 🚦 Attempt ${attempt} failed: ${msg}. Retrying in 2s...`);
+        await new Promise(r => setTimeout(r, 2000));
         continue;
       }
 
-      logger.error('[Database] ❌ Critical DB Error:', {
+      logger.error('[Database] ❌ DB Error:', {
         message: msg,
-        query: text.substring(0, 100),
+        query: text.substring(0, 200),
         attempt,
       });
       throw error;
     } finally {
       if (client) {
-        client.release(); // Return to pool instead of destroying
+        client.release();
       }
     }
   }
@@ -127,7 +118,6 @@ export const sql = Object.assign(
   }
 );
 
-import { logger, decryptApiKey } from '../lib/index.js';
 import type { DBProduct, PendingPriceUpdate } from '../lib/types.js';
 
 export interface TelegramUser {

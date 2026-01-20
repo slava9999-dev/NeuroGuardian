@@ -1,0 +1,11 @@
+[2026-01-19T20:44:14.992Z] INFO  [VectorStore] Using HuggingFace embeddings (1024 dims)
+Testing Vector Store with HF...
+[2026-01-19T20:44:15.423Z] INFO  [VectorStore] Initialized successfully
+[2026-01-19T20:44:15.664Z] WARN  [HF-Embed] Error on attempt 1. Retrying in 2000ms... {"error":{}}
+[2026-01-19T20:44:17.820Z] WARN  [HF-Embed] Error on attempt 2. Retrying in 4000ms... {"error":{}}
+Vector Test Failed: Error: HuggingFace API error: 410 {"error":"https://api-inference.huggingface.co is no longer supported. Please use https://router.huggingface.co instead."}
+    at HuggingFaceEmbeddingProvider.embedBatch (C:\NeuroGUARDIAN\src\infrastructure\rag\VectorStore.ts:225:17)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async HuggingFaceEmbeddingProvider.embed (C:\NeuroGUARDIAN\src\infrastructure\rag\VectorStore.ts:183:24)
+    at async VectorStore.addDocument (C:\NeuroGUARDIAN\src\infrastructure\rag\VectorStore.ts:343:19)
+    at async testVector (C:\NeuroGUARDIAN\scripts\test-vector.ts:8:16)

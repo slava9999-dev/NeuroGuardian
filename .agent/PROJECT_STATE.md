@@ -8,8 +8,33 @@
 
 ## 🎯 Current Phase: RELEASE PREPARATION (Phase 12) 🚀 PRODUCTION READY
 
-**Last Session:** 2026-01-20 (Session 84)
-**Focus:** 🎨 NEURO-UI V7.0 Warm Light Redesign
+**Last Session:** 2026-01-20 (Session 85)
+**Focus:** 🏹 Sentinel Hunter Mode & Competitive Analysis
+
+### Session 2026-01-20 (Session 85 - Hunter Mode Development) 🏹
+
+**Objective: Implement competitive analysis and aggressive repricing (Hunter Mode).**
+
+> ✅ **HUNTER MODE CORE:** Implemented competitive monitoring logic in `SentinelOrchestrator`. It now checks competitor prices using `DigitalEyes` (LLM-based vision) and performs automated repricing based on `aggressive` strategy.
+> ✅ **TOOLS:** Created `add_competitor_monitor` and `check_sentinel_status` tools for the AI Agent, allowing users to control Hunter Mode via chat.
+> ✅ **DATABASE:** Updated schema (`competitor_url`, `competitor_price`, `price_strategy`) to support tracking.
+> ✅ **TELEGRAM:** Integrated "Hunter Attack" notifications - users receive immediate alerts when Sentinel undercuts a competitor.
+
+**Completed Actions:**
+
+- [x] **Database Updates**: Added competitor tracking columns to `products` table.
+- [x] **Sentinel Tools**: Implemented `AddCompetitorMonitorTool` and registered it in `ToolRegistry`.
+- [x] **Orchestrator Logic**:
+  - Added `processCompetitorsHunter` method for periodic competitor checks.
+  - Implemented smart repricing logic (Undercutting) with Stop Loss protection.
+  - Integrated with `MarketplaceService` for real price updates.
+- [x] **Notifications**: Added detailed "Hunter Attack" and "Sentinel Defense" alerts via Telegram.
+
+**Key Insights:**
+
+```
+Hunter Mode transforms Sentinel from a passive defender to an active competitor, using LLM Vision to "see" real buyer prices that APIs often hide.
+```
 
 ### Session 2026-01-20 (Session 84 - UI/UX Redesign & Audit Fixes) 🎨
 

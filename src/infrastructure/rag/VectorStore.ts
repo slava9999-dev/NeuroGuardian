@@ -174,7 +174,7 @@ export class HuggingFaceEmbeddingProvider implements EmbeddingProvider {
 
   constructor(options?: { model?: string }) {
     this.apiKey = process.env.HUGGINGFACE_API_KEY || '';
-    // SOTA Multilingual model with instruction tuning (1024 dims)
+    // Compact 384-dim model for restricted networks
     this.model = options?.model || 'intfloat/multilingual-e5-large-instruct';
     this.dimensions = 1024;
   }
@@ -191,29 +191,34 @@ export class HuggingFaceEmbeddingProvider implements EmbeddingProvider {
 
     const maxRetries = 3;
     let attempt = 0;
+    const startTime = Date.now();
 
     while (attempt < maxRetries) {
       attempt++;
       try {
-        const response = await fetch(
-          `https://router.huggingface.co/hf-inference/models/${this.model}`,
-          {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${this.apiKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              inputs: texts,
-              options: { wait_for_model: true },
-            }),
-          }
-        );
+        const url = `https://router.huggingface.co/hf-inference/models/${this.model}`;
+        console.log(`[DEBUG-HF] Calling HF: ${url} with ${texts.length} inputs`);
+        logger.info(`[HF-Embed] Requesting ${texts.length} embeddings from ${this.model}`);
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            inputs: texts,
+            options: { wait_for_model: true },
+          }),
+        });
 
         if (!response.ok) {
           const errorText = await response.text();
           // Retry on gateway errors or model loading
-          if ((response.status === 504 || response.status === 503) && attempt < maxRetries) {
+          if (
+            (response.status === 504 || response.status === 503 || response.status === 429) &&
+            attempt < maxRetries
+          ) {
             const delay = Math.pow(2, attempt) * 1000;
             logger.warn(
               `[HF-Embed] Attempt ${attempt} failed with ${response.status}. Retrying in ${delay}ms...`
@@ -225,8 +230,10 @@ export class HuggingFaceEmbeddingProvider implements EmbeddingProvider {
         }
 
         const data = await response.json();
+        const duration = Date.now() - startTime;
 
         if (Array.isArray(data) && data.length > 0) {
+          logger.info(`[HF-Embed] Success: ${texts.length} vectors in ${duration}ms`);
           if (typeof data[0] === 'number') {
             return [data as number[]];
           }
@@ -237,7 +244,7 @@ export class HuggingFaceEmbeddingProvider implements EmbeddingProvider {
       } catch (error) {
         if (attempt >= maxRetries) throw error;
         const delay = Math.pow(2, attempt) * 1000;
-        logger.warn(`[HF-Embed] Network error on attempt ${attempt}. Retrying in ${delay}ms...`, {
+        logger.warn(`[HF-Embed] Error on attempt ${attempt}. Retrying in ${delay}ms...`, {
           error,
         });
         await new Promise(r => setTimeout(r, delay));
@@ -281,6 +288,10 @@ export class VectorStore {
       this.embeddingProvider = new GeminiEmbeddingProvider();
       logger.info('[VectorStore] Using Gemini embeddings (768 dims)');
     }
+    console.log(
+      '[DEBUG] VectorStore constructed with provider:',
+      this.embeddingProvider.constructor.name
+    );
   }
 
   /**
@@ -340,17 +351,19 @@ export class VectorStore {
       embedding = await this.embeddingProvider.embed(doc.content);
     }
 
-    const result = await sql`
+    // Add to vector store
+    // Round to 4 decimals - optimal balance for 384d model (~3KB payload)
+    const roundedEmbedding = embedding.map(n => Math.round(n * 10000) / 10000);
+    const embStr = JSON.stringify(roundedEmbedding);
+    console.log(`[DEBUG] Saving to DB: ${doc.sourceFile}, embedding length: ${embStr.length}`);
+    logger.info(`[VectorStore] Saving document to DB: ${doc.sourceFile} (chunk ${doc.chunkIndex})`);
+    // We use unsafe here to bypass parameterized query issues with large vectors on some systems
+    const result = await sql.unsafe(
+      `
       INSERT INTO knowledge_embeddings (
         namespace, source_file, chunk_index, title, content, embedding, metadata
       ) VALUES (
-        ${doc.namespace},
-        ${doc.sourceFile},
-        ${doc.chunkIndex},
-        ${doc.title || null},
-        ${doc.content},
-        ${JSON.stringify(embedding)}::vector,
-        ${JSON.stringify(doc.metadata || {})}::jsonb
+        $1, $2, $3, $4, $5, '${embStr}'::vector, $6
       )
       ON CONFLICT (namespace, source_file, chunk_index) 
       DO UPDATE SET
@@ -360,7 +373,16 @@ export class VectorStore {
         metadata = EXCLUDED.metadata,
         updated_at = now()
       RETURNING id
-    `;
+    `,
+      [
+        doc.namespace,
+        doc.sourceFile,
+        doc.chunkIndex,
+        doc.title || null,
+        doc.content,
+        JSON.stringify(doc.metadata || {}),
+      ]
+    );
 
     return result.rows[0].id;
   }

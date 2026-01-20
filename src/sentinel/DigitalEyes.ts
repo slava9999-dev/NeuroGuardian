@@ -72,7 +72,7 @@ export class DigitalEyes {
     }
   }
 
-  private distillContent(html: string, marketplace: 'WB' | 'Ozon'): string {
+  private distillContent(html: string, _marketplace: 'WB' | 'Ozon'): string {
     const $ = cheerio.load(html);
 
     // Remove scripts (unless needed), styles, svgs to reduce token count

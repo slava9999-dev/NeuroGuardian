@@ -1,0 +1,20 @@
+[2026-01-19T20:58:39.613Z] INFO  [VectorStore] Using HuggingFace embeddings (1024 dims)
+[DEBUG] VectorStore constructed with provider: HuggingFaceEmbeddingProvider
+Testing Vector Store with HF...
+[2026-01-19T20:58:40.056Z] INFO  [VectorStore] Initialized successfully
+[DEBUG-HF] Calling HF: https://router.huggingface.co/hf-inference/models/intfloat/multilingual-e5-large-instruct with 1 inputs
+[2026-01-19T20:58:40.057Z] INFO  [HF-Embed] Requesting 1 embeddings from intfloat/multilingual-e5-large-instruct
+[2026-01-19T20:58:45.919Z] INFO  [HF-Embed] Success: 1 vectors in 5862ms
+[DEBUG] Saving to DB: test_file
+[2026-01-19T20:58:45.920Z] INFO  [VectorStore] Saving document to DB: test_file (chunk 0)
+[2026-01-19T20:59:04.830Z] WARN  [Database] тЪая╕П Attempt 1 failed: Connection terminated unexpectedly. Retrying in 1000ms...
+[2026-01-19T20:59:25.194Z] WARN  [Database] тЪая╕П Attempt 2 failed: Connection terminated unexpectedly. Retrying in 2000ms...
+[2026-01-19T20:59:46.563Z] WARN  [Database] тЪая╕П Attempt 3 failed: Connection terminated unexpectedly. Retrying in 3000ms...
+[2026-01-19T21:00:08.899Z] WARN  [Database] тЪая╕П Attempt 4 failed: Connection terminated unexpectedly. Retrying in 4000ms...
+[2026-01-19T21:00:32.250Z] ERROR [Database] тЭМ Critical DB Error: {"error":"{\"message\":\"Connection terminated unexpectedly\",\"query\":\"\\n      INSERT INTO knowledge_embeddings (\\n        namespace, source_file, chunk_index, title, conten\",\"attempt\":5}"}
+Vector Test Failed: Error: Connection terminated unexpectedly
+    at C:\NeuroGUARDIAN\node_modules\pg\lib\client.js:545:17
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async executeWithRetry (C:\NeuroGUARDIAN\src\api-lib\services\database.ts:67:21)
+    at async VectorStore.addDocument (C:\NeuroGUARDIAN\src\infrastructure\rag\VectorStore.ts:351:20)
+    at async testVector (C:\NeuroGUARDIAN\scripts\test-vector.ts:8:16)
