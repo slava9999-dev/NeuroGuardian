@@ -47,22 +47,46 @@ export class SentinelAlertSender {
     const teamMembers = await this.findTeamMembers(user);
     const notifiedIds = new Set<number>();
 
+    // Map threat type to alert type
+    const threatData = threat.data as {
+      buyerPrice?: number;
+      sellerPrice?: number;
+      minPrice?: number;
+      discountPercent?: number;
+      isPromoActive?: boolean;
+      livePrice?: number;
+    };
+
+    // Determine alert type based on threat type
+    let alertType: 'promo_violation' | 'stoploss_breach' | 'sentinel_alert' = 'sentinel_alert';
+    if (threat.type === 'promo_price_violation') {
+      alertType = 'promo_violation';
+    } else if (threat.type === 'buyer_price_below_stoploss') {
+      alertType = 'stoploss_breach';
+    }
+
     for (const member of teamMembers) {
       if (notifiedIds.has(member.id)) continue;
 
       try {
         await sendAlert({
-          type: 'sentinel_alert',
+          type: alertType,
           urgency: threat.severity as AlertUrgency,
           product: {
             name: product.title,
             marketplace,
             externalId: product.nm_id ? String(product.nm_id) : product.product_id,
-            userId: member.id, // Send using THEIR userId context
+            userId: member.id,
           },
           message: threat.message,
           data: {
-            livePrice: (threat.data as { livePrice?: number })?.livePrice || product.current_price,
+            // For promo/stoploss alerts
+            buyerPrice: threatData.buyerPrice || product.estimated_buyer_price || 0,
+            sellerPrice: threatData.sellerPrice || product.current_price || 0,
+            minPrice: threatData.minPrice || product.min_price || 0,
+            discountPercent: threatData.discountPercent || 0,
+            // Legacy support
+            livePrice: threatData.livePrice || product.current_price,
           },
         });
         notifiedIds.add(member.id);

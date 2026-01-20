@@ -17,17 +17,19 @@ export type AlertUrgency = 'low' | 'medium' | 'high' | 'critical';
 export type AlertType =
   | 'price_protection'
   | 'sentinel_alert'
-  | 'margin_warning' // NEW: Low margin alert
-  | 'stock_warning' // NEW: Low stock alert
-  | 'competitor_alert' // NEW: Competitor price drop
-  | 'system_alert' // NEW: System health alerts from Kernel
-  | 'auth_error' // NEW: 401 Unauthorized from marketplace
+  | 'margin_warning' // Low margin alert
+  | 'stock_warning' // Low stock alert
+  | 'competitor_alert' // Competitor price drop
+  | 'system_alert' // System health alerts from Kernel
+  | 'auth_error' // 401 Unauthorized from marketplace
   | 'system_error'
   | 'sync_completed'
   | 'daily_report'
   | 'hourly_report'
   | 'subscription_expired'
-  | 'defense_confirmation' // NEW: Manual confirmation for defense action
+  | 'defense_confirmation' // Manual confirmation for defense action
+  | 'promo_violation' // NEW: Product added to promo, buyer price below stoploss
+  | 'stoploss_breach' // NEW: Real buyer price is below stoploss
   | 'welcome';
 
 export interface Alert {
@@ -267,6 +269,36 @@ function getAlertButtons(alert: Alert): Record<string, unknown> | undefined {
         callback_data: 'buy_subscription',
       },
     ]);
+  }
+
+  // ═══════════════════════════════════════════════════
+  // 🚨 PROMO & STOPLOSS VIOLATION ALERTS
+  // Кнопки для быстрых действий
+  // ═══════════════════════════════════════════════════
+  if ((alert.type === 'promo_violation' || alert.type === 'stoploss_breach') && alert.product) {
+    const { externalId, marketplace } = alert.product;
+    const mpLower = marketplace.toLowerCase().includes('ozon') ? 'ozon' : 'wb';
+
+    // Ссылка на товар
+    const productUrl =
+      mpLower === 'wb'
+        ? `https://www.wildberries.ru/catalog/${externalId}/detail.aspx`
+        : `https://www.ozon.ru/product/${externalId}`;
+
+    // Первый ряд: ссылки на товар
+    buttons.push([
+      { text: '🔗 Открыть товар', url: productUrl },
+      { text: '📊 Проверить карточку', callback_data: `check_product:${externalId}` },
+    ]);
+
+    // Второй ряд: действия
+    buttons.push([
+      { text: '💰 Поднять цену', callback_data: `raise_price:${mpLower}:${externalId}` },
+      { text: '🛡️ Настроить защиту', callback_data: `check_protection:${externalId}` },
+    ]);
+
+    // Третий ряд: dismiss
+    buttons.push([{ text: '✅ Понял, проверю', callback_data: `ack_alert:${externalId}` }]);
   }
 
   return buttons.length > 0 ? { inline_keyboard: buttons } : undefined;
@@ -537,6 +569,90 @@ function formatAlert(alert: Alert, smartMessage?: string | null): string {
       `⏰ Хватит на: *~${daysLeft} дн.*`,
       ``,
       `💡 ${alert.message || 'Закажите товар на склад, чтобы не потерять продажи!'}`,
+    ].join('\n');
+  }
+
+  // ═══════════════════════════════════════════════════
+  // 🚨 PROMO VIOLATION - ТОВАР ДОБАВЛЕН В АКЦИЮ
+  // Визуально выделенный, критический алерт
+  // ═══════════════════════════════════════════════════
+  if (alert.type === 'promo_violation' && alert.product) {
+    const mpEmoji = alert.product.marketplace.toUpperCase() === 'WB' ? '🟣' : '🔵';
+    const now = new Date();
+    const time = now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    const date = now.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+
+    const sellerPrice = (alert.data?.sellerPrice as number) || 0;
+    const buyerPrice = (alert.data?.buyerPrice as number) || 0;
+    const minPrice = (alert.data?.minPrice as number) || 0;
+    const discountPercent = (alert.data?.discountPercent as number) || 0;
+    const loss = minPrice - buyerPrice;
+
+    // Короткое название (макс 45 символов)
+    const shortTitle =
+      alert.product.name.length > 45
+        ? alert.product.name.substring(0, 42) + '...'
+        : alert.product.name;
+
+    return [
+      `🚨 *SENTINEL — АКЦИЯ НАРУШАЕТ СТОП-ЛОСС*`,
+      ``,
+      `${mpEmoji} ${alert.product.marketplace.toUpperCase()} • ${date}, ${time}`,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      ``,
+      `📦 *${escapeMarkdown(shortTitle)}*`,
+      `🏷️ Артикул: \`${alert.product.externalId}\``,
+      ``,
+      `┌─────────────────────────────`,
+      `│ 💰 *Ваша цена:*     ${sellerPrice}₽`,
+      `│ 🏷️ *Покупатель видит:*  ${buyerPrice}₽`,
+      `│ 🔒 *Стоп-лосс:*     ${minPrice}₽`,
+      `│`,
+      `│ 📉 *Скидка:* ${discountPercent}% (акция МП)`,
+      `│ 💸 *Убыток:* ${loss}₽ за шт.`,
+      `└─────────────────────────────`,
+      ``,
+      `⚠️ *Причина:* Маркетплейс добавил товар в акцию`,
+      ``,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      `💡 _Отключите участие в акциях или поднимите цену_`,
+    ].join('\n');
+  }
+
+  // ═══════════════════════════════════════════════════
+  // ⚠️ STOPLOSS BREACH - ЦЕНА НИЖЕ СТОП-ЛОССА
+  // Менее критичный, но требует внимания
+  // ═══════════════════════════════════════════════════
+  if (alert.type === 'stoploss_breach' && alert.product) {
+    const mpEmoji = alert.product.marketplace.toUpperCase() === 'WB' ? '🟣' : '🔵';
+    const now = new Date();
+    const time = now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+
+    const buyerPrice = (alert.data?.buyerPrice as number) || 0;
+    const minPrice = (alert.data?.minPrice as number) || 0;
+    const sellerPrice = (alert.data?.sellerPrice as number) || 0;
+    const diff = minPrice - buyerPrice;
+
+    const shortTitle =
+      alert.product.name.length > 50
+        ? alert.product.name.substring(0, 47) + '...'
+        : alert.product.name;
+
+    return [
+      `⚠️ *Sentinel — Цена ниже стоп-лосса*`,
+      ``,
+      `${mpEmoji} ${alert.product.marketplace.toUpperCase()} • ${time}`,
+      `📦 ${escapeMarkdown(shortTitle)}`,
+      ``,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      `💰 *Ваша цена:* ${sellerPrice}₽`,
+      `👁️ *Покупатель видит:* ${buyerPrice}₽`,
+      `🔒 *Ваш стоп-лосс:* ${minPrice}₽`,
+      ``,
+      `📉 *Ниже на:* ${diff}₽`,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      ``,
+      `💡 _Проверьте настройки карточки и скидки_`,
     ].join('\n');
   }
 

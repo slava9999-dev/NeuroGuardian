@@ -8,8 +8,12 @@ export const ThreatType = {
   COMPETITOR_PRICE_DROP: 'competitor_price_drop',
   DB_PRICE_MISMATCH: 'db_price_mismatch',
   MARGIN_BELOW_ZERO: 'margin_below_zero',
-  FLASH_CRASH: 'flash_crash', // New
-  PRICE_DUMP: 'price_dump', // New
+  FLASH_CRASH: 'flash_crash',
+  PRICE_DUMP: 'price_dump',
+  // NEW: Buyer price (with all discounts/promos) is below stop-loss
+  BUYER_PRICE_BELOW_STOPLOSS: 'buyer_price_below_stoploss',
+  // NEW: Product was added to a promo/sale that drops buyer price
+  PROMO_PRICE_VIOLATION: 'promo_price_violation',
 } as const;
 
 export type ThreatType = (typeof ThreatType)[keyof typeof ThreatType];
@@ -178,7 +182,7 @@ export class ThreatDetector {
       });
     }
 
-    // 3. Stop-Loss Check
+    // 3. Stop-Loss Check (API Price)
     const minPriceToCheck = product.min_price || 0;
     const bufferPercent = product.card_discount_buffer || 0;
     const effectiveMinPrice = Math.round(minPriceToCheck * (1 + bufferPercent / 100));
@@ -189,9 +193,39 @@ export class ThreatDetector {
         severity: 'critical',
         productId: product.product_id,
         nmId: product.nm_id,
-        message: `Цена (${livePrice}₽) упала ниже Stop-Loss ${bufferPercent > 0 ? `с учетом буфера (${effectiveMinPrice}₽)` : `(${minPriceToCheck}₽)`}.`,
+        message: `Цена товара (${livePrice}₽) упала ниже Stop-Loss ${bufferPercent > 0 ? `с буфером (${effectiveMinPrice}₽)` : `(${minPriceToCheck}₽)`}.`,
         data: { livePrice, minPrice: minPriceToCheck, effectiveMinPrice, bufferPercent },
       });
+    }
+
+    // 4. CRITICAL: Real Buyer Price Check (what customer actually pays)
+    // This catches promos, WB Wallet, Ozon Card discounts that the seller doesn't control
+    const realBuyerPrice = product.estimated_buyer_price;
+    if (realBuyerPrice && realBuyerPrice > 0 && minPriceToCheck > 0) {
+      // Check if buyer price is below stop-loss
+      if (realBuyerPrice < minPriceToCheck) {
+        const discount = Math.round(((livePrice - realBuyerPrice) / livePrice) * 100);
+        const isPromoActive = discount > 5; // More than 5% discount = likely promo
+
+        threats.push({
+          type: isPromoActive
+            ? ThreatType.PROMO_PRICE_VIOLATION
+            : ThreatType.BUYER_PRICE_BELOW_STOPLOSS,
+          severity: 'critical',
+          productId: product.product_id,
+          nmId: product.nm_id,
+          message: isPromoActive
+            ? `🚨 АКЦИЯ! Покупатель видит ${realBuyerPrice}₽ (скидка ${discount}%), ваш стоп-лосс: ${minPriceToCheck}₽`
+            : `⚠️ Цена для покупателя (${realBuyerPrice}₽) ниже стоп-лосса (${minPriceToCheck}₽)`,
+          data: {
+            sellerPrice: livePrice,
+            buyerPrice: realBuyerPrice,
+            minPrice: minPriceToCheck,
+            discountPercent: discount,
+            isPromoActive,
+          },
+        });
+      }
     }
 
     return {

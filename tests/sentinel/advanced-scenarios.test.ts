@@ -166,7 +166,7 @@ describe('Sentinel Advanced Scenarios', () => {
 
       expect(scan.hasThreats).toBe(true);
       const stopLossThreat = scan.threats.find(t => t.type === ThreatType.COMPETITOR_PRICE_DROP);
-      expect(stopLossThreat?.message).toContain('упала ниже Stop-Loss с учетом буфера (1100₽)');
+      expect(stopLossThreat?.message).toContain('упала ниже Stop-Loss с буфером (1100₽)');
     });
   });
 

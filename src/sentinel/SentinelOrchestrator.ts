@@ -12,7 +12,7 @@ import type { SentinelRunResult, UserCycleResult } from './types.js';
 import { priceShield, type PriceRule } from './PriceShield.js';
 import { getCompetitorPrice } from '../api-lib/services/competitor-monitor.js';
 import { priceParserService } from '../api-lib/core-services/PriceParserService.js';
-import { digitalEyes } from './DigitalEyes.js';
+import { browserEyes } from './BrowserEyes.js'; // Real browser for accurate buyer price
 import { sentinelPriceReporter } from './PriceReporter.js';
 import { notificationService } from '../api-lib/services/notifications.js';
 import { logger } from '../api-lib/lib/logger.js';
@@ -331,31 +331,30 @@ export class SentinelOrchestrator {
                       ? `https://www.wildberries.ru/catalog/${sku}/detail.aspx`
                       : `https://www.ozon.ru/product/${sku}/`;
 
-                  // Use Sentinel Digital Eyes (LLM Vision)
-                  const eyeResult = await digitalEyes.gazeAtProduct(marketplace, url);
+                  // Use BrowserEyes (Real Browser + Stealth) for accurate buyer price
+                  const eyeResult = await browserEyes.gazeAtProduct(marketplace, url);
 
-                  if (eyeResult && eyeResult.buyerPrice > 0) {
+                  const buyerPrice = eyeResult?.buyerPrice ?? 0;
+                  const originalPrice = eyeResult?.originalPrice ?? 0;
+
+                  if (buyerPrice > 0) {
                     const discountPercent =
-                      eyeResult.originalPrice > 0
-                        ? ((eyeResult.originalPrice - eyeResult.buyerPrice) /
-                            eyeResult.originalPrice) *
-                          100
-                        : 0;
+                      originalPrice > 0 ? ((originalPrice - buyerPrice) / originalPrice) * 100 : 0;
 
                     logger.info(
-                      `[DigitalEyes] Found REAL price for ${sku}: ${eyeResult.buyerPrice} (was ${product.current_price})`
+                      `[BrowserEyes] Found REAL price for ${sku}: ${buyerPrice}₽ (seller: ${product.current_price}₽)`
                     );
 
                     await db
                       .update(products)
                       .set({
-                        estimatedBuyerPrice: eyeResult.buyerPrice,
+                        estimatedBuyerPrice: buyerPrice,
                         marketplaceDiscountPercent: String(Math.round(discountPercent)),
                         updatedAt: new Date(),
                       })
                       .where(eq(products.id, product.id));
 
-                    product.estimated_buyer_price = eyeResult.buyerPrice;
+                    product.estimated_buyer_price = buyerPrice;
                     product.marketplace_discount_percent = discountPercent;
                   } else {
                     // Fallback to legacy parser if Eyes fail (e.g. timeout)
@@ -527,7 +526,7 @@ export class SentinelOrchestrator {
           estimated_buyer_price: p.estimatedBuyerPrice,
           product_id: p.productId,
           nm_id: p.nmId,
-          offer_id: (p as any).offerId || null,
+          offer_id: (p as Record<string, unknown>).offerId as string | null,
           is_monitored: p.isMonitored,
           marketplace: p.marketplace,
           title: p.title,
@@ -597,8 +596,8 @@ export class SentinelOrchestrator {
 
     try {
       const mp = product.competitor_url.includes('ozon') ? 'Ozon' : 'WB';
-      // 1. Check Competitor Price
-      const eyesResult = await digitalEyes.gazeAtProduct(mp, product.competitor_url);
+      // 1. Check Competitor Price using BrowserEyes (real browser)
+      const eyesResult = await browserEyes.gazeAtProduct(mp, product.competitor_url);
 
       if (!eyesResult || !eyesResult.buyerPrice) {
         return;
