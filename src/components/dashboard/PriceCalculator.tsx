@@ -10,11 +10,7 @@ import type { PanInfo } from 'framer-motion';
 import { X, ChevronDown, ChevronRight, Calculator, Info } from 'lucide-react';
 
 // Import constants and logic from shared service
-import {
-  OZON_CARD_CONFIG,
-  calculateUnitEconomics,
-  type UnitEconomicsInput,
-} from '../../api-lib/services/unit-economics';
+import { OZON_CARD_CONFIG, calculateUnitEconomics } from '../../api-lib/services/unit-economics';
 
 interface PriceCalculatorProps {
   marketplace: 'WB' | 'Ozon';
@@ -41,6 +37,7 @@ export function PriceCalculator({
   const [useOzonCard, setUseOzonCard] = useState<boolean>(true);
   const [category] = useState<string>('default');
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
+  const [storageDays, setStorageDays] = useState<string>('30');
   const [taxRate, setTaxRate] = useState<string>('7');
   const [marketingRate, setMarketingRate] = useState<string>('10');
 
@@ -70,12 +67,16 @@ export function PriceCalculator({
     const pack = parseFloat(packaging) || 0;
     const ad = parseFloat(adCost) || 0;
     const margin = parseFloat(targetMargin) || 20;
+    const days = parseFloat(storageDays) || 30;
+    const tax = (parseFloat(taxRate) || 0) / 100;
+    const marketing = (parseFloat(marketingRate) || 0) / 100;
 
     // Total 'Cost Price' input for the calculator
     const totalGoodsCost = cost + labor + ad;
 
-    const input: UnitEconomicsInput = {
-      price: 0,
+    // Get rates from the service
+    const stats = calculateUnitEconomics({
+      price: 1000,
       costPrice: totalGoodsCost,
       marketplace,
       fulfillmentType: 'fbs',
@@ -83,38 +84,61 @@ export function PriceCalculator({
       targetMarginPercent: margin,
       useOzonCard: marketplace === 'Ozon' && useOzonCard,
       category,
-    };
+      avgStorageDays: days,
+      taxRate: tax,
+      marketingRate: marketing,
+    });
 
-    // We rely on the service's logic to get rates
-    const stats = calculateUnitEconomics({ ...input, price: 1000 });
+    // Storage cost calculation
+    const storageCostPerDay = marketplace === 'WB' ? 0.08 : 0.75; // ₽/л/день
+    const storageCost = Math.round(storageCostPerDay * days);
 
     // Fixed Costs from User Inputs:
-    const fixedCosts = totalGoodsCost + log + pack;
+    const fixedCosts = totalGoodsCost + log + pack + storageCost;
 
-    // Variable Rates from Service & Logic:
-    const variableRate =
-      stats.commissionRate +
-      stats.acquiring / 1000 +
-      (marketplace === 'Ozon' && useOzonCard
+    // Variable Rates
+    const commissionRate = stats.commissionRate;
+    const acquiringRate = marketplace === 'Ozon' ? 0.015 : 0;
+    const sppRate = marketplace === 'WB' ? 0.08 : 0.05;
+    const ozonCardRate =
+      marketplace === 'Ozon' && useOzonCard
         ? OZON_CARD_CONFIG.discountPercent * OZON_CARD_CONFIG.adoptionRate
-        : 0);
+        : 0;
 
     const bankCommission = 0.01; // ~1% withdrawal
-    const tax = (parseFloat(taxRate) || 0) / 100;
-    const marketing = (parseFloat(marketingRate) || 0) / 100;
-    const totalVariableRate = variableRate + bankCommission + tax + marketing;
+    const totalVariableRate =
+      commissionRate + acquiringRate + sppRate + ozonCardRate + bankCommission + tax + marketing;
 
     // Target Margin Rate
     const targetMarginRate = margin / 100;
 
+    // Build warnings array
+    const warnings: Array<{ type: 'critical' | 'warning' | 'info'; message: string }> = [];
+
     // Check if calculation is possible
     if (totalVariableRate + targetMarginRate >= 1) {
-      // Fallback or error object
       return {
         price: 0,
         breakEvenPrice: 0,
-        rates: { commission: 0, ozonCard: 0, acquiring: 0, variableTotal: 0 },
-        breakdown: { goods: 0, logistics: 0, packaging: 0, margin: 0, profit: 0 },
+        rates: {
+          commission: 0,
+          ozonCard: 0,
+          acquiring: 0,
+          spp: 0,
+          tax: 0,
+          marketing: 0,
+          bank: 0,
+          variableTotal: 0,
+        },
+        breakdown: {
+          goods: 0,
+          logistics: 0,
+          packaging: 0,
+          storage: 0,
+          margin: 0,
+          profit: 0,
+        },
+        warnings: [],
         error: 'Комиссии превышают 100%',
       };
     }
@@ -123,31 +147,73 @@ export function PriceCalculator({
     const breakEvenPrice = Math.ceil(fixedCosts / (1 - totalVariableRate));
 
     // Recommended Price (with target margin)
-    // Formula: Price = FixedCosts / (1 - VariableRate - MarginRate)
     const minPrice = Math.ceil(fixedCosts / (1 - totalVariableRate - targetMarginRate));
 
     // Calculate expected profit at recommended price
     const expectedProfit = minPrice * targetMarginRate;
 
+    // Real costs at recommended price
+    const priceCommission = Math.round(minPrice * commissionRate);
+    const priceAcquiring = Math.round(minPrice * acquiringRate);
+    const priceSpp = Math.round(minPrice * sppRate);
+    const priceOzonCard = Math.round(minPrice * ozonCardRate);
+    const priceTax = Math.round(minPrice * tax);
+    const priceMarketing = Math.round(minPrice * marketing);
+
+    // Warnings
+    if (marketplace === 'Ozon' && useOzonCard && ozonCardRate > 0) {
+      const ozonCardCost = Math.round(minPrice * ozonCardRate);
+      warnings.push({
+        type: 'warning',
+        message: `Ozon Card съедает ~${ozonCardCost}₽ с заказа (5% × 40% покупателей)`,
+      });
+    }
+
+    if (days > 45) {
+      warnings.push({
+        type: days > 60 ? 'critical' : 'warning',
+        message:
+          days > 60
+            ? `⚠️ ${days} дней на складе! Тариф хранения удвоен!`
+            : `${days} дней на складе — через ${60 - days} дней тариф удвоится`,
+      });
+    }
+
+    if (margin < 15) {
+      warnings.push({
+        type: 'info',
+        message: `Маржа ${margin}% — рискованно при возвратах и акциях`,
+      });
+    }
+
     return {
-      price: Math.ceil(minPrice / 10) * 10, // Round up to nearest 10
+      price: Math.ceil(minPrice / 10) * 10,
       breakEvenPrice: Math.ceil(breakEvenPrice / 10) * 10,
       rates: {
-        commission: stats.commissionRate * 100,
-        ozonCard:
-          marketplace === 'Ozon' && useOzonCard
-            ? OZON_CARD_CONFIG.discountPercent * OZON_CARD_CONFIG.adoptionRate * 100
-            : 0,
-        acquiring: (stats.acquiring / 1000) * 100,
+        commission: commissionRate * 100,
+        ozonCard: ozonCardRate * 100,
+        acquiring: acquiringRate * 100,
+        spp: sppRate * 100,
+        tax: tax * 100,
+        marketing: marketing * 100,
+        bank: bankCommission * 100,
         variableTotal: totalVariableRate * 100,
       },
       breakdown: {
         goods: totalGoodsCost,
         logistics: log,
         packaging: pack,
+        storage: storageCost,
+        commission: priceCommission,
+        acquiring: priceAcquiring,
+        spp: priceSpp,
+        ozonCard: priceOzonCard,
+        tax: priceTax,
+        marketing: priceMarketing,
         margin: margin,
         profit: Math.round(expectedProfit),
       },
+      warnings,
       error: null,
     };
   }, [
@@ -161,6 +227,7 @@ export function PriceCalculator({
     marketplace,
     useOzonCard,
     category,
+    storageDays,
     taxRate,
     marketingRate,
   ]);
@@ -261,7 +328,7 @@ export function PriceCalculator({
             </div>
 
             {/* 2. Key Metrics Grid */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-3">
               <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
                 <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">
                   Логистика
@@ -275,8 +342,27 @@ export function PriceCalculator({
                     className="w-full text-lg font-bold text-slate-900 outline-none placeholder:text-slate-200"
                     placeholder="0"
                   />
-                  <span className="absolute right-0 top-1/2 -translate-y-1/2 text-slate-400 font-medium">
+                  <span className="absolute right-0 top-1/2 -translate-y-1/2 text-slate-400 font-medium text-sm">
                     ₽
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">
+                  Склад
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={storageDays}
+                    onChange={e => setStorageDays(e.target.value)}
+                    className="w-full text-lg font-bold text-slate-900 outline-none placeholder:text-slate-200"
+                    placeholder="30"
+                  />
+                  <span className="absolute right-0 top-1/2 -translate-y-1/2 text-slate-400 font-medium text-sm">
+                    дн
                   </span>
                 </div>
               </div>
@@ -294,7 +380,7 @@ export function PriceCalculator({
                     className="w-full text-lg font-bold text-slate-900 outline-none placeholder:text-slate-200"
                     placeholder="20"
                   />
-                  <span className="absolute right-0 top-1/2 -translate-y-1/2 text-slate-400 font-medium">
+                  <span className="absolute right-0 top-1/2 -translate-y-1/2 text-slate-400 font-medium text-sm">
                     %
                   </span>
                 </div>
@@ -302,7 +388,7 @@ export function PriceCalculator({
 
               {/* Ozon Card Toggle included in grid if Ozon */}
               {marketplace === 'Ozon' && (
-                <div className="col-span-2 flex justify-between items-center bg-blue-50/50 p-3 rounded-xl border border-blue-100">
+                <div className="col-span-3 flex justify-between items-center bg-blue-50/50 p-3 rounded-xl border border-blue-100">
                   <span className="text-sm font-bold text-blue-700">Использовать Ozon Card</span>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input
@@ -428,32 +514,142 @@ export function PriceCalculator({
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="bg-white rounded-2xl p-5 shadow-lg shadow-indigo-100 border border-indigo-50"
+                className="space-y-4"
               >
-                <div className="flex justify-between items-end mb-4">
-                  <div>
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                      Рекомендуемая цена
-                    </p>
-                    <p className="text-3xl font-black text-indigo-600 tracking-tight">
-                      {calculationResult.price.toLocaleString()}
-                      <span className="text-lg ml-1 text-indigo-300">₽</span>
-                    </p>
+                {/* Main Result */}
+                <div className="bg-white rounded-2xl p-5 shadow-lg shadow-indigo-100 border border-indigo-50">
+                  <div className="flex justify-between items-end mb-4">
+                    <div>
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        Рекомендуемая цена
+                      </p>
+                      <p className="text-3xl font-black text-indigo-600 tracking-tight">
+                        {calculationResult.price.toLocaleString()}
+                        <span className="text-lg ml-1 text-indigo-300">₽</span>
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
+                        Чистая прибыль
+                      </p>
+                      <p className="text-xl font-bold text-emerald-500">
+                        +{Math.round(calculationResult.breakdown.profit).toLocaleString()} ₽
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                      Чистая прибыль
-                    </p>
-                    <p className="text-xl font-bold text-emerald-500">
-                      +{Math.round(calculationResult.breakdown.profit).toLocaleString()} ₽
-                    </p>
+
+                  <div className="pt-4 border-t border-slate-100 flex justify-between text-xs font-medium text-slate-400">
+                    <span>Точка 0: {calculationResult.breakEvenPrice} ₽</span>
+                    <span>Комиссии: ~{Math.round(calculationResult.rates.variableTotal)}%</span>
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-slate-100 flex justify-between text-xs font-medium text-slate-400">
-                  <span>Точка 0: {calculationResult.breakEvenPrice} ₽</span>
-                  <span>Комиссии: ~{Math.round(calculationResult.rates.variableTotal)}%</span>
+                {/* Detailed Cost Breakdown */}
+                <div className="bg-white rounded-2xl p-4 border border-slate-100">
+                  <p className="text-xs font-bold text-slate-500 uppercase mb-3">
+                    Разбивка расходов
+                  </p>
+                  <div className="space-y-2">
+                    {[
+                      {
+                        label: 'Товар + работа',
+                        value: calculationResult.breakdown.goods || 0,
+                        color: 'bg-slate-400',
+                      },
+                      {
+                        label: 'Логистика',
+                        value: calculationResult.breakdown.logistics || 0,
+                        color: 'bg-orange-400',
+                      },
+                      {
+                        label: 'Хранение',
+                        value: calculationResult.breakdown.storage || 0,
+                        color: 'bg-amber-400',
+                      },
+                      {
+                        label: 'Упаковка',
+                        value: calculationResult.breakdown.packaging || 0,
+                        color: 'bg-yellow-400',
+                      },
+                      {
+                        label: `Комиссия ${marketplace}`,
+                        value: calculationResult.breakdown.commission || 0,
+                        color: 'bg-rose-400',
+                      },
+                      ...(marketplace === 'Ozon'
+                        ? [
+                            {
+                              label: 'Эквайринг 1.5%',
+                              value: calculationResult.breakdown.acquiring || 0,
+                              color: 'bg-pink-400',
+                            },
+                            ...((calculationResult.breakdown.ozonCard || 0) > 0
+                              ? [
+                                  {
+                                    label: 'Ozon Card',
+                                    value: calculationResult.breakdown.ozonCard || 0,
+                                    color: 'bg-blue-400',
+                                  },
+                                ]
+                              : []),
+                          ]
+                        : []),
+                      {
+                        label: `SPP ${marketplace === 'WB' ? '8%' : '5%'}`,
+                        value: calculationResult.breakdown.spp || 0,
+                        color: 'bg-purple-400',
+                      },
+                      {
+                        label: `Налог ${taxRate}%`,
+                        value: calculationResult.breakdown.tax || 0,
+                        color: 'bg-indigo-400',
+                      },
+                      {
+                        label: `Маркетинг ${marketingRate}%`,
+                        value: calculationResult.breakdown.marketing || 0,
+                        color: 'bg-cyan-400',
+                      },
+                    ]
+                      .filter(item => item.value > 0)
+                      .map((item, idx) => (
+                        <div key={idx} className="flex items-center gap-2 text-xs">
+                          <div className={`w-2 h-2 rounded-full ${item.color}`} />
+                          <span className="text-slate-500 flex-1">{item.label}</span>
+                          <span className="font-bold text-slate-700">
+                            {item.value.toLocaleString()} ₽
+                          </span>
+                        </div>
+                      ))}
+                    <div className="flex items-center gap-2 text-xs pt-2 border-t border-slate-100 mt-2">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                      <span className="text-emerald-600 font-semibold flex-1">Ваша прибыль</span>
+                      <span className="font-bold text-emerald-600">
+                        {calculationResult.breakdown.profit.toLocaleString()} ₽
+                      </span>
+                    </div>
+                  </div>
                 </div>
+
+                {/* Warnings */}
+                {calculationResult.warnings && calculationResult.warnings.length > 0 && (
+                  <div className="space-y-2">
+                    {calculationResult.warnings.map((warning, idx) => (
+                      <div
+                        key={idx}
+                        className={`p-3 rounded-xl text-xs font-medium flex items-start gap-2 ${
+                          warning.type === 'critical'
+                            ? 'bg-rose-50 text-rose-600 border border-rose-200'
+                            : warning.type === 'warning'
+                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                              : 'bg-slate-50 text-slate-600 border border-slate-200'
+                        }`}
+                      >
+                        <Info className="w-4 h-4 shrink-0 mt-0.5" />
+                        <span>{warning.message}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </motion.div>
             )}
 

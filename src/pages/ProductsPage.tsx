@@ -30,8 +30,6 @@ import { ProductCardSkeleton } from '../components/ui/Skeleton';
 import type { Product } from '../types';
 
 // Modules
-import { ProductSMMModal } from '../components/dashboard/ProductSMMModal';
-import { ProductMediaModal } from '../components/dashboard/ProductMediaModal';
 import { PriceCalculator } from '../components/dashboard/PriceCalculator';
 
 export function ProductsPage({
@@ -61,9 +59,7 @@ export function ProductsPage({
   const [showLogHistory, setShowLogHistory] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
 
-  const [selectedForSMM, setSelectedForSMM] = useState<Product | null>(null);
   const [selectedForCalculator, setSelectedForCalculator] = useState<Product | null>(null);
-  const [selectedForMedia, setSelectedForMedia] = useState<Product | null>(null);
 
   // Load products on mount
   useEffect(() => {
@@ -382,11 +378,7 @@ export function ProductsPage({
               ))}
             </div>
           ) : (
-            <DashboardGrid
-              onOpenSMM={setSelectedForSMM}
-              onOpenCalculator={setSelectedForCalculator}
-              onOpenMedia={setSelectedForMedia}
-            />
+            <DashboardGrid onOpenCalculator={setSelectedForCalculator} />
           )}
         </div>
 
@@ -424,21 +416,6 @@ export function ProductsPage({
         )}
         {showLogHistory && (
           <LogHistory isOpen={showLogHistory} onClose={() => setShowLogHistory(false)} />
-        )}
-        {selectedForSMM && (
-          <ProductSMMModal
-            isOpen={!!selectedForSMM}
-            onClose={() => setSelectedForSMM(null)}
-            product={selectedForSMM}
-          />
-        )}
-        {selectedForMedia && (
-          <ProductMediaModal
-            isOpen={!!selectedForMedia}
-            onClose={() => setSelectedForMedia(null)}
-            product={selectedForMedia}
-            onUpdate={() => hapticFeedback('success')}
-          />
         )}
       </AnimatePresence>
 

@@ -7,12 +7,10 @@ import { useShallow } from 'zustand/react/shallow';
 import type { Product } from '../../types';
 
 interface DashboardGridProps {
-  onOpenSMM?: (product: Product) => void;
   onOpenCalculator?: (product: Product) => void;
-  onOpenMedia?: (product: Product) => void;
 }
 
-export function DashboardGrid({ onOpenSMM, onOpenCalculator, onOpenMedia }: DashboardGridProps) {
+export function DashboardGrid({ onOpenCalculator }: DashboardGridProps) {
   const products = useProductsStore(useShallow(selectFilteredProducts));
   const totalInCatalog = useProductsStore(state => state.products.length);
   const isLoading = useProductsStore(state => state.isLoading);
@@ -111,9 +109,7 @@ export function DashboardGrid({ onOpenSMM, onOpenCalculator, onOpenMedia }: Dash
               <ProductCard
                 product={product}
                 onUpdate={updated => useProductsStore.getState().updateProduct(product.id, updated)}
-                onOpenSMM={onOpenSMM}
                 onOpenCalculator={onOpenCalculator}
-                onOpenMedia={onOpenMedia}
               />
             </motion.div>
           ))}

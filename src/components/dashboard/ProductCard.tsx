@@ -11,7 +11,6 @@ import {
   TrendingUp,
   TrendingDown,
   Image as ImageIcon,
-  Wand2,
   Shield,
   AlertTriangle,
   Check,
@@ -24,18 +23,10 @@ import type { Product } from '../../types';
 interface ProductCardProps {
   product: Product;
   onUpdate: (updated: Product) => void;
-  onOpenSMM?: (product: Product) => void;
   onOpenCalculator?: (product: Product) => void;
-  onOpenMedia?: (product: Product) => void;
 }
 
-export function ProductCard({
-  product,
-  onUpdate,
-  onOpenSMM,
-  onOpenCalculator,
-  onOpenMedia,
-}: ProductCardProps) {
+export function ProductCard({ product, onUpdate, onOpenCalculator }: ProductCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [localCost, setLocalCost] = useState(product.costPrice || 0);
   const [localMin, setLocalMin] = useState(product.minPrice || 0);
@@ -245,40 +236,17 @@ export function ProductCard({
               exit={{ opacity: 0 }}
               className="flex gap-2"
             >
-              {/* SMM Button */}
-              <button
-                onClick={() => {
-                  hapticFeedback('light');
-                  onOpenSMM?.(product);
-                }}
-                className="flex-1 btn btn-secondary py-3"
-              >
-                <Wand2 className="w-4 h-4 text-primary" />
-                Контент
-              </button>
-
-              {/* Media Button */}
-              <button
-                onClick={() => {
-                  hapticFeedback('light');
-                  onOpenMedia?.(product);
-                }}
-                className="btn btn-ghost py-3 px-3"
-                aria-label="Медиа"
-              >
-                <ImageIcon className="w-4 h-4" />
-              </button>
-
               {/* Calculator Button */}
               <button
                 onClick={() => {
                   hapticFeedback('light');
                   onOpenCalculator?.(product);
                 }}
-                className="btn btn-ghost py-3 px-3"
-                aria-label="Калькулятор"
+                className="flex-1 btn btn-secondary py-3"
+                aria-label="Калькулятор юнит-экономики"
               >
                 <Calculator className="w-4 h-4" />
+                Калькулятор
               </button>
             </motion.div>
           )}

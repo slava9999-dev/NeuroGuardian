@@ -166,68 +166,156 @@ export function AgentPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="flex-1 flex flex-col items-center justify-center px-6 pb-32"
+            className="flex-1 overflow-y-auto px-4 pb-40"
           >
-            {/* Viktor Hero */}
-            <div className="relative mb-10">
-              <div className="absolute inset-0 bg-primary/5 blur-[60px] rounded-full scale-150" />
-              <ViktorCore size="lg" />
-            </div>
-
-            <div className="text-center space-y-3 mb-10">
-              <p className="text-xs font-semibold tracking-widest text-primary/60 uppercase">
-                Ваш персональный ассистент
-              </p>
-              <h1 className="text-3xl font-bold tracking-tight text-text-main">
-                Привет, {firstName}!
-              </h1>
-              <p className="text-text-secondary text-sm max-w-[280px] mx-auto leading-relaxed">
-                Я — Виктор. Помогу защитить маржу, следить за ценами и делать продажи стабильными.
-              </p>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="grid grid-cols-2 gap-3 w-full max-w-sm">
-              <QuickActionButton
-                icon={<Shield className="w-5 h-5 text-success" />}
-                label="Защитить товары"
-                onClick={() => handleSendMessage('защити все товары')}
-              />
-              <QuickActionButton
-                icon={<TrendingUp className="w-5 h-5 text-primary" />}
-                label="Аналитика продаж"
-                onClick={() => handleSendMessage('покажи статистику продаж')}
-              />
-              <QuickActionButton
-                icon={<Calculator className="w-5 h-5 text-warning" />}
-                label="Юнит-экономика"
-                onClick={() => handleSendMessage('рассчитай юнит-экономику')}
-              />
-              <QuickActionButton
-                icon={<Package className="w-5 h-5 text-info" />}
-                label="Проверить цены"
-                onClick={() => handleSendMessage('проверь цены конкурентов')}
-              />
-            </div>
-
-            {/* Creative Tools Section */}
-            <div className="w-full max-w-sm mt-6 pt-6 border-t border-surface-dim">
-              <p className="text-xs font-semibold tracking-widest text-primary/60 uppercase mb-3 text-center">
-                🎨 Креативные инструменты
-              </p>
-              <div className="grid grid-cols-2 gap-3">
-                <QuickActionButton
-                  icon={<span className="text-lg">🖼️</span>}
-                  label="Сгенерировать фото"
-                  onClick={() => handleSendMessage('сгенерируй фото товара')}
+            {/* Hero Section */}
+            <div className="flex flex-col items-center pt-8 pb-6">
+              <div className="relative mb-6">
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-br from-primary/20 via-violet-400/10 to-transparent blur-[50px] rounded-full scale-150"
+                  animate={{
+                    scale: [1.5, 1.6, 1.5],
+                    opacity: [0.3, 0.5, 0.3],
+                  }}
+                  transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
                 />
-                <QuickActionButton
-                  icon={<span className="text-lg">✍️</span>}
-                  label="Создать пост"
-                  onClick={() => handleSendMessage('создай SMM пост для товара')}
-                />
+                <ViktorCore size="lg" />
               </div>
+
+              <motion.div
+                className="text-center space-y-2"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+              >
+                <p className="text-[10px] font-bold tracking-[0.2em] text-primary uppercase">
+                  AI-Помощник для маркетплейсов
+                </p>
+                <h1 className="text-2xl font-bold tracking-tight text-text-main">
+                  Привет, {firstName}!
+                </h1>
+                <p className="text-text-secondary text-sm max-w-[260px] mx-auto leading-relaxed">
+                  Чем могу помочь сегодня?
+                </p>
+              </motion.div>
             </div>
+
+            {/* Action Categories */}
+            <div className="max-w-md mx-auto space-y-5">
+              {/* Category: Protection & Analytics */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+              >
+                <div className="flex items-center gap-2 mb-3 px-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-success" />
+                  <span className="text-[10px] font-bold tracking-widest text-text-muted uppercase">
+                    Защита и аналитика
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <ActionCard
+                    icon={<Shield className="w-5 h-5" />}
+                    iconBg="bg-success/10"
+                    iconColor="text-success"
+                    title="Защита товаров"
+                    subtitle="Стоп-лоссы"
+                    onClick={() => handleSendMessage('защити все товары')}
+                  />
+                  <ActionCard
+                    icon={<TrendingUp className="w-5 h-5" />}
+                    iconBg="bg-primary/10"
+                    iconColor="text-primary"
+                    title="Аналитика"
+                    subtitle="Продажи и тренды"
+                    onClick={() => handleSendMessage('покажи статистику продаж')}
+                  />
+                </div>
+              </motion.div>
+
+              {/* Category: Economics */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+              >
+                <div className="flex items-center gap-2 mb-3 px-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-warning" />
+                  <span className="text-[10px] font-bold tracking-widest text-text-muted uppercase">
+                    Юнит-экономика
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <ActionCard
+                    icon={<Calculator className="w-5 h-5" />}
+                    iconBg="bg-warning/10"
+                    iconColor="text-warning"
+                    title="Калькулятор"
+                    subtitle="Рассчитать маржу"
+                    onClick={() => handleSendMessage('рассчитай юнит-экономику')}
+                  />
+                  <ActionCard
+                    icon={<Package className="w-5 h-5" />}
+                    iconBg="bg-info/10"
+                    iconColor="text-info"
+                    title="Конкуренты"
+                    subtitle="Мониторинг цен"
+                    onClick={() => handleSendMessage('проверь цены конкурентов')}
+                  />
+                </div>
+              </motion.div>
+
+              {/* Category: Creative */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+              >
+                <div className="flex items-center gap-2 mb-3 px-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-violet-500" />
+                  <span className="text-[10px] font-bold tracking-widest text-text-muted uppercase">
+                    Креатив
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <ActionCard
+                    icon={<span className="text-base">🖼️</span>}
+                    iconBg="bg-violet-500/10"
+                    iconColor="text-violet-600"
+                    title="Фото товара"
+                    subtitle="AI-генерация"
+                    onClick={() =>
+                      handleSendMessage(
+                        'Хочу сгенерировать lifestyle фото для карточки товара. Покажи мои товары чтобы я выбрал.'
+                      )
+                    }
+                  />
+                  <ActionCard
+                    icon={<span className="text-base">✍️</span>}
+                    iconBg="bg-pink-500/10"
+                    iconColor="text-pink-600"
+                    title="SMM-пост"
+                    subtitle="Для соцсетей"
+                    onClick={() =>
+                      handleSendMessage(
+                        'Помоги написать продающий пост для Instagram. Покажи мои товары чтобы я выбрал, про какой писать.'
+                      )
+                    }
+                  />
+                </div>
+              </motion.div>
+            </div>
+
+            {/* Hint */}
+            <motion.p
+              className="text-center text-[11px] text-text-muted mt-6"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.7 }}
+            >
+              Или просто напишите свой вопрос ↓
+            </motion.p>
           </motion.div>
         )}
       </AnimatePresence>
@@ -422,24 +510,35 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   );
 }
 
-interface QuickActionButtonProps {
+interface ActionCardProps {
   icon: React.ReactNode;
-  label: string;
+  iconBg: string;
+  iconColor: string;
+  title: string;
+  subtitle: string;
   onClick: () => void;
 }
 
-function QuickActionButton({ icon, label, onClick }: QuickActionButtonProps) {
+function ActionCard({ icon, iconBg, iconColor, title, subtitle, onClick }: ActionCardProps) {
   return (
     <motion.button
       onClick={() => {
         hapticFeedback('light');
         onClick();
       }}
-      className="flex items-center gap-3 px-4 py-4 rounded-xl bg-surface border border-surface-dim text-text-main hover:border-primary hover:shadow-md transition-all text-sm font-medium"
+      className="flex items-center gap-3 p-3.5 rounded-2xl bg-surface border border-surface-dim hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all duration-200 text-left group"
       whileTap={{ scale: 0.97 }}
+      whileHover={{ y: -2 }}
     >
-      {icon}
-      <span className="text-left">{label}</span>
+      <div
+        className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center shrink-0 ${iconColor} group-hover:scale-110 transition-transform`}
+      >
+        {icon}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-text-main truncate">{title}</p>
+        <p className="text-[11px] text-text-muted truncate">{subtitle}</p>
+      </div>
     </motion.button>
   );
 }
