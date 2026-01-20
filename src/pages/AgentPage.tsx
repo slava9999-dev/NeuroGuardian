@@ -255,7 +255,7 @@ export function AgentPage() {
           ref={messagesContainerRef}
           className="flex-1 overflow-y-auto px-4 py-4 scroll-smooth"
           style={{
-            paddingBottom: '140px', // Space for input bar
+            paddingBottom: '220px', // Space for Input Bar AND Nav Bar (64px + ~100px input + safety)
           }}
         >
           <div className="max-w-2xl mx-auto space-y-4">
@@ -273,9 +273,13 @@ export function AgentPage() {
       )}
 
       {/* Input Bar - FIXED: always visible at bottom */}
+      {/* Input Bar - FIXED above Navigation Bar (h-16 = 64px) */}
       <div
-        className="fixed bottom-0 left-0 right-0 z-50 bg-linear-to-t from-background via-background to-transparent pt-6"
-        style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 16px)' }}
+        className="fixed left-0 right-0 z-50 bg-linear-to-t from-background via-background to-transparent pt-6"
+        style={{
+          bottom: 'calc(4rem + env(safe-area-inset-bottom))', // Lift above Nav Bar
+          paddingBottom: '16px',
+        }}
       >
         <div className="max-w-2xl mx-auto px-4">
           <div className="flex items-end gap-2 bg-surface rounded-2xl border border-surface-dim shadow-lg p-2">
