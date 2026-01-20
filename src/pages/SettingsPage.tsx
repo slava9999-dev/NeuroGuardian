@@ -1,6 +1,6 @@
 // ============================================
-// NeuroGUARDIAN — Settings Page V4.0 (Premium)
-// Aesthetic: System Control Panel | Digital Identity
+// NeuroGUARDIAN — Settings Page V7.0 (Warm Light)
+// Clear UX: Easy API key input, sync feedback
 // ============================================
 
 import { useState, useEffect } from 'react';
@@ -15,10 +15,14 @@ import {
   RefreshCcw,
   Store,
   CheckCircle2,
-  MinusCircle,
   Crown,
   Volume2,
   VolumeX,
+  X,
+  Key,
+  AlertCircle,
+  Package,
+  HelpCircle,
 } from 'lucide-react';
 import { useAppStore } from '../stores';
 import { hapticFeedback } from '../lib/telegram';
@@ -28,7 +32,6 @@ import {
   productsApi,
   type MarketplaceAccount,
 } from '../lib/api';
-import { SecurityBadge } from '../components/ui/SecurityBadge';
 import type { DefenseMode } from '../types';
 
 export function SettingsPage({
@@ -41,12 +44,13 @@ export function SettingsPage({
   const { user, defenseMode, setUser, setVoiceEnabled } = useAppStore();
   const [isSaving, setIsSaving] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [syncStatus] = useState<string | null>(null);
+  const [syncResult, setSyncResult] = useState<{ success: boolean; count: number } | null>(null);
 
   // Multi-account state
   const [accounts, setAccounts] = useState<MarketplaceAccount[]>([]);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Partial<MarketplaceAccount>>({});
+  const [showHelp, setShowHelp] = useState<'wb' | 'ozon' | null>(null);
 
   useEffect(() => {
     loadAccounts();
@@ -72,18 +76,40 @@ export function SettingsPage({
         wbApiKey: editingAccount.wb_token,
         ozonClientId: editingAccount.ozon_client_id,
         ozonApiKey: editingAccount.ozon_api_key,
-        isActive: editingAccount.is_active,
+        isActive: editingAccount.is_active ?? true,
       };
       const res = await marketplaceAccountsApi.saveAccount(payload);
       if (res.success) {
         hapticFeedback('success');
         setShowAccountModal(false);
+        setEditingAccount({});
         loadAccounts();
       }
     } catch {
-      alert('System Error');
+      hapticFeedback('error');
+      alert('Ошибка сохранения. Проверьте данные.');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSync = async () => {
+    hapticFeedback('medium');
+    setIsSyncing(true);
+    setSyncResult(null);
+    try {
+      const [wbResult, ozonResult] = await Promise.all([
+        productsApi.syncProducts('WB').catch(() => ({ count: 0 })),
+        productsApi.syncProducts('Ozon').catch(() => ({ count: 0 })),
+      ]);
+      const total = (wbResult.count || 0) + (ozonResult.count || 0);
+      setSyncResult({ success: true, count: total });
+      hapticFeedback('success');
+    } catch {
+      setSyncResult({ success: false, count: 0 });
+      hapticFeedback('error');
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -93,97 +119,111 @@ export function SettingsPage({
     settingsApi.updateSettings({ defenseMode: mode });
   };
 
+  const handleDeleteAccount = async (id: number) => {
+    if (!confirm('Удалить этот аккаунт?')) return;
+    try {
+      await marketplaceAccountsApi.deleteAccount(id);
+      hapticFeedback('success');
+      loadAccounts();
+    } catch {
+      hapticFeedback('error');
+    }
+  };
+
   return (
-    <div className="min-h-full text-white px-5 py-6 pb-32 relative overflow-x-hidden">
+    <div className="min-h-full bg-page px-5 py-6 pb-32" role="main">
       {/* Header */}
-      <header className="flex items-center justify-between mb-10 nav-blur sticky top-0 z-50 p-2 -mx-2 rounded-full border border-white/5">
+      <header className="flex items-center gap-4 mb-8">
         <button
           onClick={onBack}
-          className="p-2.5 rounded-full bg-white/5 hover:bg-white/10 transition-all"
+          className="p-2 rounded-xl bg-surface border border-surface-dim hover:border-primary transition-colors"
+          aria-label="Назад"
         >
-          <ArrowLeft className="w-5 h-5" />
+          <ArrowLeft className="w-5 h-5 text-text-secondary" />
         </button>
-        <span className="text-[10px] font-black tracking-[0.4em] text-zinc-500 uppercase">
-          Настройки Системы
-        </span>
-        <div className="w-10" />
+        <h1 className="text-xl font-bold text-text-main">Настройки</h1>
       </header>
 
-      {/* Sync Status Banner */}
-      <AnimatePresence>
-        {syncStatus && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="mb-8 p-4 rounded-xl bg-violet-500/10 border border-violet-500/20 text-violet-400 text-[11px] font-bold tracking-widest uppercase flex items-center gap-3"
-          >
-            <RefreshCcw className="w-4 h-4 animate-spin" /> {syncStatus}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* User Identity */}
-      <section className="premium-card mb-8 border-indigo-500/20">
-        <div className="flex items-center gap-5">
-          <div className="relative">
-            <img
-              src="/agent-avatar.png"
-              className="w-16 h-16 rounded-full border-2 border-violet-500/50 object-cover"
-              alt="User"
-            />
-            <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-400 border-4 border-black" />
-          </div>
-          <div>
-            <h2 className="text-xl font-black italic tracking-tighter uppercase">
-              {user?.firstName || 'Commander'}
-            </h2>
-            <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">
-              {user?.username ? `@${user.username}` : 'Стратегический Оператор'}
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Marketplace Hub */}
-      <section className="mb-10">
-        <div className="flex items-center justify-between mb-4 px-1">
-          <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em]">
-            Подключенные Аккаунты
-          </h3>
+      {/* ============================================
+          SECTION 1: API KEYS (MAIN FOCUS)
+          ============================================ */}
+      <section className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="section-title">🔑 Ключи маркетплейсов</h2>
           <button
             onClick={() => {
               setEditingAccount({ marketplace: 'wb', is_active: true });
               setShowAccountModal(true);
             }}
-            className="flex items-center gap-2 text-[10px] font-black text-emerald-400 hover:text-white transition-all uppercase tracking-widest"
+            className="btn btn-ghost text-xs"
           >
-            <Plus className="w-3 h-3" /> Добавить
+            <Plus className="w-4 h-4" />
+            Добавить
           </button>
         </div>
 
+        {/* Empty State */}
+        {accounts.length === 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="card p-6 text-center"
+          >
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-warning-soft flex items-center justify-center">
+              <Key className="w-8 h-8 text-warning" />
+            </div>
+            <h3 className="font-semibold text-text-main mb-2">Подключите маркетплейс</h3>
+            <p className="text-sm text-text-secondary mb-6 max-w-xs mx-auto">
+              Добавьте API-ключи Wildberries или Ozon, чтобы синхронизировать товары и включить
+              защиту цен
+            </p>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => {
+                  setEditingAccount({ marketplace: 'wb', is_active: true });
+                  setShowAccountModal(true);
+                }}
+                className="btn btn-primary"
+              >
+                <Store className="w-4 h-4" />
+                Wildberries
+              </button>
+              <button
+                onClick={() => {
+                  setEditingAccount({ marketplace: 'ozon', is_active: true });
+                  setShowAccountModal(true);
+                }}
+                className="btn btn-secondary"
+              >
+                <Store className="w-4 h-4" />
+                Ozon
+              </button>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Account Cards */}
         <div className="space-y-3">
           {accounts.map(acc => (
-            <div
-              key={acc.id}
-              className="premium-card flex items-center justify-between py-4 group hover:bg-white/2"
-            >
+            <motion.div key={acc.id} layout className="card p-4 flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div
-                  className={`w-12 h-12 rounded-xl flex items-center justify-center border ${acc.marketplace === 'wb' ? 'bg-purple-500/10 border-purple-500/20 text-purple-400' : 'bg-blue-500/10 border-blue-500/20 text-blue-400'}`}
+                  className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                    acc.marketplace === 'wb'
+                      ? 'bg-purple-100 text-purple-600'
+                      : 'bg-blue-100 text-blue-600'
+                  }`}
                 >
                   <Store className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-black italic tracking-tight">
-                    {acc.name.toUpperCase()}
-                  </h4>
-                  <div className="flex items-center gap-2">
-                    <div
-                      className={`w-1.5 h-1.5 rounded-full ${acc.is_active ? 'bg-emerald-400 shadow-[0_0_8px_#10b981]' : 'bg-rose-500'}`}
-                    />
-                    <span className="text-[9px] font-mono text-zinc-500 uppercase">
-                      {acc.marketplace} • {acc.is_active ? 'Активен' : 'Отключен'}
+                  <h4 className="font-semibold text-text-main">{acc.name}</h4>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className={`badge ${acc.is_active ? 'badge-success' : 'badge-neutral'}`}>
+                      {acc.is_active ? 'Активен' : 'Отключен'}
+                    </span>
+                    <span className="text-xs text-text-muted uppercase">
+                      {acc.marketplace === 'wb' ? 'Wildberries' : 'Ozon'}
                     </span>
                   </div>
                 </div>
@@ -194,70 +234,163 @@ export function SettingsPage({
                     setEditingAccount(acc);
                     setShowAccountModal(true);
                   }}
-                  className="p-2.5 rounded-lg bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10 transition-all"
+                  className="p-2 rounded-lg hover:bg-surface-hl text-text-muted hover:text-primary transition-colors"
+                  aria-label="Редактировать"
                 >
                   <Edit3 className="w-4 h-4" />
                 </button>
-                <button className="p-2.5 rounded-lg bg-red-500/5 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 transition-all">
+                <button
+                  onClick={() => handleDeleteAccount(acc.id)}
+                  className="p-2 rounded-lg hover:bg-danger-soft text-text-muted hover:text-danger transition-colors"
+                  aria-label="Удалить"
+                >
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
-            </div>
+            </motion.div>
           ))}
-          {accounts.length === 0 && !isSaving && (
-            <div className="py-6 px-4 bg-white/2 border border-dashed border-white/10 rounded-2xl text-center">
-              <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-4">
-                Нет подключенных аккаунтов
-              </p>
-              <button
-                onClick={() => {
-                  setEditingAccount({ marketplace: 'wb', is_active: true });
-                  setShowAccountModal(true);
-                }}
-                className="inline-flex items-center gap-2 px-6 py-3 bg-white text-black rounded-xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl hover:bg-primary transition-all"
-              >
-                <Plus className="w-4 h-4" /> Добавить API Ключ
-              </button>
-            </div>
-          )}
-          {accounts.length > 0 && (
+        </div>
+
+        {/* Sync Button */}
+        {accounts.length > 0 && (
+          <motion.div layout className="mt-4">
             <button
               disabled={isSyncing}
-              onClick={async () => {
-                hapticFeedback('medium');
-                setIsSyncing(true);
-                try {
-                  // Sync both marketplaces for all active accounts
-                  await productsApi.syncProducts('WB');
-                  await productsApi.syncProducts('Ozon');
-                  hapticFeedback('success');
-                  alert('Синхронизация завершена успешно!');
-                } catch {
-                  hapticFeedback('error');
-                  alert('Ошибка синхронизации. Проверьте API ключи.');
-                } finally {
-                  setIsSyncing(false);
-                }
-              }}
-              className="w-full py-4 mt-2 rounded-2xl bg-primary/10 border border-primary/20 text-primary font-black text-[10px] uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-primary hover:text-black transition-all disabled:opacity-50"
+              onClick={handleSync}
+              className="w-full btn btn-primary py-4 text-sm"
             >
-              <RefreshCcw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />{' '}
-              {isSyncing ? 'СИНХРОНИЗАЦИЯ...' : 'Синхронизировать Каталоги'}
+              <RefreshCcw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+              {isSyncing ? 'Синхронизация...' : 'Синхронизировать товары'}
             </button>
-          )}
+
+            {/* Sync Result */}
+            <AnimatePresence>
+              {syncResult && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  className={`mt-3 p-4 rounded-xl flex items-center gap-3 ${
+                    syncResult.success
+                      ? 'bg-success-soft border border-success/20'
+                      : 'bg-danger-soft border border-danger/20'
+                  }`}
+                >
+                  {syncResult.success ? (
+                    <>
+                      <CheckCircle2 className="w-5 h-5 text-success shrink-0" />
+                      <div>
+                        <span className="font-semibold text-success">
+                          Синхронизировано успешно!
+                        </span>
+                        <p className="text-sm text-text-secondary mt-0.5">
+                          Загружено товаров: <strong>{syncResult.count}</strong>
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <AlertCircle className="w-5 h-5 text-danger shrink-0" />
+                      <span className="font-semibold text-danger">
+                        Ошибка синхронизации. Проверьте ключи.
+                      </span>
+                    </>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        )}
+      </section>
+
+      {/* ============================================
+          SECTION 2: DEFENSE SETTINGS
+          ============================================ */}
+      <section className="mb-8">
+        <h2 className="section-title">🛡️ Защита Sentinel</h2>
+
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <button
+            onClick={() => handleDefenseModeChange('price_correction')}
+            className={`p-4 rounded-xl border-2 transition-all text-left ${
+              defenseMode === 'price_correction'
+                ? 'border-primary bg-primary-dim shadow-md'
+                : 'border-surface-dim bg-surface hover:border-primary/30'
+            }`}
+          >
+            <RefreshCcw
+              className={`w-6 h-6 mb-2 ${
+                defenseMode === 'price_correction' ? 'text-primary' : 'text-text-muted'
+              }`}
+            />
+            <h4 className="font-semibold text-text-main text-sm">Коррекция цены</h4>
+            <p className="text-xs text-text-muted mt-1">Возврат к минимуму при демпинге</p>
+          </button>
+
+          <button
+            onClick={() => handleDefenseModeChange('zero_stock')}
+            className={`p-4 rounded-xl border-2 transition-all text-left ${
+              defenseMode === 'zero_stock'
+                ? 'border-danger bg-danger-soft shadow-md'
+                : 'border-surface-dim bg-surface hover:border-danger/30'
+            }`}
+          >
+            <Package
+              className={`w-6 h-6 mb-2 ${
+                defenseMode === 'zero_stock' ? 'text-danger' : 'text-text-muted'
+              }`}
+            />
+            <h4 className="font-semibold text-text-main text-sm">Заморозка</h4>
+            <p className="text-xs text-text-muted mt-1">Обнуление остатков при угрозе</p>
+          </button>
+        </div>
+
+        {/* Price Buffer Slider */}
+        <div className="card p-4">
+          <div className="flex justify-between items-center mb-3">
+            <div>
+              <span className="font-semibold text-text-main text-sm">Буфер цены</span>
+              <p className="text-xs text-text-muted">Допуск для СПП и акций</p>
+            </div>
+            <span className="text-2xl font-bold text-primary">
+              {user?.priceBufferPercent ?? 5}%
+            </span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="30"
+            step="1"
+            value={user?.priceBufferPercent ?? 5}
+            onChange={e => {
+              hapticFeedback('light');
+              setUser({ ...user!, priceBufferPercent: Number(e.target.value) });
+            }}
+            onMouseUp={() =>
+              settingsApi.updateSettings({ priceBufferPercent: user?.priceBufferPercent })
+            }
+            onTouchEnd={() =>
+              settingsApi.updateSettings({ priceBufferPercent: user?.priceBufferPercent })
+            }
+            className="w-full h-2 bg-surface-hl rounded-lg appearance-none cursor-pointer accent-primary"
+          />
         </div>
       </section>
 
-      {/* Viktor Voice Control */}
-      <section className="mb-10">
-        <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em] mb-4 px-1">
-          Персона Виктора
-        </h3>
-        <div className="premium-card border-white/5">
+      {/* ============================================
+          SECTION 3: VOICE SETTINGS
+          ============================================ */}
+      <section className="mb-8">
+        <h2 className="section-title">🎙️ Голос Виктора</h2>
+        <div className="card p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div
-                className={`p-3 rounded-xl transition-all ${user?.voiceEnabled ? 'bg-emerald-500/10 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.1)]' : 'bg-zinc-500/10 text-zinc-500'}`}
+                className={`p-3 rounded-xl ${
+                  user?.voiceEnabled
+                    ? 'bg-success-soft text-success'
+                    : 'bg-surface-hl text-text-muted'
+                }`}
               >
                 {user?.voiceEnabled ? (
                   <Volume2 className="w-5 h-5" />
@@ -266,12 +399,8 @@ export function SettingsPage({
                 )}
               </div>
               <div>
-                <h4 className="text-sm font-black italic tracking-tight uppercase transition-colors">
-                  Голосовые Ответы
-                </h4>
-                <p className="text-[9px] text-zinc-500 font-bold uppercase mt-0.5 max-w-[180px]">
-                  Виктор будет отвечать аудио-сообщениями в Telegram
-                </p>
+                <h4 className="font-semibold text-text-main">Голосовые ответы</h4>
+                <p className="text-xs text-text-muted">Виктор будет отвечать аудио в Telegram</p>
               </div>
             </div>
             <button
@@ -280,217 +409,156 @@ export function SettingsPage({
                 hapticFeedback(newValue ? 'success' : 'light');
                 setVoiceEnabled(newValue);
               }}
-              className={`w-12 h-6 rounded-full transition-all relative ${user?.voiceEnabled ? 'bg-emerald-500' : 'bg-zinc-800'}`}
+              className={`w-12 h-7 rounded-full transition-all relative ${
+                user?.voiceEnabled ? 'bg-success' : 'bg-surface-dim'
+              }`}
+              role="switch"
+              aria-checked={user?.voiceEnabled}
             >
               <div
-                className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-md ${user?.voiceEnabled ? 'left-7' : 'left-1'}`}
+                className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow-md transition-all ${
+                  user?.voiceEnabled ? 'left-6' : 'left-1'
+                }`}
               />
             </button>
           </div>
         </div>
       </section>
 
-      {/* Sentinel Security Panel */}
-      <section className="mb-10">
-        <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em] mb-4 px-1">
-          Алгоритмы Защиты Sentinel
-        </h3>
-        <div className="grid grid-cols-2 gap-3 mb-6">
-          <motion.button
-            whileTap={{ scale: 0.95, y: 2 }}
-            onClick={() => handleDefenseModeChange('price_correction')}
-            className={`p-4 rounded-xl border transition-all text-left flex flex-col gap-3 ${defenseMode === 'price_correction' ? 'bg-violet-500/10 border-violet-500/50 shadow-[0_0_20px_rgba(139,92,246,0.1)]' : 'bg-white/2 border-white/5 opacity-60'}`}
-          >
-            <RefreshCcw
-              className={`w-6 h-6 ${defenseMode === 'price_correction' ? 'text-violet-400' : 'text-zinc-600'}`}
-            />
-            <div>
-              <h4 className="text-xs font-black tracking-tight uppercase">Коррекция</h4>
-              <p className="text-[9px] text-zinc-500 font-bold uppercase mt-1 leading-tight">
-                Мгновенный возврат к Стоп-Лоссу
-              </p>
-            </div>
-          </motion.button>
-          <motion.button
-            whileTap={{ scale: 0.95, y: 2 }}
-            onClick={() => handleDefenseModeChange('zero_stock')}
-            className={`p-4 rounded-xl border transition-all text-left flex flex-col gap-3 ${defenseMode === 'zero_stock' ? 'bg-red-500/5 border-red-500/50 shadow-[0_0_20px_rgba(239,68,68,0.05)]' : 'bg-white/2 border-white/5 opacity-60'}`}
-          >
-            <MinusCircle
-              className={`w-6 h-6 ${defenseMode === 'zero_stock' ? 'text-red-500' : 'text-zinc-600'}`}
-            />
-            <div>
-              <h4 className="text-xs font-black tracking-tight uppercase">Заморозка</h4>
-              <p className="text-[9px] text-zinc-500 font-bold uppercase mt-1 leading-tight">
-                Обнуление остатков при демпинге
-              </p>
-            </div>
-          </motion.button>
-        </div>
-
-        {/* Advanced Sliders */}
-        <div className="premium-card border-white/5">
-          <header className="flex items-center gap-2 mb-6">
-            <Shield className="w-4 h-4 text-violet-500 shadow-[0_0_10px_rgba(139,92,246,0.5)]" />
-            <span className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em]">
-              Буферы Безопасности
-            </span>
-          </header>
-
-          <div className="space-y-6 text-left">
-            <div className="flex justify-between items-center bg-white/2 p-3 rounded-lg border border-white/5">
-              <div className="flex flex-col">
-                <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-                  БУФЕР ЦЕНЫ
-                </span>
-                <span className="text-[8px] text-zinc-600 font-bold uppercase">
-                  Допуск для СПП и акций
-                </span>
-              </div>
-              <span className="font-mono text-xl font-bold text-violet-400">
-                {user?.priceBufferPercent ?? 5}%
-              </span>
-            </div>
-
-            <input
-              type="range"
-              min="0"
-              max="30"
-              step="1"
-              value={user?.priceBufferPercent ?? 5}
-              onChange={e => {
-                hapticFeedback('light');
-                setUser({ ...user!, priceBufferPercent: Number(e.target.value) });
-              }}
-              onMouseUp={() =>
-                settingsApi.updateSettings({ priceBufferPercent: user?.priceBufferPercent })
-              }
-              className="w-full h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-violet-500"
-            />
-
-            <p className="text-[9px] text-zinc-500 font-medium leading-relaxed italic border-l-2 border-violet-500/30 pl-3">
-              Интеллектуальный буфер Sentinel предотвращает ложные срабатывания при временных
-              колебаниях скидок маркетплейса.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Subscription & Security */}
-      <section className="space-y-4">
-        <SecurityBadge />
-        <div className="premium-card flex flex-col gap-5 border-success/20 bg-linear-to-br from-success/5 to-transparent">
-          <div className="flex items-center justify-between">
+      {/* ============================================
+          SECTION 4: SUBSCRIPTION
+          ============================================ */}
+      <section className="mb-8">
+        <h2 className="section-title">👑 Подписка</h2>
+        <div className="card p-4 bg-gradient-to-br from-primary-dim to-surface">
+          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-success/10 text-success">
-                <Crown className="w-5 h-5 shadow-[0_0_10px_var(--color-success)]" />
+              <div className="p-2.5 rounded-xl bg-primary text-white">
+                <Crown className="w-5 h-5" />
               </div>
               <div>
-                <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-0.5">
-                  Ваш Тариф
-                </span>
-                <span className="text-sm font-black italic uppercase text-white">
-                  {user?.subscriptionPlan || 'FREE'} PLAN
-                </span>
+                <span className="text-xs text-text-muted">Ваш тариф</span>
+                <h4 className="font-bold text-text-main uppercase">
+                  {user?.subscriptionPlan || 'FREE'}
+                </h4>
               </div>
             </div>
-            <div className="flex flex-col items-end">
-              <span className="text-[9px] px-2 py-0.5 rounded-md bg-success text-black font-black tracking-widest uppercase">
-                АКТИВЕН
-              </span>
-            </div>
+            <span className="badge badge-success">Активен</span>
           </div>
-
-          <button
-            onClick={() => onNavigate?.('subscription')}
-            className="w-full py-4 rounded-2xl bg-white text-black font-black text-[10px] uppercase tracking-[0.2em] shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"
-          >
-            УПРАВЛЕНИЕ ПОДПИСКОЙ <CreditCard className="w-3.5 h-3.5" />
+          <button onClick={() => onNavigate?.('subscription')} className="w-full btn btn-secondary">
+            <CreditCard className="w-4 h-4" />
+            Управление подпиской
           </button>
         </div>
       </section>
 
-      {/* Modal - Account Edit (Premium Styled) */}
+      {/* ============================================
+          MODAL: ADD/EDIT ACCOUNT
+          ============================================ */}
       <AnimatePresence>
         {showAccountModal && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-background/90 backdrop-blur-xl p-4">
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
             <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
+              initial={{ y: '100%', opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: '100%', opacity: 0 }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="w-full max-w-md premium-card p-8 border-primary/30 bg-surface relative"
+              className="w-full max-w-md bg-surface rounded-2xl shadow-2xl overflow-hidden"
             >
-              <div className="absolute top-2 left-1/2 -translate-x-1/2 w-12 h-1 bg-white/10 rounded-full sm:hidden" />
-
-              <div className="flex justify-between items-center mb-8">
-                <h3 className="text-xl font-black italic tracking-tighter uppercase text-white">
-                  {editingAccount.id ? 'Настройка Аккаунта' : 'Новое Подключение'}
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-5 border-b border-surface-dim">
+                <h3 className="text-lg font-bold text-text-main">
+                  {editingAccount.id ? 'Редактировать аккаунт' : 'Добавить маркетплейс'}
                 </h3>
                 <button
-                  onClick={() => setShowAccountModal(false)}
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 transition-colors"
+                  onClick={() => {
+                    setShowAccountModal(false);
+                    setEditingAccount({});
+                  }}
+                  className="p-2 rounded-lg hover:bg-surface-hl transition-colors"
                   aria-label="Закрыть"
                 >
-                  <Plus className="w-5 h-5 rotate-45 text-zinc-500" />
+                  <X className="w-5 h-5 text-text-muted" />
                 </button>
               </div>
 
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em] px-1">
-                    Название Профиля
-                  </label>
-                  <input
-                    type="text"
-                    value={editingAccount.name || ''}
-                    onChange={e => setEditingAccount({ ...editingAccount, name: e.target.value })}
-                    className="w-full bg-white/2 border border-white/5 rounded-xl p-4 text-sm font-bold text-white outline-none focus:border-primary/50 transition-colors"
-                    placeholder="Напр: Основной Склад"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em] px-1">
-                    Платформа
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
+              {/* Modal Body */}
+              <div className="p-5 space-y-5">
+                {/* Marketplace Selection */}
+                <div>
+                  <label className="input-label">Маркетплейс</label>
+                  <div className="grid grid-cols-2 gap-3">
                     {(['wb', 'ozon'] as const).map(m => (
                       <button
                         key={m}
+                        type="button"
                         onClick={() => setEditingAccount({ ...editingAccount, marketplace: m })}
-                        className={`py-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${editingAccount.marketplace === m ? 'bg-primary border-primary/50 text-black shadow-[0_10px_20px_var(--color-primary-dim)]' : 'bg-white/2 border-white/5 text-zinc-500'}`}
+                        className={`p-4 rounded-xl border-2 transition-all flex items-center justify-center gap-2 ${
+                          editingAccount.marketplace === m
+                            ? 'border-primary bg-primary-dim font-semibold'
+                            : 'border-surface-dim hover:border-primary/30'
+                        }`}
                       >
+                        <Store className="w-4 h-4" />
                         {m === 'wb' ? 'Wildberries' : 'Ozon'}
                       </button>
                     ))}
                   </div>
                 </div>
 
+                {/* Profile Name */}
+                <div>
+                  <label className="input-label">Название профиля</label>
+                  <input
+                    type="text"
+                    value={editingAccount.name || ''}
+                    onChange={e => setEditingAccount({ ...editingAccount, name: e.target.value })}
+                    className="input"
+                    placeholder="Например: Основной склад"
+                  />
+                  <p className="input-hint">Для удобства идентификации</p>
+                </div>
+
+                {/* Ozon Client ID (only for Ozon) */}
                 {editingAccount.marketplace === 'ozon' && (
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em] px-1">
-                      Ozon Client ID
-                    </label>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <label className="input-label mb-0">Client ID</label>
+                      <button
+                        type="button"
+                        onClick={() => setShowHelp('ozon')}
+                        className="text-text-muted hover:text-primary"
+                      >
+                        <HelpCircle className="w-4 h-4" />
+                      </button>
+                    </div>
                     <input
                       type="text"
                       value={editingAccount.ozon_client_id || ''}
                       onChange={e =>
                         setEditingAccount({ ...editingAccount, ozon_client_id: e.target.value })
                       }
-                      className="w-full bg-white/2 border border-white/5 rounded-xl p-4 text-sm font-bold text-white outline-none focus:border-primary/50 transition-colors"
-                      placeholder="Напр: 12345678"
+                      className="input mt-1"
+                      placeholder="Например: 123456"
                     />
                   </div>
                 )}
 
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em] px-1">
-                    {editingAccount.marketplace === 'ozon'
-                      ? 'Ozon API Key'
-                      : 'Секретный Токен (WB)'}
-                  </label>
-                  <div className="relative">
+                {/* API Key */}
+                <div>
+                  <div className="flex items-center gap-2">
+                    <label className="input-label mb-0">
+                      {editingAccount.marketplace === 'ozon' ? 'API Key' : 'API Token'}
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowHelp(editingAccount.marketplace || 'wb')}
+                      className="text-text-muted hover:text-primary"
+                    >
+                      <HelpCircle className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="relative mt-1">
                     <input
                       type="password"
                       value={
@@ -505,28 +573,74 @@ export function SettingsPage({
                             e.target.value,
                         })
                       }
-                      className="w-full bg-white/2 border border-white/5 rounded-xl p-4 text-sm font-bold text-white outline-none focus:border-success/40 transition-colors"
-                      placeholder="••••••••••••••••"
+                      className="input pr-10"
+                      placeholder="Вставьте ключ сюда..."
                     />
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                      <Shield className="w-4 h-4 text-zinc-700" />
-                    </div>
+                    <Shield className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                   </div>
+                  <p className="input-hint flex items-center gap-1">
+                    <Shield className="w-3 h-3" />
+                    Ключ шифруется и хранится безопасно
+                  </p>
                 </div>
               </div>
 
-              <button
-                onClick={handleSaveAccount}
-                disabled={isSaving}
-                className="w-full py-5 bg-white text-black font-black text-[10px] uppercase tracking-[0.3em] rounded-2xl mt-12 hover:bg-success transition-all flex items-center justify-center gap-3 shadow-xl"
-              >
-                {isSaving ? (
-                  <RefreshCcw className="w-4 h-4 animate-spin" />
-                ) : (
-                  <>
-                    АКТИВИРОВАТЬ СВЯЗЬ <CheckCircle2 className="w-4 h-4" />
-                  </>
-                )}
+              {/* Modal Footer */}
+              <div className="p-5 border-t border-surface-dim bg-surface-warm">
+                <button
+                  onClick={handleSaveAccount}
+                  disabled={isSaving || !editingAccount.name}
+                  className="w-full btn btn-primary py-4"
+                >
+                  {isSaving ? (
+                    <RefreshCcw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      {editingAccount.id ? 'Сохранить изменения' : 'Подключить аккаунт'}
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Help Modal */}
+      <AnimatePresence>
+        {showHelp && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-surface rounded-2xl p-6 max-w-sm w-full shadow-2xl"
+            >
+              <h3 className="font-bold text-lg text-text-main mb-3">
+                Где взять {showHelp === 'wb' ? 'API Token' : 'ключи Ozon'}?
+              </h3>
+              {showHelp === 'wb' ? (
+                <div className="text-sm text-text-secondary space-y-2">
+                  <p>1. Зайдите в личный кабинет Wildberries</p>
+                  <p>
+                    2. Перейдите в <strong>Настройки → Доступ к API</strong>
+                  </p>
+                  <p>3. Нажмите "Создать токен" с доступом к ценам</p>
+                  <p>4. Скопируйте и вставьте сюда</p>
+                </div>
+              ) : (
+                <div className="text-sm text-text-secondary space-y-2">
+                  <p>1. Зайдите в seller.ozon.ru</p>
+                  <p>
+                    2. Перейдите в <strong>Настройки → API-ключи</strong>
+                  </p>
+                  <p>3. Создайте ключ с правами на товары и цены</p>
+                  <p>4. Client ID и API Key вставьте в соответствующие поля</p>
+                </div>
+              )}
+              <button onClick={() => setShowHelp(null)} className="w-full btn btn-secondary mt-5">
+                Понятно
               </button>
             </motion.div>
           </div>
