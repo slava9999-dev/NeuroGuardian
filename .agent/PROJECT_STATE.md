@@ -29,6 +29,10 @@
   - Implemented smart repricing logic (Undercutting) with Stop Loss protection.
   - Integrated with `MarketplaceService` for real price updates.
 - [x] **Notifications**: Added detailed "Hunter Attack" and "Sentinel Defense" alerts via Telegram.
+- [x] **Deployment Fixes**:
+  - Resolved `ERR_MODULE_NOT_FOUND` in `DigitalEyes.ts` by adding `.js` extensions.
+  - Fixed Vercel Env variables (removed hidden characters in `CRON_SECRET`).
+  - Adjusted Cron schedule to daily (`0 6 * * *`) for Vercel Hobby plan compliance.
 
 **Key Insights:**
 
