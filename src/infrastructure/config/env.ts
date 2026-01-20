@@ -75,6 +75,16 @@ const envSchema = z.object({
     .string()
     .transform(v => v.replace(/\r/g, '').trim())
     .optional(),
+  HUGGINGFACE_API_KEY: z
+    .string()
+    .transform(v => v.replace(/\r/g, '').trim())
+    .optional(),
+  REPLICATE_API_KEY: z
+    .string()
+    .transform(v => v.replace(/\r/g, '').trim())
+    .optional(),
+  RAG_PROVIDER: z.enum(['gemini', 'huggingface', 'openai']).optional().default('gemini'),
+  VISION_PROVIDER: z.enum(['gemini', 'huggingface']).optional().default('gemini'),
 
   // Mode
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),

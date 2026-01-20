@@ -1,10 +1,11 @@
 // ============================================
 // NeuroGUARDIAN — Vision Core Service
-// AI-powered image analysis with Gemini Vision
-// Version: 1.0.0 | Date: January 2026
+// AI-powered image analysis with Gemini Vision and Qwen 2 Vision
+// Version: 1.1.0 | Date: January 2026
 // ============================================
 
 import { logger } from '../api-lib/lib/logger.js';
+import { HuggingFaceProvider } from '../infrastructure/llm/HuggingFaceProvider.js';
 
 // ============================================
 // Types
@@ -60,11 +61,12 @@ export interface VisionCheckRequest {
 }
 
 // ============================================
-// Gemini Vision Provider
+// Vision Providers
 // ============================================
 
 const GEMINI_VISION_MODEL_PRO = 'gemini-1.5-pro';
 const GEMINI_VISION_MODEL_FAST = 'gemini-1.5-flash';
+const HF_VISION_MODEL = 'Qwen/Qwen2-VL-72B-Instruct';
 
 // ============================================
 // 🌍 UNIVERSAL MARKETPLACE QUALITY PROMPT
@@ -117,142 +119,175 @@ const VISION_ANALYSIS_PROMPT = `Ты — строгий контролёр ка�
 
 export class VisionService {
   private apiKey: string;
+  private hfProvider: HuggingFaceProvider;
+  private provider: 'gemini' | 'huggingface';
 
   constructor() {
     this.apiKey = process.env.GEMINI_API_KEY || '';
-    if (!this.apiKey) {
+    if (!this.apiKey && process.env.VISION_PROVIDER === 'gemini') {
       logger.warn('[VisionService] GEMINI_API_KEY not configured');
     }
+
+    this.provider = (process.env.VISION_PROVIDER as 'gemini' | 'huggingface') || 'gemini';
+
+    this.hfProvider = new HuggingFaceProvider({
+      model: HF_VISION_MODEL,
+      maxTokens: 2048,
+      temperature: 0.1,
+    });
   }
 
   /**
-   * Analyze image using Gemini Vision
+   * Analyze image using Gemini Vision or Qwen 2.5 VL (HF)
    */
   async analyzeImage(request: VisionCheckRequest): Promise<VisionAnalysisResult> {
     const startTime = Date.now();
-
-    if (!this.apiKey) {
-      throw new Error('GEMINI_API_KEY not configured');
-    }
-
-    // Determine model
-    const model = request.mode === 'deep_scan' ? GEMINI_VISION_MODEL_PRO : GEMINI_VISION_MODEL_FAST;
+    const useDeepScan = request.mode === 'deep_scan';
 
     try {
-      // 1. Check CACHE
       const crypto = await import('crypto');
       const createHash = crypto.createHash;
       const { sql } = await import('../api-lib/services/database.js');
 
-      // Create a unique hash for the image request
-      // If URL provided, hash the URL. If Base64, hash the first 100 chars + length (for speed)
+      // 1. Check CACHE
       let imageHash = '';
       if (request.imageUrl) {
         imageHash = createHash('md5').update(request.imageUrl).digest('hex');
       } else if (request.imageBase64) {
-        // Hash content for deduplication
         imageHash = createHash('md5').update(request.imageBase64).digest('hex');
       }
+
+      // Determine model version for cache key
+      const modelVersion =
+        this.provider === 'huggingface'
+          ? HF_VISION_MODEL
+          : useDeepScan
+            ? GEMINI_VISION_MODEL_PRO
+            : GEMINI_VISION_MODEL_FAST;
 
       // Try to find in cache
       if (imageHash) {
         try {
           const cached =
-            await sql`SELECT * FROM vision_cache WHERE image_hash = ${imageHash} AND model_version = ${model} LIMIT 1`;
+            await sql`SELECT * FROM vision_cache WHERE image_hash = ${imageHash} AND model_version = ${modelVersion} LIMIT 1`;
 
           if (cached.rows.length > 0) {
             const cachedResult = cached.rows[0].analysis_result as VisionAnalysisResult;
-            logger.info('[VisionService] Cache HIT', { imageHash });
+            logger.info('[VisionService] Cache HIT', { imageHash, provider: this.provider });
 
             // Update last accessed
             await sql`UPDATE vision_cache SET last_accessed_at = NOW() WHERE id = ${cached.rows[0].id}`;
 
             return {
               ...cachedResult,
-              processing_time_ms: 0, // Instant
-              analyzed_at: new Date().toISOString(), // Show current retrieval time
+              processing_time_ms: 0,
+              analyzed_at: new Date().toISOString(),
             };
           }
         } catch (dbErr) {
-          logger.warn('[VisionService] Cache lookup failed', { error: dbErr });
-          // Proceed to analysis if cache fails
+          /* ignore */
         }
       }
 
-      // Prepare image data
-      const imagePart = request.imageBase64
-        ? {
+      let content = '';
+
+      // 2. Perform Analysis
+      if (this.provider === 'huggingface') {
+        // HUGGING FACE LOGIC
+        logger.info(`[VisionService] Using HuggingFace (${HF_VISION_MODEL})`);
+
+        let imageUrl = request.imageUrl;
+        // If we only have base64, create a data URI
+        if (!imageUrl && request.imageBase64) {
+          imageUrl = `data:image/jpeg;base64,${request.imageBase64}`;
+        }
+
+        if (!imageUrl) {
+          throw new Error('Image URL or Base64 required for HF Vision');
+        }
+
+        const response = await this.hfProvider.complete([
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: VISION_ANALYSIS_PROMPT },
+              { type: 'image_url', image_url: { url: imageUrl } },
+            ],
+          },
+        ]);
+        content = response.content;
+      } else {
+        // GEMINI LOGIC
+        if (!this.apiKey) throw new Error('GEMINI_API_KEY Configured');
+        const model = modelVersion;
+
+        logger.info(`[VisionService] Using Gemini (${model})`);
+
+        // Prepare image data for Gemini
+        const imagePart = request.imageBase64
+          ? {
+              inlineData: {
+                mimeType: 'image/jpeg',
+                data: request.imageBase64,
+              },
+            }
+          : {
+              fileData: {
+                mimeType: 'image/jpeg',
+                fileUri: request.imageUrl!,
+              },
+            };
+
+        // For URL-based images on Gemini, sometimes fetching ourselves constitutes a better path if fileUri is not supported by API Key directly (Vertex AI vs AI Studio)
+        // But the original code handled it:
+        // "For URL-based images, we need to fetch and convert to base64"
+        let imageData = imagePart;
+
+        if (request.imageUrl && !request.imageBase64) {
+          logger.info(`[VisionService] Fetching image: ${request.imageUrl}`);
+          const imageResponse = await fetch(request.imageUrl);
+          if (!imageResponse.ok) throw new Error(`Failed to fetch image: ${imageResponse.status}`);
+          const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+          const imageBuffer = await imageResponse.arrayBuffer();
+          const base64 = Buffer.from(imageBuffer).toString('base64');
+          imageData = {
             inlineData: {
-              mimeType: 'image/jpeg',
-              data: request.imageBase64,
-            },
-          }
-        : {
-            fileData: {
-              mimeType: 'image/jpeg',
-              fileUri: request.imageUrl!,
+              mimeType: contentType,
+              data: base64,
             },
           };
-
-      // For URL-based images, we need to fetch and convert to base64
-      let imageData = imagePart;
-      if (request.imageUrl && !request.imageBase64) {
-        logger.info(`[VisionService] Fetching image: ${request.imageUrl}`);
-        const imageResponse = await fetch(request.imageUrl);
-
-        if (!imageResponse.ok) {
-          throw new Error(
-            `Failed to fetch image: ${imageResponse.status} ${imageResponse.statusText}`
-          );
         }
 
-        const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
-        const imageBuffer = await imageResponse.arrayBuffer();
-        const base64 = Buffer.from(imageBuffer).toString('base64');
-
-        logger.info(
-          `[VisionService] Image fetched. Type: ${contentType}, Size: ${imageBuffer.byteLength} bytes`
+        const { fetchWithRetry } = await import('../api-lib/lib/index.js');
+        const responseBody = await fetchWithRetry(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [
+                {
+                  parts: [{ text: VISION_ANALYSIS_PROMPT }, imageData],
+                },
+              ],
+              generationConfig: {
+                temperature: 0.1,
+                maxOutputTokens: 2048,
+              },
+            }),
+          }
         );
 
-        imageData = {
-          inlineData: {
-            mimeType: contentType,
-            data: base64,
-          },
+        const data = responseBody as {
+          candidates?: { content?: { parts?: { text: string }[] } }[];
         };
+        content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
       }
 
-      logger.info(`[VisionService] Sending request to model: ${model}`);
-
-      const { fetchWithRetry } = await import('../api-lib/lib/index.js');
-
-      // Call Gemini Vision API with industrial retry logic
-      const responseBody = await fetchWithRetry(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${this.apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [{ text: VISION_ANALYSIS_PROMPT }, imageData],
-              },
-            ],
-            generationConfig: {
-              temperature: 0.1,
-              maxOutputTokens: 2048,
-            },
-          }),
-        }
-      );
-
-      const data = responseBody as { candidates?: { content?: { parts?: { text: string }[] } }[] };
-      const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-      // Parse JSON response
+      // 3. Parse Response (Common)
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
-        throw new Error('Failed to parse Vision response as JSON');
+        throw new Error('Failed to parse Vision response as JSON: ' + content.slice(0, 100));
       }
 
       const analysis = JSON.parse(jsonMatch[0]);
@@ -285,16 +320,19 @@ export class VisionService {
         seo_tags_ru: analysis.seo_tags_ru || [],
         seo_tags_en: analysis.seo_tags_en || [],
         analyzed_at: new Date().toISOString(),
-        model_version: model,
+        model_version: modelVersion,
         processing_time_ms: processingTime,
       };
 
-      // Save to CACHE
+      // 4. Save to CACHE
       if (imageHash) {
         try {
+          // Note: using modelVersion keeps cache separated between Gemini/HF
           await sql`
             INSERT INTO vision_cache (image_hash, image_url, analysis_result, model_version)
-            VALUES (${imageHash}, ${request.imageUrl || 'base64'}, ${JSON.stringify(result)}, ${model})
+            VALUES (${imageHash}, ${request.imageUrl || 'base64'}, ${JSON.stringify(
+              result
+            )}, ${modelVersion})
             ON CONFLICT DO NOTHING
             `;
           logger.info('[VisionService] Saved to cache');
@@ -305,8 +343,7 @@ export class VisionService {
 
       logger.info('[VisionService] Analysis completed', {
         quality: overallQuality,
-        material: result.material_detected,
-        wb_compliant: result.wb_compliant,
+        provider: this.provider,
         processingTimeMs: processingTime,
       });
 

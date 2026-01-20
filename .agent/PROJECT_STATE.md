@@ -147,6 +147,21 @@ Strict Type Checking (tsc) необходимо включать в pre-push х�
 Обработка события 'error' на уровне pg.Client обязательна для предотвращения аварийного завершения процесса при сетевых сбоях.
 ```
 
+### Session 2026-01-20 (Session 84 - HuggingFace PRO Production Deployment) 🚀
+
+**Objective: Полная активация ключей HuggingFace PRO на production-окружении Vercel**
+
+> ✅ **KEYS SETUP:** Успешно добавлены production-переменные `HUGGINGFACE_API_KEY`, `RAG_PROVIDER=huggingface`, `VISION_PROVIDER=huggingface` в Vercel через CLI.
+> ✅ **HF VISION:** Полностью внедрен `VisionService` с поддержкой Qwen 2.5 VL через переменную окружения `VISION_PROVIDER`.
+> ✅ **CONFIG VALIDATION:** Обновлена схема валидации `env.ts` для поддержки новых ключей и провайдеров (включая Replicate fallback).
+
+**Completed Actions:**
+
+- [x] **Vercel Env**: Добавление ключей через `vercel env add ...`.
+- [x] **Vision Service**: Рефакторинг `VisionService.ts` с поддержкой `VISION_PROVIDER`.
+- [x] **Config**: Обновление `src/infrastructure/config/env.ts` и `vercel.json`.
+- [x] **Next Step**: Финальный деплой (`git push`) для применения изменений.
+
 ### Session 2026-01-19 (Session 79 - Critical Security Audit & Hardening) 🛡️
 
 **Objective: Устранение критических уязвимостей безопасности, выявленных в ходе аудита**
