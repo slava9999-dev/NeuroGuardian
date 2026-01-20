@@ -22,6 +22,18 @@ vi.mock('@vercel/kv', () => ({
   },
 }));
 
+vi.mock('ioredis', () => ({
+  Redis: vi.fn().mockImplementation(() => ({
+    get: vi.fn().mockResolvedValue(null),
+    set: vi.fn().mockResolvedValue('OK'),
+    setex: vi.fn().mockResolvedValue('OK'),
+    del: vi.fn().mockResolvedValue(1),
+    ping: vi.fn().mockResolvedValue('PONG'),
+    connect: vi.fn().mockResolvedValue('OK'),
+    disconnect: vi.fn(),
+  })),
+}));
+
 vi.mock('@langchain/openai', () => ({
   OpenAIEmbeddings: vi.fn().mockImplementation(() => ({
     embedQuery: vi.fn().mockResolvedValue([0.1, 0.2, 0.3]),

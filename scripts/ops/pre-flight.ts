@@ -50,9 +50,16 @@ async function main() {
     failed = true;
   }
 
-  // 4. Mission Critical Smoke Test (TEMPORARILY DISABLED - DB connection issues)
+  // 4. Mission Critical Smoke Test
   console.log('\n🛡️ Phase 4: Sentinel Mission Stability');
-  console.log('   ⚠️  Skipped (DB connection issues in test environment)');
+  try {
+    console.log('   - Running Smoke Test...');
+    execSync('npx tsx scripts/ops/smoke-test.ts', { stdio: 'inherit' });
+    console.log('   ✅ Sentinel is operational.');
+  } catch {
+    console.error('   ❌ Smoke test failed! Critical system components are down.');
+    failed = true;
+  }
 
   // 5. Unit Tests
   console.log('\n🧪 Phase 5: Quality Assurance (Unit Tests)');
