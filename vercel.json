@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api?action=check-prices&includeReport=true",
-      "schedule": "*/30 * * * *"
+      "schedule": "0 6 * * *"
     }
   ],
   "rewrites": [
