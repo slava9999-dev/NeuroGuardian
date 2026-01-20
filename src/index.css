@@ -17,11 +17,11 @@
   */
   
   /* Background Layers — WARM, NOT WHITE */
-  --color-background: #faf8f5;      /* Warm cream - main bg */
-  --color-surface: #ffffff;          /* Pure white for cards */
-  --color-surface-warm: #f5f3ef;     /* Warm surface for sections */
-  --color-surface-hl: #eeebe5;       /* Highlighted surface */
-  --color-surface-dim: #ddd8d0;      /* Borders, dividers */
+  --color-background: #f5f0e8;      /* Warmer cream - more obvious */
+  --color-surface: #fefefe;          /* Off-white for cards */
+  --color-surface-warm: #f0ebe3;     /* Warm surface for sections */
+  --color-surface-hl: #e8e2d8;       /* Highlighted surface */
+  --color-surface-dim: #d4cec4;      /* Borders, dividers */
 
   /* Primary: Intelligence Violet */
   --color-primary: #6366f1;          /* Indigo-500 — more friendly */
