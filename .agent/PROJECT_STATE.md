@@ -48,6 +48,8 @@
 Warm cream (#faf8f5) creates a softer, more premium feel than pure white.
 Skeleton loading improves perceived performance significantly.
 Voice input UI ready for Web Speech API - works in Chrome/Safari.
+⚠️ Database migration required for 'min_margin' column (script created).
+⚠️ User needs to re-enter API keys due to encryption key rotation/loss.
 ```
 
 ### Session 2026-01-19 (Session 83 - Security Agent & God Mode Hardening) 🛡️
