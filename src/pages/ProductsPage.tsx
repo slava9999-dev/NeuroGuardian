@@ -1,9 +1,9 @@
 // ============================================
-// NeuroGUARDIAN — Products Page V6.0 (Human)
-// Aesthetic: Clean, Spacious, Light Mode
+// NeuroGUARDIAN — Products Page V7.0 (Warm Light)
+// Aesthetic: Clean, Spacious, Warm Light Mode
 // ============================================
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Shield,
@@ -15,6 +15,7 @@ import {
   ArrowLeft,
   Settings,
   RefreshCcw,
+  CheckCircle2,
 } from 'lucide-react';
 import { useProductsStore } from '../stores';
 import { productsApi } from '../lib/api';
@@ -25,6 +26,7 @@ import { BulkUpdateCostsModal } from '../components/dashboard/BulkUpdateCostsMod
 import { LogHistory } from '../components/dashboard/LogHistory';
 import { hapticFeedback } from '../lib/telegram';
 import { ViktorCore } from '../components/ui/ViktorCore';
+import { ProductCardSkeleton } from '../components/ui/Skeleton';
 import type { Product } from '../types';
 
 // Modules
@@ -39,7 +41,6 @@ export function ProductsPage({
   onBack: () => void;
   onNavigate?: (page: string) => void;
 }) {
-  // const user = useAppStore(state => state.user); // Unused for now
   const {
     products,
     searchQuery,
@@ -52,26 +53,57 @@ export function ProductsPage({
     setStatusFilter,
   } = useProductsStore();
 
+  const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ success: boolean; count: number } | null>(null);
   const [showBulkStopLoss, setShowBulkStopLoss] = useState(false);
   const [showBulkCosts, setShowBulkCosts] = useState(false);
   const [showLogHistory, setShowLogHistory] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
 
-  const refreshProducts = async () => {
+  const [selectedForSMM, setSelectedForSMM] = useState<Product | null>(null);
+  const [selectedForCalculator, setSelectedForCalculator] = useState<Product | null>(null);
+  const [selectedForMedia, setSelectedForMedia] = useState<Product | null>(null);
+
+  // Load products on mount
+  useEffect(() => {
+    loadProducts();
+  }, []);
+
+  const loadProducts = async () => {
+    setIsLoading(true);
     try {
       const res = await productsApi.getProducts();
       if (res.success) {
         setProducts(res.products as unknown as Product[]);
       }
     } catch (e) {
-      console.error('Failed to refresh products:', e);
+      console.error('Failed to load products:', e);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const [selectedForSMM, setSelectedForSMM] = useState<Product | null>(null);
-  const [selectedForCalculator, setSelectedForCalculator] = useState<Product | null>(null);
-  const [selectedForMedia, setSelectedForMedia] = useState<Product | null>(null);
+  const handleSync = async () => {
+    hapticFeedback('medium');
+    setIsSyncing(true);
+    setSyncResult(null);
+    try {
+      const [wbResult, ozonResult] = await Promise.all([
+        productsApi.syncProducts('WB').catch(() => ({ count: 0 })),
+        productsApi.syncProducts('Ozon').catch(() => ({ count: 0 })),
+      ]);
+      const total = (wbResult.count || 0) + (ozonResult.count || 0);
+      setSyncResult({ success: true, count: total });
+      await loadProducts();
+      hapticFeedback('success');
+    } catch {
+      setSyncResult({ success: false, count: 0 });
+      hapticFeedback('error');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Calculate stats
   const stats = useMemo(() => {
@@ -91,38 +123,35 @@ export function ProductsPage({
         tone: 'alert' as const,
         badge: 'ТРЕБУЕТ ВНИМАНИЯ',
         title: 'Обнаружены угрозы по ценам',
-        message: `${stats.triggered} товара под атакой. Рекомендую перейти в центр защиты или написать мне.`,
+        message: `${stats.triggered} товара под атакой. Рекомендую перейти в центр защиты.`,
       };
     }
     if (stats.unprotected > 0) {
       return {
         tone: 'processing' as const,
-        badge: 'РЕКОМЕНДАЦИЯ ВИКТОРА',
+        badge: 'РЕКОМЕНДАЦИЯ',
         title: 'Часть товаров без защиты',
-        message: `Без защиты осталось ${stats.unprotected} товаров. Я могу рассчитать стоп-лоссы автоматически.`,
+        message: `Без защиты осталось ${stats.unprotected} товаров. Настройте стоп-лоссы.`,
       };
     }
     return {
       tone: 'success' as const,
       badge: 'ВСЕ СПОКОЙНО',
       title: 'Каталог под защитой',
-      message: 'Все товары защищены. Я мониторю цены каждые 30 минут.',
+      message: 'Все товары защищены. Мониторинг каждые 30 минут.',
     };
   }, [stats]);
 
   const viktorToneStyles: Record<typeof viktorStatus.tone, string> = {
-    alert: 'border-rose-200 bg-rose-50 text-rose-700',
-    processing: 'border-primary/30 bg-primary/10 text-indigo-700',
-    success: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    alert: 'border-danger/20 bg-danger-soft',
+    processing: 'border-warning/20 bg-warning-soft',
+    success: 'border-success/20 bg-success-soft',
   };
 
   return (
-    <div className="min-h-full pb-24 bg-slate-50 relative overflow-x-hidden">
-      {/* Dynamic Background */}
-      <div className="bg-cosmic" />
-
+    <div className="min-h-full pb-24 bg-page relative overflow-x-hidden" role="main">
       {/* Header */}
-      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-slate-200/70">
+      <header className="sticky top-0 z-30 bg-surface/95 backdrop-blur-xl border-b border-surface-dim">
         <div className="px-4 py-3">
           <div className="flex items-center justify-between gap-3">
             {/* Back + Title */}
@@ -132,15 +161,15 @@ export function ProductsPage({
                   hapticFeedback('light');
                   onBack();
                 }}
-                className="p-2.5 rounded-full hover:bg-slate-100 transition-all text-slate-500 shrink-0"
+                className="p-2.5 rounded-xl bg-surface border border-surface-dim hover:border-primary transition-all"
                 aria-label="Назад"
               >
-                <ArrowLeft className="w-5 h-5" />
+                <ArrowLeft className="w-5 h-5 text-text-secondary" />
               </button>
               <div className="min-w-0">
-                <h1 className="text-lg font-bold text-slate-900 tracking-tight">Товары</h1>
-                <p className="text-[10px] font-medium text-slate-500 uppercase tracking-widest">
-                  {stats.total} SKU • {stats.protected} Active
+                <h1 className="text-lg font-bold text-text-main tracking-tight">Товары</h1>
+                <p className="text-xs font-medium text-text-muted">
+                  {stats.total} SKU • {stats.protected} защищено
                 </p>
               </div>
             </div>
@@ -152,7 +181,7 @@ export function ProductsPage({
                   hapticFeedback('light');
                   onNavigate?.('settings');
                 }}
-                className="p-2 rounded-full hover:bg-slate-100 transition-all text-slate-500 hover:text-primary"
+                className="p-2 rounded-xl hover:bg-surface-hl transition-all text-text-muted hover:text-primary"
                 aria-label="Настройки"
               >
                 <Settings className="w-5 h-5" />
@@ -163,11 +192,43 @@ export function ProductsPage({
         </div>
       </header>
 
-      <div className="relative z-10 px-4 py-6 space-y-6">
+      <div className="relative z-10 px-4 py-6 space-y-5">
+        {/* Sync Result Toast */}
+        <AnimatePresence>
+          {syncResult && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className={`p-4 rounded-xl flex items-center gap-3 ${
+                syncResult.success
+                  ? 'bg-success-soft border border-success/20'
+                  : 'bg-danger-soft border border-danger/20'
+              }`}
+            >
+              <CheckCircle2
+                className={`w-5 h-5 ${syncResult.success ? 'text-success' : 'text-danger'}`}
+              />
+              <div>
+                <span
+                  className={`font-semibold ${syncResult.success ? 'text-success' : 'text-danger'}`}
+                >
+                  {syncResult.success ? 'Синхронизировано!' : 'Ошибка синхронизации'}
+                </span>
+                {syncResult.success && (
+                  <p className="text-sm text-text-secondary">
+                    Загружено товаров: <strong>{syncResult.count}</strong>
+                  </p>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Viktor Status Panel */}
-        {products.length > 0 && (
+        {!isLoading && products.length > 0 && (
           <motion.div
-            className={`p-4 rounded-2xl border shadow-sm flex items-start gap-4 ${viktorToneStyles[viktorStatus.tone]}`}
+            className={`p-4 rounded-2xl border flex items-start gap-4 ${viktorToneStyles[viktorStatus.tone]}`}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
           >
@@ -176,15 +237,10 @@ export function ProductsPage({
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-600">
-                  {viktorStatus.badge}
-                </span>
-                <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-400">
-                  VIKTOR
-                </span>
+                <span className="badge badge-neutral text-[9px]">{viktorStatus.badge}</span>
               </div>
-              <p className="text-sm font-semibold text-slate-900 mb-1">{viktorStatus.title}</p>
-              <p className="text-xs text-slate-600 leading-relaxed">{viktorStatus.message}</p>
+              <p className="text-sm font-semibold text-text-main mb-1">{viktorStatus.title}</p>
+              <p className="text-xs text-text-secondary leading-relaxed">{viktorStatus.message}</p>
             </div>
           </motion.div>
         )}
@@ -192,28 +248,28 @@ export function ProductsPage({
         {/* Search + Filter Bar */}
         <div className="flex gap-2">
           <div className="flex-1 relative group">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-primary transition-colors" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted group-focus-within:text-primary transition-colors" />
             <input
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Поиск..."
-              className="w-full bg-white border border-slate-200 rounded-2xl pl-10 pr-4 py-3.5 text-sm text-slate-900 placeholder-slate-400 focus:border-primary/50 focus:ring-4 focus:ring-primary/10 outline-none transition-all shadow-sm"
+              placeholder="Поиск товаров..."
+              className="input pl-10"
             />
           </div>
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`px-4 rounded-2xl border transition-all shadow-sm ${
+            className={`px-4 rounded-xl border transition-all ${
               showFilters || marketplaceFilter !== 'all' || statusFilter !== 'all'
-                ? 'bg-primary/10 border-primary/30 text-primary'
-                : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                ? 'bg-primary-dim border-primary/30 text-primary'
+                : 'bg-surface border-surface-dim text-text-muted hover:border-primary/30'
             }`}
           >
             <Filter className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Filter Panel (collapsed by default) */}
+        {/* Filter Panel */}
         <AnimatePresence>
           {showFilters && (
             <motion.div
@@ -222,48 +278,44 @@ export function ProductsPage({
               exit={{ opacity: 0, height: 0 }}
               className="overflow-hidden"
             >
-              <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-4">
+              <div className="p-4 rounded-2xl card space-y-4">
                 <div>
-                  <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-2 font-bold">
-                    Маркетплейс
-                  </p>
+                  <p className="input-label mb-2">Маркетплейс</p>
                   <div className="flex gap-2">
                     {(['all', 'WB', 'Ozon'] as const).map(m => (
                       <button
                         key={m}
                         onClick={() => setMarketplaceFilter(m)}
-                        className={`flex-1 px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all border ${
+                        className={`flex-1 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all border ${
                           marketplaceFilter === m
-                            ? 'bg-primary/10 border-primary/30 text-slate-900 shadow-[0_10px_20px_var(--color-primary-dim)]'
-                            : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-white'
+                            ? 'bg-primary-dim border-primary/30 text-primary'
+                            : 'bg-surface-warm border-surface-dim text-text-secondary hover:border-primary/30'
                         }`}
                       >
-                        {m === 'all' ? 'ВСЕ' : m}
+                        {m === 'all' ? 'Все' : m}
                       </button>
                     ))}
                   </div>
                 </div>
 
                 <div>
-                  <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-2 font-bold">
-                    Статус
-                  </p>
+                  <p className="input-label mb-2">Статус</p>
                   <div className="flex flex-wrap gap-2">
                     {(
                       [
-                        { id: 'all', label: 'ВСЕ' },
-                        { id: 'active', label: 'АКТИВНЫЕ' },
-                        { id: 'protected', label: 'ЗАЩИТА' },
-                        { id: 'triggered', label: 'АТАКИ' },
+                        { id: 'all', label: 'Все' },
+                        { id: 'active', label: 'Активные' },
+                        { id: 'protected', label: 'Защита' },
+                        { id: 'triggered', label: 'Атаки' },
                       ] as const
                     ).map(s => (
                       <button
                         key={s.id}
                         onClick={() => setStatusFilter(s.id)}
-                        className={`px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all border ${
+                        className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all border ${
                           statusFilter === s.id
-                            ? 'bg-primary/10 border-primary/30 text-slate-900 shadow-[0_10px_20px_var(--color-primary-dim)]'
-                            : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-white'
+                            ? 'bg-primary-dim border-primary/30 text-primary'
+                            : 'bg-surface-warm border-surface-dim text-text-secondary hover:border-primary/30'
                         }`}
                       >
                         {s.label}
@@ -277,39 +329,23 @@ export function ProductsPage({
         </AnimatePresence>
 
         {/* Quick Actions Row */}
-        <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
+        <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 no-scrollbar">
           <button
             onClick={() => {
               hapticFeedback('medium');
               setShowBulkStopLoss(true);
             }}
-            className="flex-1 min-w-[140px] py-3 px-4 bg-primary text-white rounded-xl font-bold text-xs uppercase tracking-wider shadow-lg shadow-primary/30 active:scale-95 transition-all flex items-center justify-center gap-2"
+            className="flex-1 min-w-[140px] btn btn-primary py-3"
           >
             <Shield className="w-4 h-4" />
-            ЗАЩИТИТЬ ВСЕ
+            Защитить все
           </button>
 
           <button
             disabled={isSyncing}
-            onClick={async () => {
-              hapticFeedback('medium');
-              setIsSyncing(true);
-              try {
-                await productsApi.syncProducts('WB');
-                await productsApi.syncProducts('Ozon');
-                await refreshProducts(); // Use locally defined refresh
-                hapticFeedback('success');
-                alert('Синхронизация завершена успешно!');
-              } catch (e) {
-                console.error(e);
-                hapticFeedback('error');
-                alert('Ошибка синхронизации. Проверьте настройки API.');
-              } finally {
-                setIsSyncing(false);
-              }
-            }}
-            className="p-3 min-w-[48px] rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-slate-900 hover:border-primary/40 transition-all shadow-sm flex items-center justify-center disabled:opacity-50"
-            title="Синхронизировать с маркетплейсом"
+            onClick={handleSync}
+            className="p-3 min-w-[48px] btn btn-secondary"
+            title="Синхронизировать"
           >
             <RefreshCcw className={`w-5 h-5 ${isSyncing ? 'animate-spin' : ''}`} />
           </button>
@@ -319,7 +355,7 @@ export function ProductsPage({
               hapticFeedback('light');
               setShowBulkCosts(true);
             }}
-            className="p-3 min-w-[48px] rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-slate-900 hover:border-primary/40 transition-all shadow-sm flex items-center justify-center"
+            className="p-3 min-w-[48px] btn btn-secondary"
             title="Загрузить себестоимость"
           >
             <Upload className="w-5 h-5" />
@@ -330,40 +366,46 @@ export function ProductsPage({
               hapticFeedback('light');
               setShowLogHistory(true);
             }}
-            className="p-3 min-w-[48px] rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-slate-900 hover:border-primary/40 transition-all shadow-sm flex items-center justify-center"
-            title="История действий"
+            className="p-3 min-w-[48px] btn btn-secondary"
+            title="История"
           >
             <History className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Products Grid with Module Handlers */}
+        {/* Products Grid or Skeleton Loading */}
         <div className="min-h-[200px]">
-          <DashboardGrid
-            onOpenSMM={setSelectedForSMM}
-            onOpenCalculator={setSelectedForCalculator}
-            onOpenMedia={setSelectedForMedia}
-          />
+          {isLoading ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map(i => (
+                <ProductCardSkeleton key={i} />
+              ))}
+            </div>
+          ) : (
+            <DashboardGrid
+              onOpenSMM={setSelectedForSMM}
+              onOpenCalculator={setSelectedForCalculator}
+              onOpenMedia={setSelectedForMedia}
+            />
+          )}
         </div>
 
         {/* Empty Catalog State */}
-        {products.length === 0 && (
+        {!isLoading && products.length === 0 && (
           <div className="text-center py-20 px-4">
-            <div className="w-24 h-24 rounded-3xl bg-white border border-slate-200 flex items-center justify-center mx-auto mb-8 shadow-sm">
-              <Package className="w-12 h-12 text-slate-400" />
+            <div className="w-24 h-24 rounded-2xl bg-surface border border-surface-dim flex items-center justify-center mx-auto mb-8">
+              <Package className="w-12 h-12 text-text-muted" />
             </div>
-            <h3 className="text-xl font-black italic tracking-tighter uppercase text-slate-900 mb-2">
-              Каталог пуст
-            </h3>
-            <p className="text-slate-500 text-sm max-w-[240px] mx-auto font-medium mb-10 leading-relaxed">
-              Для начала работы подключите аккаунты маркетплейсов в настройках.
+            <h3 className="text-xl font-bold text-text-main mb-2">Каталог пуст</h3>
+            <p className="text-text-secondary text-sm max-w-[240px] mx-auto mb-8">
+              Подключите аккаунты маркетплейсов в настройках для синхронизации товаров.
             </p>
             <button
               onClick={() => {
                 hapticFeedback('medium');
                 onNavigate?.('settings');
               }}
-              className="inline-flex items-center gap-3 px-10 py-5 bg-primary text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-[0_10px_30px_rgba(99,102,241,0.2)] hover:brightness-110 transition-all"
+              className="btn btn-primary py-4 px-8"
             >
               <Settings className="w-4 h-4" />
               Подключить API
@@ -372,7 +414,7 @@ export function ProductsPage({
         )}
       </div>
 
-      {/* MODALS LAYER */}
+      {/* MODALS */}
       <AnimatePresence>
         {showBulkStopLoss && (
           <BulkStopLossModal isOpen={showBulkStopLoss} onClose={() => setShowBulkStopLoss(false)} />
@@ -383,8 +425,6 @@ export function ProductsPage({
         {showLogHistory && (
           <LogHistory isOpen={showLogHistory} onClose={() => setShowLogHistory(false)} />
         )}
-
-        {/* NEW MODULES */}
         {selectedForSMM && (
           <ProductSMMModal
             isOpen={!!selectedForSMM}
@@ -392,25 +432,20 @@ export function ProductsPage({
             product={selectedForSMM}
           />
         )}
-
         {selectedForMedia && (
           <ProductMediaModal
             isOpen={!!selectedForMedia}
             onClose={() => setSelectedForMedia(null)}
             product={selectedForMedia}
-            onUpdate={() => {
-              // Refresh product logic if needed, usually stores update automatically
-              hapticFeedback('success');
-            }}
+            onUpdate={() => hapticFeedback('success')}
           />
         )}
       </AnimatePresence>
 
-      {/* CALCULATOR (Special Case - Rendered via Portal inside component) */}
+      {/* Calculator */}
       {selectedForCalculator && (
         <PriceCalculator
           marketplace={selectedForCalculator.marketplace}
-          // Use type assertion or check if minPrice is valid cost price estimation
           initialCostPrice={
             selectedForCalculator.minPrice > 0
               ? Math.round(selectedForCalculator.minPrice * 0.7)
@@ -420,7 +455,6 @@ export function ProductsPage({
           onCalculated={async price => {
             hapticFeedback('success');
             if (!selectedForCalculator) return;
-
             try {
               const res = await productsApi.updateProductParams(selectedForCalculator.id, {
                 minPrice: price,
