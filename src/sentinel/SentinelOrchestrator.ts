@@ -13,6 +13,8 @@ import { priceShield, type PriceRule } from './PriceShield.js';
 import { getCompetitorPrice } from '../api-lib/services/competitor-monitor.js';
 import { priceParserService } from '../api-lib/core-services/PriceParserService.js';
 import { digitalEyes } from './DigitalEyes.js';
+import { sentinelPriceReporter } from './PriceReporter.js';
+import { notificationService } from '../api-lib/services/notifications.js';
 import { logger } from '../api-lib/lib/logger.js';
 
 export class SentinelOrchestrator {
@@ -33,7 +35,9 @@ export class SentinelOrchestrator {
   /**
    * Run a full cycle for all users
    */
-  async runCycle(): Promise<SentinelRunResult> {
+  async runCycle(
+    options: { limit?: number; skipDigitalVision?: boolean; sendPriceReport?: boolean } = {}
+  ): Promise<SentinelRunResult> {
     // Check Emergency Stop using Drizzle
     try {
       const stopFlag = await db.query.systemFlags.findFirst({
@@ -94,7 +98,7 @@ export class SentinelOrchestrator {
 
         try {
           logger.info(`Processing User: ${user.first_name || user.id} (${user.id})`);
-          await this.processUser(user, result, userResult);
+          await this.processUser(user, result, userResult, options);
 
           const report = this.reportGenerator.generateUserReport(user, userResult);
           if (report) {
@@ -171,7 +175,7 @@ export class SentinelOrchestrator {
    */
   async runForUser(
     userId: string | number,
-    options: { limit?: number; skipDigitalVision?: boolean } = {}
+    options: { limit?: number; skipDigitalVision?: boolean; sendPriceReport?: boolean } = {}
   ): Promise<SentinelRunResult> {
     const result: SentinelRunResult = {
       usersProcessed: 1,
@@ -200,7 +204,7 @@ export class SentinelOrchestrator {
     user: DBUser,
     summary: SentinelRunResult,
     userResult?: UserCycleResult,
-    options: { limit?: number; skipDigitalVision?: boolean } = {}
+    options: { limit?: number; skipDigitalVision?: boolean; sendPriceReport?: boolean } = {}
   ): Promise<void> {
     const monitoredProducts = await db.query.products.findMany({
       columns: { id: true },
@@ -490,6 +494,59 @@ export class SentinelOrchestrator {
         }
       } catch (err) {
         logger.error('Bulk price update failed', err);
+      }
+    }
+
+    // === SENTINEL PRICE REPORT ===
+    if (options.sendPriceReport) {
+      try {
+        const freshProducts = await db.query.products.findMany({
+          where: and(
+            eq(products.userId, String(user.id)),
+            drizzleSql`(${products.isMonitored} = true OR ${products.minPrice} > 0)`
+          ),
+        });
+
+        // Map Drizzle camelCase to DBProduct snake_case
+        const mapped = freshProducts.map(p => ({
+          ...p,
+          min_price: p.minPrice,
+          current_price: p.currentPrice,
+          estimated_buyer_price: p.estimatedBuyerPrice,
+          product_id: p.productId,
+          nm_id: p.nmId,
+          offer_id: (p as any).offerId || null,
+          is_monitored: p.isMonitored,
+          marketplace: p.marketplace,
+          title: p.title,
+        })) as unknown as DBProduct[];
+
+        const report = await sentinelPriceReporter.generateDetailedReport(mapped);
+
+        const breaches = mapped.filter(
+          p =>
+            (p.current_price || 0) > 0 &&
+            (p.min_price || 0) > 0 &&
+            (p.current_price || 0) < (p.min_price || 0)
+        );
+
+        let replyMarkup: Record<string, unknown> | undefined = undefined;
+        if (breaches.length > 0) {
+          replyMarkup = {
+            inline_keyboard: [
+              [
+                {
+                  text: `🚨 Исправить цены (${breaches.length} шт)`,
+                  callback_data: `sentinel_fix_prices:${user.id}`,
+                },
+              ],
+            ],
+          };
+        }
+
+        await notificationService.sendRawMessage(Number(user.id), report, replyMarkup);
+      } catch (e) {
+        logger.error('Failed to send periodic price report', e);
       }
     }
   }

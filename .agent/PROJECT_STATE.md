@@ -50,7 +50,9 @@ Skeleton loading improves perceived performance significantly.
 Voice input UI ready for Web Speech API - works in Chrome/Safari.
 ⚠️ Database migration required for 'min_margin' column (script created).
 ⚠️ User needs to re-enter API keys due to encryption key rotation/loss.
-🚀 **Digital Eyes Implemented:** Sentinel now uses LLM (Gemini Flash) to parse raw HTML and find "hidden" buyer prices (WB Wallet/Ozon Card) instead of relying solely on API.
+🚀 **Digital Eyes Implemented:** Sentinel now uses LLM (Gemini Flash) to parse raw HTML and find "hidden" buyer prices (WB Wallet/Ozon Card).
+📊 **Unified Periodic Reports:** Consolidated Price Check & Report into a SINGLE 30-min Cron job (`check-prices&includeReport=true`) to comply with Vercel Hobby limits.
+🔴 **Interactive Alerts:** Reports highlight Stop Loss breaches and include a "Fix Prices" button to auto-correct them via Telegram.
 ```
 
 ### Session 2026-01-19 (Session 83 - Security Agent & God Mode Hardening) 🛡️

@@ -9,6 +9,10 @@ import type { DBProduct } from '../lib/types.js';
 import { verifyAdminAccessAsync, extractAnyAuthAsync } from '../middleware/auth.js';
 
 import { sentinelOrchestrator as sentinelService } from '../../sentinel/SentinelOrchestrator.js';
+import { sentinelPriceReporter } from '../../sentinel/PriceReporter.js';
+import { notificationService } from '../services/notifications.js';
+import { db, products, users } from '../../infrastructure/database/db.js';
+import { eq, and, sql as drizzleSql } from 'drizzle-orm';
 import { getSecret } from '../lib/secrets-helper.js';
 import { logger } from '../lib/logger.js';
 
@@ -50,15 +54,19 @@ export async function handleCheckPrices(
   try {
     let result;
 
+    const includeReport = req.query.includeReport === 'true';
+
     if (authResult.success) {
       logger.info('Sentinel check started for user', {
         userId: authResult.context.userId,
         authMethod: authResult.context.authMethod,
       });
-      result = await sentinelService.runForUser(authResult.context.userId);
+      result = await sentinelService.runForUser(authResult.context.userId, {
+        sendPriceReport: includeReport,
+      });
     } else if (isGlobalAdmin) {
       logger.info('Sentinel full global cycle started');
-      result = await sentinelService.runCycle();
+      result = await sentinelService.runCycle({ sendPriceReport: includeReport });
     } else {
       return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -329,5 +337,150 @@ export async function handleSentinelDashboard(
   } catch (error) {
     logger.error('Sentinel Dashboard Error', error, { userId });
     return res.status(500).json({ error: 'Failed to fetch sentinel dashboard' });
+  }
+}
+
+/**
+ * Handle sentinel price report generation (Cron/Manual)
+ */
+export async function handleSentinelPriceReport(
+  req: VercelRequest,
+  res: VercelResponse
+): Promise<VercelResponse> {
+  const isGlobalAdmin = await verifyAdminAccessAsync(req);
+  if (!isGlobalAdmin) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    // 1. Get active users
+    const activeUsers = await db.query.users.findMany({
+      where: and(
+        eq(users.isActive, true),
+        drizzleSql`(${users.protectionEnabled} = true OR ${users.subscriptionActive} = true)`
+      ),
+    });
+
+    let reportsSent = 0;
+
+    for (const user of activeUsers) {
+      if (!user.id) continue;
+
+      // 2. Get user's tracked products
+      const userProducts = await db.query.products.findMany({
+        where: and(
+          eq(products.userId, String(user.id)),
+          drizzleSql`(${products.isMonitored} = true)`
+        ),
+      });
+
+      if (userProducts.length === 0) continue;
+
+      // 3. Generate Report
+      // Map Drizzle camelCase to DBProduct snake_case
+      const mappedProducts = userProducts.map(p => ({
+        ...p,
+        product_id: p.productId,
+        nm_id: p.nmId,
+        current_price: p.currentPrice,
+        min_price: p.minPrice,
+        estimated_buyer_price: p.estimatedBuyerPrice,
+        title: p.title,
+        marketplace: p.marketplace,
+        is_monitored: p.isMonitored,
+      })) as unknown as DBProduct[];
+
+      const report = await sentinelPriceReporter.generateDetailedReport(mappedProducts);
+
+      // 4. Check for breaches to add interaction
+      const breaches = mappedProducts.filter(
+        p =>
+          (p.current_price || 0) > 0 &&
+          (p.min_price || 0) > 0 &&
+          (p.current_price || 0) < (p.min_price || 0)
+      );
+      const hasBreaches = breaches.length > 0;
+
+      // 5. Send Report with Buttons
+      let replyMarkup: Record<string, unknown> | undefined = undefined;
+
+      if (hasBreaches) {
+        replyMarkup = {
+          inline_keyboard: [
+            [
+              {
+                text: `🚨 Исправить цены (${breaches.length} шт)`,
+                callback_data: `sentinel_fix_prices:${user.id}`,
+              },
+            ],
+          ],
+        };
+      }
+
+      const success = await notificationService.sendRawMessage(
+        Number(user.id),
+        report,
+        replyMarkup
+      );
+      if (success) reportsSent++;
+    }
+
+    return res.json({ success: true, reportsSent, usersProcessed: activeUsers.length });
+  } catch (error) {
+    logger.error('Sentinel Price Report Failed', error);
+    return res.status(500).json({ error: 'Report generation failed' });
+  }
+}
+
+/**
+ * Handle "Fix Prices" button action
+ */
+export async function handleSentinelFixPrices(
+  req: VercelRequest,
+  res: VercelResponse
+): Promise<VercelResponse> {
+  const { userId } = req.body || req.query;
+
+  if (!userId) {
+    return res.status(400).json({ error: 'Missing userId' });
+  }
+
+  try {
+    const fixedProducts: string[] = [];
+
+    // 1. Find breached products
+    const breachedProducts = await db.query.products.findMany({
+      where: and(
+        eq(products.userId, String(userId)),
+        drizzleSql`current_price < min_price AND min_price > 0`
+      ),
+    });
+
+    if (breachedProducts.length === 0) {
+      return res.json({ success: true, message: 'No prices needed fixing' });
+    }
+
+    // 2. Fix them
+    for (const p of breachedProducts) {
+      if (!p.minPrice) continue;
+
+      await db
+        .update(products)
+        .set({ currentPrice: p.minPrice, updatedAt: new Date() })
+        .where(eq(products.id, p.id));
+
+      fixedProducts.push(p.title || p.productId);
+    }
+
+    // 3. Notify user
+    await notificationService.sendRawMessage(
+      Number(userId),
+      `✅ *Успешно исправлено ${fixedProducts.length} цен!*\n\nЦены установлены на уровень Stop Loss. Синхронизация с маркетплейсом запущена.`
+    );
+
+    return res.json({ success: true, fixed: fixedProducts.length });
+  } catch (error) {
+    logger.error('Fix Prices Failed', error);
+    return res.status(500).json({ error: 'Fix failed' });
   }
 }

@@ -823,7 +823,26 @@ export const notificationService = {
   sendDailyReport,
   sendWelcomeMessage,
   sendTelegramNotification,
+  sendRawMessage,
 };
+
+/**
+ * Send a raw custom message to a user with optional buttons
+ * Used for complex reports and interactive tools
+ */
+export async function sendRawMessage(
+  userId: number,
+  markdownText: string,
+  replyMarkup?: Record<string, unknown>
+): Promise<boolean> {
+  const chatId = await getUserChatId(userId);
+  if (!chatId) return false;
+
+  return await sendTelegramMessage(chatId, markdownText, {
+    replyMarkup: replyMarkup,
+    parseMode: 'Markdown',
+  });
+}
 
 /**
  * Legacy compatibility wrapper (simple text message)
