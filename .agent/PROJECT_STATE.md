@@ -1,6 +1,6 @@
 # 📊 Project State — NeuroGUARDIAN
 
-# Updated: 2026-01-20T18:20:00+03:00
+# Updated: 2026-01-20T22:06:00+03:00
 
 # This file tracks current progress and is updated at end of each session
 
@@ -8,8 +8,40 @@
 
 ## 🎯 Current Phase: PRODUCTION DEPLOYMENT (Phase 13) 🚀 READY FOR LAUNCH
 
-**Last Session:** 2026-01-20 (Session 86)
-**Focus:** 🤖 HuggingFace PRO Integration + Hunter Mode Completion + UI Improvements
+**Last Session:** 2026-01-20 (Session 87)
+**Focus:** 🛡️ Premium Telegram Alerts & BrowserEyes Integration
+
+### Session 2026-01-20 (Session 87 - Premium Sentinel Alerts) 📱
+
+**Objective: Enhance Sentinel alert system with premium Telegram notifications and real buyer price detection.**
+
+> ✅ **BROWSER EYES:** Replaced `digitalEyes` with `browserEyes` (Playwright + Stealth) for accurate buyer price detection.
+> ✅ **NEW THREAT TYPES:** Added `PROMO_PRICE_VIOLATION` and `BUYER_PRICE_BELOW_STOPLOSS` for detecting marketplace promotions affecting stop-loss.
+> ✅ **PREMIUM ALERTS:** Created visually stunning Telegram alert templates with progress bars, action buttons, and motivational messages.
+> ✅ **STATUS REPORTS:** Completely redesigned ReportGenerator with visual status indicators (🟢🟢🟢🟢🟢).
+
+**Completed Actions:**
+
+- [x] **ThreatDetector.ts**: Added 2 new threat types for promo/buyer price violations.
+- [x] **SentinelOrchestrator.ts**: Switched from digitalEyes to browserEyes for real buyer prices.
+- [x] **AlertSender.ts**: Updated threat type mapping for new alert types.
+- [x] **notifications.ts**: Created premium templates for `promo_violation` and `stoploss_breach` alerts with action buttons.
+- [x] **ReportGenerator.ts**: Full rewrite with visual status bars, pluralization, and motivational messages.
+- [x] **advanced-scenarios.test.ts**: Updated test to match new message format.
+
+**Key Insights:**
+
+```
+Real buyer prices (with marketplace discounts) are critical for accurate stop-loss detection.
+Visual progress bars (🟢🟢🟢🟢🟢) significantly improve user experience in Telegram alerts.
+Action buttons in alerts allow users to respond immediately to price threats.
+```
+
+**Next Steps (P0):**
+
+1. Test promo_violation alerts with real marketplace promotion scenarios
+2. Monitor BrowserEyes performance in production (Playwright resource usage)
+3. Add historical threat tracking for analytics dashboard
 
 ### Session 2026-01-20 (Session 86 - HuggingFace Integration & Hunter Mode UI) 🤖
 
