@@ -398,6 +398,11 @@ export class VectorStore {
     // 1. Generate embeddings for docs without them
     const docsToEmbed = docs.filter(d => !d.embedding);
     if (docsToEmbed.length > 0) {
+      // HUGGINGFACE can fail on large batches too, so we could batch this if needed,
+      // but usually the DB insert is the bottleneck. The HF provider handles its own internal batching/retries?
+      // Actually HF provider takes an array. Let's trust it for now or check if it needs batching.
+      // Current logs show HF succeeds with 26 inputs. The DB fails.
+
       const texts = docsToEmbed.map(d => d.content);
       const embeddings = await this.embeddingProvider.embedBatch(texts);
       docsToEmbed.forEach((doc, i) => {
@@ -405,57 +410,71 @@ export class VectorStore {
       });
     }
 
-    // 2. Prepare bulk insert
-    // We use a single query for all documents to minimize connection overhead
-    try {
-      const valuePlaceholders: string[] = [];
-      const queryValues: unknown[] = [];
+    // 2. Prepare bulk insert in BATCHES
+    // preventing huge SQL statements that drop connections
+    const BATCH_SIZE = 5;
+    const allIds: number[] = [];
 
-      docs.forEach((doc, i) => {
-        const offset = i * 7;
-        valuePlaceholders.push(
-          `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}::vector, $${offset + 7}::jsonb)`
+    for (let i = 0; i < docs.length; i += BATCH_SIZE) {
+      const batch = docs.slice(i, i + BATCH_SIZE);
+
+      try {
+        const valuePlaceholders: string[] = [];
+        const queryValues: unknown[] = [];
+
+        batch.forEach((doc, idx) => {
+          const offset = idx * 7;
+          valuePlaceholders.push(
+            `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}::vector, $${offset + 7}::jsonb)`
+          );
+
+          queryValues.push(
+            doc.namespace,
+            doc.sourceFile,
+            doc.chunkIndex,
+            doc.title || null,
+            doc.content,
+            // Force [1,2,3] string format for pgvector casting
+            JSON.stringify(doc.embedding),
+            JSON.stringify(doc.metadata || {})
+          );
+        });
+
+        const queryText = `
+          INSERT INTO knowledge_embeddings (
+            namespace, source_file, chunk_index, title, content, embedding, metadata
+          ) VALUES ${valuePlaceholders.join(', ')}
+          ON CONFLICT (namespace, source_file, chunk_index) 
+          DO UPDATE SET
+            title = EXCLUDED.title,
+            content = EXCLUDED.content,
+            embedding = EXCLUDED.embedding,
+            metadata = EXCLUDED.metadata,
+            updated_at = now()
+          RETURNING id
+        `;
+
+        const result = await sql.unsafe(queryText, queryValues);
+        const ids = result.rows.map(r => r.id);
+        allIds.push(...(ids as number[]));
+
+        logger.info(
+          `[VectorStore] Batch saved: ${batch.length} chunks from ${batch[0].sourceFile}`
         );
 
-        queryValues.push(
-          doc.namespace,
-          doc.sourceFile,
-          doc.chunkIndex,
-          doc.title || null,
-          doc.content,
-          // Force [1,2,3] string format for pgvector casting
-          JSON.stringify(doc.embedding),
-          JSON.stringify(doc.metadata || {})
-        );
-      });
-
-      const queryText = `
-        INSERT INTO knowledge_embeddings (
-          namespace, source_file, chunk_index, title, content, embedding, metadata
-        ) VALUES ${valuePlaceholders.join(', ')}
-        ON CONFLICT (namespace, source_file, chunk_index) 
-        DO UPDATE SET
-          title = EXCLUDED.title,
-          content = EXCLUDED.content,
-          embedding = EXCLUDED.embedding,
-          metadata = EXCLUDED.metadata,
-          updated_at = now()
-        RETURNING id
-      `;
-
-      const result = await sql.unsafe(queryText, queryValues);
-      const ids = result.rows.map(r => r.id);
-
-      logger.info(`[VectorStore] Bulk added ${ids.length} documents from ${docs[0].sourceFile}`);
-      return ids;
-    } catch (error) {
-      logger.error('[VectorStore] Bulk insert failed', {
-        file: docs[0]?.sourceFile,
-        count: docs.length,
-        error,
-      });
-      throw error;
+        // Small delay to let DB breathe
+        await new Promise(r => setTimeout(r, 200));
+      } catch (error) {
+        logger.error('[VectorStore] Batch insert failed', {
+          file: batch[0]?.sourceFile,
+          batchIndex: i,
+          error,
+        });
+        throw error;
+      }
     }
+
+    return allIds;
   }
 
   /**
