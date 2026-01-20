@@ -5,7 +5,6 @@
 // ============================================
 
 import type { DBProduct } from '../api-lib/lib/types';
-import { geminiFlash } from '../infrastructure/llm/GeminiProvider';
 
 export class SentinelPriceReporter {
   /**
@@ -94,7 +93,7 @@ export class SentinelPriceReporter {
   /**
    * Optional: Use LLM to generate a summary insight
    */
-  async generateInsight(products: DBProduct[]): Promise<string> {
+  async generateInsight(_products: DBProduct[]): Promise<string> {
     try {
       // ... (Not implemented for speed/cost, using template above is better for exact numbers)
       return '';

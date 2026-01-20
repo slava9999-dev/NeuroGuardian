@@ -438,13 +438,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return handleBulkLogDefense(req, res);
 
       case 'sentinel-stats':
-      case 'sentinel-dashboard': {
+      case 'sentinel-dashboard':
+      case 'sentinel-alerts': {
         const auth = await extractAnyAuthAsync(req);
         if (auth.success === false) {
           return sendAuthError(res, auth.error, auth.statusCode);
         }
         if (action === 'sentinel-stats') {
           return withSubscription(req, res, handleSentinelStats, auth.context.userId);
+        }
+        if (action === 'sentinel-alerts') {
+          // Import sentinel agent
+          const { sentinelAgent } = await import('../src/sentinel/SentinelAgent.js');
+          const alerts = await sentinelAgent.monitorAllProducts();
+          return res.status(200).json({ success: true, alerts });
         }
         return withSubscription(req, res, handleSentinelDashboard, auth.context.userId);
       }

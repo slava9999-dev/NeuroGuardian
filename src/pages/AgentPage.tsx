@@ -209,6 +209,25 @@ export function AgentPage() {
                 onClick={() => handleSendMessage('проверь цены конкурентов')}
               />
             </div>
+
+            {/* Creative Tools Section */}
+            <div className="w-full max-w-sm mt-6 pt-6 border-t border-surface-dim">
+              <p className="text-xs font-semibold tracking-widest text-primary/60 uppercase mb-3 text-center">
+                🎨 Креативные инструменты
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <QuickActionButton
+                  icon={<span className="text-lg">🖼️</span>}
+                  label="Сгенерировать фото"
+                  onClick={() => handleSendMessage('сгенерируй фото товара')}
+                />
+                <QuickActionButton
+                  icon={<span className="text-lg">✍️</span>}
+                  label="Создать пост"
+                  onClick={() => handleSendMessage('создай SMM пост для товара')}
+                />
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -255,7 +274,7 @@ export function AgentPage() {
           ref={messagesContainerRef}
           className="flex-1 overflow-y-auto px-4 py-4 scroll-smooth"
           style={{
-            paddingBottom: '220px', // Space for Input Bar AND Nav Bar (64px + ~100px input + safety)
+            paddingBottom: '280px', // Increased space for Input Bar + Nav Bar (was 220px)
           }}
         >
           <div className="max-w-2xl mx-auto space-y-4">
@@ -272,13 +291,12 @@ export function AgentPage() {
         </div>
       )}
 
-      {/* Input Bar - FIXED: always visible at bottom */}
-      {/* Input Bar - FIXED above Navigation Bar (h-16 = 64px) */}
+      {/* Input Bar - FIXED: Increased spacing above Navigation Bar */}
       <div
         className="fixed left-0 right-0 z-50 bg-linear-to-t from-background via-background to-transparent pt-6"
         style={{
-          bottom: 'calc(4rem + env(safe-area-inset-bottom))', // Lift above Nav Bar
-          paddingBottom: '16px',
+          bottom: 'calc(5rem + env(safe-area-inset-bottom))', // 80px above nav (was 64px)
+          paddingBottom: '20px', // Extra padding
         }}
       >
         <div className="max-w-2xl mx-auto px-4">

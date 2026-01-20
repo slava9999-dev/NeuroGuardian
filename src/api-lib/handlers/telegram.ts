@@ -837,9 +837,117 @@ async function handleCallbackQuery(query: TelegramCallbackQuery): Promise<void> 
       break;
     }
 
-    default:
-      // Unknown callback
+    // --- SENTINEL ALERT ACTIONS ---
+    default: {
+      // Handle Sentinel actions
+      if (data.startsWith('sentinel_')) {
+        // Get userId from Telegram user
+        const telegramUserId = query.from.id;
+        const userResult = await sql`
+          SELECT id FROM users WHERE telegram_id = ${telegramUserId.toString()} LIMIT 1
+        `;
+
+        if (userResult.rows.length === 0) {
+          await answerCallbackQuery(query.id, '❌ Пользователь не найден');
+          break;
+        }
+
+        const userId = userResult.rows[0].id;
+
+        if (data.startsWith('sentinel_lower:')) {
+          // Format: sentinel_lower:productId:newPrice
+          const [, productIdStr, newPriceStr] = data.split(':');
+          const productId = parseInt(productIdStr);
+          const newPrice = parseInt(newPriceStr);
+
+          try {
+            await sql`
+              UPDATE products
+              SET current_price = ${newPrice}, updated_at = NOW()
+              WHERE id = ${productId} AND user_id = ${userId}
+            `;
+
+            await answerCallbackQuery(query.id, `✅ Цена обновлена: ${newPrice} ₽`);
+            await sendTelegramMessage(
+              chatId,
+              `✅ <b>Цена успешно обновлена!</b>\n\n💰 Новая цена: <b>${newPrice} ₽</b>\n\n🎯 Теперь вы снова конкурентоспособны!`
+            );
+          } catch (err) {
+            logger.error('Failed to update price', err);
+            await answerCallbackQuery(query.id, '❌ Ошибка обновления цены');
+          }
+        } else if (data.startsWith('sentinel_monitor:')) {
+          const [, productIdStr] = data.split(':');
+          const productId = parseInt(productIdStr);
+
+          try {
+            await sql`
+              UPDATE products
+              SET is_monitored = true, updated_at = NOW()
+              WHERE id = ${productId} AND user_id = ${userId}
+            `;
+
+            await answerCallbackQuery(query.id, '👁️ Мониторинг включен');
+            await sendTelegramMessage(
+              chatId,
+              '👁️ <b>Мониторинг активирован</b>\n\nSentinel будет следить за этим товаром и уведомит вас о изменениях.'
+            );
+          } catch (err) {
+            logger.error('Failed to enable monitoring', err);
+            await answerCallbackQuery(query.id, '❌ Ошибка');
+          }
+        } else if (data.startsWith('sentinel_ignore:')) {
+          await answerCallbackQuery(query.id, '🚫 Алерт проигнорирован');
+          await sendTelegramMessage(
+            chatId,
+            '🚫 <i>Алерт проигнорирован. Sentinel продолжит мониторинг.</i>'
+          );
+        } else if (data.startsWith('sentinel_details:')) {
+          const [, productIdStr] = data.split(':');
+          const productId = parseInt(productIdStr);
+
+          try {
+            const product = await sql`
+              SELECT 
+                title,
+                current_price,
+                competitor_price,
+                competitor_url,
+                marketplace,
+                min_price,
+                price_strategy
+              FROM products
+              WHERE id = ${productId} AND user_id = ${userId}
+              LIMIT 1
+            `;
+
+            if (product.rows.length > 0) {
+              const p = product.rows[0];
+              const diff = p.current_price - p.competitor_price;
+              const diffPercent = Math.round((diff / p.current_price) * 100);
+
+              let details = `📊 <b>Детальная аналитика</b>\n\n`;
+              details += `📦 ${p.title}\n`;
+              details += `🏪 ${p.marketplace}\n\n`;
+              details += `💰 Текущая цена: ${p.current_price} ₽\n`;
+              details += `💸 Конкурент: ${p.competitor_price} ₽\n`;
+              details += `📉 Разница: ${diff} ₽ (${diffPercent}%)\n`;
+              details += `🛡️ Min цена: ${p.min_price} ₽\n`;
+              details += `🎯 Стратегия: ${p.price_strategy || 'не задана'}\n\n`;
+              details += `🔗 <a href="${p.competitor_url}">Товар конкурента</a>`;
+
+              await sendTelegramMessage(chatId, details);
+            }
+            await answerCallbackQuery(query.id, '📊 Данные загружены');
+          } catch (err) {
+            logger.error('Failed to fetch product details', err);
+            await answerCallbackQuery(query.id, '❌ Ошибка загрузки');
+          }
+        }
+      }
+      // Unknown callback - do nothing
       break;
+    }
   }
 }
 

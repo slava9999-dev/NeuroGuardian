@@ -1,4 +1,5 @@
 import { SentinelDashboard } from '../components/dashboard/SentinelDashboard';
+import { SentinelAlerts } from '../components/dashboard/SentinelAlerts';
 
 export function DashboardPage() {
   return (
@@ -11,6 +12,17 @@ export function DashboardPage() {
 
       {/* Main V5 Dashboard */}
       <SentinelDashboard />
+
+      {/* Hunter Mode: Competitor Alerts */}
+      <div className="mt-8">
+        <div className="flex items-center gap-3 mb-6">
+          <h2 className="text-2xl font-black italic uppercase text-white">Hunter Mode</h2>
+          <span className="text-xs font-bold bg-purple-600 text-white px-3 py-1 rounded-full">
+            BETA
+          </span>
+        </div>
+        <SentinelAlerts />
+      </div>
 
       {/* Additional Sections (e.g. Quick Links) can be added here */}
       <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-6">

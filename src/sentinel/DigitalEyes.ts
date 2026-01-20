@@ -1,5 +1,5 @@
 import { logger } from '../api-lib/lib/logger.js';
-import { geminiFlash } from '../infrastructure/llm/GeminiProvider.js';
+import { llmRouter } from '../infrastructure/llm/LLMRouter.js';
 import * as cheerio from 'cheerio';
 
 interface EyesResult {
@@ -9,6 +9,7 @@ interface EyesResult {
   promoType?: string; // 'WB Wallet', 'Ozon Card'
   stockStatus: 'in_stock' | 'out_of_stock';
   screenshotUrl?: string; // Future implementation
+  [key: string]: unknown; // Index signature for logger compatibility
 }
 
 export class DigitalEyes {
@@ -72,55 +73,91 @@ export class DigitalEyes {
     }
   }
 
-  private distillContent(html: string, _marketplace: 'WB' | 'Ozon'): string {
+  private distillContent(html: string, marketplace: 'WB' | 'Ozon'): string {
     const $ = cheerio.load(html);
 
-    // Remove scripts (unless needed), styles, svgs to reduce token count
-    // NOTE: Some WB prices are in JSON inside <script> tags.
-    // For now, we keep text, but if we parsed JSON-LD it would be better.
-    // Let's strip style/svg but keep script content if it looks like JSON?
-    // No, standard text "vision" is safer for generic LLM.
+    // STRATEGY: Extract structured data first (JSON-LD, script data), then fallback to text
+    const structuredData: string[] = [];
 
+    // 1. Extract JSON-LD (common for product data)
+    $('script[type="application/ld+json"]').each((_, elem) => {
+      const jsonText = $(elem).html();
+      if (jsonText && (jsonText.includes('price') || jsonText.includes('Price'))) {
+        structuredData.push(`JSON-LD: ${jsonText}`);
+      }
+    });
+
+    // 2. Extract WB-specific data objects from scripts
+    if (marketplace === 'WB') {
+      $('script').each((_, elem) => {
+        const scriptContent = $(elem).html() || '';
+        // Look for common WB data patterns
+        if (
+          scriptContent.includes('"price"') ||
+          scriptContent.includes('"salePriceU"') ||
+          scriptContent.includes('"priceU"') ||
+          scriptContent.includes('nmId')
+        ) {
+          // Extract just the relevant JSON object (limit to 2000 chars per script)
+          const relevantPart = scriptContent.substring(0, 2000);
+          structuredData.push(`WB-Script-Data: ${relevantPart}`);
+        }
+      });
+    }
+
+    // 3. Clean up DOM and extract visible text
     $('style').remove();
     $('svg').remove();
     $('noscript').remove();
     $('footer').remove();
     $('header').remove();
-
-    // Specific cleanup
+    $('script').remove(); // Remove after extraction
     $('.cookie-banner').remove();
 
-    // Extract text and condense whitespace
-    const text = $('body').text().replace(/\s+/g, ' ').trim();
+    // Extract visible text
+    const visibleText = $('body').text().replace(/\s+/g, ' ').trim();
 
-    // Limit context window
-    return text.substring(0, 20000);
+    // 4. Combine structured data + visible text (prioritize structured)
+    const combined = [...structuredData, `Visible-Text: ${visibleText.substring(0, 10000)}`].join(
+      '\n\n'
+    );
+
+    // Limit total context
+    return combined.substring(0, 25000);
   }
 
   private async askIntelligence(marketplace: 'WB' | 'Ozon', content: string): Promise<EyesResult> {
     const prompt = `
-    Ты — ИИ-агент Sentinel Digital Eyes. Твоя задача — извлечь РЕАЛЬНУЮ цену для покупателя из текста страницы маркетплейса ${marketplace}.
-    
-    МАРКЕТПЛЕЙСЫ СКРЫВАЮТ ЦЕНЫ ДЛЯ ПОКУПАТЕЛЕЙ (WB Кошелек, Ozon Карта).
-    Твоя цель — найти именно эту, САМУЮ НИЗКУЮ цену, выделенную цветом (зеленым/фиолетовым).
+Ты — ИИ-агент Sentinel Digital Eyes. Извлеки РЕАЛЬНУЮ цену покупателя из данных страницы ${marketplace}.
 
-    Контент страницы (шумный текст):
-    """
-    ${content}
-    """
+**ПРИОРИТЕТ ИСТОЧНИКОВ ДАННЫХ:**
+1. JSON-LD (application/ld+json) - ищи поля "price", "offers.price"
+2. WB-Script-Data - ищи "salePriceU" (цена в копейках, раздели на 100), "priceU", "price"
+3. Visible-Text - ищи числа с символом ₽, особенно рядом со словами "кошелек", "карта", "скидка"
 
-    Верни JSON (без markdown):
-    {
-      "buyerPrice": number (цена С картой/кошельком, самая низкая),
-      "originalPrice": number (зачеркнутая цена),
-      "cardPrice": number (цена по карте, если есть, иначе null),
-      "stockStatus": "in_stock" | "out_of_stock"
-    }
+**ПРАВИЛА ИЗВЛЕЧЕНИЯ ДЛЯ WB:**
+- "salePriceU": 123456 означает 1234.56 ₽ (делим на 100)
+- "priceU": 234567 означает 2345.67 ₽ (старая цена)
+- Ищи МИНИМАЛЬНУЮ цену (обычно зеленая/фиолетовая с иконкой кошелька)
+- Если товар "Нет в наличии" / "out of stock" → stockStatus: "out_of_stock"
 
-    Если не можешь найти цену, верни null в значениях, но попытайся угадать по контексту (числа рядом с символом ₽).
+**ДАННЫЕ СТРАНИЦЫ:**
+"""
+${content}
+"""
+
+**ВЕРНИ ТОЛЬКО JSON (без markdown, без комментариев):**
+{
+  "buyerPrice": <число или null>,
+  "originalPrice": <число или null>,
+  "cardPrice": <число или null>,
+  "stockStatus": "in_stock" | "out_of_stock"
+}
+
+**ВАЖНО:** Если нашел "salePriceU" или "priceU" в JSON - используй их в первую очередь!
     `;
 
-    const response = await geminiFlash.complete([{ role: 'user', content: prompt }]);
+    const response = await llmRouter.complete([{ role: 'user', content: prompt }]);
 
     try {
       // Clean up markdown block if present
@@ -129,8 +166,11 @@ export class DigitalEyes {
         .replace(/```/g, '')
         .trim();
       return JSON.parse(jsonStr);
-    } catch (e) {
-      logger.warn('[DigitalEyes] Failed to parse LLM response', { response: response.content });
+    } catch (error) {
+      logger.warn('[DigitalEyes] Failed to parse LLM response', {
+        response: response.content,
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw new Error('LLM JSON parse error');
     }
   }
