@@ -1,7 +1,7 @@
 // ============================================
 // NeuroGUARDIAN — Response Validator (Guardrails)
 // Validates agent responses before sending to user
-// Version: 1.0.0 | Date: January 2026
+// Version: 1.1.0 | Date: January 2026
 // ============================================
 
 import { logger } from '../../api-lib/lib/logger.js';
@@ -15,13 +15,25 @@ export interface ValidationResult {
   issues: ValidationIssue[];
   suggestions: string[];
   correctedResponse?: string;
+  metrics?: ValidationMetrics;
 }
 
 export interface ValidationIssue {
-  type: 'hallucination' | 'irrelevant' | 'unsafe' | 'quality' | 'factual' | 'tone';
+  type: 'hallucination' | 'irrelevant' | 'unsafe' | 'quality' | 'factual' | 'tone' | 'link';
   severity: 'low' | 'medium' | 'high' | 'critical';
   message: string;
   location?: string;
+}
+
+/**
+ * Validation metrics for monitoring
+ */
+export interface ValidationMetrics {
+  totalValidations: number;
+  passed: number;
+  failed: number;
+  criticalRejections: number;
+  avgScore: number;
 }
 
 /**
@@ -69,7 +81,7 @@ const QUALITY_ISSUES = [
   // Repetitive text
   { pattern: /(.{20,})\1{2,}/s, issue: 'Повторяющийся текст' },
   // Incomplete sentences
-  { pattern: /\.\.\.$(?!.*[.!?])/, issue: 'Незаконченное предложение' },
+  { pattern: /\.\.\.$/m, issue: 'Незаконченное предложение' },
 ];
 
 /**
@@ -83,16 +95,33 @@ const KNOWN_FACTS = {
 };
 
 /**
+ * Critical fallback message when response is too dangerous
+ */
+const CRITICAL_FALLBACK =
+  'Не удалось сформировать корректный ответ. Пожалуйста, переформулируйте вопрос или обратитесь в поддержку.';
+
+/**
  * Response Validator
  * Checks agent responses before sending
  */
 export class ResponseValidator {
+  // In-memory metrics (reset on restart)
+  private metrics: ValidationMetrics = {
+    totalValidations: 0,
+    passed: 0,
+    failed: 0,
+    criticalRejections: 0,
+    avgScore: 100,
+  };
   /**
    * Main validation entry point
    */
   async validate(response: string, context: ValidationContext): Promise<ValidationResult> {
     const issues: ValidationIssue[] = [];
     const suggestions: string[] = [];
+
+    // Track validation
+    this.metrics.totalValidations++;
 
     // 1. Check for hallucinations
     const hallucinationIssues = this.checkHallucinations(response);
@@ -118,8 +147,17 @@ export class ResponseValidator {
     const toneIssues = this.checkTone(response);
     issues.push(...toneIssues);
 
+    // 7. Check links (NEW)
+    const linkIssues = this.checkLinks(response);
+    issues.push(...linkIssues);
+
     // Calculate score
     const score = this.calculateScore(issues);
+
+    // Update running average
+    this.metrics.avgScore =
+      (this.metrics.avgScore * (this.metrics.totalValidations - 1) + score) /
+      this.metrics.totalValidations;
 
     // Generate suggestions
     if (issues.length > 0) {
@@ -131,13 +169,40 @@ export class ResponseValidator {
     const hasMultipleHigh = issues.filter(i => i.severity === 'high').length >= 2;
     const isValid = !hasCritical && !hasMultipleHigh && score >= 60;
 
-    // Log validation
+    // Update metrics
+    if (isValid) {
+      this.metrics.passed++;
+    } else {
+      this.metrics.failed++;
+      if (hasCritical) {
+        this.metrics.criticalRejections++;
+      }
+    }
+
+    // Log validation with context
     if (!isValid) {
       logger.warn('[ResponseValidator] Response failed validation', {
         score,
-        issues: issues.length,
+        issueCount: issues.length,
         critical: hasCritical,
+        issueTypes: issues.map(i => i.type),
+        query: context.userQuery.substring(0, 50),
       });
+    }
+
+    // Determine corrected response
+    let correctedResponse: string | undefined;
+    if (!isValid) {
+      if (hasCritical) {
+        // Critical issues = use safe fallback
+        correctedResponse = CRITICAL_FALLBACK;
+        logger.error('[ResponseValidator] CRITICAL: Using fallback response', {
+          issues: issues.filter(i => i.severity === 'critical'),
+        });
+      } else {
+        // Non-critical = attempt correction
+        correctedResponse = this.attemptCorrection(response, issues);
+      }
     }
 
     return {
@@ -145,7 +210,8 @@ export class ResponseValidator {
       score,
       issues,
       suggestions,
-      correctedResponse: isValid ? undefined : this.attemptCorrection(response, issues),
+      correctedResponse,
+      metrics: { ...this.metrics },
     };
   }
 
@@ -391,6 +457,76 @@ export class ResponseValidator {
     return issues;
   }
 
+  /**
+   * Check links for validity
+   * Ensures WB/Ozon links have valid format and IDs
+   */
+  private checkLinks(response: string): ValidationIssue[] {
+    const issues: ValidationIssue[] = [];
+
+    // Extract all URLs from response
+    const urlPattern = /https?:\/\/[^\s<>)"']+/gi;
+    const urls = response.match(urlPattern) || [];
+
+    for (const url of urls) {
+      // Check WB links
+      if (url.includes('wildberries.ru')) {
+        // Extract nmId from WB URL
+        const nmIdMatch = url.match(/catalog\/(\d+)/);
+        if (nmIdMatch) {
+          const nmId = parseInt(nmIdMatch[1]);
+          // Sanity check: WB nmIds are typically 6-10 digits
+          if (nmId < 100000 || nmId > 9999999999) {
+            issues.push({
+              type: 'link',
+              severity: 'high',
+              message: `Подозрительный WB артикул в ссылке: ${nmId}`,
+              location: url,
+            });
+          }
+        } else if (!url.includes('/catalog/') && !url.includes('/seller/')) {
+          // WB link without valid path
+          issues.push({
+            type: 'link',
+            severity: 'medium',
+            message: 'WB ссылка без артикула товара',
+            location: url,
+          });
+        }
+      }
+
+      // Check Ozon links
+      if (url.includes('ozon.ru')) {
+        // Extract product ID from Ozon URL
+        const productMatch = url.match(/product\/[^/]*-(\d+)/);
+        if (productMatch) {
+          const productId = parseInt(productMatch[1]);
+          // Sanity check: Ozon IDs are typically 6-12 digits
+          if (productId < 100000 || productId > 999999999999) {
+            issues.push({
+              type: 'link',
+              severity: 'high',
+              message: `Подозрительный Ozon ID в ссылке: ${productId}`,
+              location: url,
+            });
+          }
+        }
+      }
+
+      // Check for obviously fake domains
+      if (/fake|test|example|localhost/i.test(url)) {
+        issues.push({
+          type: 'link',
+          severity: 'critical',
+          message: 'Фейковая ссылка в ответе',
+          location: url,
+        });
+      }
+    }
+
+    return issues;
+  }
+
   // ============================================
   // HELPERS
   // ============================================
@@ -495,6 +631,38 @@ export class ResponseValidator {
       .replace(/[^\wа-яё\s]/gi, '')
       .split(/\s+/)
       .filter(word => word.length > 2 && !stopWords.includes(word));
+  }
+
+  // ============================================
+  // METRICS API
+  // ============================================
+
+  /**
+   * Get current validation metrics
+   */
+  getMetrics(): ValidationMetrics {
+    return { ...this.metrics };
+  }
+
+  /**
+   * Reset metrics (useful for periodic reporting)
+   */
+  resetMetrics(): void {
+    this.metrics = {
+      totalValidations: 0,
+      passed: 0,
+      failed: 0,
+      criticalRejections: 0,
+      avgScore: 100,
+    };
+  }
+
+  /**
+   * Get pass rate as percentage
+   */
+  getPassRate(): number {
+    if (this.metrics.totalValidations === 0) return 100;
+    return Math.round((this.metrics.passed / this.metrics.totalValidations) * 100);
   }
 }
 
