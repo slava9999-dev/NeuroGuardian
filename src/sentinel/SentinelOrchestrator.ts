@@ -1,4 +1,11 @@
-import { db, users, products, sentinelLogs, systemFlags } from '../infrastructure/database/db.js';
+import {
+  db,
+  users,
+  products,
+  sentinelLogs,
+  systemFlags,
+  marketplaceAccounts,
+} from '../infrastructure/database/db.js';
 import { eq, and, sql as drizzleSql, inArray } from 'drizzle-orm';
 
 import { logSentinelAction } from '../api-lib/services/database.js';
@@ -215,14 +222,18 @@ export class SentinelOrchestrator {
     userResult?: UserCycleResult,
     options: { limit?: number; skipDigitalVision?: boolean; sendPriceReport?: boolean } = {}
   ): Promise<void> {
-    const monitoredProducts = await db.query.products.findMany({
-      columns: { id: true },
-      where: and(
-        eq(products.userId, String(user.id)),
-        drizzleSql`(${products.isMonitored} = true OR ${products.minPrice} > 0)`
-      ),
-      limit: options.limit,
-    });
+    const monitoredProducts = await db
+      .select({ id: products.id })
+      .from(products)
+      .leftJoin(marketplaceAccounts, eq(products.accountId, marketplaceAccounts.id))
+      .where(
+        and(
+          eq(products.userId, String(user.id)),
+          drizzleSql`(${products.isMonitored} = true OR ${products.minPrice} > 0)`,
+          drizzleSql`(${products.accountId} IS NULL OR ${marketplaceAccounts.isActive} = true)`
+        )
+      )
+      .limit(options.limit || 2000);
 
     const productIds = monitoredProducts.map(p => p.id);
     if (productIds.length === 0) return;
