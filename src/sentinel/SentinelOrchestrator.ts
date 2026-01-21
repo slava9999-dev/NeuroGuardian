@@ -326,24 +326,61 @@ export class SentinelOrchestrator {
                       ? String(product.nm_id)
                       : product.product_id.replace('ozon-', '');
 
-                  const url =
-                    marketplace === 'WB'
-                      ? `https://www.wildberries.ru/catalog/${sku}/detail.aspx`
-                      : `https://www.ozon.ru/product/${sku}/`;
+                  const isProduction =
+                    process.env.VERCEL_ENV === 'production' ||
+                    process.env.NODE_ENV === 'production';
 
-                  // Use BrowserEyes (Real Browser + Stealth) for accurate buyer price
-                  const eyeResult = await browserEyes.gazeAtProduct(marketplace, url);
+                  // CRITICAL FIX: BrowserEyes (Playwright) doesn't work in Vercel Serverless
+                  // Use legacy API parser in production, BrowserEyes only locally
+                  let buyerPrice = 0;
+                  let originalPrice = 0;
 
-                  const buyerPrice = eyeResult?.buyerPrice ?? 0;
-                  const originalPrice = eyeResult?.originalPrice ?? 0;
+                  if (!isProduction) {
+                    // LOCAL/DEVELOPMENT: Use BrowserEyes for accurate buyer price detection
+                    try {
+                      const url =
+                        marketplace === 'WB'
+                          ? `https://www.wildberries.ru/catalog/${sku}/detail.aspx`
+                          : `https://www.ozon.ru/product/${sku}/`;
 
+                      const eyeResult = await browserEyes.gazeAtProduct(marketplace, url);
+                      buyerPrice = eyeResult?.buyerPrice ?? 0;
+                      originalPrice = eyeResult?.originalPrice ?? 0;
+
+                      if (buyerPrice > 0) {
+                        logger.info(
+                          `[BrowserEyes] Found REAL price for ${sku}: ${buyerPrice}₽ (seller: ${product.current_price}₽)`
+                        );
+                      }
+                    } catch (eyeError) {
+                      logger.warn(`[BrowserEyes] Failed for ${sku}, falling back to API`, {
+                        error: eyeError,
+                      });
+                      buyerPrice = 0; // Force fallback
+                    }
+                  }
+
+                  // PRODUCTION OR FALLBACK: Use API parser
+                  if (buyerPrice === 0) {
+                    const realPriceInfo =
+                      marketplace === 'WB'
+                        ? await priceParserService.getWbRealPrice(sku)
+                        : await priceParserService.getOzonRealPrice(sku);
+
+                    buyerPrice = realPriceInfo.buyerPrice;
+                    originalPrice = (realPriceInfo as any).originalPrice || 0;
+
+                    if (buyerPrice > 0) {
+                      logger.info(
+                        `[API Parser] Found price for ${sku}: ${buyerPrice}₽ (method: ${isProduction ? 'production-api' : 'fallback'})`
+                      );
+                    }
+                  }
+
+                  // Update DB if we got valid price
                   if (buyerPrice > 0) {
                     const discountPercent =
                       originalPrice > 0 ? ((originalPrice - buyerPrice) / originalPrice) * 100 : 0;
-
-                    logger.info(
-                      `[BrowserEyes] Found REAL price for ${sku}: ${buyerPrice}₽ (seller: ${product.current_price}₽)`
-                    );
 
                     await db
                       .update(products)
@@ -356,17 +393,6 @@ export class SentinelOrchestrator {
 
                     product.estimated_buyer_price = buyerPrice;
                     product.marketplace_discount_percent = discountPercent;
-                  } else {
-                    // Fallback to legacy parser if Eyes fail (e.g. timeout)
-                    const realPriceInfo =
-                      marketplace === 'WB'
-                        ? await priceParserService.getWbRealPrice(sku)
-                        : await priceParserService.getOzonRealPrice(sku);
-
-                    if (realPriceInfo.buyerPrice > 0) {
-                      product.estimated_buyer_price = realPriceInfo.buyerPrice;
-                      // update db... (omitted to keep code short, relying on DigitalEyes primarily)
-                    }
                   }
                 } catch (e) {
                   logger.warn(`Failed to update buyer price for ${product.product_id}`, {
