@@ -18,6 +18,7 @@ export class PriceParserService {
   /**
    * Get Real Buyer Price from Wildberries (Public Mobile API)
    * This mimics the mobile app requests to get the actual price including SPP.
+   * Updated: Using v4 API (v1/v2 deprecated as of Jan 2026)
    */
   async getWbRealPrice(article: string | number): Promise<RealPriceInfo> {
     const nmId = Number(article);
@@ -30,14 +31,12 @@ export class PriceParserService {
     const staticCardUrl = `https://${basketHost}/vol${vol}/part${part}/${nmId}/info/ru/card.json`;
 
     // 2. Prepare Dynamic Price URLs (card.wb.ru)
-    // We try multiple known query params configurations
+    // UPDATED: v4 is the current working version (v1/v2 deprecated)
     const dynamicUrls = [
-      // Standard Mobile
-      `https://card.wb.ru/cards/v2/detail?appType=1&curr=rub&dest=-1257786&spp=30&nm=${nmIdStr}`,
-      // Desktop / Web
-      `https://card.wb.ru/cards/v2/detail?appType=128&curr=rub&dest=-1257786&spp=30&nm=${nmIdStr}`,
-      // No dest (Global)
-      `https://card.wb.ru/cards/v2/detail?appType=1&curr=rub&nm=${nmIdStr}`,
+      // v4 API - Current working version
+      `https://card.wb.ru/cards/v4/detail?appType=1&curr=rub&dest=-1257786&spp=30&nm=${nmIdStr}`,
+      // Fallback v4 without spp
+      `https://card.wb.ru/cards/v4/detail?appType=1&curr=rub&nm=${nmIdStr}`,
     ];
 
     let productTitle = `Товар ${nmIdStr}`;
@@ -65,18 +64,19 @@ export class PriceParserService {
 
         if (res.ok) {
           const data = await res.json();
-          const p = data.data?.products?.[0];
+          const p = data.data?.products?.[0] || data.products?.[0]; // v4 has products at root level
           if (p) {
             const size = p.sizes?.[0];
-            if (size) {
-              const basic = (size.price?.basic || size.price?.product || p.priceU || 0) / 100;
-              const total = (size.price?.total || size.price?.sale || p.salePriceU || 0) / 100;
+            if (size && size.price) {
+              // v4 API format: price.basic (in kopecks), price.product (buyer price in kopecks)
+              const basic = (size.price.basic || 0) / 100;
+              const product = (size.price.product || size.price.total || 0) / 100;
 
               sellerPrice = Math.round(basic);
-              buyerPrice = Math.round(total);
+              buyerPrice = Math.round(product);
               productTitle = p.name || productTitle;
-              rating = p.reviewRating || 0;
-              reviewCount = p.feedbacks || 0;
+              rating = p.reviewRating || p.rating || 0;
+              reviewCount = p.feedbacks || p.nmFeedbacks || 0;
               found = true;
               break; // Success
             }
