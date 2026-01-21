@@ -1,6 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
+  PieChart,
+  Pie,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+} from 'recharts';
+import {
   Activity,
   Shield,
   Cpu,
@@ -9,6 +21,8 @@ import {
   StopCircle,
   Lock,
   Server,
+  Eye,
+  CheckCircle,
   type LucideIcon,
 } from 'lucide-react';
 import ReactFlow, {
@@ -113,11 +127,12 @@ function StatCard({ icon: Icon, label, value, subValue }: StatCardProps) {
 
 export function GodModePage() {
   const [stats, setStats] = useState<SystemStats | null>(null);
+  const [validatorMetrics, setValidatorMetrics] = useState<any>(null); // TODO: Type this properly
   const [loading, setLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'sentinel' | 'map' | 'features'>(
-    'dashboard'
-  );
+  const [activeTab, setActiveTab] = useState<
+    'dashboard' | 'sentinel' | 'map' | 'features' | 'analytics'
+  >('dashboard');
 
   // React Flow State (Mock topology for now)
   const [nodes, , onNodesChange] = useNodesState([
@@ -137,10 +152,9 @@ export function GodModePage() {
 
   const fetchStats = useCallback(async () => {
     try {
+      // Fetch System Stats
       const res = await fetch('/api?action=admin-system', {
-        headers: {
-          'X-Init-Data': getInitData() || '',
-        },
+        headers: { 'X-Init-Data': getInitData() || '' },
       });
 
       if (res.status === 404 || res.status === 403) {
@@ -149,11 +163,20 @@ export function GodModePage() {
       }
 
       const data = await res.json();
-      if (data.success) {
-        setStats(data);
+      if (data.success) setStats(data);
+
+      // Fetch Analytics Metrics (Validator + BrowserEyes)
+      const metrRes = await fetch(
+        '/api?action=validator-metrics&includeLogs=true&includeThreats=true',
+        {
+          headers: { 'X-Init-Data': getInitData() || '' },
+        }
+      );
+      const metrData = await metrRes.json();
+      if (metrData.success) {
+        setValidatorMetrics(metrData);
       }
     } catch {
-      // Empty catch to satisfy unused variable check
       // Silently fail
     } finally {
       setLoading(false);
@@ -232,10 +255,10 @@ export function GodModePage() {
       <div className="pt-24 pb-24 px-6 max-w-7xl mx-auto">
         {/* TABS */}
         <div className="flex gap-2 mb-8 overflow-x-auto pb-2 no-scrollbar">
-          {['dashboard', 'map', 'sentinel', 'features'].map(tab => (
+          {['dashboard', 'map', 'sentinel', 'analytics', 'features'].map(tab => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab as 'dashboard' | 'sentinel' | 'map')}
+              onClick={() => setActiveTab(tab as any)}
               className={`px-4 py-2 rounded-lg font-mono text-sm uppercase transition-all ${
                 activeTab === tab
                   ? 'bg-violet-500/20 text-violet-400 border border-violet-500/50'
@@ -418,6 +441,159 @@ export function GodModePage() {
                   </button>
                 </div>
               ))}
+            </motion.div>
+          )}
+          {activeTab === 'analytics' && validatorMetrics && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="space-y-6"
+            >
+              {/* KPI CARDS */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <StatCard
+                  icon={CheckCircle}
+                  label="Pass Rate"
+                  value={`${validatorMetrics.validation?.passRate || 100}%`}
+                  subValue={`Total: ${validatorMetrics.validation?.total || 0}`}
+                />
+                <StatCard
+                  icon={AlertTriangle}
+                  label="Threats Detected"
+                  value={validatorMetrics.threats?.total || 0}
+                  subValue={`${validatorMetrics.threats?.pending || 0} pending`}
+                />
+                <StatCard
+                  icon={Eye}
+                  label="BrowserEyes Requests"
+                  value={validatorMetrics.browserEyes?.totalRequests || 0}
+                  subValue={`Avg: ${Math.round(validatorMetrics.browserEyes?.avgDurationMs || 0)}ms`}
+                />
+                <StatCard
+                  icon={Server}
+                  label="Avg Validation Score"
+                  value={validatorMetrics.validation?.avgScore || 0}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* VALIDATION ISSUES CHART */}
+                <div className="bg-stone-900/50 border border-stone-800 rounded-xl p-6">
+                  <h3 className="text-lg font-bold mb-4 font-mono flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-amber-500" />
+                    Validation Issues Breakdown
+                  </h3>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={Object.entries(validatorMetrics.validation?.issueBreakdown || {}).map(
+                          ([name, value]) => ({ name, value })
+                        )}
+                        layout="vertical"
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#444" opacity={0.3} />
+                        <XAxis type="number" stroke="#888" />
+                        <YAxis
+                          dataKey="name"
+                          type="category"
+                          width={150}
+                          stroke="#888"
+                          fontSize={12}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: '#1c1917',
+                            borderColor: '#292524',
+                            color: '#fff',
+                          }}
+                        />
+                        <Bar dataKey="value" fill="#f59e0b" radius={[0, 4, 4, 0]} barSize={20} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* THREAT TYPES CHART */}
+                <div className="bg-stone-900/50 border border-stone-800 rounded-xl p-6">
+                  <h3 className="text-lg font-bold mb-4 font-mono flex items-center gap-2">
+                    <Shield className="w-5 h-5 text-red-500" />
+                    Detected Threats by Type
+                  </h3>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={Object.entries(validatorMetrics.threats?.byType || {}).map(
+                            ([name, value]) => ({ name, value })
+                          )}
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                          label={({ name, percent }: any) =>
+                            `${name} ${(percent * 100).toFixed(0)}%`
+                          }
+                        >
+                          {Object.entries(validatorMetrics.threats?.byType || {}).map(
+                            (_, index) => (
+                              <Cell
+                                key={`cell-${index}`}
+                                fill={['#ef4444', '#f97316', '#eab308', '#84cc16'][index % 4]}
+                              />
+                            )
+                          )}
+                        </Pie>
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: '#1c1917',
+                            borderColor: '#292524',
+                            color: '#fff',
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* BROWSER EYES LATENCY */}
+                <div className="bg-stone-900/50 border border-stone-800 rounded-xl p-6 col-span-1 lg:col-span-2">
+                  <h3 className="text-lg font-bold mb-4 font-mono flex items-center gap-2">
+                    <Eye className="w-5 h-5 text-violet-500" />
+                    BrowserEyes Performance (Latency ms)
+                  </h3>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={[
+                          {
+                            name: 'WB',
+                            avg: validatorMetrics.browserEyes?.byMarketplace?.WB?.avgDuration || 0,
+                          },
+                          {
+                            name: 'Ozon',
+                            avg:
+                              validatorMetrics.browserEyes?.byMarketplace?.Ozon?.avgDuration || 0,
+                          },
+                        ]}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#444" opacity={0.3} />
+                        <XAxis dataKey="name" stroke="#888" />
+                        <YAxis stroke="#888" />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: '#1c1917',
+                            borderColor: '#292524',
+                            color: '#fff',
+                          }}
+                        />
+                        <Bar dataKey="avg" fill="#8b5cf6" radius={[4, 4, 0, 0]} barSize={40} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>

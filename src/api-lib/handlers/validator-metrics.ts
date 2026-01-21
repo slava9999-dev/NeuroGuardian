@@ -7,6 +7,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { responseValidator } from '../../agent/core/ResponseValidator.js';
 import { validationLogService, threatHistoryService } from '../services/validation-log.service.js';
+import { browserEyes } from '../../sentinel/BrowserEyes.js';
 import { extractAnyAuthAsync, sendAuthError } from '../middleware/auth.js';
 import { verifyAdminAccessAsync } from '../middleware/auth.js';
 import { logger } from '../lib/logger.js';
@@ -43,6 +44,7 @@ export async function handleValidatorMetrics(
       success: boolean;
       timestamp: string;
       inMemoryMetrics?: ReturnType<typeof responseValidator.getMetrics>;
+      browserEyes?: ReturnType<typeof browserEyes.getMetrics>;
       validation?: Awaited<ReturnType<typeof validationLogService.getStats>>;
       threats?: Awaited<ReturnType<typeof threatHistoryService.getStats>>;
     } = {
@@ -50,8 +52,9 @@ export async function handleValidatorMetrics(
       timestamp: new Date().toISOString(),
     };
 
-    // Always include in-memory metrics from ResponseValidator singleton
+    // Always include in-memory metrics
     response.inMemoryMetrics = responseValidator.getMetrics();
+    response.browserEyes = browserEyes.getMetrics();
 
     // Include validation DB stats
     if (includeLogs) {
