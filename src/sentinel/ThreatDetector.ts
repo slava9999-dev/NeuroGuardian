@@ -1,6 +1,7 @@
 import type { DBUser, DBProduct } from '../api-lib/lib/types.js';
 import { calculateUnitEconomics, estimateCostPrice } from '../api-lib/services/unit-economics.js';
 import { advancedThreatDetector } from './AdvancedThreatDetector.js';
+import { threatHistoryService } from '../api-lib/services/validation-log.service.js';
 
 export const ThreatType = {
   OZON_CARD_EROSION: 'ozon_card_erosion',
@@ -60,6 +61,30 @@ export class ThreatDetector {
       }
     }
     return threats;
+  }
+
+  /**
+   * Log threats to history database (non-blocking)
+   */
+  async logThreatsToHistory(
+    userId: string,
+    threats: Threat[],
+    marketplace: 'WB' | 'Ozon'
+  ): Promise<void> {
+    for (const threat of threats) {
+      threatHistoryService
+        .logThreat({
+          userId,
+          productId: threat.productId,
+          nmId: threat.nmId,
+          marketplace,
+          threat,
+          actionTaken: 'pending',
+        })
+        .catch(() => {
+          /* Ignore logging errors */
+        });
+    }
   }
 
   /**

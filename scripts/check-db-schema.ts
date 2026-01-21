@@ -1,42 +1,37 @@
-import { config } from 'dotenv';
-import path from 'path';
+// Check actual DB schema for sentinel_logs
+import pg from 'pg';
+import dotenv from 'dotenv';
 
-config({ path: path.resolve(process.cwd(), '.env') });
-config({ path: path.resolve(process.cwd(), '.env.local') });
+dotenv.config();
 
-import { sql } from '../src/api-lib/services/database.js';
+const isProduction =
+  process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production';
 
-async function checkSchema() {
-  console.log('🔍 Checking products table schema...');
+const pool = new pg.Pool({
+  connectionString: process.env.POSTGRES_URL,
+  ssl: isProduction ? { rejectUnauthorized: false } : false,
+});
 
-  try {
-    // Check for duplicates
-    const duplicates = await sql`
-      SELECT product_id, COUNT(*) 
-      FROM products 
-      GROUP BY product_id 
-      HAVING COUNT(*) > 1
-    `;
+async function main() {
+  console.log('🔍 Checking sentinel_logs table structure...\n');
 
-    if (duplicates.rows.length > 0) {
-      console.warn('⚠️ Found duplicates in product_id:', duplicates.rows);
-    } else {
-      console.log('✅ No duplicates found in product_id. Safe to add UNIQUE constraint.');
-    }
+  const result = await pool.query(`
+    SELECT column_name, data_type, is_nullable
+    FROM information_schema.columns 
+    WHERE table_name = 'sentinel_logs'
+    ORDER BY ordinal_position
+  `);
 
-    // Check existing indexes
-    const indexes = await sql`
-      SELECT indexname, indexdef 
-      FROM pg_indexes 
-      WHERE tablename = 'products'
-    `;
-    console.log(
-      '📊 Existing indexes:',
-      indexes.rows.map(r => r.indexname)
-    );
-  } catch (err) {
-    console.error('❌ Check failed:', err);
+  console.log('📋 Columns in sentinel_logs:');
+  for (const row of result.rows) {
+    console.log(`  - ${row.column_name} (${row.data_type}, nullable: ${row.is_nullable})`);
   }
+
+  await pool.end();
+  process.exit(0);
 }
 
-checkSchema();
+main().catch(err => {
+  console.error('Failed:', err.message);
+  process.exit(1);
+});

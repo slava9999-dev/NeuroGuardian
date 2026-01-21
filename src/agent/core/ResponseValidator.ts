@@ -1,10 +1,11 @@
 // ============================================
 // NeuroGUARDIAN — Response Validator (Guardrails)
 // Validates agent responses before sending to user
-// Version: 1.1.0 | Date: January 2026
+// Version: 1.2.0 | Date: January 2026
 // ============================================
 
 import { logger } from '../../api-lib/lib/logger.js';
+import { validationLogService } from '../../api-lib/services/validation-log.service.js';
 
 /**
  * Validation result with detailed feedback
@@ -39,11 +40,12 @@ export interface ValidationMetrics {
 /**
  * Validation context for checking
  */
-interface ValidationContext {
+export interface ValidationContext {
   userQuery: string;
   toolResults?: Array<{ tool: string; success: boolean; data?: unknown }>;
   userHistory?: string[];
   marketplace?: 'wb' | 'ozon';
+  userId?: string; // For DB logging
 }
 
 /**
@@ -117,6 +119,7 @@ export class ResponseValidator {
    * Main validation entry point
    */
   async validate(response: string, context: ValidationContext): Promise<ValidationResult> {
+    const startTime = Date.now();
     const issues: ValidationIssue[] = [];
     const suggestions: string[] = [];
 
@@ -205,7 +208,7 @@ export class ResponseValidator {
       }
     }
 
-    return {
+    const result: ValidationResult = {
       isValid,
       score,
       issues,
@@ -213,6 +216,23 @@ export class ResponseValidator {
       correctedResponse,
       metrics: { ...this.metrics },
     };
+
+    // Log to database (non-blocking)
+    validationLogService
+      .logValidation({
+        userId: context.userId,
+        score,
+        passed: isValid,
+        issues,
+        queryPreview: context.userQuery.substring(0, 100),
+        responseLength: response.length,
+        processingTimeMs: Date.now() - startTime,
+      })
+      .catch(() => {
+        /* Ignore logging errors */
+      });
+
+    return result;
   }
 
   /**

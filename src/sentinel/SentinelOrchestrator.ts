@@ -117,10 +117,15 @@ export class SentinelOrchestrator {
             await db.insert(sentinelLogs).values({
               userId: String(user.id),
               productId: 'SYSTEM',
-              action: 'PROCESS_USER',
-              newValue: JSON.stringify({ error: errorMsg }),
-              details: 'SYSTEM_ERROR',
+              productTitle: 'System Error',
+              detectedPrice: 0,
+              minPrice: 0,
+              defenseAction: 'SYSTEM_ERROR',
+              savedAmount: 0,
               marketplace: 'ALL',
+              threatType: 'PROCESS_USER_ERROR',
+              success: false,
+              details: JSON.stringify({ error: errorMsg }),
             });
           } catch (logErr) {
             logger.error('Failed to log system error to DB', logErr);
@@ -469,6 +474,13 @@ export class SentinelOrchestrator {
             if (scan.hasThreats) {
               summary.threatsDetected += scan.threats.length;
               if (userResult) userResult.threatsDetected += scan.threats.length;
+
+              // Log threats to history database (non-blocking)
+              this.threatDetector
+                .logThreatsToHistory(String(user.id), scan.threats, marketplace)
+                .catch(() => {
+                  /* Ignore logging errors */
+                });
 
               const stopLossThreat = scan.threats.find(
                 (t: Threat) => t.type === ThreatType.COMPETITOR_PRICE_DROP

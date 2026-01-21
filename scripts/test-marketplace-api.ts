@@ -1,7 +1,7 @@
 import { sql } from '@vercel/postgres';
 import dotenv from 'dotenv';
 import { fetchWithRetry } from '../src/api-lib/lib/index.js';
-import { getMarketplaceKeys } from '../src/api-lib/services/marketplace.js';
+import { getMarketplaceKeys } from '../src/api-lib/services/marketplace-bridge.js';
 
 dotenv.config({ path: '.env.production' });
 console.log('DB URL:', process.env.POSTGRES_URL ? 'PRESENT' : 'MISSING');

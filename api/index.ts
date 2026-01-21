@@ -155,6 +155,13 @@ import {
   getTelegramWebhookInfo,
 } from '../src/api-lib/handlers/telegram.js';
 
+// Validator Metrics (Analytics)
+import {
+  handleValidatorMetrics,
+  handleThreatHistory,
+  handleResetValidatorMetrics,
+} from '../src/api-lib/handlers/validator-metrics.js';
+
 // Utilities
 import {
   sanitizeInput,
@@ -519,6 +526,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       case 'get-system-metrics':
         return handleGetSystemMetrics(req, res);
+
+      // ========== VALIDATOR METRICS (ANALYTICS) ==========
+      case 'validator-metrics':
+        return handleValidatorMetrics(req, res);
+
+      case 'threat-history':
+        return handleThreatHistory(req, res);
+
+      case 'reset-validator-metrics':
+        return handleResetValidatorMetrics(req, res);
 
       // ========== ADMIN ENDPOINTS ==========
       case 'init-db':

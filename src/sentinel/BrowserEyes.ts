@@ -21,8 +21,38 @@ interface BrowserEyesResult {
   confidence: number; // 0-1
 }
 
+// Performance metrics for monitoring
+interface BrowserEyesMetrics {
+  totalRequests: number;
+  successfulExtractions: number;
+  failedExtractions: number;
+  avgDurationMs: number;
+  peakDurationMs: number;
+  lastError: string | null;
+  lastErrorTime: Date | null;
+  byMarketplace: {
+    WB: { success: number; failed: number; avgDuration: number };
+    Ozon: { success: number; failed: number; avgDuration: number };
+  };
+}
+
 export class BrowserEyes {
   private browser: Browser | null = null;
+
+  // Performance metrics
+  private metrics: BrowserEyesMetrics = {
+    totalRequests: 0,
+    successfulExtractions: 0,
+    failedExtractions: 0,
+    avgDurationMs: 0,
+    peakDurationMs: 0,
+    lastError: null,
+    lastErrorTime: null,
+    byMarketplace: {
+      WB: { success: 0, failed: 0, avgDuration: 0 },
+      Ozon: { success: 0, failed: 0, avgDuration: 0 },
+    },
+  };
 
   /**
    * Initialize browser instance (reusable) with stealth mode
@@ -128,16 +158,25 @@ export class BrowserEyes {
       const finalResult = this.mergeResults(domResult, visionResult);
 
       const duration = Date.now() - startTime;
+
+      // Update metrics
+      this.updateMetrics(marketplace, duration, true);
+
       logger.info(`[BrowserEyes] Extraction complete in ${duration}ms`, {
         method: finalResult.extractionMethod,
         price: finalResult.buyerPrice,
+        marketplace,
       });
 
       return finalResult;
     } catch (error) {
+      const duration = Date.now() - startTime;
+      this.updateMetrics(marketplace, duration, false, error);
+
       logger.error('[BrowserEyes] Failed to extract price', {
         marketplace,
         url,
+        durationMs: duration,
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
@@ -348,6 +387,73 @@ export class BrowserEyes {
     }
 
     return domResult;
+  }
+
+  /**
+   * Update performance metrics after each extraction
+   */
+  private updateMetrics(
+    marketplace: 'WB' | 'Ozon',
+    durationMs: number,
+    success: boolean,
+    error?: unknown
+  ): void {
+    this.metrics.totalRequests++;
+
+    if (success) {
+      this.metrics.successfulExtractions++;
+      this.metrics.byMarketplace[marketplace].success++;
+    } else {
+      this.metrics.failedExtractions++;
+      this.metrics.byMarketplace[marketplace].failed++;
+      this.metrics.lastError = error instanceof Error ? error.message : String(error);
+      this.metrics.lastErrorTime = new Date();
+    }
+
+    // Update peak duration
+    if (durationMs > this.metrics.peakDurationMs) {
+      this.metrics.peakDurationMs = durationMs;
+    }
+
+    // Update average duration (running average)
+    const totalSuccessful = this.metrics.successfulExtractions;
+    if (totalSuccessful > 0) {
+      this.metrics.avgDurationMs =
+        (this.metrics.avgDurationMs * (totalSuccessful - 1) + durationMs) / totalSuccessful;
+    }
+
+    // Update marketplace-specific average
+    const mpStats = this.metrics.byMarketplace[marketplace];
+    const mpTotal = mpStats.success + mpStats.failed;
+    if (mpTotal > 0) {
+      mpStats.avgDuration = (mpStats.avgDuration * (mpTotal - 1) + durationMs) / mpTotal;
+    }
+  }
+
+  /**
+   * Get current performance metrics for monitoring
+   */
+  getMetrics(): BrowserEyesMetrics {
+    return { ...this.metrics };
+  }
+
+  /**
+   * Reset metrics (useful for periodic reporting)
+   */
+  resetMetrics(): void {
+    this.metrics = {
+      totalRequests: 0,
+      successfulExtractions: 0,
+      failedExtractions: 0,
+      avgDurationMs: 0,
+      peakDurationMs: 0,
+      lastError: null,
+      lastErrorTime: null,
+      byMarketplace: {
+        WB: { success: 0, failed: 0, avgDuration: 0 },
+        Ozon: { success: 0, failed: 0, avgDuration: 0 },
+      },
+    };
   }
 }
 
