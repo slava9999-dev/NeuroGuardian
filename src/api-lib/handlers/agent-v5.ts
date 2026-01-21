@@ -289,7 +289,24 @@ export async function handleAgentV5Confirm(
   }
 
   // 3. Verify taskId
-  if (taskId && pendingAction.taskId !== taskId) {
+  if (!taskId) {
+    return res.status(400).json({
+      success: false,
+      message: '❌ Идентификатор задачи отсутствует.',
+      executed: false,
+    });
+  }
+
+  // SECURITY: Strict format validation for V5 task IDs
+  if (!/^task_v5_\d+_[a-z0-9]{5}$/.test(taskId)) {
+    return res.status(400).json({
+      success: false,
+      message: '❌ Неверный формат идентификатора задачи.',
+      executed: false,
+    });
+  }
+
+  if (pendingAction.taskId !== taskId) {
     return res.json({
       success: false,
       message: '❌ Идентификатор операции устарел. Попробуйте ещё раз.',

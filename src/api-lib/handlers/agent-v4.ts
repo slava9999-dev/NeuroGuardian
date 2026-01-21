@@ -407,23 +407,29 @@ export async function handleAgentV4Confirm(
   }
 
   // Verify taskId matches
-  if (taskId) {
-    // SECURITY: Validate taskId format to prevent injection or invalid processing
-    if (!/^task_\d+_[a-z0-9]{5}$/.test(taskId)) {
-      return res.status(400).json({
-        success: false,
-        content: '❌ Неверный формат идентификатора задачи.',
-        executed: false,
-      });
-    }
+  if (!taskId) {
+    return res.status(400).json({
+      success: false,
+      content: '❌ Идентификатор задачи отсутствует.',
+      executed: false,
+    });
+  }
 
-    if (pendingAction.taskId !== taskId) {
-      return res.json({
-        success: false,
-        content: '❌ Идентификатор операции не совпадает.',
-        executed: false,
-      });
-    }
+  // SECURITY: Validate taskId format to prevent injection or invalid processing
+  if (!/^task_\d+_[a-z0-9]{5}$/.test(taskId)) {
+    return res.status(400).json({
+      success: false,
+      content: '❌ Неверный формат идентификатора задачи.',
+      executed: false,
+    });
+  }
+
+  if (pendingAction.taskId !== taskId) {
+    return res.json({
+      success: false,
+      content: '❌ Идентификатор операции не совпадает.',
+      executed: false,
+    });
   }
 
   // Get user data for API keys

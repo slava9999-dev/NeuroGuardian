@@ -94,7 +94,8 @@ export async function handleCreatePayment(
     logger.error('Failed to create payment', error, { userId, tier: req.body?.tier });
     return res.status(500).json({
       error: 'Payment creation failed',
-      message: error instanceof Error ? error.message : 'Unknown error',
+      message:
+        'Не удалось создать платёж. Пожалуйста, попробуйте позже или обратитесь в поддержку.',
     });
   }
 }

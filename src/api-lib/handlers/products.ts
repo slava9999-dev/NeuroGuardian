@@ -34,7 +34,7 @@ export async function handleProducts(
     const rows = products as unknown as DBProduct[];
     const formatted = rows.map(p => ({
       id: p.product_id,
-      productId: p.product_id, // CRITICAL: Frontend needs this for updates!
+      productId: p.product_id,
       nmId: p.nm_id,
       vendorCode: p.official_sku || p.product_id,
       title: sanitizeInput(String(p.title || '')),
@@ -43,12 +43,10 @@ export async function handleProducts(
       estimatedBuyerPrice: Number(p.estimated_buyer_price || p.current_price || 0),
       marketplaceDiscountPercent: Number(p.marketplace_discount_percent || 0),
       minPrice: Number(p.min_price || 0),
-      costPrice: Number(p.cost_price || 0),
       stock: Number(p.current_stock || 0),
       marketplace: p.marketplace,
       status: p.status,
       isMonitored: p.is_monitored,
-      mediaAssets: p.media_assets || [],
     }));
 
     return res.json({ products: formatted, total: formatted.length });

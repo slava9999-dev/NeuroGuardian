@@ -8,7 +8,6 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sql } from '../services/database.js';
 import { orchestrateV5 } from '../../agent/core/AgentOrchestratorV5.js';
 import { logger, config } from '../lib/index.js';
-import { circuitBreakers } from '../lib/circuit-breaker.js';
 import { inferGender } from '../../agent/utils/genderDetection.js';
 import { stateManager } from '../../agent/core/StateManager.js';
 import { db, systemFlags, users } from '../../infrastructure/database/db.js';
@@ -1011,18 +1010,10 @@ export async function handleTelegramWebhook(
               await sendTelegramMessage(chatId, '⏳ Запускаю проверку систем...');
               // Simple health check summary
               try {
+                // Check DB and TG status
                 const token = config.TELEGRAM_BOT_TOKEN;
                 const tgRes = await fetch(`${TELEGRAM_API}${token}/getMe`);
                 const tgData = (await tgRes.json()) as { result: { username: string } };
-
-                // Circuit Breakers Status
-                const cbStatus = circuitBreakers.getAllStatus();
-                const cbReport =
-                  cbStatus.length > 0
-                    ? cbStatus
-                        .map(s => `${s.state === 'CLOSED' ? '🟢' : '🔴'} ${s.name}: ${s.state}`)
-                        .join('\n')
-                    : '⚪ Предохранители не активны';
 
                 const healthMsg = `
 🛡️ <b>Системный пульс</b>
@@ -1030,9 +1021,6 @@ export async function handleTelegramWebhook(
 ✅ Бот: @${tgData.result.username}
 ✅ Крипто: Ключ настроен
 🌐 Окружение: <code>${config.NODE_ENV}</code>
-
-🔌 <b>Предохранители (Circuit Breakers):</b>
-${cbReport}
 
 ✨ Все системы в норме.
 `;

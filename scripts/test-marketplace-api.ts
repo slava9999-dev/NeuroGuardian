@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 import { fetchWithRetry } from '../src/api-lib/lib/index.js';
 import { getMarketplaceKeys } from '../src/api-lib/services/marketplace-bridge.js';
 
-dotenv.config({ path: '.env.production' });
+dotenv.config({ path: '.env' });
 console.log('DB URL:', process.env.POSTGRES_URL ? 'PRESENT' : 'MISSING');
 console.log('ENV:', process.env.VERCEL_ENV);
 

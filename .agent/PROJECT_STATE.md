@@ -1,6 +1,6 @@
 # 📊 Project State — NeuroGUARDIAN
 
-# Updated: 2026-01-21T18:30:00+03:00
+# Updated: 2026-01-21T21:00:00+03:00
 
 # This file tracks current progress and is updated at end of each session
 
@@ -8,8 +8,42 @@
 
 ## 🎯 Current Phase: PRODUCTION DEPLOYMENT (Phase 13) 🚀 READY FOR LAUNCH
 
-**Last Session:** 2026-01-21 (Session 91)
-**Focus:** 🛡️ Security Hardening & Pre-Flight
+**Last Session:** 2026-01-21 (Session 92)
+**Focus:** 🛡️ Sentinel Logic & Security Hardening Implementation
+
+### Session 2026-01-21 (Session 92 - Sentinel Fix & Security Audit Hardening) 🛡️
+
+**Objective: Fix Sentinel cycle errors and implement remaining security audit fixes.**
+
+> ✅ **SENTINEL CYCLE FIX:** Orchestrator now ignores products from inactive accounts, preventing "API Key Not Configured" errors for users with broken encryption keys.
+> ✅ **TASK ID VALIDATION:** `taskId` is now mandatory and strictly validated via regex in `agent-v4` and `agent-v5` confirmation handlers.
+> ✅ **INFO DISCLOSURE:** Sensitive fields (`costPrice`, `mediaAssets`) removed from public products API list.
+> ✅ **ERROR HARDENING:** Sanitized error messages in payment handlers to prevent internal system leakage.
+> ✅ **SYSTEM OBSCURITY:** Removed detailed circuit breaker status from Telegram `/health` command to minimize internal info exposure.
+
+**Completed Actions:**
+
+- [x] **Sentinel Recovery**: Modified `src/sentinel/SentinelOrchestrator.ts` to join with `marketplace_accounts` and filter by `isActive`.
+- [x] **Security Hardening**:
+  - `agent-v4.ts` & `agent-v5.ts`: Implemented mandatory `taskId` with regex validation.
+  - `products.ts`: Removed business-sensitive fields from output.
+  - `payments.ts`: Hardened error handling in payment creation.
+  - `telegram.ts`: Cleaned up `/health` output and removed unused imports.
+- [x] **Database Audit**: Verified active user count (3 active users in prod).
+
+**Key Insights:**
+
+```
+Filtering by active accounts in Sentinel significantly reduces log noise and prevents alert fatigue.
+Strict taskId validation is a critical defense against replay or probing attacks on pending actions.
+Removing costPrice from the generic products list follows the principle of least privilege for data access.
+```
+
+**Next Steps (P0):**
+
+1. Final push to production.
+2. Monitor Sentinel logs for any secondary cycle issues.
+3. Verify new taskId validation in the frontend/bot UX.
 
 ### Session 2026-01-21 (Session 91 - Security Hardening) 🛡️
 
