@@ -63,17 +63,18 @@ const HALLUCINATION_PATTERNS = [
 
 const UNSAFE_PATTERNS = [
   // Financial manipulation
-  /гарантир(?:ую|уем|ованн)\w* прибыль/i,
+  /гарантир[а-яё]* прибыль/i,
   /100%\s*(?:гарантия|результат|успех)/i,
   // Legal issues
-  /обход\w*\s*(?:закон|налог|правил)/i,
+  /обход[а-яё]*\s*(?:закон|налог|правил)/i,
+  /обой(?:ти|дет|дём)[а-яё]*\s*(?:закон|налог|правил)/i,
   // Competitor bashing
   /(?:конкурент|другие сервисы)\s*(?:обман|мошенн|плох)/i,
 ];
 
 const OFF_TOPIC_TRIGGERS = [
   // Completely off-topic
-  /расскаж(?:и|у)\s*(?:анекдот|шутк|историю не по теме)/i,
+  /расскаж[а-яё]*\s*(?:анекдот|шутк|историю не по теме)/i,
   /(?:погода|новости|политика)\s*(?:сегодня|сейчас)/i,
 ];
 
@@ -90,7 +91,7 @@ const QUALITY_ISSUES = [
  * Known facts for fact-checking
  */
 const KNOWN_FACTS = {
-  ozon_card_fee: 5, // 5% always from seller
+  ozon_card_fee: 5, // 5% always from seller (not 10%!)
   wb_spp_max: 30, // Max 30% SPP
   max_commission: 50, // No commission above 50%
   min_commission: 0, // No negative commission
@@ -401,7 +402,7 @@ export class ResponseValidator {
     const issues: ValidationIssue[] = [];
 
     // Check Ozon Card fee
-    const ozonCardMatch = response.match(/ozon\s*карт\w*\s*[:=]?\s*(\d+)%/i);
+    const ozonCardMatch = response.match(/ozon\s*(?:карт|card)[а-яёa-z]*\s*[:=]?\s*(\d+)%/i);
     if (ozonCardMatch && parseInt(ozonCardMatch[1]) !== KNOWN_FACTS.ozon_card_fee) {
       issues.push({
         type: 'factual',
@@ -411,7 +412,8 @@ export class ResponseValidator {
     }
 
     // Check commission ranges
-    const commissionMatch = response.match(/комисси\w*\s*[:=]?\s*(\d+)%/i);
+    // Allow text between 'commission' and value (e.g. "Комиссия маркетплейса: 75%")
+    const commissionMatch = response.match(/комисси[а-яё]*[\s\S]{0,50}?[:=]?\s*(\d+)%/i);
     if (commissionMatch) {
       const commission = parseInt(commissionMatch[1]);
       if (commission > KNOWN_FACTS.max_commission || commission < KNOWN_FACTS.min_commission) {

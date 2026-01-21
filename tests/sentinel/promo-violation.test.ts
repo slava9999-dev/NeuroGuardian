@@ -55,12 +55,12 @@ describe('Promo Violation Alerts', () => {
   describe('BUYER_PRICE_BELOW_STOPLOSS Detection', () => {
     it('should detect when buyer price is below stop-loss', () => {
       const product = createProduct({
-        current_price: 1500,
-        min_price: 1200,
-        estimated_buyer_price: 1100, // Below min_price!
+        current_price: 1250, // Seller price
+        min_price: 1200, // Stop-loss
+        estimated_buyer_price: 1190, // Just below min_price, small discount (4.8%)
       });
 
-      const result = detector.scanProductThreats(product, 1500, 'WB');
+      const result = detector.scanProductThreats(product, 1250, 'WB');
 
       expect(result.hasThreats).toBe(true);
       expect(
@@ -124,12 +124,12 @@ describe('Promo Violation Alerts', () => {
 
     it('should classify as BUYER_PRICE_BELOW_STOPLOSS for small discounts', () => {
       const product = createProduct({
-        current_price: 1500,
+        current_price: 1220,
         min_price: 1200,
-        estimated_buyer_price: 1150, // Only ~3% discount, not promo
+        estimated_buyer_price: 1180, // ~3% discount, not promo
       });
 
-      const result = detector.scanProductThreats(product, 1500, 'WB');
+      const result = detector.scanProductThreats(product, 1220, 'WB');
 
       // Small discount but still below stop-loss
       const threats = result.threats.filter(
