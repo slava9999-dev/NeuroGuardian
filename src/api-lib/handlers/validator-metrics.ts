@@ -65,7 +65,7 @@ export async function handleValidatorMetrics(
 
     logger.info('[ValidatorMetrics] Stats retrieved', {
       isAdmin,
-      userId: userId || 'all',
+      userId: (userId || 'all') as any,
       hours,
     });
 

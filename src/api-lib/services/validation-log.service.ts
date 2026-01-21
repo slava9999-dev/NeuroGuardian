@@ -366,7 +366,7 @@ class ThreatHistoryService {
       resolvedAt: Date | null;
     }>
   > {
-    return db
+    const history = await db
       .select({
         id: threatHistory.id,
         threatType: threatHistory.threatType,
@@ -382,6 +382,12 @@ class ThreatHistoryService {
       .where(eq(threatHistory.productId, productId))
       .orderBy(desc(threatHistory.createdAt))
       .limit(limit);
+
+    return history.map(entry => ({
+      ...entry,
+      message: entry.message || '',
+      createdAt: entry.createdAt || new Date(),
+    }));
   }
 }
 
