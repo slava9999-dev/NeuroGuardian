@@ -41,10 +41,25 @@ export class WbService {
     // Step 2: Fetch REAL prices from Prices API
     const { priceMap } = await this.fetchPrices(apiKey, nmIds);
 
-    // Step 3: Fetch REAL stocks from Warehouse Stocks API
-    const stockMap = await this.fetchStocks(apiKey, nmIds);
+    // Step 3: Build SKU → nmId mapping from cards (for FBS stocks)
+    // WB FBS API requires actual SKU/barcode, not nmId
+    const skuToNmIdMap = new Map<string, number>();
+    for (const card of cards) {
+      if (card.sizes) {
+        for (const size of card.sizes) {
+          if (size.skus) {
+            for (const sku of size.skus) {
+              skuToNmIdMap.set(sku, card.nmID);
+            }
+          }
+        }
+      }
+    }
 
-    // Step 4: Map to unified format
+    // Step 4: Fetch REAL stocks from Warehouse Stocks API (with proper SKUs)
+    const stockMap = await this.fetchStocks(apiKey, nmIds, skuToNmIdMap);
+
+    // Step 5: Map to unified format
     return cards.map(card => ({
       product_id: `wb-${card.nmID}`,
       nm_id: card.nmID.toString(),
@@ -154,8 +169,15 @@ export class WbService {
 
   /**
    * Fetch WB stocks
+   * @param apiKey - WB API key
+   * @param nmIds - Product nmIDs
+   * @param skuToNmIdMap - Mapping of SKU/barcode → nmId for FBS (optional)
    */
-  async fetchStocks(apiKey: string, nmIds: number[]): Promise<Map<number, number>> {
+  async fetchStocks(
+    apiKey: string,
+    nmIds: number[],
+    skuToNmIdMap?: Map<string, number>
+  ): Promise<Map<number, number>> {
     const stockMap = new Map<number, number>();
 
     if (nmIds.length === 0) return stockMap;
@@ -171,7 +193,15 @@ export class WbService {
         const warehouses = await warehousesRes.json();
 
         if (Array.isArray(warehouses) && warehouses.length > 0) {
-          const skus = nmIds.map(id => String(id));
+          // Use real SKUs if available, otherwise fallback to nmId (less accurate)
+          const skus =
+            skuToNmIdMap && skuToNmIdMap.size > 0
+              ? Array.from(skuToNmIdMap.keys())
+              : nmIds.map(id => String(id));
+
+          console.log(
+            `📡 WB FBS Stocks: querying ${warehouses.length} warehouses with ${skus.length} SKUs`
+          );
 
           for (const wh of warehouses) {
             try {
@@ -189,7 +219,14 @@ export class WbService {
                 const stocks = stocksData.stocks || [];
 
                 for (const stock of stocks) {
-                  const nmId = parseInt(stock.sku);
+                  // Map SKU back to nmId
+                  let nmId: number;
+                  if (skuToNmIdMap && skuToNmIdMap.has(stock.sku)) {
+                    nmId = skuToNmIdMap.get(stock.sku)!;
+                  } else {
+                    nmId = parseInt(stock.sku);
+                  }
+
                   if (!isNaN(nmId)) {
                     const current = stockMap.get(nmId) || 0;
                     stockMap.set(nmId, current + (stock.amount || 0));
@@ -200,11 +237,16 @@ export class WbService {
               console.warn(`⚠️ WB Stocks error for warehouse ${wh.id}:`, e);
             }
           }
+
+          if (stockMap.size > 0) {
+            console.log(`✅ WB FBS Stocks: found ${stockMap.size} products with stock`);
+          }
         }
       }
 
       // Step 2: FBO fallback - use Statistics API
       if (stockMap.size === 0) {
+        console.log(`📡 WB FBO Stocks: trying Statistics API fallback...`);
         const today = new Date();
         const dateFrom = new Date(today);
         dateFrom.setDate(today.getDate() - 1);
@@ -228,6 +270,7 @@ export class WbService {
               }
             }
           }
+          console.log(`✅ WB FBO Stocks: found ${stockMap.size} products with stock`);
         }
       }
     } catch (e) {
