@@ -33,6 +33,7 @@
   - Fixed `react-is` build dependency.
   - Passed all Pre-flight checks (Tests, Types, Build).
   - Pushed to `main`.
+  - Fixed `tsconfig.node.json` target compatibility (ES2023 -> ES2022).
 
 **Key Insights:**
 
