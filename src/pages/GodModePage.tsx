@@ -125,9 +125,31 @@ function StatCard({ icon: Icon, label, value, subValue }: StatCardProps) {
 // MAIN PAGE
 // ==========================================
 
+interface ValidatorMetrics {
+  validation?: {
+    passRate?: number;
+    total?: number;
+    avgScore?: number;
+    issueBreakdown?: Record<string, number>;
+  };
+  threats?: {
+    total?: number;
+    pending?: number;
+    byType?: Record<string, number>;
+  };
+  browserEyes?: {
+    totalRequests?: number;
+    avgDurationMs?: number;
+    byMarketplace?: {
+      WB?: { avgDuration?: number };
+      Ozon?: { avgDuration?: number };
+    };
+  };
+}
+
 export function GodModePage() {
   const [stats, setStats] = useState<SystemStats | null>(null);
-  const [validatorMetrics, setValidatorMetrics] = useState<any>(null); // TODO: Type this properly
+  const [validatorMetrics, setValidatorMetrics] = useState<ValidatorMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
   const [activeTab, setActiveTab] = useState<
@@ -258,7 +280,9 @@ export function GodModePage() {
           {['dashboard', 'map', 'sentinel', 'analytics', 'features'].map(tab => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab as any)}
+              onClick={() =>
+                setActiveTab(tab as 'dashboard' | 'sentinel' | 'map' | 'features' | 'analytics')
+              }
               className={`px-4 py-2 rounded-lg font-mono text-sm uppercase transition-all ${
                 activeTab === tab
                   ? 'bg-violet-500/20 text-violet-400 border border-violet-500/50'
@@ -532,9 +556,13 @@ export function GodModePage() {
                           outerRadius={80}
                           fill="#8884d8"
                           dataKey="value"
-                          label={({ name, percent }: any) =>
-                            `${name} ${(percent * 100).toFixed(0)}%`
-                          }
+                          label={({
+                            name,
+                            percent,
+                          }: {
+                            name?: string | number;
+                            percent?: number;
+                          }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
                         >
                           {Object.entries(validatorMetrics.threats?.byType || {}).map(
                             (_, index) => (

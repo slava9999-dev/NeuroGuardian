@@ -68,7 +68,8 @@ export async function handleValidatorMetrics(
 
     logger.info('[ValidatorMetrics] Stats retrieved', {
       isAdmin,
-      userId: (userId || 'all') as any,
+      // @ts-expect-error: Logger types mismatch for userId
+      userId: userId || 'all',
       hours,
     });
 

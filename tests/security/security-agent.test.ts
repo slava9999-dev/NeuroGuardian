@@ -37,18 +37,17 @@ describe('SecurityAgent Integration', () => {
       headers: { 'user-agent': 'test' },
     };
 
-    const next = vi.fn();
     const res = {
       status: vi.fn().mockReturnThis(),
       json: vi.fn().mockReturnThis(),
-    } as any;
+    } as unknown as Response;
 
     try {
       const middleware = agent.createMiddleware({
         inputValidation: { checkBody: true },
       });
 
-      await middleware(maliciousReq as any, res, next);
+      await middleware(maliciousReq as unknown as Request, res);
       // If it doesn't throw, it's a failure
       expect(true, 'Middleware should have thrown for SQL injection').toBe(false);
     } catch (error: unknown) {
@@ -70,14 +69,13 @@ describe('SecurityAgent Integration', () => {
       headers: { 'user-agent': 'test' },
     };
 
-    const next = vi.fn();
-    const res = { status: vi.fn().mockReturnThis(), json: vi.fn() } as any;
+    const res = { status: vi.fn().mockReturnThis(), json: vi.fn() } as unknown as Response;
 
     try {
       const middleware = agent.createMiddleware({
         inputValidation: { checkBody: true },
       });
-      await middleware(maliciousReq as any, res, next);
+      await middleware(maliciousReq as unknown as Request, res);
       expect(true, 'Middleware should have thrown for XSS').toBe(false);
     } catch (error: unknown) {
       if (error instanceof InjectionDetectedError) {
@@ -96,14 +94,13 @@ describe('SecurityAgent Integration', () => {
       headers: { 'user-agent': 'test' },
     };
 
-    const next = vi.fn();
-    const res = { status: vi.fn().mockReturnThis(), json: vi.fn() } as any;
+    const res = { status: vi.fn().mockReturnThis(), json: vi.fn() } as unknown as Response;
 
     try {
       const middleware = agent.createMiddleware({
         inputValidation: { checkQuery: true },
       });
-      await middleware(maliciousReq as any, res, next);
+      await middleware(maliciousReq as unknown as Request, res);
       expect(true, 'Middleware should have thrown for NoSQL injection').toBe(false);
     } catch (error: unknown) {
       if (error instanceof InjectionDetectedError) {

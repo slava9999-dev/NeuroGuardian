@@ -77,9 +77,11 @@ function getKVClient(): VercelKV | null {
  */
 export async function checkRateLimit(
   identifier: string,
-  strict: boolean = false
+  strict: boolean = false,
+  limitOverride?: number
 ): Promise<RateLimitResult> {
-  const limit = strict ? RATE_LIMIT_STRICT : RATE_LIMIT;
+  const limit =
+    limitOverride !== undefined ? limitOverride : strict ? RATE_LIMIT_STRICT : RATE_LIMIT;
   const key = `rate:${identifier}`;
 
   const client = getKVClient();

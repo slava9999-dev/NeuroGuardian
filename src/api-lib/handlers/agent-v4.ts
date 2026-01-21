@@ -83,6 +83,19 @@ export async function handleAgentV4(
     userId = parseInt(bypassTelegramId as string);
     logger.info('Admin API access granted', { userId });
 
+    // SECURITY: Verify user exists before proceeding
+    // Prevents probing attacks and ensures data integrity
+    try {
+      const userExists = await getUserById(userId);
+      if (!userExists) {
+        logger.warn('Admin bypass attempt for non-existent user', { userId });
+        return res.status(404).json({ error: 'User not found' });
+      }
+    } catch (error) {
+      logger.error('Admin bypass user check failed', error);
+      return res.status(500).json({ error: 'User verification failed' });
+    }
+
     // Audit this bypass
     const agent = getSecurityAgent();
     if (!agent.isInitialized()) await agent.initialize();
@@ -135,18 +148,17 @@ export async function handleAgentV4(
     return res.status(400).json({ error: 'Message is required' });
   }
 
-  // 4. Rate limit (skip for admin)
+  // 4. Rate limit (Apply to everyone including admins to prevent DoS)
   logger.debug('Checking rate limit', { userId, isAdmin });
-  if (!isAdmin) {
-    const agentRateLimit = await checkRateLimit(`agent:${userId}`, true);
-    if (!agentRateLimit.allowed) {
-      return res.json({
-        success: true,
-        message: '⏳ **Превышен лимит запросов.**\n\nПодождите минуту и попробуйте снова.',
-      });
-    }
-  } else {
-    logger.debug('Skipping rate limit for admin bypass');
+  // Admins get 5x limit (100 vs 20)
+  const limitOverride = isAdmin ? 100 : undefined;
+
+  const agentRateLimit = await checkRateLimit(`agent:${userId}`, true, limitOverride);
+  if (!agentRateLimit.allowed) {
+    return res.json({
+      success: true,
+      message: '⏳ **Превышен лимит запросов.**\n\nПодождите минуту и попробуйте снова.',
+    });
   }
 
   // 5. Load conversation history
@@ -395,12 +407,23 @@ export async function handleAgentV4Confirm(
   }
 
   // Verify taskId matches
-  if (taskId && pendingAction.taskId !== taskId) {
-    return res.json({
-      success: false,
-      content: '❌ Идентификатор операции не совпадает.',
-      executed: false,
-    });
+  if (taskId) {
+    // SECURITY: Validate taskId format to prevent injection or invalid processing
+    if (!/^task_\d+_[a-z0-9]{5}$/.test(taskId)) {
+      return res.status(400).json({
+        success: false,
+        content: '❌ Неверный формат идентификатора задачи.',
+        executed: false,
+      });
+    }
+
+    if (pendingAction.taskId !== taskId) {
+      return res.json({
+        success: false,
+        content: '❌ Идентификатор операции не совпадает.',
+        executed: false,
+      });
+    }
   }
 
   // Get user data for API keys

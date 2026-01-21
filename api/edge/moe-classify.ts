@@ -1,5 +1,4 @@
 import { classifyQuery } from '../../src/api-lib/agent/moe-router.js';
-import { logger } from '../../src/api-lib/lib/logger.js';
 
 export const config = {
   runtime: 'edge',
@@ -52,8 +51,9 @@ export default async function handler(req: Request) {
         },
       }
     );
-  } catch (error: any) {
-    return new Response(JSON.stringify({ error: error.message }), {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
       headers: { 'content-type': 'application/json' },
     });

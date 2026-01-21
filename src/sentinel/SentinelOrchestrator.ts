@@ -373,7 +373,8 @@ export class SentinelOrchestrator {
                         : await priceParserService.getOzonRealPrice(sku);
 
                     buyerPrice = realPriceInfo.buyerPrice;
-                    originalPrice = (realPriceInfo as any).originalPrice || 0;
+                    originalPrice =
+                      (realPriceInfo as unknown as { originalPrice?: number }).originalPrice || 0;
 
                     if (buyerPrice > 0) {
                       logger.info(

@@ -392,6 +392,12 @@ export async function handleBatchSetStopLoss(
   // Validate productIds array (optional - if not provided, update all products without stop-loss)
   let targetProductIds: string[] = [];
   if (Array.isArray(productIds) && productIds.length > 0) {
+    if (productIds.length > 100) {
+      return res.status(400).json({
+        error: 'Batch too large',
+        message: 'Max 100 products per request',
+      });
+    }
     targetProductIds = productIds.map(String);
   }
 

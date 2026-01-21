@@ -3,7 +3,7 @@
 // Aesthetic: Clean, Spacious, Warm Light Mode
 // ============================================
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Shield,
@@ -62,11 +62,8 @@ export function ProductsPage({
   const [selectedForCalculator, setSelectedForCalculator] = useState<Product | null>(null);
 
   // Load products on mount
-  useEffect(() => {
-    loadProducts();
-  }, []);
 
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     setIsLoading(true);
     try {
       const res = await productsApi.getProducts();
@@ -78,7 +75,11 @@ export function ProductsPage({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [setProducts]);
+
+  useEffect(() => {
+    loadProducts();
+  }, [loadProducts]);
 
   const handleSync = async () => {
     hapticFeedback('medium');

@@ -236,17 +236,3 @@ export function AgentWelcomeSkeleton() {
 }
 
 // Export all for easy access
-export const Skeletons = {
-  Base: Skeleton,
-  ProductCard: ProductCardSkeleton,
-  ProductsPage: ProductsPageSkeleton,
-  Message: MessageSkeleton,
-  SettingsSection: SettingsSectionSkeleton,
-  AccountCard: AccountCardSkeleton,
-  DashboardStats: DashboardStatsSkeleton,
-  PageLoading: PageLoadingSkeleton,
-  SubscriptionCard: SubscriptionCardSkeleton,
-  AgentWelcome: AgentWelcomeSkeleton,
-};
-
-export default Skeletons;
