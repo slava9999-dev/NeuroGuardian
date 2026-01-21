@@ -263,7 +263,9 @@ export class SentinelOrchestrator {
       } catch (e) {
         const error = e instanceof Error ? e : new Error(String(e));
         logger.error('Error fetching product chunk', error, { chunkIds: chunk });
-        summary.errors.push(`Failed to fetch product chunk for User ${user.id}: ${error.message}`);
+        const errorMsg = `Failed to fetch product chunk for User ${user.id}: ${error.message}`;
+        summary.errors.push(errorMsg);
+        if (userResult) userResult.errors.push(errorMsg);
       }
     }
 
@@ -760,7 +762,15 @@ export class SentinelOrchestrator {
       .filter(Boolean)
       .join('\n');
 
-    await this.alertSender.sendAdminSummary(message);
+    if (hasErrors) {
+      const errorDetails = result.errors
+        .slice(0, 5)
+        .map(e => `• ${e}`)
+        .join('\n');
+      await this.alertSender.sendAdminSummary(`${message}\n\n🔍 Детали ошибок:\n${errorDetails}`);
+    } else {
+      await this.alertSender.sendAdminSummary(message);
+    }
   }
 }
 
