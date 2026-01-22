@@ -140,7 +140,7 @@ export async function handleAdminSystem(
             /* ignore */
           }
 
-          const result = await sentinelOrchestrator.runCycle();
+          const result = await sentinelOrchestrator.runCycle({ sendPriceReport: true });
           return res.json({
             success: true,
             message: 'Sentinel Cycle Completed',

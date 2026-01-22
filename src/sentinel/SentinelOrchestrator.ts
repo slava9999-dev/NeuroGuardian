@@ -177,6 +177,7 @@ export class SentinelOrchestrator {
         }
       }
 
+      // After processing, send summary
       await this.sendCycleSummary(result);
     } catch (err) {
       result.errors.push(`Critical cycle error: ${err}`);
@@ -344,55 +345,58 @@ export class SentinelOrchestrator {
                       ? String(product.nm_id)
                       : product.product_id.replace('ozon-', '');
 
-                  const isProduction =
-                    process.env.VERCEL_ENV === 'production' ||
-                    process.env.NODE_ENV === 'production';
+                  // --- INDUSTRIAL AGENT LOGIC: DIGITAL VISION FIRST ---
+                  // We ALWAYS start with Digital Vision (BrowserEyes) to see what the customer sees.
+                  // Only if that fails do we fallback to API.
 
-                  // CRITICAL FIX: BrowserEyes (Playwright) doesn't work in Vercel Serverless
-                  // Use legacy API parser in production, BrowserEyes only locally
                   let buyerPrice = 0;
                   let originalPrice = 0;
 
-                  if (!isProduction) {
-                    // LOCAL/DEVELOPMENT: Use BrowserEyes for accurate buyer price detection
-                    try {
-                      const url =
-                        marketplace === 'WB'
-                          ? `https://www.wildberries.ru/catalog/${sku}/detail.aspx`
-                          : `https://www.ozon.ru/product/${sku}/`;
-
-                      const eyeResult = await browserEyes.gazeAtProduct(marketplace, url);
-                      buyerPrice = eyeResult?.buyerPrice ?? 0;
-                      originalPrice = eyeResult?.originalPrice ?? 0;
-
-                      if (buyerPrice > 0) {
-                        logger.info(
-                          `[BrowserEyes] Found REAL price for ${sku}: ${buyerPrice}₽ (seller: ${product.current_price}₽)`
-                        );
-                      }
-                    } catch (eyeError) {
-                      logger.warn(`[BrowserEyes] Failed for ${sku}, falling back to API`, {
-                        error: eyeError,
-                      });
-                      buyerPrice = 0; // Force fallback
-                    }
-                  }
-
-                  // PRODUCTION OR FALLBACK: Use API parser
-                  if (buyerPrice === 0) {
-                    const realPriceInfo =
+                  try {
+                    // 1. Digital Vision Check
+                    const url =
                       marketplace === 'WB'
-                        ? await priceParserService.getWbRealPrice(sku)
-                        : await priceParserService.getOzonRealPrice(sku);
+                        ? `https://www.wildberries.ru/catalog/${sku}/detail.aspx`
+                        : `https://www.ozon.ru/product/${sku}/`;
 
-                    buyerPrice = realPriceInfo.buyerPrice;
-                    originalPrice =
-                      (realPriceInfo as unknown as { originalPrice?: number }).originalPrice || 0;
+                    const eyeResult = await browserEyes.gazeAtProduct(marketplace, url);
+                    buyerPrice = eyeResult?.buyerPrice ?? 0;
+                    originalPrice = eyeResult?.originalPrice ?? 0;
 
                     if (buyerPrice > 0) {
                       logger.info(
-                        `[API Parser] Found price for ${sku}: ${buyerPrice}₽ (method: ${isProduction ? 'production-api' : 'fallback'})`
+                        `[Sentinel Agent] Digital Vision Success for ${sku}: ${buyerPrice}₽ (Seller: ${product.current_price}₽)`
                       );
+                    }
+                  } catch (eyeError) {
+                    logger.warn(
+                      `[Sentinel Agent] Digital Vision interrupted for ${sku}, engaging Fallback Protocols`,
+                      {
+                        error: eyeError,
+                      }
+                    );
+                    buyerPrice = 0;
+                  }
+
+                  // 2. Fallback Protocol: API Parser
+                  if (buyerPrice === 0) {
+                    try {
+                      const realPriceInfo =
+                        marketplace === 'WB'
+                          ? await priceParserService.getWbRealPrice(sku)
+                          : await priceParserService.getOzonRealPrice(sku);
+
+                      buyerPrice = realPriceInfo.buyerPrice;
+                      originalPrice =
+                        (realPriceInfo as unknown as { originalPrice?: number }).originalPrice || 0;
+
+                      if (buyerPrice > 0) {
+                        logger.info(
+                          `[Sentinel Agent] API Fallback Success for ${sku}: ${buyerPrice}₽`
+                        );
+                      }
+                    } catch (_apiError) {
+                      logger.warn(`[Sentinel Agent] All pricing protocols failed for ${sku}`);
                     }
                   }
 

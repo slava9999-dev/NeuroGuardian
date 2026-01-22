@@ -20,19 +20,21 @@
 
 ## ✅ ЧТО ГОТОВО (Production Ready)
 
-| Компонент                 | Статус     | Проверено / Новое                 |
-| ------------------------- | ---------- | --------------------------------- |
-| **Security Agent (RASP)** | ✅ Активен | SQLi/XSS/NoSQLi Detection         |
-| **God Mode v2**           | ✅ Активен | Динамические Feature Flags        |
-| **Sentry Core**           | ✅ Активен | Frontend Error Tracking           |
-| **JSON Logging**          | ✅ Активен | Structured Logs for Cloud         |
-| **Edge MoE Classifier**   | ✅ Активен | Latency optimized                 |
-| **SWR Caching**           | ✅ Активен | instant UI for Products           |
-| **Shield Audit**          | ✅ Активен | Secret Rotation Monitoring        |
-| **Sentinel Service**      | ✅ Готов   | Legacy + New Crypto support       |
-| **Sentinel Smoke Test**   | ✅ Готов   | DB Connection Stabilized          |
-| **Database Schema**       | ✅ Sync    | Tables & Vector Ext. Fixed        |
-| **RAG Vector Store**      | ✅ Готов   | HuggingFace 1024-dim (251 chunks) |
+| Компонент                 | Статус     | Проверено / Новое                    |
+| ------------------------- | ---------- | ------------------------------------ |
+| **Security Agent (RASP)** | ✅ Активен | SQLi/XSS/NoSQLi Detection            |
+| **God Mode v2**           | ✅ Активен | Динамические Feature Flags           |
+| **Sentry Core**           | ✅ Активен | Frontend Error Tracking              |
+| **JSON Logging**          | ✅ Активен | Structured Logs for Cloud            |
+| **Edge MoE Classifier**   | ✅ Активен | Latency optimized                    |
+| **SWR Caching**           | ✅ Активен | instant UI for Products              |
+| **Shield Audit**          | ✅ Активен | Secret Rotation Monitoring           |
+| **Sentinel Service**      | ✅ Готов   | Real-Time Orchestrator v2            |
+| **Digital Vision**        | ✅ Готов   | BrowserEyes (Primary) + API Fallback |
+| **Alerting System**       | ✅ Готов   | Instant + Reports schedule           |
+| **Sentinel Smoke Test**   | ✅ Готов   | DB Connection Stabilized             |
+| **Database Schema**       | ✅ Sync    | Tables & Vector Ext. Fixed           |
+| **RAG Vector Store**      | ✅ Готов   | HuggingFace 1024-dim (251 chunks)    |
 
 ---
 

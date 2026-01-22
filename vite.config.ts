@@ -59,4 +59,61 @@ export default defineConfig({
       },
     },
   },
+  // -------------------------------------------------
+  // Bundle optimization – exclude heavy server-only deps
+  // -------------------------------------------------
+  optimizeDeps: {
+    exclude: [
+      '@langchain/openai',
+      '@langchain/core',
+      '@langchain/langgraph',
+      '@langchain/community',
+      'puppeteer',
+      'playwright-extra',
+      'playwright',
+      'replicate',
+      'chromadb',
+      'bullmq',
+    ],
+  },
+  ssr: {
+    external: [
+      '@langchain/openai',
+      '@langchain/core',
+      '@langchain/langgraph',
+      '@langchain/community',
+      'puppeteer',
+      'playwright-extra',
+      'playwright',
+      'replicate',
+      'chromadb',
+      'bullmq',
+    ],
+  },
+  build: {
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      external: [
+        // These are server-only and should never be in client bundle
+        'pg',
+        'bullmq',
+        'chromadb',
+      ],
+      output: {
+        manualChunks: {
+          // Split vendor libs into separate chunks for better caching
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-charts': ['recharts', 'react-is'],
+          'vendor-animation': ['framer-motion'],
+          'vendor-ui': [
+            'lucide-react',
+            '@radix-ui/react-dialog',
+            '@radix-ui/react-visually-hidden',
+          ],
+          'vendor-state': ['zustand'],
+          'vendor-utils': ['zod', 'clsx', 'tailwind-merge', 'class-variance-authority'],
+        },
+      },
+    },
+  },
 });

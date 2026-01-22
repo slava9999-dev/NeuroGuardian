@@ -251,10 +251,28 @@ export const scheduledSentinelCycle = inngest.createFunction(
     actionsTaken: number;
     errors: string[];
   }> => {
-    logger.info('[Inngest] Starting scheduled Sentinel cycle');
+    const now = new Date();
+    const utcHour = now.getUTCHours();
+    const utcMinutes = now.getUTCMinutes();
+
+    // MSK is UTC+3. We want reports at:
+    // 09:00 MSK -> 06:00 UTC
+    // 14:00 MSK -> 11:00 UTC
+    // 20:00 MSK -> 17:00 UTC
+    // Running every 30 mins means checking minutes < 30 ensures we don't send twice (e.g. 06:00 vs 06:30)
+    // although sendPriceReport logic inside runCycle is per-run.
+    const reportHoursUTC = [6, 11, 17];
+    const isReportTime = reportHoursUTC.includes(utcHour) && utcMinutes < 30;
+
+    logger.info('[Inngest] Starting scheduled Sentinel cycle', {
+      isReportTime,
+      utcHour,
+      utcMinutes,
+    });
 
     const result = await step.run('run-full-cycle', async () => {
-      return await sentinelService.runCycle();
+      // If it's report time, we generate and send detailed price reports to users
+      return await sentinelService.runCycle({ sendPriceReport: isReportTime });
     });
 
     logger.info('[Inngest] Scheduled Sentinel cycle completed', {

@@ -17,6 +17,48 @@ import {
 import type { DBProduct } from '../lib/types.js';
 import { mediaQueue } from '../../vision/index.js';
 
+// Validation middleware
+import { validateBody } from '../middleware/validation.js';
+import { z } from 'zod';
+
+// Local schemas for this handler
+const updateProductBodySchema = z
+  .object({
+    productId: z.union([z.coerce.number().int().positive(), z.string().min(1).max(50)]),
+    minPrice: z.coerce.number().positive().optional(),
+    costPrice: z.coerce.number().positive().optional(),
+  })
+  .refine(data => data.minPrice !== undefined || data.costPrice !== undefined, {
+    message: 'At least one of minPrice or costPrice is required',
+  });
+
+const batchStopLossSchema = z.object({
+  percentage: z.coerce.number().min(5).max(50),
+  productIds: z
+    .array(z.union([z.coerce.number(), z.string()]))
+    .max(100)
+    .optional(),
+});
+
+const batchUpdateCostsSchema = z.object({
+  updates: z
+    .array(
+      z.object({
+        productId: z.string().optional(),
+        barcode: z.string().optional(),
+        costPrice: z.coerce.number().min(0),
+        minMargin: z.coerce.number().min(0).max(100).optional(),
+      })
+    )
+    .min(1)
+    .max(100),
+});
+
+const syncProductsSchema = z.object({
+  marketplace: z.enum(['WB', 'Ozon', 'wb', 'ozon']).optional().default('Ozon'),
+  enableSmartDefaults: z.boolean().optional().default(true),
+});
+
 // fetchWithRetry moved to api-lib/lib/index.js
 
 /**
@@ -53,14 +95,10 @@ export async function handleProducts(
   }
 
   // POST: Update product prices (min price or cost price)
-  const { productId, minPrice, costPrice } = req.body || {};
+  const validated = await validateBody(req, res, updateProductBodySchema);
+  if (!validated) return res; // Response already sent by validateBody
 
-  if (!productId || (minPrice === undefined && costPrice === undefined)) {
-    return res.status(400).json({
-      error: 'Invalid parameters',
-      received: { productId, minPrice, costPrice },
-    });
-  }
+  const { productId, minPrice, costPrice } = validated;
 
   try {
     // SECURITY: Verify product ownership before update (IDOR protection)
@@ -75,14 +113,15 @@ export async function handleProducts(
 
     const updates: string[] = [];
     const promises: Promise<void>[] = [];
+    const productIdStr = String(productId);
 
     if (minPrice !== undefined) {
-      promises.push(updateProductMinPrice(userId, productId, minPrice));
+      promises.push(updateProductMinPrice(userId, productIdStr, minPrice));
       updates.push(`minPrice=${minPrice}`);
     }
 
     if (costPrice !== undefined) {
-      promises.push(updateProductCostPrice(userId, productId, costPrice));
+      promises.push(updateProductCostPrice(userId, productIdStr, costPrice));
       updates.push(`costPrice=${costPrice}`);
     }
 
@@ -113,8 +152,12 @@ export async function handleSyncProducts(
   res: VercelResponse,
   userId: number
 ): Promise<VercelResponse> {
-  const { marketplace, enableSmartDefaults = true } = req.body || {};
-  const mp = (marketplace || 'Ozon') as 'WB' | 'Ozon';
+  // Validate with Zod schema
+  const validated = await validateBody(req, res, syncProductsSchema);
+  if (!validated) return res;
+
+  const { marketplace, enableSmartDefaults } = validated;
+  const mp = (marketplace?.toUpperCase() === 'WB' ? 'WB' : 'Ozon') as 'WB' | 'Ozon';
 
   // Get user's subscription status
   const user = await getUserById(userId);
@@ -376,28 +419,12 @@ export async function handleBatchSetStopLoss(
   res: VercelResponse,
   userId: number
 ): Promise<VercelResponse> {
-  const { percentage, productIds } = req.body || {};
+  // Validate with Zod schema
+  const validated = await validateBody(req, res, batchStopLossSchema);
+  if (!validated) return res;
 
-  // Validate percentage (5-50% as per index.ts logic)
-  if (typeof percentage !== 'number' || percentage < 5 || percentage > 50) {
-    return res.status(400).json({
-      error: 'Invalid percentage',
-      message: 'Percentage must be between 5 and 50',
-      received: percentage,
-    });
-  }
-
-  // Validate productIds array (optional - if not provided, update all products without stop-loss)
-  let targetProductIds: string[] = [];
-  if (Array.isArray(productIds) && productIds.length > 0) {
-    if (productIds.length > 100) {
-      return res.status(400).json({
-        error: 'Batch too large',
-        message: 'Max 100 products per request',
-      });
-    }
-    targetProductIds = productIds.map(String);
-  }
+  const { percentage, productIds } = validated;
+  const targetProductIds: string[] = productIds ? productIds.map(String) : [];
 
   try {
     let productsToUpdate;
@@ -582,22 +609,11 @@ export async function handleBatchUpdateCosts(
   res: VercelResponse,
   userId: number
 ): Promise<VercelResponse> {
-  const { updates } = req.body || {};
+  // Validate with Zod schema
+  const validated = await validateBody(req, res, batchUpdateCostsSchema);
+  if (!validated) return res;
 
-  if (!Array.isArray(updates) || updates.length === 0) {
-    return res.status(400).json({
-      error: 'Invalid updates format',
-      message: 'Expected array of { productId, costPrice }',
-    });
-  }
-
-  // Limit batch size to prevent timeouts
-  if (updates.length > 100) {
-    return res.status(400).json({
-      error: 'Batch too large',
-      message: 'Max 100 items per request',
-    });
-  }
+  const { updates } = validated;
 
   try {
     const results = {

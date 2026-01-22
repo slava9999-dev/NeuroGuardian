@@ -48,7 +48,31 @@ export class PriceParserService {
     let found = false;
     let errorMsg = '';
 
-    // Step A: Try Dynamic Price API (Preferred)
+    // Step A: Try BrowserEyes (Digital Vision) if available
+    try {
+      // Use BrowserEyes as primary method per 'Digital Vision' requirement
+      const { browserEyes } = await import('../../sentinel/BrowserEyes.js');
+      const url = `https://www.wildberries.ru/catalog/${nmIdStr}/detail.aspx`;
+
+      const result = await browserEyes.gazeAtProduct('WB', url);
+      if (result.buyerPrice && result.buyerPrice > 0) {
+        return {
+          marketplace: 'wb',
+          productId: nmIdStr,
+          title: productTitle || 'WB Product', // BrowserEyes doesn't extract title yet, keep default or enhance later
+          sellerPrice: result.originalPrice || result.buyerPrice,
+          buyerPrice: result.buyerPrice,
+          currency,
+          rating,
+          reviewCount,
+          error: undefined,
+        };
+      }
+    } catch (_e) {
+      // Fallback to API if browser fails
+    }
+
+    // Step B: Try Dynamic Price API (v4)
     for (const url of dynamicUrls) {
       try {
         const res = await fetchWithRetry(
@@ -87,7 +111,32 @@ export class PriceParserService {
       }
     }
 
-    // Step B: Fallback to Static Card (Reliable existence check)
+    // Step C: Fallback to BrowserEyes if API failed
+    if (!found) {
+      try {
+        const { browserEyes } = await import('../../sentinel/BrowserEyes.js');
+        const url = `https://www.wildberries.ru/catalog/${nmIdStr}/detail.aspx`;
+        const result = await browserEyes.gazeAtProduct('WB', url);
+
+        if (result.buyerPrice && result.buyerPrice > 0) {
+          return {
+            marketplace: 'wb',
+            productId: nmIdStr,
+            title: productTitle,
+            sellerPrice: result.originalPrice || result.buyerPrice,
+            buyerPrice: result.buyerPrice,
+            currency,
+            rating,
+            reviewCount,
+            error: undefined,
+          };
+        }
+      } catch (e) {
+        // Log but allow to proceed to static fallback
+      }
+    }
+
+    // Step D: Fallback to Static Card (Reliable existence check)
     if (!found) {
       try {
         const res = await fetchWithRetry(staticCardUrl, {}, 1);
@@ -158,18 +207,23 @@ export class PriceParserService {
    * For production reliability, this should be routed through a Scraping API (ZenRows/ScraperAPI).
    */
   async getOzonRealPrice(sku: string): Promise<RealPriceInfo> {
-    // Note: Ozon URL would be https://www.ozon.ru/product/${sku}
-    // But direct fetch is blocked by anti-bot protection.
     try {
-      // Ozon requires Cookies/Rendering. Simple fetch often gets 403 or CAPTCHA.
-      // We will try to fetch a specific mobile API endpoint if possible, or fail gracefully advising a Proxy.
-      // Public Composer API is sometimes open.
+      // Use BrowserEyes to bypass Ozon anti-bot protection
+      const { browserEyes } = await import('../../sentinel/BrowserEyes.js');
+      const url = `https://www.ozon.ru/product/${sku}/`;
+      const result = await browserEyes.gazeAtProduct('Ozon', url);
 
-      // Strategy A: Try Composer API (Mobile) - heavily guarded but sometimes works with right headers.
-      // Strategy B: Return a "Not Implemented" for basic version or mock if in TEST_MODE.
-
-      // For this combat tool, we acknowledge the limitation.
-      // We will return a specific error code that the Agent can interpret.
+      if (result.buyerPrice && result.buyerPrice > 0) {
+        return {
+          marketplace: 'ozon',
+          productId: sku,
+          sellerPrice: result.originalPrice || result.buyerPrice,
+          buyerPrice: result.buyerPrice,
+          cardPrice: result.cardPrice || undefined,
+          currency: 'RUB',
+          error: undefined,
+        };
+      }
 
       return {
         marketplace: 'ozon',
@@ -177,8 +231,7 @@ export class PriceParserService {
         sellerPrice: 0,
         buyerPrice: 0,
         currency: 'RUB',
-        error:
-          'Ozon Protected: Requires Browser Agent (Anti-Bot bypass). Please use the architectural upgrade to connect ZenRows.',
+        error: 'Ozon BrowserEyes extraction returned no price',
       };
     } catch (e) {
       return {
@@ -187,7 +240,7 @@ export class PriceParserService {
         sellerPrice: 0,
         buyerPrice: 0,
         currency: 'RUB',
-        error: 'Failed to access Ozon',
+        error: `Failed to access Ozon via BrowserEyes: ${e instanceof Error ? e.message : String(e)}`,
         raw: e,
       };
     }
