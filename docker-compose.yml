@@ -32,6 +32,21 @@ services:
     networks:
       - neuro-network
 
+  browserless:
+    image: browserless/chrome:latest
+    container_name: neuro-browser-cluster
+    ports:
+      - "3002:3000"
+    environment:
+      - MAX_CONCURRENT_SESSIONS=10
+      - MAX_QUEUE_LENGTH=10
+      - PREBOOT_CHROME=true
+      - KEEP_ALIVE=true
+      - CONNECTION_TIMEOUT=60000
+    restart: always
+    networks:
+      - neuro-network
+
   n8n:
     image: n8nio/n8n:latest
     container_name: neuro-n8n

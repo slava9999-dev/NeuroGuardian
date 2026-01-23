@@ -44,6 +44,20 @@ export class SentinelOrchestrator {
   }
 
   /**
+   * Returns list of active users for task orchestration
+   */
+  async getActiveUserIds(): Promise<number[]> {
+    const activeUsers = await db.query.users.findMany({
+      where: and(
+        eq(users.isActive, true),
+        drizzleSql`(${users.protectionEnabled} = true OR ${users.subscriptionActive} = true)`
+      ),
+      columns: { id: true },
+    });
+    return activeUsers.map(u => Number(u.id));
+  }
+
+  /**
    * Run a full cycle for all users
    */
   async runCycle(
@@ -395,8 +409,10 @@ export class SentinelOrchestrator {
                           `[Sentinel Agent] API Fallback Success for ${sku}: ${buyerPrice}₽`
                         );
                       }
-                    } catch (_apiError) {
-                      logger.warn(`[Sentinel Agent] All pricing protocols failed for ${sku}`);
+                    } catch (error) {
+                      logger.warn(`[Sentinel Agent] All pricing protocols failed for ${sku}`, {
+                        error,
+                      });
                     }
                   }
 

@@ -6,9 +6,10 @@
 // ============================================
 
 import { chromium } from 'playwright-extra';
-import type { Browser, Page } from 'playwright';
+import type { Browser, Page, BrowserContext } from 'playwright';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { logger } from '../api-lib/lib/logger.js';
+import { proxyService } from '../api-lib/services/proxy-service.js';
 
 interface BrowserEyesResult {
   buyerPrice: number | null;
@@ -56,27 +57,34 @@ export class BrowserEyes {
 
   /**
    * Initialize browser instance (reusable) with stealth mode
+   * Supports local launch and remote browserless cluster
    */
   async init(): Promise<void> {
     if (this.browser) return;
 
-    logger.info('[BrowserEyes] Launching Chromium with Stealth Mode...');
+    const browserlessUrl = process.env.BROWSERLESS_URL; // e.g. ws://localhost:3002
 
-    // Apply stealth plugin to avoid detection
-    chromium.use(StealthPlugin());
+    if (browserlessUrl) {
+      logger.info(`[BrowserEyes] Connecting to remote cluster: ${browserlessUrl}`);
+      this.browser = await chromium.connectOverCDP(browserlessUrl);
+    } else {
+      logger.info('[BrowserEyes] Launching local Chromium with Stealth Mode...');
+      // Apply stealth plugin to avoid detection
+      chromium.use(StealthPlugin());
 
-    this.browser = await chromium.launch({
-      headless: true,
-      args: [
-        '--disable-blink-features=AutomationControlled',
-        '--disable-dev-shm-usage',
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-web-security',
-        '--disable-features=IsolateOrigins,site-per-process',
-        '--lang=ru-RU',
-      ],
-    });
+      this.browser = await chromium.launch({
+        headless: true,
+        args: [
+          '--disable-blink-features=AutomationControlled',
+          '--disable-dev-shm-usage',
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-web-security',
+          '--disable-features=IsolateOrigins,site-per-process',
+          '--lang=ru-RU',
+        ],
+      });
+    }
   }
 
   /**
@@ -108,7 +116,16 @@ export class BrowserEyes {
       throw new Error('Browser not initialized');
     }
 
-    const page = await this.browser.newPage({
+    const proxyUrl = await proxyService.getNextProxy();
+    const contextOptions: {
+      viewport: { width: number; height: number };
+      userAgent: string;
+      locale: string;
+      timezoneId: string;
+      geolocation: { latitude: number; longitude: number };
+      permissions: string[];
+      proxy?: { server: string };
+    } = {
       viewport: { width: 1920, height: 1080 },
       userAgent:
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
@@ -116,7 +133,15 @@ export class BrowserEyes {
       timezoneId: 'Europe/Moscow',
       geolocation: { latitude: 55.7558, longitude: 37.6173 }, // Moscow
       permissions: ['geolocation'],
-    });
+    };
+
+    if (proxyUrl) {
+      logger.info(`[BrowserEyes] Using proxy: ${proxyUrl}`);
+      contextOptions.proxy = { server: proxyUrl };
+    }
+
+    const context: BrowserContext = await this.browser.newContext(contextOptions);
+    const page = await context.newPage();
 
     // Additional anti-detection: Override navigator properties
     await page.addInitScript(() => {

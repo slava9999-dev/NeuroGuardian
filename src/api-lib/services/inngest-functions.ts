@@ -237,57 +237,75 @@ export const backgroundPriceCheck = inngest.createFunction(
 // SCHEDULED SENTINEL CYCLE
 // ============================================
 
+// ============================================
+// SCHEDULED SENTINEL CYCLE (FAN-OUT ARCHITECTURE)
+// ============================================
+
+/**
+ * Main orchestrator task: Triggered every 30 mins.
+ * It identifies all active users and triggers INDIVIDUAL tasks for each.
+ * This prevents one heavy user from blocking the entire system.
+ */
 export const scheduledSentinelCycle = inngest.createFunction(
   {
     id: 'scheduled-sentinel-cycle',
-    name: 'Scheduled Sentinel Cycle (30 min)',
+    name: 'Sentinel Global Orchestrator (30 min)',
   },
-  { cron: '*/30 * * * *' }, // Every 30 minutes
-  async ({
-    step,
-  }): Promise<{
-    usersProcessed: number;
-    threatsDetected: number;
-    actionsTaken: number;
-    errors: string[];
-  }> => {
+  { cron: '*/30 * * * *' },
+  async ({ step }) => {
+    logger.info('[Sentinel-FanOut] Starting global cycle orchestration');
+
+    const usersToProcess = await step.run('gather-active-users', async (): Promise<number[]> => {
+      // Logic to get only active users with protection enabled
+      // In production, we'd chunk this if > 10,000 users
+      const result = await sentinelService.getActiveUserIds();
+      return result;
+    });
+
     const now = new Date();
     const utcHour = now.getUTCHours();
-    const utcMinutes = now.getUTCMinutes();
+    const isReportTime = [6, 11, 17].includes(utcHour);
 
-    // MSK is UTC+3. We want reports at:
-    // 09:00 MSK -> 06:00 UTC
-    // 14:00 MSK -> 11:00 UTC
-    // 20:00 MSK -> 17:00 UTC
-    // Running every 30 mins means checking minutes < 30 ensures we don't send twice (e.g. 06:00 vs 06:30)
-    // although sendPriceReport logic inside runCycle is per-run.
-    const reportHoursUTC = [6, 11, 17];
-    const isReportTime = reportHoursUTC.includes(utcHour) && utcMinutes < 30;
+    // FAN-OUT: Trigger individual user tasks
+    const events = ((usersToProcess as unknown as number[]) || []).map((userId: number) => ({
+      name: 'sentinel/user.process',
+      data: { userId, isReportTime },
+    }));
 
-    logger.info('[Inngest] Starting scheduled Sentinel cycle', {
-      isReportTime,
-      utcHour,
-      utcMinutes,
+    await step.sendEvent('trigger-user-tasks', events);
+
+    logger.info('[Sentinel-FanOut] Triggered individual tasks', {
+      count: usersToProcess.length,
     });
 
-    const result = await step.run('run-full-cycle', async () => {
-      // If it's report time, we generate and send detailed price reports to users
-      return await sentinelService.runCycle({ sendPriceReport: isReportTime });
-    });
+    return { usersCount: usersToProcess.length };
+  }
+);
 
-    logger.info('[Inngest] Scheduled Sentinel cycle completed', {
-      usersProcessed: result.usersProcessed,
-      threatsDetected: result.threatsDetected,
-      actionsTaken: result.actionsTaken,
-      errors: result.errors?.length ?? 0,
-    });
+/**
+ * Individual User Worker: Handles one user comprehensively.
+ * Industrial grade concurrency and error isolation.
+ */
+export const processSentinelUserTask = inngest.createFunction(
+  {
+    id: 'sentinel-user-worker',
+    name: 'Sentinel User Worker',
+    concurrency: {
+      limit: 25, // Up to 25 accounts processed simultaneously
+      key: 'event.data.userId',
+    },
+    retries: 3,
+  },
+  { event: 'sentinel/user.process' },
+  async ({ event, step }) => {
+    const { userId, isReportTime } = event.data;
 
-    return {
-      usersProcessed: result.usersProcessed ?? 0,
-      threatsDetected: result.threatsDetected ?? 0,
-      actionsTaken: result.actionsTaken ?? 0,
-      errors: result.errors ?? [],
-    };
+    return await step.run('execute-user-cycle', async () => {
+      logger.info(`[Sentinel-Worker] Processing user ${userId}`);
+      return await sentinelService.runForUser(userId, {
+        sendPriceReport: isReportTime,
+      });
+    });
   }
 );
 
