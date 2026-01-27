@@ -1,0 +1,96 @@
+version: '3.8'
+
+services:
+  # ==========================================
+  # 1. CORE API SERVICE
+  # The brain of NeuroGUARDIAN
+  # ==========================================
+  api:
+    image: node:20-slim
+    container_name: neuro-api
+    restart: always
+    working_dir: /app
+    # Industrial-grade start: Debian + Build-essential + Automatic Sharp handled by npm
+    command: sh -c "apt-get update && apt-get install -y libvips-dev build-essential python3 --no-install-recommends && npm install --legacy-peer-deps && npx tsx scripts/local-api-server.mjs"
+    volumes:
+      - ./:/app
+      - /app/node_modules
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - POSTGRES_URL=${POSTGRES_URL}
+      - BROWSERLESS_URL=ws://browserless:3000
+      - REDIS_URL=redis://redis:6379
+      - HUGGINGFACE_API_KEY=${HUGGINGFACE_API_KEY}
+    depends_on:
+      - postgres
+      - redis
+      - browserless
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 2G
+
+  # ==========================================
+  # 2. BROWSERLESS CLUSTER (The Eyes)
+  # Scalable Chrome instances for Sentinel
+  # ==========================================
+  browserless:
+    image: browserless/chrome:latest
+    container_name: neuro-eyes
+    restart: always
+    ports:
+      - "3002:3000"
+    environment:
+      - MAX_CONCURRENT_SESSIONS=10
+      - CONNECTION_TIMEOUT=60000
+      - MAX_QUEUE_LENGTH=20
+      - PREBOOT_CHROME=true
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 3G # Chrome needs RAM!
+    shm_size: '2gb' # Critical for Chrome stability
+
+  # ==========================================
+  # 3. DATABASE (The Memory)
+  # Local PostgreSQL 15 with pgvector
+  # ==========================================
+  postgres:
+    image: pgvector/pgvector:pg15
+    container_name: neuro-db
+    restart: always
+    environment:
+      POSTGRES_USER: neuro_admin
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secure_pass_change_me}
+      POSTGRES_DB: neuroguardian
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+
+  # ==========================================
+  # 4. REDIS (The Speed)
+  # Caching layer for Agent State & Prices
+  # ==========================================
+  redis:
+    image: redis:alpine
+    container_name: neuro-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
+volumes:
+  postgres_data:
+  redis_data:

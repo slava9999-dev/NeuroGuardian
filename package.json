@@ -9,12 +9,8 @@
     "dev:full": "concurrently \"npm run dev:api\" \"cross-env VITE_LOCAL_BACKEND=true npm run dev\"",
     "build": "vite build",
     "build:security-agent": "cd security-agent && npm run build",
-    "vercel-build": "rm -rf api/handlers && npm run build:security-agent && npm run build -- --emptyOutDir",
-    "postinstall": "cd security-agent && npm install && npm run build || true",
-    "typecheck": "tsc -b",
     "lint": "eslint .",
     "preview": "vite preview",
-    "prepare": "husky",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -100,7 +96,9 @@
     "tailwind-merge": "^3.4.0",
     "uuid": "^13.0.0",
     "zod": "^4.1.13",
-    "zustand": "^5.0.9"
+    "zustand": "^5.0.9",
+    "sharp": "^0.34.5",
+    "tsx": "^4.21.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
@@ -127,9 +125,7 @@
     "knip": "^5.82.0",
     "lint-staged": "^16.2.7",
     "prettier": "^3.7.4",
-    "sharp": "^0.34.5",
     "tailwindcss": "^4.1.18",
-    "tsx": "^4.21.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.4",
