@@ -6,12 +6,42 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+// Mock logger to suppress noise
+vi.mock('../../src/api-lib/lib/logger.js', () => ({
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
+
 // Mock all dependencies
 vi.mock('../../src/infrastructure/llm/GeminiProvider.js', () => ({
   GeminiProvider: vi.fn().mockImplementation(() => ({
-    complete: vi.fn().mockResolvedValue({
-      content: 'Mocked response',
-      tokensUsed: 100,
+    complete: vi.fn().mockImplementation(async (messages: any[]) => {
+      // Find the last user message to avoid matching keywords in system prompts
+      const userMessage = messages.filter(m => m.role === 'user').pop()?.content || '';
+      const prompt = userMessage.toLowerCase();
+      let category = 'CHAT';
+
+      if (prompt.includes('товар') || prompt.includes('product')) category = 'PRODUCTS';
+      else if (prompt.includes('цена') || prompt.includes('price') || prompt.includes('стоп-лосс'))
+        category = 'PRICING';
+      else if (prompt.includes('статус') || prompt.includes('защит') || prompt.includes('sentinel'))
+        category = 'SENTINEL';
+      else if (prompt.includes('аналитика') || prompt.includes('юнит') || prompt.includes('abc'))
+        category = 'ANALYTICS';
+
+      return {
+        content: JSON.stringify({
+          category,
+          confidence: 0.9,
+          reasoning: `Mocked classification for: ${category}`,
+          entities: { productIds: [], prices: [], marketplace: null },
+        }),
+        tokensUsed: 100,
+      };
     }),
     completeWithTools: vi.fn().mockResolvedValue({
       content: 'Mocked tool response',
@@ -22,7 +52,15 @@ vi.mock('../../src/infrastructure/llm/GeminiProvider.js', () => ({
 }));
 
 vi.mock('../../src/api-lib/services/database.js', () => ({
-  sql: vi.fn().mockResolvedValue({ rows: [] }),
+  sql: Object.assign(
+    vi.fn().mockImplementation(async (strings: any, ...args: any[]) => {
+      const query = typeof strings === 'string' ? strings : strings[0];
+      if (query.includes('pg_extension')) return { rows: [{ has_vector: true }] };
+      if (query.includes('information_schema.tables')) return { rows: [{ has_table: true }] };
+      return { rows: [] };
+    }),
+    { unsafe: vi.fn().mockResolvedValue({ rows: [{ id: 1 }] }) }
+  ),
 }));
 
 vi.mock('../../src/agent/core/StateManager.js', () => ({
@@ -40,6 +78,28 @@ vi.mock('../../src/agent/execution/ToolRegistry.js', () => ({
   toolRegistry: {
     get: vi.fn().mockReturnValue(undefined),
     execute: vi.fn().mockResolvedValue({ success: true }),
+  },
+}));
+
+vi.mock('../../src/api-lib/services/validation-log.service.js', () => ({
+  validationLogService: {
+    logValidation: vi.fn().mockResolvedValue(undefined),
+    getStats: vi.fn().mockResolvedValue({}),
+  },
+}));
+
+vi.mock('../../src/infrastructure/rag/SpecialistKnowledgeBase.js', () => ({
+  specialistKnowledgeBase: {
+    retrieveForSpecialist: vi.fn().mockResolvedValue({
+      documents: [],
+      formattedContext: '',
+      tokensEstimate: 0,
+    }),
+    retrieveHybrid: vi.fn().mockResolvedValue({
+      documents: [],
+      formattedContext: '',
+      tokensEstimate: 0,
+    }),
   },
 }));
 

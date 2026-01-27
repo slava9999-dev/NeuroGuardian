@@ -102,7 +102,9 @@ export class EmergencyResponse {
       throw new Error('EmergencyResponse: audit logger not set');
     }
 
-    console.log('[EmergencyResponse] Initialized');
+    if (process.env.NODE_ENV !== 'test') {
+      console.log('[EmergencyResponse] Initialized');
+    }
   }
 
   // ============================================

@@ -76,7 +76,9 @@ export class AuditLogger {
       this.flushInterval = setInterval(() => this.flushBuffer(), this.FLUSH_INTERVAL_MS);
 
       this.initialized = true;
-      console.log('[AuditLogger] Connected to ClickHouse at', this.config.clickhouse.host);
+      if (process.env.NODE_ENV !== 'test') {
+        console.log('[AuditLogger] Connected to ClickHouse at', this.config.clickhouse.host);
+      }
     } catch (error) {
       throw new SecurityAgentError(
         `Failed to connect to ClickHouse: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -154,14 +156,16 @@ export class AuditLogger {
     }
 
     // Log to console for debugging (never log sensitive data!)
-    console.log('[AuditLogger] Event logged', {
-      id: entry.id,
-      event: entry.event,
-      category: entry.category,
-      severity: entry.severity,
-      userId: entry.userId,
-      traceId: entry.traceId,
-    });
+    if (process.env.NODE_ENV !== 'test') {
+      console.log('[AuditLogger] Event logged', {
+        id: entry.id,
+        event: entry.event,
+        category: entry.category,
+        severity: entry.severity,
+        userId: entry.userId,
+        traceId: entry.traceId,
+      });
+    }
 
     return entry.id;
   }
@@ -409,12 +413,15 @@ export class AuditLogger {
       }));
 
       await this.client!.insert('security_audit.audit_logs', rows);
-
-      console.log('[AuditLogger] Flushed buffer', { count: rows.length });
+      if (process.env.NODE_ENV !== 'test') {
+        console.log('[AuditLogger] Flushed buffer', { count: rows.length });
+      }
     } catch (error) {
       // Put entries back to buffer on failure
       this.buffer.unshift(...entries);
-      console.error('[AuditLogger] Failed to flush buffer', error);
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('[AuditLogger] Failed to flush buffer', error);
+      }
     }
   }
 

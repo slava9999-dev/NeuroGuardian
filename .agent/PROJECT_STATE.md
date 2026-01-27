@@ -17,6 +17,29 @@
 > ✅ **AI ENABLED:** Configured Gemini & OpenRouter keys for on-server agent logic.
 > ✅ **SECURITY:** Integrated `ADMIN_API_KEY` for cross-service authorization.
 
+### Session 2026-01-27 (Session 97 - Test Log Silencing & Cleanup) 🧹
+
+**Objective: Reduce log noise during testing to improve developer experience.**
+
+> ✅ **SILENCED LOGS:** Wrapped initialization and informational logs in `SecurityAgent` modules, `StorageService`, and `ToolRegistry` with `process.env.NODE_ENV !== 'test'` checks.
+> ✅ **CLEANER OUTPUT:** Reduced console spam during `vitest` runs, making it easier to identify actual failures.
+> ✅ **DEBUG REMOVAL:** Removed leftover `console.log` debug statements in `VectorStore`.
+
+**Completed Actions:**
+
+- [x] **Security Agent**:
+  - `secrets.ts`, `audit.ts`, `authz.ts`, `n8n.ts`, `regression.ts`, `ai-guard.ts`, `emergency.ts`: Conditional logging.
+- [x] **Core Services**:
+  - `src/vision/StorageService.ts`: Silenced mock upload logs in tests.
+  - `src/agent/execution/index.ts`: Silenced tool registry count log.
+  - `src/infrastructure/rag/VectorStore.ts`: Removed debug log.
+
+**Key Insights:**
+
+```
+Noisy logs during tests mask legitimate errors. Conditional suppression is a simple but effective quality of life improvement for the dev team.
+```
+
 ### Session 2026-01-27 (Session 96 - API Debugging & Final Deployment) 🚀
 
 **Objective: Solve Sharp native module issues and launch API on server.**

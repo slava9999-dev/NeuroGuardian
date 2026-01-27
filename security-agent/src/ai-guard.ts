@@ -116,7 +116,9 @@ export class AIAgentGuard {
     // Initialize token budgets from storage (в production - из Redis/DB)
     // For now, budgets are in-memory
 
-    console.log('[AIAgentGuard] Initialized');
+    if (process.env.NODE_ENV !== 'test') {
+      console.log('[AIAgentGuard] Initialized');
+    }
   }
 
   // ============================================

@@ -2,7 +2,16 @@
 // NeuroGUARDIAN — Circuit Breaker Tests
 // ============================================
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+vi.mock('../../src/api-lib/lib/logger.js', () => ({
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
+
 import {
   CircuitBreaker,
   CircuitBreakerPresets,

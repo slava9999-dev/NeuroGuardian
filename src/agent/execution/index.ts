@@ -91,9 +91,11 @@ export function registerAllTools(): void {
   // Admin
   toolRegistry.register(getSystemLogsTool);
 
-  logger.info(`[ToolRegistry] Registered ${toolRegistry.getStats().total} tools:`, {
-    tools: toolRegistry.getNames(),
-  });
+  if (process.env.NODE_ENV !== 'test') {
+    logger.info(`[ToolRegistry] Registered ${toolRegistry.getStats().total} tools:`, {
+      tools: toolRegistry.getNames(),
+    });
+  }
 }
 
 // Re-export individual tools for direct access

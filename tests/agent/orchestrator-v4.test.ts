@@ -3,7 +3,7 @@
 // Tests for two-phase pipeline architecture
 // ============================================
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   PlanSchema,
   AnswerSchema,
@@ -273,6 +273,16 @@ describe('Agent Orchestrator V4', () => {
   });
 
   describe('sanitizeAnswerLinks', () => {
+    let warnSpy: any;
+
+    beforeEach(() => {
+      warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      warnSpy.mockRestore();
+    });
+
     it('should remove hallucinated links', () => {
       const answer: Answer = {
         message: 'Test',

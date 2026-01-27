@@ -130,7 +130,9 @@ export class SecretsGuard {
     if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
       this.client = null;
       this.initialized = true;
-      console.log('[SecretsGuard] Running in fallback mode (TEST/DEV)');
+      if (process.env.NODE_ENV !== 'test') {
+        console.log('[SecretsGuard] Running in fallback mode (TEST/DEV)');
+      }
       return;
     }
 
@@ -484,7 +486,9 @@ export class SecretsGuard {
     // 3. Rate limiting hasn't been exceeded
 
     // For now, we log and allow (will be enhanced with OPA policies)
-    console.log('[SecretsGuard] Validating access', { userId, key, purpose });
+    if (process.env.NODE_ENV !== 'test') {
+      console.log('[SecretsGuard] Validating access', { userId, key, purpose });
+    }
   }
 }
 

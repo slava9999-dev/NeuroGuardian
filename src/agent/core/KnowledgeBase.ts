@@ -73,9 +73,14 @@ export class KnowledgeBase {
       }
 
       this.isLoaded = true;
-      logger.info(`[KnowledgeBase] Loaded ${this.docs.length} documents.`);
+      if (process.env.NODE_ENV !== 'test') {
+        logger.info(`[KnowledgeBase] Loaded ${this.docs.length} documents.`);
+      }
     } catch (error) {
-      logger.error('[KnowledgeBase] Init error:', error);
+      // In test environment, we might expect some init errors if dirs are missing, verify criticality
+      if (process.env.NODE_ENV !== 'test') {
+        logger.error('[KnowledgeBase] Init error:', error);
+      }
     }
   }
 

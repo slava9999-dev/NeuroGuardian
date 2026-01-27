@@ -76,7 +76,9 @@ export class SecurityAgent {
   async initialize(): Promise<void> {
     if (this.initialized) return;
 
-    console.log('[SecurityAgent] Initializing...');
+    if (process.env.NODE_ENV !== 'test') {
+      console.log('[SecurityAgent] Initializing...');
+    }
 
     await Promise.all([
       this.secrets.initialize(),
@@ -89,17 +91,23 @@ export class SecurityAgent {
     ]);
 
     this.initialized = true;
-    console.log('[SecurityAgent] Initialized successfully');
+    if (process.env.NODE_ENV !== 'test') {
+      console.log('[SecurityAgent] Initialized successfully');
+    }
   }
 
   /**
    * Graceful shutdown
    */
   async shutdown(): Promise<void> {
-    console.log('[SecurityAgent] Shutting down...');
+    if (process.env.NODE_ENV !== 'test') {
+      console.log('[SecurityAgent] Shutting down...');
+    }
     await this.audit.shutdown();
     this.initialized = false;
-    console.log('[SecurityAgent] Shutdown complete');
+    if (process.env.NODE_ENV !== 'test') {
+      console.log('[SecurityAgent] Shutdown complete');
+    }
   }
 
   /**
@@ -113,9 +121,13 @@ export class SecurityAgent {
    * Create middleware using this agent's configuration
    */
   createMiddleware(options: SecurityMiddlewareOptions) {
-    return securityMiddleware(options, async (req: unknown, res: unknown) => {
-      return { success: true, req, res };
-    });
+    return securityMiddleware(
+      options,
+      async (req: unknown, res: unknown) => {
+        return { success: true, req, res };
+      },
+      this
+    );
   }
 }
 
@@ -142,7 +154,13 @@ export function createSecurityAgentFromEnv(): SecurityAgent {
     host: process.env.REDIS_HOST || 'localhost',
     port: parseInt(process.env.REDIS_PORT || '6379', 10),
   };
-  // Only use Upstash if URL is provided
+
+  // Support REDIS_URL from .env
+  if (process.env.REDIS_URL) {
+    redisConfig.url = process.env.REDIS_URL;
+  }
+
+  // Only use Upstash if URL is provided (overrides REDIS_URL)
   if (process.env.UPSTASH_REDIS_REST_URL) {
     redisConfig.url = process.env.UPSTASH_REDIS_REST_URL;
     redisConfig.password = process.env.UPSTASH_REDIS_REST_TOKEN || '';
@@ -237,7 +255,8 @@ const RASP_PATTERNS = {
  */
 export function securityMiddleware<T extends (...args: unknown[]) => Promise<unknown>>(
   options: SecurityMiddlewareOptions,
-  handler: T
+  handler: T,
+  providedAgent?: SecurityAgent
 ): T {
   return (async (...args: unknown[]) => {
     const [req] = args as [
@@ -249,7 +268,7 @@ export function securityMiddleware<T extends (...args: unknown[]) => Promise<unk
       },
     ];
 
-    const agent = getSecurityAgent();
+    const agent = providedAgent || getSecurityAgent();
 
     // Ensure initialized
     if (!agent.isInitialized()) {

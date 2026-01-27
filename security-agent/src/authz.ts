@@ -169,20 +169,58 @@ export class AuthorizationGuard {
         // Local development - try local Redis
         const ioredis = await import('ioredis');
         const RedisClient = ioredis.default || ioredis;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const client = new (RedisClient as any)({
-          host: this.config.redis.host || 'localhost',
-          port: this.config.redis.port || 6379,
-          password: this.config.redis.password,
+
+        // Build connection options
+        const redisOptions: any = {
           lazyConnect: true,
           maxRetriesPerRequest: 1,
           retryStrategy: () => null, // Don't retry
+        };
+
+        if (this.config.redis.url && !this.config.redis.url.startsWith('http')) {
+          // Use URL for ioredis (if not Upstash REST URL)
+          redisOptions.connectionName = 'security-agent';
+          // ioredis constructor handles the URL
+        } else {
+          redisOptions.host = this.config.redis.host || 'localhost';
+          redisOptions.port = this.config.redis.port || 6379;
+          if (this.config.redis.password) {
+            redisOptions.password = this.config.redis.password;
+          }
+        }
+
+        const client =
+          this.config.redis.url && !this.config.redis.url.startsWith('http')
+            ? new (RedisClient as any)(this.config.redis.url, redisOptions)
+            : new (RedisClient as any)(redisOptions);
+
+        // Prevent unhandled error events and silence NOAUTH noise in tests/dev
+        client.on('error', (err: any) => {
+          const msg = err.message || String(err);
+          // Suppress authentication errors in logs as they are expected/handled by fallback
+          if (msg.includes('NOAUTH') || msg.includes('ECONNREFUSED')) {
+            return;
+          }
+          // Suppress other connection errors in test environment
+          if (
+            process.env.NODE_ENV === 'test' &&
+            (msg.includes('connect') || msg.includes('ready'))
+          ) {
+            return;
+          }
+          console.warn('[AuthorizationGuard] Redis error event', {
+            message: msg,
+            code: err.code,
+          });
         });
 
         // Try to connect with timeout
         try {
           await Promise.race([
-            client.connect(),
+            (async () => {
+              await client.connect();
+              await client.ping(); // Verify AUTH
+            })(),
             new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000)),
           ]);
 
@@ -201,14 +239,23 @@ export class AuthorizationGuard {
             },
             ttl: async key => await client.ttl(key),
           };
-          console.log('[AuthorizationGuard] Local Redis connected');
+          if (process.env.NODE_ENV !== 'test') {
+            console.log('[AuthorizationGuard] Local Redis connected');
+          }
         } catch {
-          console.log('[AuthorizationGuard] Local Redis not available, using local cache');
+          if (process.env.NODE_ENV !== 'test') {
+            console.log('[AuthorizationGuard] Local Redis not available, using local cache');
+          }
           this.redis = null;
+          try {
+            client.disconnect();
+          } catch {}
         }
       }
     } catch (error) {
-      console.warn('[AuthorizationGuard] Redis connection failed, using local cache only', error);
+      if (process.env.NODE_ENV !== 'test') {
+        console.warn('[AuthorizationGuard] Redis connection failed, using local cache only', error);
+      }
       // Continue without Redis - use local cache
     }
   }

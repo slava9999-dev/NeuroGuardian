@@ -18,6 +18,16 @@ vi.mock('../../src/api-lib/services/validation-log.service.js', () => ({
   },
 }));
 
+// Mock logger to suppress noise
+vi.mock('../../src/api-lib/lib/logger.js', () => ({
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
+
 describe('ResponseValidator Edge Cases', () => {
   let validator: ResponseValidator;
   let baseContext: ValidationContext;

@@ -32,9 +32,13 @@ export class StorageService {
         // For Cloudflare R2 and some S3 providers
         forcePathStyle: true,
       });
-      logger.info(`[Storage] Initialized with real S3 client. Bucket: ${this.bucket}`);
+      if (process.env.NODE_ENV !== 'test') {
+        logger.info(`[Storage] Initialized with real S3 client. Bucket: ${this.bucket}`);
+      }
     } else {
-      logger.warn('[Storage] Missing credentials, using mock mode');
+      if (process.env.NODE_ENV !== 'test') {
+        logger.warn('[Storage] Missing credentials, using mock mode');
+      }
     }
   }
 
@@ -50,7 +54,9 @@ export class StorageService {
     const key = `${folder}/${fileName}`;
 
     if (!this.s3Client) {
-      logger.info(`[Storage] Mock uploading ${key} (${fileBuffer.length} bytes, ${mimeType})`);
+      if (process.env.NODE_ENV !== 'test') {
+        logger.info(`[Storage] Mock uploading ${key} (${fileBuffer.length} bytes, ${mimeType})`);
+      }
       return `https://cdn.example.com/${key}`;
     }
 

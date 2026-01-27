@@ -288,10 +288,6 @@ export class VectorStore {
       this.embeddingProvider = new GeminiEmbeddingProvider();
       logger.info('[VectorStore] Using Gemini embeddings (768 dims)');
     }
-    console.log(
-      '[DEBUG] VectorStore constructed with provider:',
-      this.embeddingProvider.constructor.name
-    );
   }
 
   /**
@@ -355,7 +351,6 @@ export class VectorStore {
     // Round to 4 decimals - optimal balance for 384d model (~3KB payload)
     const roundedEmbedding = embedding.map(n => Math.round(n * 10000) / 10000);
     const embStr = JSON.stringify(roundedEmbedding);
-    console.log(`[DEBUG] Saving to DB: ${doc.sourceFile}, embedding length: ${embStr.length}`);
     logger.info(`[VectorStore] Saving document to DB: ${doc.sourceFile} (chunk ${doc.chunkIndex})`);
     // We use unsafe here to bypass parameterized query issues with large vectors on some systems
     const result = await sql.unsafe(

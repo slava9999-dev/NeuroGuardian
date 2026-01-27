@@ -42,13 +42,13 @@ async function main() {
     console.log('   Creating Indexes...');
 
     // 1. Structure Indexes
-    await sql`CREATE INDEX idx_embeddings_namespace ON knowledge_embeddings(namespace)`;
-    await sql`CREATE INDEX idx_embeddings_source ON knowledge_embeddings(source_file)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_embeddings_namespace ON knowledge_embeddings(namespace)`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_embeddings_source ON knowledge_embeddings(source_file)`;
 
     // 2. Vector Index (HNSW)
     console.log('   - Index: HNSW (Vector)');
     await sql`
-      CREATE INDEX idx_embeddings_hnsw 
+      CREATE INDEX IF NOT EXISTS idx_embeddings_hnsw 
       ON knowledge_embeddings 
       USING hnsw (embedding vector_cosine_ops)
       WITH (m = 16, ef_construction = 64)
@@ -57,7 +57,7 @@ async function main() {
     // 3. Full-Text Index (GIN)
     console.log('   - Index: GIN (Full-Text)');
     await sql`
-      CREATE INDEX idx_embeddings_content_fts 
+      CREATE INDEX IF NOT EXISTS idx_embeddings_content_fts 
       ON knowledge_embeddings 
       USING GIN (to_tsvector('russian', content))
     `;

@@ -16,11 +16,13 @@ async function main() {
   // 1. Static Analysis
   console.log('\n🔍 Phase 1: Static Analysis (Lint & Types)');
   try {
+    console.log('   - Running Lint...');
+    execSync('npm run lint', { stdio: 'inherit' });
     console.log('   - Running Type Check...');
     execSync('npm run typecheck', { stdio: 'inherit' });
-    console.log('   ✅ TypeScript is happy.');
+    console.log('   ✅ TypeScript and ESLint are happy.');
   } catch {
-    console.error('   ❌ TypeScript errors found!');
+    console.error('   ❌ Static analysis failed!');
     failed = true;
   }
 

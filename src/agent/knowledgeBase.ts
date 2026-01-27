@@ -53,7 +53,9 @@ export class AgentKnowledgeBase {
     // Загружаем из БД (пользовательские документы)
     await this.loadDocumentsFromDB();
 
-    console.log(`[KnowledgeBase] Loaded ${this.documents.size} documents`);
+    if (process.env.NODE_ENV !== 'test') {
+      console.log(`[KnowledgeBase] Loaded ${this.documents.size} documents`);
+    }
   }
 
   /**

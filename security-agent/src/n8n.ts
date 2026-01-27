@@ -84,7 +84,6 @@ export class N8nGuardian {
   async initialize(): Promise<void> {
     // In test environment, skip key initialization
     if (process.env.NODE_ENV === 'test' || process.env.VITEST) {
-      console.log('[N8nGuardian] Running in test mode, skipping key initialization');
       this.n8nApiKey = process.env.N8N_API_KEY || 'test-api-key';
       return;
     }

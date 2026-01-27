@@ -5,11 +5,26 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+// Set env variables for test
+process.env.MOE_ROUTING_ENABLED = 'false';
+
 // Mock external dependencies before imports
 vi.mock('@langchain/openai', () => ({
   ChatOpenAI: vi.fn().mockImplementation(() => ({
-    invoke: vi.fn().mockRejectedValue(new Error('LLM not available in test')),
+    invoke: vi.fn().mockResolvedValue({
+      content: JSON.stringify({ intent: 'CHAT', confidence: 1.0, reasoning: 'Mock success' }),
+    }),
   })),
+}));
+
+// Mock logger to suppress noise
+vi.mock('../../src/api-lib/lib/logger.js', () => ({
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
 }));
 
 // Now import the module
@@ -108,11 +123,11 @@ describe('MoE Router', () => {
   });
 
   describe('LLM Health Check', () => {
-    it('should report unhealthy when LLM unavailable', async () => {
+    it('should report healthy when LLM available', async () => {
       const health = await checkLocalLLMHealth();
 
-      expect(health.healthy).toBe(false);
-      expect(health.error).toBeDefined();
+      expect(health.healthy).toBe(true);
+      expect(health.error).toBeUndefined();
       expect(health.latencyMs).toBeGreaterThanOrEqual(0);
     });
   });

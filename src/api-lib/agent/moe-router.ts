@@ -84,7 +84,9 @@ function getLocalLLMClient(): ChatOpenAI {
         apiKey: 'not-needed',
       },
     });
-    logger.info('[MoE] Local LLM client initialized', { baseURL });
+    if (process.env.NODE_ENV !== 'test') {
+      logger.info('[MoE] Local LLM client initialized', { baseURL });
+    }
   }
   return localLLMClient;
 }
@@ -295,10 +297,12 @@ const classifyIntent = async (
   if (!classification) {
     classification = classifyByRules(query);
     classifiedBy = 'fallback_rules';
-    logger.info('[MoE] Using rule-based classification', {
-      intent: classification.intent,
-      confidence: classification.confidence,
-    });
+    if (process.env.NODE_ENV !== 'test') {
+      logger.info('[MoE] Using rule-based classification', {
+        intent: classification.intent,
+        confidence: classification.confidence,
+      });
+    }
   }
 
   // Map intent to route

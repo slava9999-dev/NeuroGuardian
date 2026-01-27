@@ -10,6 +10,7 @@
     "build": "vite build",
     "build:security-agent": "cd security-agent && npm run build",
     "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

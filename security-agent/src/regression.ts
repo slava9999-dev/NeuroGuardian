@@ -102,7 +102,9 @@ export class RegressionShield {
     if (!this.audit) {
       throw new Error('RegressionShield: audit logger not set');
     }
-    console.log('[RegressionShield] Initialized');
+    if (process.env.NODE_ENV !== 'test') {
+      console.log('[RegressionShield] Initialized');
+    }
   }
 
   // ============================================

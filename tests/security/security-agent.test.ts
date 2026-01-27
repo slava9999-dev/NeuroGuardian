@@ -8,12 +8,30 @@ import {
 describe('SecurityAgent Integration', () => {
   let agent: SecurityAgent;
 
+  // Mock ioredis to suppress NOAUTH logs during testing
+  vi.mock('ioredis', () => {
+    const Redis = vi.fn();
+    Redis.prototype.connect = vi.fn().mockResolvedValue(undefined);
+    Redis.prototype.ping = vi.fn().mockResolvedValue('PONG');
+    Redis.prototype.get = vi.fn().mockResolvedValue(null);
+    Redis.prototype.set = vi.fn().mockResolvedValue('OK');
+    Redis.prototype.setex = vi.fn().mockResolvedValue('OK');
+    Redis.prototype.incr = vi.fn().mockResolvedValue(1);
+    Redis.prototype.expire = vi.fn().mockResolvedValue(1);
+    Redis.prototype.ttl = vi.fn().mockResolvedValue(300);
+    Redis.prototype.disconnect = vi.fn().mockResolvedValue(undefined);
+    Redis.prototype.on = vi.fn();
+    return { default: Redis };
+  });
+
   beforeEach(() => {
     // Reset env for each test
     process.env.NODE_ENV = 'test';
     const config: SecurityAgentConfig = {
       vault: { address: 'http://localhost:8200', token: 'test', tlsEnabled: false },
-      redis: { host: 'localhost', port: 6379 },
+      redis: {
+        url: process.env.REDIS_URL || 'redis://:localredispass@localhost:6379',
+      },
       clickhouse: {
         host: 'localhost',
         port: 8123,
