@@ -69,11 +69,22 @@ async function executeWithRetry(text: string, values: unknown[]): Promise<QueryR
     try {
       client = await pool.connect();
 
-      // Ensure specific search path
-      await client.query('SET search_path TO public');
+      // Create a local handler for this session to prevent unhandled 'error' events (like ECONNRESET)
+      // which would otherwise crash the process.
+      const errorHandler = (err: Error) =>
+        logger.warn(`[Database] ⚠️ Client session error: ${err.message}`);
+      client.on('error', errorHandler);
 
-      const res = await client.query(text, values);
-      return res;
+      try {
+        // Ensure specific search path
+        await client.query('SET search_path TO public');
+
+        const res = await client.query(text, values);
+        return res;
+      } finally {
+        // CRITICAL: Remove the listener before returning the client to the pool to prevent memory leaks
+        client.removeListener('error', errorHandler);
+      }
     } catch (error: unknown) {
       const err = error as Error;
       const msg = err.message || String(error);
