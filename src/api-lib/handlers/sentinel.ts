@@ -15,6 +15,7 @@ import { db, products, users } from '../../infrastructure/database/db.js';
 import { eq, and, sql as drizzleSql } from 'drizzle-orm';
 import { getSecret } from '../lib/secrets-helper.js';
 import { logger } from '../lib/logger.js';
+import { sql } from '../services/database.js';
 
 /**
  * Handle check-prices action (Sentinel Cron)
@@ -93,8 +94,6 @@ export async function handleSentinelStats(
   res: VercelResponse,
   userId: number
 ): Promise<VercelResponse> {
-  const { sql } = await import('@vercel/postgres');
-
   try {
     const logs = await sql`
       SELECT * FROM sentinel_logs 
@@ -134,7 +133,6 @@ export async function handleSentinelDashboard(
   res: VercelResponse,
   userId: number
 ): Promise<VercelResponse> {
-  const { sql } = await import('@vercel/postgres');
   const { ThreatDetector } = await import('../../sentinel/ThreatDetector.js');
   const threatDetector = new ThreatDetector();
   const { getMarketplaceKeys, fetchWbPrices, fetchOzonCurrentPrices } =

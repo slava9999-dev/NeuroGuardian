@@ -12,10 +12,31 @@
 **Focus:** 🏁 Production Rollout & API Orchestration
 
 > ✅ **PRODUCTION LIVE:** NeuroGuardian API is operational at 185.26.121.139 (Port 3001).
-> ✅ **SHARP RESOLVED:** Migrated to `node:20-slim` (Debian) and fixed native dependencies (libvips).
-> ✅ **DB CONNECTED:** Resolved SSL requirement issues for local Docker PG.
-> ✅ **AI ENABLED:** Configured Gemini & OpenRouter keys for on-server agent logic.
-> ✅ **SECURITY:** Integrated `ADMIN_API_KEY` for cross-service authorization.
+> ✅ **SSL FIXED:** Resolved connectivity issues with internal Docker PG.
+> ✅ **AUTH RECOVERED:** Implemented Admin Key bypass (userId 0) for stats access.
+
+### Session 2026-01-27 (Session 98 - Production Connectivity Recovery) 🚀
+
+**Objective: Resolve SSL "Connection Not Supported" and fix Analytics Authorization logic.**
+
+> ✅ **DB CONNECTIVITY:** Modified `database.ts` to skip SSL for internal Docker network hosts (`db`, `postgres`), enabling stable communication with PostgreSQL.
+> ✅ **ADMIN BYPASS:** Added `userId 0` support in `auth.ts` and `withSubscription.ts` for Admin API Key users, allowing instant access to system metrics without DB registration.
+> ✅ **ANALYTICS FIX:** Corrected `handleGetAnalytics` to properly evaluate `AuthResult` objects, fixing the "Unauthorized" error for valid keys.
+> ✅ **DEPLOYMENT:** Successfully updated files on VPS via `scp` and restarted services; verified metrics endpoint responsiveness.
+
+**Completed Actions:**
+
+- [x] **Database Service**: `src/api-lib/services/database.ts` (Dynamic SSL logic).
+- [x] **Auth Middleware**: `src/api-lib/middleware/auth.ts` (System Admin bypass).
+- [x] **Subscription**: `src/api-lib/middleware/withSubscription.ts` (Admin bypass).
+- [x] **Handlers**: `src/api-lib/handlers/analytics.ts` and `sentinel.ts` (Auth logic and @vercel/postgres removal).
+
+**Key Insights:**
+
+```
+Direct imports of @vercel/postgres in handlers can bypass local SSL configurations. Centralizing DB access through a single database service is safer for multi-environment deployments.
+Admin bypass logic (userId 0) is essential for bootstrap queries when the admin user hasn't interacted with the system as a regular user yet.
+```
 
 ### Session 2026-01-27 (Session 97 - Test Log Silencing & Cleanup) 🧹
 

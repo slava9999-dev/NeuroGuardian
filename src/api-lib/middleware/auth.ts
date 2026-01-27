@@ -220,11 +220,28 @@ export async function extractAnyAuthAsync(req: VercelRequest): Promise<AuthResul
     return { success: false, error: 'Unauthorized', statusCode: 401 };
   }
 
+  // SYSTEM ADMIN BYPASS: userId 0 is reserved for global system control
+  if (userId === 0) {
+    return {
+      success: true,
+      context: {
+        userId,
+        authMethod,
+        user: {
+          id: 0,
+          first_name: 'System',
+          last_name: 'Admin',
+          is_active: true,
+          subscription_active: true,
+          subscription_plan: 'premium',
+        } as any,
+      },
+    };
+  }
+
   // ENRICH WITH USER DATA (SaaS Isolation Layer)
   const userRes = await sql`SELECT * FROM users WHERE id = ${userId}`;
   if (userRes.rows.length === 0) {
-    // Auto-onboarding: Create user if they don't exist yet but have valid Telegram IDs
-    // (Actual logic would be in UserRepository, but for SaaS we want consistency)
     return { success: false, error: 'User registration required', statusCode: 403 };
   }
 

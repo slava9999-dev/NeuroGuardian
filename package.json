@@ -47,7 +47,8 @@
     "test:agent:cleanup": "npx tsx tests/agent/run-professional-tests.ts --cleanup",
     "medic": "npx tsx scripts/neuro-medic.ts",
     "rag:migrate": "npx tsx scripts/rag-migrate.ts",
-    "rag:ingest": "npx tsx scripts/rag-ingest.ts"
+    "rag:ingest": "npx tsx scripts/rag-ingest.ts",
+    "postinstall": "npm run build:security-agent"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.46",

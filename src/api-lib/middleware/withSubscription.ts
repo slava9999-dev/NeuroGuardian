@@ -13,6 +13,11 @@ export async function withSubscription(
   userId: number
 ) {
   try {
+    // SYSTEM ADMIN BYPASS
+    if (userId === 0) {
+      return handler(req, res, userId);
+    }
+
     const result = await sql`
       SELECT subscription_active, subscription_end, subscription_plan 
       FROM users 
