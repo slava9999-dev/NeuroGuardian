@@ -1158,9 +1158,11 @@ PgVector остается основным движком знаний.
 - [x] **Real Cloud Storage Integration**
   - Implemented `StorageService` using AWS SDK v3 (S3/R2 compatible)
   - Added support for both Buffer and URL uploads
-- [x] **Project Scaffolding & Setup**
-  - Configured `npm` scripts and `tsconfig` paths
-  - Set up `tests/setup.ts` and mock environment
+- [x] **Deploy API to High Profy Server** (185.26.121.139)
+- [x] **Configure Nginx + SSL** (HTTPS via sslip.io)
+- [x] **Migrate Telegram Webhook** (Successfully moved from Vercel to Server)
+- [x] **Configure Vision Proxies** (HTTP/S support for WB scraping)
+- [x] **Optimize Performance** (Refactored rate-limiting to use local Redis)
 
 ### 🚧 In Progress
 
@@ -1525,7 +1527,16 @@ PgVector остается основным движком знаний.
 
 ---
 
-## ✅ Recently Completed (Sessions 48-67)
+## ✅ Recently Completed (Sessions 48-100)
+
+### Session 100 - High Profy Migration & SSL (Current)
+
+- [x] **Server Deployment**: Successfully deployed API on VPS (High Profy).
+- [x] **Sharp Fix**: Resolved binary dependencies for vision processing on Debian.
+- [x] **Reverse Proxy**: Set up Nginx with SSL (sslip.io) for secure hooks.
+- [x] **Webhook Migration**: Redirected Telegram bot from Vercel to Server.
+- [x] **Performance**: Shifted rate-limiting from Vercel KV to local Redis.
+- [x] **Safety**: Configured HTTP/S proxies for secure marketplace scraping.
 
 ### Session 67 - Agent Persona Critical Upgrade
 
@@ -1608,4 +1619,4 @@ PgVector остается основным движком знаний.
 
 ---
 
-_Last updated: 2026-01-27T12:55:00+03:00_
+_Last updated: 2026-01-27T14:10:00+03:00_

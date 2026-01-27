@@ -4,71 +4,36 @@
 // Refactored: Uses Security Agent for KV credentials
 // ============================================
 
-import { createClient, type VercelKV } from '@vercel/kv';
+import { Redis } from 'ioredis';
 import type { RateLimitResult } from './types.js';
 import { RATE_LIMIT, RATE_LIMIT_STRICT, RATE_WINDOW } from './constants.js';
-import { getSecret, getSecretSync } from './secrets-helper.js';
 
 // In-memory fallback store
 const inMemoryRateLimit = new Map<string, { count: number; resetAt: number }>();
 
-// Lazy-load KV client (only if configured)
-let kvClient: VercelKV | null = null;
+// Local Redis client
+let redisClient: Redis | null = null;
 
 /**
- * Get KV client (async version with Security Agent)
- * Exported for future async rate-limiting implementations
+ * Get Redis client for rate limiting
  */
-export async function getKVClientAsync(): Promise<VercelKV | null> {
-  if (kvClient) return kvClient;
+function getRedisClient(): Redis | null {
+  if (redisClient) return redisClient;
 
-  const [kvUrl, kvToken] = await Promise.all([
-    getSecret('kv_rest_api_url', 'rate_limit'),
-    getSecret('kv_rest_api_token', 'rate_limit'),
-  ]);
+  const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 
-  if (kvUrl && kvToken) {
-    try {
-      kvClient = createClient({
-        url: kvUrl,
-        token: kvToken,
-      });
-      console.log('✅ KV client initialized via Security Agent');
-      return kvClient;
-    } catch {
-      console.warn('⚠️ Failed to create KV client, using in-memory fallback');
-      return null;
-    }
+  try {
+    redisClient = new Redis(redisUrl, {
+      maxRetriesPerRequest: 1,
+      lazyConnect: true,
+      retryStrategy: () => null, // Don't hang if redis is down
+    });
+    console.log('🚀 Redis Rate Limiter initialized');
+    return redisClient;
+  } catch (_e) {
+    console.warn('⚠️ Redis connection failed for rate limiting, using memory fallback');
+    return null;
   }
-
-  return null;
-}
-
-/**
- * Get KV client (sync version with fallback to env)
- * @deprecated Use getKVClientAsync for new code
- */
-function getKVClient(): VercelKV | null {
-  if (kvClient) return kvClient;
-
-  const kvUrl = getSecretSync('kv_rest_api_url') || process.env.KV_REST_API_URL;
-  const kvToken = getSecretSync('kv_rest_api_token') || process.env.KV_REST_API_TOKEN;
-
-  if (kvUrl && kvToken) {
-    try {
-      kvClient = createClient({
-        url: kvUrl,
-        token: kvToken,
-      });
-      console.log('✅ KV client initialized');
-      return kvClient;
-    } catch {
-      console.warn('⚠️ Failed to create KV client, using in-memory fallback');
-      return null;
-    }
-  }
-
-  return null;
 }
 
 /**
@@ -84,10 +49,10 @@ export async function checkRateLimit(
     limitOverride !== undefined ? limitOverride : strict ? RATE_LIMIT_STRICT : RATE_LIMIT;
   const key = `rate:${identifier}`;
 
-  const client = getKVClient();
+  const client = getRedisClient();
 
   if (client) {
-    // Use KV-backed rate limiting
+    // Use Redis-backed rate limiting
     try {
       const current = await client.incr(key);
 
@@ -101,7 +66,7 @@ export async function checkRateLimit(
         remaining: Math.max(0, limit - current),
       };
     } catch (error) {
-      console.error('KV rate limit error:', error instanceof Error ? error.message : error);
+      console.error('Redis rate limit error:', error instanceof Error ? error.message : error);
       // Fall through to in-memory
     }
   }
@@ -150,12 +115,12 @@ export function cleanupExpiredEntries(): number {
 export async function resetRateLimit(identifier: string): Promise<void> {
   const key = `rate:${identifier}`;
 
-  const client = getKVClient();
+  const client = getRedisClient();
   if (client) {
     try {
       await client.del(key);
     } catch (error) {
-      console.error('Failed to reset KV rate limit:', error);
+      console.error('Failed to reset Redis rate limit:', error);
     }
   }
 

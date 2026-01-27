@@ -194,7 +194,8 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION update_expired_subscriptions()
 RETURNS INTEGER AS $$
 DECLARE
-  v_updated INTEGER;
+  v_trials_updated INTEGER;
+  v_active_updated INTEGER;
 BEGIN
   -- Expire trials
   UPDATE subscriptions
@@ -202,7 +203,7 @@ BEGIN
   WHERE status = 'trial' 
     AND trial_ends_at < NOW();
   
-  GET DIAGNOSTICS v_updated = ROW_COUNT;
+  GET DIAGNOSTICS v_trials_updated = ROW_COUNT;
   
   -- Expire active subscriptions
   UPDATE subscriptions
@@ -210,9 +211,9 @@ BEGIN
   WHERE status = 'active' 
     AND current_period_end < NOW();
   
-  GET DIAGNOSTICS v_updated = v_updated + ROW_COUNT;
+  GET DIAGNOSTICS v_active_updated = ROW_COUNT;
   
-  RETURN v_updated;
+  RETURN v_trials_updated + v_active_updated;
 END;
 $$ LANGUAGE plpgsql;
 

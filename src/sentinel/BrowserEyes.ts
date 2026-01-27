@@ -107,6 +107,7 @@ export class BrowserEyes {
     options?: {
       useVision?: boolean; // Use AI vision analysis
       waitForAuth?: boolean; // Wait for user to login (future)
+      saveScreenshot?: boolean; // Save screenshot to result
     }
   ): Promise<BrowserEyesResult> {
     const startTime = Date.now();
@@ -179,8 +180,13 @@ export class BrowserEyes {
         visionResult = await this.extractPriceFromVision(page, marketplace);
       }
 
-      // Combine results (prefer DOM if available, fallback to vision)
       const finalResult = this.mergeResults(domResult, visionResult);
+
+      // Take screenshot if requested or if extraction failed (for debugging)
+      if (options?.saveScreenshot || finalResult.buyerPrice === null) {
+        const screenshot = await page.screenshot({ type: 'png', fullPage: false });
+        finalResult.screenshotUrl = `data:image/png;base64,${screenshot.toString('base64')}`;
+      }
 
       const duration = Date.now() - startTime;
 

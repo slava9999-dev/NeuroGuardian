@@ -21,11 +21,13 @@ function getPool(): pkg.Pool {
   if (_pool) return _pool;
 
   const connectionString = config.POSTGRES_URL.replace(/\r/g, '').trim();
+  const isLocal = connectionString.includes('localhost') || connectionString.includes('127.0.0.1');
+  const useSsl = process.env.DB_NO_SSL !== 'true' && !isLocal;
 
   // Optimized for Neon/Vercel Postgres with Node 25+
   const poolConfig: PoolConfig = {
     connectionString,
-    ssl: { rejectUnauthorized: false },
+    ssl: useSsl ? { rejectUnauthorized: false } : false,
     max: 10, // Increased for concurrency
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 30000,
