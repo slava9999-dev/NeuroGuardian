@@ -20,7 +20,7 @@ export async function handleGetAnalytics(
   const isCron = await extractCronAuthAsync(req);
   const isAdmin = await extractAdminAuthAsync(req);
 
-  if (!isCron && !isAdmin) {
+  if (!isCron.success && !isAdmin.success) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 

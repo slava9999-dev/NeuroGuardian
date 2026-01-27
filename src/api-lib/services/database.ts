@@ -21,8 +21,16 @@ function getPool(): pkg.Pool {
   if (_pool) return _pool;
 
   const connectionString = config.POSTGRES_URL.replace(/\r/g, '').trim();
-  const isLocal = connectionString.includes('localhost') || connectionString.includes('127.0.0.1');
-  const useSsl = process.env.DB_NO_SSL !== 'true' && !isLocal;
+  const isLocal =
+    connectionString.includes('localhost') ||
+    connectionString.includes('127.0.0.1') ||
+    connectionString.includes('postgres') ||
+    connectionString.includes('db');
+
+  // Use SSL only if explicitly requested in URL OR if production and NOT local
+  const useSsl =
+    connectionString.includes('sslmode=require') ||
+    (process.env.NODE_ENV === 'production' && !isLocal && process.env.DB_NO_SSL !== 'true');
 
   // Optimized for Neon/Vercel Postgres with Node 25+
   const poolConfig: PoolConfig = {
