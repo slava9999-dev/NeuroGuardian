@@ -44,6 +44,7 @@ function getPool(): pkg.Pool {
   };
 
   _pool = new Pool(poolConfig);
+  _pool.setMaxListeners(20); // Increase limit for many concurrent requests
 
   _pool.on('error', (err: Error) => {
     // Avoid crashing on pool errors
@@ -67,12 +68,6 @@ async function executeWithRetry(text: string, values: unknown[]): Promise<QueryR
 
     try {
       client = await pool.connect();
-
-      // Handle background errors on the client while checked out
-      // This prevents crashes from 'error' events emitted (e.g. ECONNRESET) when not awaiting a query
-      client.on('error', err => {
-        logger.warn(`[Database] ⚠️ Client background error: ${err.message}`);
-      });
 
       // Ensure specific search path
       await client.query('SET search_path TO public');
