@@ -4,7 +4,7 @@
 // highlighting REAL buyer prices vs Seller prices and Stop Loss breaches.
 // ============================================
 
-import type { DBProduct } from '../api-lib/lib/types';
+import type { DBProduct } from '../api-lib/lib/types.js';
 
 export class SentinelPriceReporter {
   /**

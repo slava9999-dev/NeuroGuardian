@@ -29,7 +29,7 @@ export async function handleValidatorMetrics(
     if (!isAdmin) {
       // User auth required for non-admin
       const auth = await extractAnyAuthAsync(req);
-      if (!auth.success) {
+      if (auth.success === false) {
         return sendAuthError(res, auth.error, auth.statusCode);
       }
       userId = String(auth.context.userId);
@@ -96,7 +96,7 @@ export async function handleThreatHistory(
   try {
     // Auth required
     const auth = await extractAnyAuthAsync(req);
-    if (!auth.success) {
+    if (auth.success === false) {
       return sendAuthError(res, auth.error, auth.statusCode);
     }
 
