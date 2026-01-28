@@ -425,9 +425,10 @@ export function ProductsPage({
         <PriceCalculator
           marketplace={selectedForCalculator.marketplace}
           initialCostPrice={
-            selectedForCalculator.minPrice > 0
+            selectedForCalculator.costPrice ||
+            (selectedForCalculator.minPrice > 0
               ? Math.round(selectedForCalculator.minPrice * 0.7)
-              : undefined
+              : undefined)
           }
           onClose={() => setSelectedForCalculator(null)}
           onCalculated={async price => {

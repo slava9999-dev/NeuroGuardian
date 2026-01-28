@@ -10,83 +10,79 @@
 
 /**
  * Wildberries commission rates by category
- * UPDATED: Reflects June 2025 (+5%) and October 2025 increases
+ * UPDATED: Reflects Oct 31, 2025 Hikes (Fixed until April 2026)
  * Source: https://seller.wildberries.ru/supplier-settings/commission
  */
 export const WB_COMMISSIONS: Record<string, number> = {
-  // Electronics (after +5% in June 2025)
-  Электроника: 0.15, // Was 0.12, now 13-17% (avg 15%)
-  Смартфоны: 0.13, // Was 0.10
-  Компьютеры: 0.14, // Was 0.11
-  'Аудио/Видео': 0.15, // Was 0.12
+  // Fashion (Major hike on Oct 31, 2025)
+  Одежда: 0.345, // Critical: 34.5% (Up from 29.5%)
+  Обувь: 0.345, // Critical: 34.5% (Up from 29.5%)
+  Аксессуары: 0.25, // Average 20-30%
 
-  // Fashion (after +5% in June 2025)
-  Одежда: 0.25, // Was 0.15, now 20-30% (avg 25%)
-  Обувь: 0.25, // Was 0.15, now 20-30%
-  Аксессуары: 0.2, // Was 0.14, now 15-25%
+  // Electronics
+  Электроника: 0.17, // Was 15%
+  Смартфоны: 0.14, // Was 13%
+  Компьютеры: 0.15, // Was 14%
+  'Аудио/Видео': 0.17, // Was 15%
 
-  // Home & Garden (after +5% in June 2025)
-  'Дом и сад': 0.17, // Was 0.13
-  Мебель: 0.2, // Was 0.15
-  Декор: 0.18, // Was 0.14
-  Текстиль: 0.2, // Was 0.14, +5% in June
+  // Home & Garden
+  'Дом и сад': 0.2, // Was 17%
+  Мебель: 0.23, // Was 20%
+  Декор: 0.2, // Was 18%
+  Текстиль: 0.25, // High hike
 
-  // Beauty
-  Красота: 0.18, // Was 0.13
-  Парфюмерия: 0.17, // Was 0.12
-  Косметика: 0.19, // Was 0.14
+  // Beauty & Kids
+  Красота: 0.23, // Was 18%
+  Парфюмерия: 0.22,
+  Косметика: 0.24,
+  'Детские товары': 0.22,
+  Игрушки: 0.24,
 
-  // Kids
-  'Детские товары': 0.18, // Was 0.13
-  Игрушки: 0.19, // Was 0.14
+  // Food & Sports
+  Продукты: 0.18, // Was 15%
+  Спорт: 0.22, // Was 18%
 
-  // Food
-  Продукты: 0.15, // Was 0.10
-
-  // Sports
-  Спорт: 0.18, // Was 0.13
-
-  // Default (after October 2025 increases, can be up to 34.5%)
-  default: 0.22, // Was 0.2
+  // Default (Safe baseline for 2026)
+  default: 0.25,
 };
 
 /**
  * Ozon commission rates by category
- * UPDATED: Reflects TZ v2.0 Production spec (2025)
- * Source: https://seller.ozon.ru/app/settings/tariff
+ * UPDATED: Nov 10, 2025 (Hike for most categories +5%)
+ * Source: https://seller.ozon.ru/app/settings/tariff (Jan 2026 simplified list)
  */
 export const OZON_COMMISSIONS: Record<string, number> = {
   // Electronics
-  Электроника: 0.12, // 8-15% range (avg 12%)
-  Смартфоны: 0.1, // 8-12%
-  Компьютеры: 0.11, // 8-13%
+  Электроника: 0.15, // Was 12%
+  Смартфоны: 0.13, // Was 10%
+  Компьютеры: 0.14, // Was 11%
 
-  // Fashion (after 2025 increases)
-  Одежда: 0.2, // Was 0.14, now 15-24% (avg 20%)
-  Обувь: 0.2, // Was 0.14, now 15-24%
-  Аксессуары: 0.17, // Was 0.13, now 13-20%
+  // Fashion (Hike on Nov 10, 2025)
+  Одежда: 0.24, // High end of 15-24%
+  Обувь: 0.24,
+  Аксессуары: 0.2, // Was 17%
 
   // Home & Garden
-  'Дом и сад': 0.15, // TZ 2.0 Spec: 15%
-  Мебель: 0.16, // Was 0.14
-  Декор: 0.15, // Was 0.13
+  'Дом и сад': 0.2, // Was 15%
+  Мебель: 0.21, // Was 16%
+  Декор: 0.2, // Was 15%
 
   // Beauty
-  Красота: 0.2, // TZ 2.0 Spec: 20%
-  Парфюмерия: 0.18, // Adjusted
+  Красота: 0.25, // Was 20%
+  Парфюмерия: 0.23,
 
   // Kids
-  'Детские товары': 0.15, // TZ 2.0 Spec: 15%
-  Игрушки: 0.15,
+  'Детские товары': 0.2, // Was 15%
+  Игрушки: 0.2,
 
   // Food
-  Продукты: 0.08, // TZ 2.0 Spec: 8%
+  Продукты: 0.12, // Was 8%, now 10-14%
 
   // Sports
-  Спорт: 0.14, // Was 0.12
+  Спорт: 0.19, // Was 14%
 
-  // Default (4-24% range, avg 15%)
-  default: 0.15,
+  // Default (Reflects Nov 2025 increase)
+  default: 0.2,
 };
 
 /**
@@ -110,8 +106,8 @@ export const OZON_COMMISSIONS: Record<string, number> = {
  */
 export const OZON_CARD_CONFIG = {
   discountPercent: 0.05, // 5% discount when customer pays with Ozon Card
-  adoptionRate: 0.4, // ~40% of Ozon orders use Ozon Card (market data)
-  effectiveImpact: 0.02, // 2% average impact on revenue (5% × 40%)
+  adoptionRate: 0.45, // Increased in 2026
+  effectiveImpact: 0.0225, // 2.25% average impact
 
   // Legacy export for backward compatibility
   get rate() {
@@ -123,24 +119,24 @@ export const OZON_CARD_CONFIG = {
 export const OZON_CARD_RATE = OZON_CARD_CONFIG.discountPercent;
 
 // ============================================
-// LOGISTICS COSTS (UPDATED JAN 2025)
+// LOGISTICS COSTS (UPDATED JAN 2026)
 // ============================================
 
 /**
  * Average logistics costs per item (RUB)
- * UPDATED: Reflects June-September 2025 changes
+ * UPDATED: Reflects Sept 2025 (WB) and Dec 2025 (Ozon) changes
  * Note: Actual costs depend on volume (liters)
  */
 export const LOGISTICS_COSTS = {
   WB: {
-    fbo: 38, // 2025 Base: 38₽ first liter
-    fbs: 55, // 2025 Base: 55₽
-    express: 150,
+    fbo: 46, // 2026 Base: 46₽ first liter (Was 38)
+    fbs: 65, // 2026 Base: 65₽ (Was 55)
+    express: 180,
   },
   Ozon: {
-    fbo: 50, // 2025 Base updated
-    fbs: 90, // CRITICAL: Douglas doubled!
-    express: 120,
+    fbo: 55, // 2026 Base: 55₽ (Was 50)
+    fbs: 105, // Douglas Hike: 105₽ (Was 90)
+    express: 140,
   },
 };
 
@@ -149,16 +145,16 @@ export const LOGISTICS_COSTS = {
  * UPDATED: Reflects actual 2025 rates
  */
 export const STORAGE_COSTS = {
-  WB: 0.08, // CRITICAL: Updated from 2.5₽ - 0.08₽/L/day for boxes
-  Ozon: 0.75, // Average: 0-2.5₽ depending on storage duration
+  WB: 0.12, // 2026: 0.12₽/L/day (Was 0.08)
+  Ozon: 1.5, // 2026: ~1.5-2.5₽ after free period
 };
 
 /**
  * SPP (Seller Price Reduction) - promotional fees
  */
 export const SPP_RATES = {
-  WB: 0.08, // ~8% average
-  Ozon: 0.05, // ~5% average
+  WB: 0.1, // ~10% average in 2026
+  Ozon: 0.06, // ~6% average in 2026
 };
 
 /**
@@ -166,7 +162,7 @@ export const SPP_RATES = {
  * ADDED: Critical for Ozon (not included in commission)
  */
 export const ACQUIRING_RATES = {
-  WB: 0, // Included in commission
+  WB: 0.015, // 2026: WB started charging for internal processing / bank fees (~1.5%)
   Ozon: 0.015, // 1.5% - NOT included in base commission
 };
 
@@ -199,9 +195,11 @@ export interface UnitEconomicsInput {
   cancelRate?: number; // % of orders cancelled/not picked up (default 5%)
   useOzonCard?: boolean; // Whether to account for Ozon Card 5% discount
   packagingCost?: number; // Cost of packaging per unit (default 15 RUB)
+  acceptanceFee?: number; // WB/Ozon acceptance fee (average 10-30 RUB)
   targetMarginPercent?: number; // Desired margin for recommended price (default 20%)
   taxRate?: number; // Tax rate (e.g. 0.06 or 0.07)
   marketingRate?: number; // Marketing cost / DRR (e.g. 0.10 for 10%)
+  riskBufferPercent?: number; // Safety buffer for unexpected MP fees/fines (default 3%)
   minProfit?: number; // Minimum acceptable profit in RUB (e.g. 500)
 }
 
@@ -224,7 +222,9 @@ export interface UnitEconomicsResult {
   returnCosts: number;
   cancelCosts: number;
   ozonCardCosts: number;
-  packagingCost: number; // NEW
+  packagingCost: number;
+  acceptanceFee: number;
+  riskBuffer: number;
   tax: number;
   marketing: number;
   totalCosts: number;
@@ -249,6 +249,8 @@ export interface UnitEconomicsResult {
     cancelCosts: number;
     ozonCardCosts: number;
     packagingCost: number;
+    acceptanceFee: number;
+    riskBuffer: number;
     tax: number;
     marketing: number;
     profit: number;
@@ -279,7 +281,7 @@ export function getCommissionRate(marketplace: 'WB' | 'Ozon', category?: string)
 
 /**
  * Calculate unit economics for a product
- * UPDATED: Includes full v2.0 Spec features (Safe Prices, Warnings)
+ * UPDATED: Includes 2026 High-Precision Formula (Hidden Fees, Acceptance, Risks)
  */
 export function calculateUnitEconomics(input: UnitEconomicsInput): UnitEconomicsResult {
   const {
@@ -293,10 +295,12 @@ export function calculateUnitEconomics(input: UnitEconomicsInput): UnitEconomics
     returnRate = DEFAULT_RATES.returnRate,
     cancelRate = DEFAULT_RATES.cancelRate,
     useOzonCard = true,
-    packagingCost = 15, // Default 15 RUB
-    targetMarginPercent = 20, // Default 20%
-    taxRate = 0.07, // Default 7% (USN)
-    marketingRate = 0.1, // Default 10% (DRR)
+    packagingCost = 20, // 2026: Materials price increased
+    acceptanceFee = 35, // 2026: Average acceptance cost (Приемка)
+    targetMarginPercent = 20,
+    taxRate = 0.07,
+    marketingRate = 0.1,
+    riskBufferPercent = 0.05, // 5% Safety buffer for "hidden MP magic"
     minProfit = 0,
   } = input;
 
@@ -344,9 +348,6 @@ export function calculateUnitEconomics(input: UnitEconomicsInput): UnitEconomics
   const cancelCosts = marketplace === 'Ozon' ? Math.round(logistics * cancelRate) : 0;
 
   // Ozon Card Discount (Seller-funded)
-  // ⚠️ CRITICAL: This is a HIDDEN COST that eats into your margin!
-  // Spec says: ~40% of orders are paid with Ozon Card
-  // Cost = Price * 5% * 0.4 = 2% average revenue loss
   let ozonCardCosts = 0;
 
   if (marketplace === 'Ozon' && useOzonCard) {
@@ -370,6 +371,9 @@ export function calculateUnitEconomics(input: UnitEconomicsInput): UnitEconomics
     }
   }
 
+  // Risk Buffer (Physical risks, unexpected fines, dimension mismatch)
+  const riskBuffer = Math.round(price * riskBufferPercent);
+
   // Tax & Marketing
   const tax = Math.round(price * taxRate);
   const marketing = Math.round(price * marketingRate);
@@ -386,6 +390,8 @@ export function calculateUnitEconomics(input: UnitEconomicsInput): UnitEconomics
     cancelCosts +
     ozonCardCosts +
     packagingCost +
+    acceptanceFee +
+    riskBuffer +
     tax +
     marketing;
 
@@ -447,28 +453,24 @@ export function calculateUnitEconomics(input: UnitEconomicsInput): UnitEconomics
 
   // --- Safe Price Calculation ---
   // Formula: Price = (FixedCosts) / (1 - VariableRate)
-  // Variable Rate components: Commission + Acquiring + SPP + OzonCardAvg
-
   const variableRate =
     commissionRate +
     sppRate +
     acquiringRate +
     taxRate +
     marketingRate +
+    riskBufferPercent +
     (marketplace === 'Ozon' && useOzonCard
       ? OZON_CARD_CONFIG.discountPercent * OZON_CARD_CONFIG.adoptionRate
       : 0);
 
-  const fixedCosts = costPrice + logistics + storage + returnCosts + cancelCosts + packagingCost;
+  const fixedCosts =
+    costPrice + logistics + storage + returnCosts + cancelCosts + packagingCost + acceptanceFee;
 
   // 1. Break-even Price (Profit = 0)
-  // Price * (1 - Variable) - Fixed = 0  =>  Price = Fixed / (1 - Variable)
   const minSafePrice = Math.ceil(fixedCosts / (1 - variableRate));
 
-  // 2. Recommended Price (Profit = TargetMargin * Price)
-  // Price * (1 - Variable) - Fixed = Target * Price
-  // Price * (1 - Variable - Target) = Fixed
-  // Price = Fixed / (1 - Variable - Target)
+  // 2. Recommended Price
   const targetRate = targetMarginPercent / 100;
   const recommendedMinPrice = Math.ceil(fixedCosts / (1 - variableRate - targetRate));
 
@@ -485,6 +487,8 @@ export function calculateUnitEconomics(input: UnitEconomicsInput): UnitEconomics
     cancelCosts,
     ozonCardCosts,
     packagingCost,
+    acceptanceFee,
+    riskBuffer,
     tax,
     marketing,
     totalCosts,
@@ -508,6 +512,8 @@ export function calculateUnitEconomics(input: UnitEconomicsInput): UnitEconomics
       cancelCosts: revenue > 0 ? Math.round((cancelCosts / revenue) * 100) : 0,
       ozonCardCosts: revenue > 0 ? Math.round((ozonCardCosts / revenue) * 100) : 0,
       packagingCost: revenue > 0 ? Math.round((packagingCost / revenue) * 100) : 0,
+      acceptanceFee: revenue > 0 ? Math.round((acceptanceFee / revenue) * 100) : 0,
+      riskBuffer: revenue > 0 ? Math.round((riskBuffer / revenue) * 100) : 0,
       tax: revenue > 0 ? Math.round((tax / revenue) * 100) : 0,
       marketing: revenue > 0 ? Math.round((marketing / revenue) * 100) : 0,
       profit: margin,

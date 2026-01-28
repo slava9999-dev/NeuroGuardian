@@ -158,7 +158,9 @@ export const calculateUnitEconomicsTool = defineTool<CalculateUnitEconomicsArgs>
               acquiring: result.acquiring,
               ozon_card: result.ozonCardCosts,
               packaging: result.packagingCost,
-              total_fees: result.totalCosts - result.costPrice, // Fees including packaging
+              acceptance: result.acceptanceFee,
+              risk_buffer: result.riskBuffer,
+              total_fees: result.totalCosts - result.costPrice,
               total_fee_percent: Math.round(
                 ((result.totalCosts - result.costPrice) / result.revenue) * 100
               ),
@@ -168,10 +170,13 @@ export const calculateUnitEconomicsTool = defineTool<CalculateUnitEconomicsArgs>
             net_profit: result.profit,
             profit_margin_percent: result.margin,
             break_even_price: result.minSafePrice,
+            recommended_price: result.recommendedMinPrice,
           },
           status,
           recommendation:
-            recommendation + (warningMessages ? `\n\n⚠️ WARN: ${warningMessages}` : ''),
+            recommendation +
+            (warningMessages ? `\n\n⚠️ ВНИМАНИЕ: ${warningMessages}` : '') +
+            `\n\n🛡️ Расчет выполнен по протоколу ProfitEngine 2026 (учет приемки, логистики и 5% буфера рисков).`,
         },
       };
     } catch (error) {

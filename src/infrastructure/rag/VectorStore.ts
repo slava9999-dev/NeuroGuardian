@@ -407,7 +407,7 @@ export class VectorStore {
 
     // 2. Prepare bulk insert in BATCHES
     // preventing huge SQL statements that drop connections
-    const BATCH_SIZE = 5;
+    const BATCH_SIZE = 2; // Reduced for stability
     const allIds: number[] = [];
 
     for (let i = 0; i < docs.length; i += BATCH_SIZE) {
@@ -423,6 +423,11 @@ export class VectorStore {
             `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}::vector, $${offset + 7}::jsonb)`
           );
 
+          // Round embedding to save bandwidth
+          const roundedEmb = doc.embedding
+            ? doc.embedding.map(n => Math.round(n * 10000) / 10000)
+            : [];
+
           queryValues.push(
             doc.namespace,
             doc.sourceFile,
@@ -430,7 +435,7 @@ export class VectorStore {
             doc.title || null,
             doc.content,
             // Force [1,2,3] string format for pgvector casting
-            JSON.stringify(doc.embedding),
+            JSON.stringify(roundedEmb),
             JSON.stringify(doc.metadata || {})
           );
         });
@@ -457,15 +462,27 @@ export class VectorStore {
           `[VectorStore] Batch saved: ${batch.length} chunks from ${batch[0].sourceFile}`
         );
 
-        // Small delay to let DB breathe
-        await new Promise(r => setTimeout(r, 200));
+        // Moderate delay to let Serverless DB breathe
+        await new Promise(r => setTimeout(r, 500));
       } catch (error) {
-        logger.error('[VectorStore] Batch insert failed', {
-          file: batch[0]?.sourceFile,
-          batchIndex: i,
-          error,
-        });
-        throw error;
+        logger.warn(
+          `[VectorStore] Batch failed, falling back to ATOMIC insertion for ${batch.length} docs...`
+        );
+
+        // ATOMIC FALLBACK: Insert docs one by one if batch fails
+        for (const doc of batch) {
+          try {
+            const id = await this.addDocument(doc);
+            allIds.push(id);
+            // Even longer delay for individual retries
+            await new Promise(r => setTimeout(r, 1000));
+          } catch (innerError) {
+            logger.error(
+              `[VectorStore] Critical failure adding document ${doc.sourceFile}:${doc.chunkIndex}`,
+              innerError
+            );
+          }
+        }
       }
     }
 
@@ -507,6 +524,7 @@ export class VectorStore {
         SELECT 
           id,
           namespace,
+          source_file,
           title,
           content,
           1 - (embedding <=> ${embeddingStr}::vector) as similarity,
@@ -523,6 +541,7 @@ export class VectorStore {
         SELECT 
           id,
           namespace,
+          source_file,
           title,
           content,
           1 - (embedding <=> ${embeddingStr}::vector) as similarity,
@@ -537,6 +556,7 @@ export class VectorStore {
     return result.rows.map(row => ({
       id: row.id as number,
       namespace: row.namespace as EmbeddingNamespace,
+      sourceFile: row.source_file as string,
       title: row.title as string | null,
       content: row.content as string,
       similarity: parseFloat(String(row.similarity)),
@@ -597,6 +617,7 @@ export class VectorStore {
         SELECT 
           id,
           namespace,
+          source_file,
           title,
           content,
           1 - (embedding <=> ${embeddingStr}::vector) as vector_score,
@@ -613,6 +634,7 @@ export class VectorStore {
     return result.rows.map(row => ({
       id: row.id as number,
       namespace: row.namespace as EmbeddingNamespace,
+      sourceFile: row.source_file as string,
       title: row.title as string | null,
       content: row.content as string,
       similarity: parseFloat(String(row.combined_score)),

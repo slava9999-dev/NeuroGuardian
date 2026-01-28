@@ -13,6 +13,7 @@ import { stateManager } from '../../agent/core/StateManager.js';
 import { db, systemFlags, users } from '../../infrastructure/database/db.js';
 import { eq } from 'drizzle-orm';
 import { VoiceService } from '../services/VoiceService.js';
+import { logOpsEvent } from '../services/ops-logger.js';
 // Using built-in Node 18+ FormData and Blob
 
 // ============================================
@@ -800,153 +801,129 @@ async function handleCallbackQuery(query: TelegramCallbackQuery): Promise<void> 
       );
       break;
 
-    // --- SENTINEL ADMIN ACTIONS ---
-    case 'sentinel_stop':
-    case 'sentinel_start': {
-      if (String(query.from.id) === String(config.ADMIN_TELEGRAM_ID)) {
-        const shouldStop = data === 'sentinel_stop';
+      // --- ACK ALERT (Quiet Sentinel) ---
+      if (data.startsWith('ack_alert:')) {
+        const externalId = data.split(':')[1];
+        await logOpsEvent({
+          eventType: 'alert_acknowledged',
+          eventSource: 'manual',
+          userId: query.from.id,
+          externalId: externalId,
+          payload: { externalId, action: 'acknowledge' },
+        });
+
+        await sendTelegramMessage(
+          Number(chatId),
+          `✅ *Принято!*\n\nЯ зафиксировал, что вы в курсе ситуации с товаром \`${externalId}\`. Я временно снижу приоритет уведомлений по этой позиции, чтобы не отвлекать вас от работы.`,
+          { parseMode: 'Markdown' }
+        );
+        return;
+      }
+
+      // --- CHECK PRODUCT ---
+      if (data.startsWith('check_product:')) {
+        const externalId = data.split(':')[1];
+        await sendTelegramMessage(
+          Number(chatId),
+          `🔍 Запрашиваю свежие данные по товару \`${externalId}\`...`
+        );
+        await handleUserMessage(
+          Number(chatId),
+          query.from.id,
+          `Проверь статус товара ${externalId}`,
+          query.from.first_name
+        );
+        return;
+      }
+
+      // --- RAISE PRICE (Manual fix) ---
+      if (data.startsWith('raise_price:')) {
+        const parts = data.split(':');
+        const mp = parts[1];
+        const externalId = parts[2];
+
+        await sendTelegramMessage(
+          Number(chatId),
+          `🚀 Готов поднять цену для защиты маржи.\n\nНа какую цену установить? (Напишите просто число в ответ или выберите из вариантов)`,
+          {
+            replyMarkup: {
+              inline_keyboard: [
+                [
+                  {
+                    text: '🎯 На +10%',
+                    callback_data: `confirm:raise_percent:${mp}:${externalId}:10`,
+                  },
+                  {
+                    text: '🎯 На +20%',
+                    callback_data: `confirm:raise_percent:${mp}:${externalId}:20`,
+                  },
+                ],
+                [
+                  {
+                    text: '🛡️ Вернуть к РРЦ',
+                    callback_data: `confirm:restore_rrc:${mp}:${externalId}`,
+                  },
+                ],
+                [{ text: '❌ Отмена', callback_data: `cancel_action` }],
+              ],
+            },
+          }
+        );
+        return;
+      }
+
+      // --- RAISE PERCENT CONFIRMATION ---
+      if (data.startsWith('confirm:raise_percent:')) {
+        const parts = data.split(':');
+        const mp = parts[2];
+        const eid = parts[3];
+        const pct = parts[4];
+
+        await sendTelegramMessage(
+          Number(chatId),
+          `💰 *Подтвердите повышение цены на ${pct}%*\n\nЭто поможет выйти из убыточной зоны. Виктор рассчитает новую цену и отправит запрос на маркетплейс.`,
+          {
+            parseMode: 'Markdown',
+            replyMarkup: {
+              inline_keyboard: [
+                [
+                  { text: '🚀 Подтверждаю', callback_data: `do_raise_percent:${mp}:${eid}:${pct}` },
+                  { text: '❌ Отмена', callback_data: `cancel_action` },
+                ],
+              ],
+            },
+          }
+        );
+        return;
+      }
+
+      // --- DO RAISE PERCENT ---
+      if (data.startsWith('do_raise_percent:')) {
+        const parts = data.split(':');
+        const mp = parts[1];
+        const eid = parts[2];
+        const pct = parts[3];
+        const userId = query.from.id;
+
+        await sendTelegramMessage(Number(chatId), `⏳ Рассчитываю и обновляю цену на ${pct}%...`);
+        const command = `Подними цену на товар ${eid} на ${pct}% на ${mp}`;
+
         try {
-          await db
-            .insert(systemFlags)
-            .values({
-              key: 'sentinel_emergency_stop',
-              valueBool: shouldStop,
-              updatedAt: new Date(),
-            })
-            .onConflictDoUpdate({
-              target: systemFlags.key,
-              set: { valueBool: shouldStop, updatedAt: new Date() },
-            });
+          const result = await orchestrateV5(command, {
+            userId,
+            isFirstContact: false,
+            userName: query.from.first_name,
+          });
 
-          await answerCallbackQuery(query.id, `Sentinel ${shouldStop ? 'остановлен' : 'запущен'}`);
-          await handleSentinelDashboard(chatId);
-        } catch (err) {
-          logger.error('Failed to toggle sentinel', err);
-          await answerCallbackQuery(query.id, '❌ Ошибка переключения');
+          await sendTelegramMessage(Number(chatId), result.message, { parseMode: 'HTML' });
+        } catch (e) {
+          logger.error('Failed to raise price via callback', e);
+          await sendTelegramMessage(Number(chatId), `❌ Ошибка при повышении цены.`);
         }
+        return;
       }
-      break;
-    }
 
-    case 'refresh_sentinel': {
-      if (String(query.from.id) === String(config.ADMIN_TELEGRAM_ID)) {
-        await handleSentinelDashboard(chatId);
-        await answerCallbackQuery(query.id, 'Данные обновлены');
-      }
-      break;
-    }
-
-    // --- SENTINEL ALERT ACTIONS ---
-    default: {
-      // Handle Sentinel actions
-      if (data.startsWith('sentinel_')) {
-        // Get userId from Telegram user
-        const telegramUserId = query.from.id;
-        const userResult = await sql`
-          SELECT id FROM users WHERE telegram_id = ${telegramUserId.toString()} LIMIT 1
-        `;
-
-        if (userResult.rows.length === 0) {
-          await answerCallbackQuery(query.id, '❌ Пользователь не найден');
-          break;
-        }
-
-        const userId = userResult.rows[0].id;
-
-        if (data.startsWith('sentinel_lower:')) {
-          // Format: sentinel_lower:productId:newPrice
-          const [, productIdStr, newPriceStr] = data.split(':');
-          const productId = parseInt(productIdStr);
-          const newPrice = parseInt(newPriceStr);
-
-          try {
-            await sql`
-              UPDATE products
-              SET current_price = ${newPrice}, updated_at = NOW()
-              WHERE id = ${productId} AND user_id = ${userId}
-            `;
-
-            await answerCallbackQuery(query.id, `✅ Цена обновлена: ${newPrice} ₽`);
-            await sendTelegramMessage(
-              chatId,
-              `✅ <b>Цена успешно обновлена!</b>\n\n💰 Новая цена: <b>${newPrice} ₽</b>\n\n🎯 Теперь вы снова конкурентоспособны!`
-            );
-          } catch (err) {
-            logger.error('Failed to update price', err);
-            await answerCallbackQuery(query.id, '❌ Ошибка обновления цены');
-          }
-        } else if (data.startsWith('sentinel_monitor:')) {
-          const [, productIdStr] = data.split(':');
-          const productId = parseInt(productIdStr);
-
-          try {
-            await sql`
-              UPDATE products
-              SET is_monitored = true, updated_at = NOW()
-              WHERE id = ${productId} AND user_id = ${userId}
-            `;
-
-            await answerCallbackQuery(query.id, '👁️ Мониторинг включен');
-            await sendTelegramMessage(
-              chatId,
-              '👁️ <b>Мониторинг активирован</b>\n\nSentinel будет следить за этим товаром и уведомит вас о изменениях.'
-            );
-          } catch (err) {
-            logger.error('Failed to enable monitoring', err);
-            await answerCallbackQuery(query.id, '❌ Ошибка');
-          }
-        } else if (data.startsWith('sentinel_ignore:')) {
-          await answerCallbackQuery(query.id, '🚫 Алерт проигнорирован');
-          await sendTelegramMessage(
-            chatId,
-            '🚫 <i>Алерт проигнорирован. Sentinel продолжит мониторинг.</i>'
-          );
-        } else if (data.startsWith('sentinel_details:')) {
-          const [, productIdStr] = data.split(':');
-          const productId = parseInt(productIdStr);
-
-          try {
-            const product = await sql`
-              SELECT 
-                title,
-                current_price,
-                competitor_price,
-                competitor_url,
-                marketplace,
-                min_price,
-                price_strategy
-              FROM products
-              WHERE id = ${productId} AND user_id = ${userId}
-              LIMIT 1
-            `;
-
-            if (product.rows.length > 0) {
-              const p = product.rows[0];
-              const diff = p.current_price - p.competitor_price;
-              const diffPercent = Math.round((diff / p.current_price) * 100);
-
-              let details = `📊 <b>Детальная аналитика</b>\n\n`;
-              details += `📦 ${p.title}\n`;
-              details += `🏪 ${p.marketplace}\n\n`;
-              details += `💰 Текущая цена: ${p.current_price} ₽\n`;
-              details += `💸 Конкурент: ${p.competitor_price} ₽\n`;
-              details += `📉 Разница: ${diff} ₽ (${diffPercent}%)\n`;
-              details += `🛡️ Min цена: ${p.min_price} ₽\n`;
-              details += `🎯 Стратегия: ${p.price_strategy || 'не задана'}\n\n`;
-              details += `🔗 <a href="${p.competitor_url}">Товар конкурента</a>`;
-
-              await sendTelegramMessage(chatId, details);
-            }
-            await answerCallbackQuery(query.id, '📊 Данные загружены');
-          } catch (err) {
-            logger.error('Failed to fetch product details', err);
-            await answerCallbackQuery(query.id, '❌ Ошибка загрузки');
-          }
-        }
-      }
-      // Unknown callback - do nothing
-      break;
-    }
+    // --- SENTINEL ADMIN ACTIONS ---
   }
 }
 

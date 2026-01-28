@@ -517,11 +517,28 @@ export class SentinelOrchestrator {
 
               // --- IMMEDIATE ALERTING ---
               // For critical "Real Price" threats, send immediate Telegram alerts
+              // SILENCE LOGIC: Don't alert if user acknowledged this specific threat in the last 6 hours
               for (const threat of scan.threats) {
                 if (
                   threat.type === ThreatType.PROMO_PRICE_VIOLATION ||
                   threat.type === ThreatType.BUYER_PRICE_BELOW_STOPLOSS
                 ) {
+                  const ackCheck = await db.execute(drizzleSql`
+                    SELECT 1 FROM ops_events 
+                    WHERE user_id = ${user.id} 
+                      AND external_id = ${product.product_id}
+                      AND event_type = 'alert_acknowledged'
+                      AND created_at > NOW() - INTERVAL '6 hours'
+                    LIMIT 1
+                  `);
+
+                  if (ackCheck.length > 0) {
+                    logger.debug(
+                      `[Sentinel] Skipping alert for ${product.product_id} - already acknowledged in last 6h`
+                    );
+                    continue;
+                  }
+
                   this.alertSender
                     .sendThreatAlert(user, product, threat, marketplace)
                     .catch(err => {

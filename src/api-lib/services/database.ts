@@ -36,11 +36,12 @@ function getPool(): pkg.Pool {
   const poolConfig: PoolConfig = {
     connectionString,
     ssl: useSsl ? { rejectUnauthorized: false } : false,
-    max: 10, // Increased for concurrency
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 30000,
+    max: 5, // Reduced for Serverless/Neon stability
+    idleTimeoutMillis: 5000, // Aggressively close idle connections to avoid stale ones
+    connectionTimeoutMillis: 10000, // Fail fast on connection
     keepAlive: true,
     statement_timeout: 60000, // 1 minute per query
+    application_name: 'neuroguardian_v2',
   };
 
   _pool = new Pool(poolConfig);
@@ -59,7 +60,7 @@ function getPool(): pkg.Pool {
  */
 async function executeWithRetry(text: string, values: unknown[]): Promise<QueryResult> {
   const pool = getPool();
-  const retries = 3;
+  const retries = 5;
   let attempt = 0;
 
   while (attempt < retries) {
@@ -94,11 +95,15 @@ async function executeWithRetry(text: string, values: unknown[]): Promise<QueryR
         msg.includes('SSL') ||
         msg.includes('ECONNRESET') ||
         msg.includes('socket') ||
-        msg.includes('connection');
+        msg.includes('connection') ||
+        msg.includes('EOF');
 
-      if (isTransient && attempt < retries) {
-        logger.warn(`[Database] 🚦 Attempt ${attempt} failed: ${msg}. Retrying in 2s...`);
-        await new Promise(r => setTimeout(r, 2000));
+      if (isTransient && attempt < 5) {
+        const delay = 2000 * attempt + Math.random() * 1000;
+        logger.warn(
+          `[Database] 🚦 Attempt ${attempt} failed: ${msg}. Retrying in ${Math.round(delay)}ms...`
+        );
+        await new Promise(r => setTimeout(r, delay));
         continue;
       }
 

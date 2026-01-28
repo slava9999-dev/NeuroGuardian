@@ -19,6 +19,7 @@ import {
   Shield,
   Package,
   Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { ViktorCore } from '../components/ui/ViktorCore';
@@ -211,7 +212,7 @@ export function AgentPage() {
                 <div className="flex items-center gap-2 mb-3 px-1">
                   <div className="w-1.5 h-1.5 rounded-full bg-success" />
                   <span className="text-[10px] font-bold tracking-widest text-text-muted uppercase">
-                    Защита и аналитика
+                    Защита Плюс 2026
                   </span>
                 </div>
                 <div className="grid grid-cols-2 gap-2.5">
@@ -219,17 +220,19 @@ export function AgentPage() {
                     icon={<Shield className="w-5 h-5" />}
                     iconBg="bg-success/10"
                     iconColor="text-success"
-                    title="Защита товаров"
-                    subtitle="Стоп-лоссы"
-                    onClick={() => handleSendMessage('защити все товары')}
+                    title="Защита всех"
+                    subtitle="Умный Стоп-Лосс"
+                    onClick={() =>
+                      handleSendMessage('Виктор, защити все мои товары по правилам 2026')
+                    }
                   />
                   <ActionCard
                     icon={<TrendingUp className="w-5 h-5" />}
                     iconBg="bg-primary/10"
                     iconColor="text-primary"
                     title="Аналитика"
-                    subtitle="Продажи и тренды"
-                    onClick={() => handleSendMessage('покажи статистику продаж')}
+                    subtitle="Тренды и прибыль"
+                    onClick={() => handleSendMessage('покажи аналитику продаж и маржинальность')}
                   />
                 </div>
               </motion.div>
@@ -243,7 +246,7 @@ export function AgentPage() {
                 <div className="flex items-center gap-2 mb-3 px-1">
                   <div className="w-1.5 h-1.5 rounded-full bg-warning" />
                   <span className="text-[10px] font-bold tracking-widest text-text-muted uppercase">
-                    Юнит-экономика
+                    Экономика и Маржа
                   </span>
                 </div>
                 <div className="grid grid-cols-2 gap-2.5">
@@ -251,17 +254,21 @@ export function AgentPage() {
                     icon={<Calculator className="w-5 h-5" />}
                     iconBg="bg-warning/10"
                     iconColor="text-warning"
-                    title="Калькулятор"
-                    subtitle="Рассчитать маржу"
-                    onClick={() => handleSendMessage('рассчитай юнит-экономику')}
+                    title="Аудит 2026"
+                    subtitle="Скрытые платежи"
+                    onClick={() =>
+                      handleSendMessage('проведи аудит юнит-экономики по новым тарифам')
+                    }
                   />
                   <ActionCard
                     icon={<Package className="w-5 h-5" />}
                     iconBg="bg-info/10"
                     iconColor="text-info"
                     title="Конкуренты"
-                    subtitle="Мониторинг цен"
-                    onClick={() => handleSendMessage('проверь цены конкурентов')}
+                    subtitle="Ценовые войны"
+                    onClick={() =>
+                      handleSendMessage('проверь цены конкурентов и предложи демпинг-защиту')
+                    }
                   />
                 </div>
               </motion.div>
@@ -275,7 +282,7 @@ export function AgentPage() {
                 <div className="flex items-center gap-2 mb-3 px-1">
                   <div className="w-1.5 h-1.5 rounded-full bg-danger" />
                   <span className="text-[10px] font-bold tracking-widest text-text-muted uppercase">
-                    Аудит и Риски
+                    Разведка и Аудит
                   </span>
                 </div>
                 <div className="grid grid-cols-2 gap-2.5">
@@ -283,17 +290,19 @@ export function AgentPage() {
                     icon={<TrendingUp className="w-5 h-5" />}
                     iconBg="bg-danger/10"
                     iconColor="text-danger"
-                    title="Здоровье каталога"
-                    subtitle="Проверка рисков"
-                    onClick={() => handleSendMessage('проверь здоровье моего каталога')}
+                    title="Капитал в риске"
+                    subtitle="Проверка стоков"
+                    onClick={() =>
+                      handleSendMessage('какая сумма капитала сейчас находится под риском?')
+                    }
                   />
                   <ActionCard
                     icon={<Package className="w-5 h-5" />}
                     iconBg="bg-primary/20"
                     iconColor="text-primary-hover"
                     title="Синхронизация"
-                    subtitle="Обновить товары"
-                    onClick={() => handleSendMessage('синхронизируй мой каталог')}
+                    subtitle="Полный апдейт"
+                    onClick={() => handleSendMessage('синхронизируй каталог и обнови остатки')}
                   />
                 </div>
               </motion.div>
@@ -354,7 +363,7 @@ export function AgentPage() {
           ref={messagesContainerRef}
           className="flex-1 overflow-y-auto px-4 py-4 scroll-smooth"
           style={{
-            paddingBottom: '280px', // Increased space for Input Bar + Nav Bar (was 220px)
+            paddingBottom: '320px', // Extra space for Chips + Input + Nav
           }}
         >
           <div className="max-w-2xl mx-auto space-y-4">
@@ -371,15 +380,41 @@ export function AgentPage() {
         </div>
       )}
 
-      {/* Input Bar - FIXED: Increased spacing above Navigation Bar */}
+      {/* Input Bar & Suggestion Chips */}
       <div
         className="fixed left-0 right-0 z-50 bg-linear-to-t from-background via-background to-transparent pt-6"
         style={{
-          bottom: 'calc(5rem + env(safe-area-inset-bottom))', // 80px above nav (was 64px)
-          paddingBottom: '20px', // Extra padding
+          bottom: 'calc(5rem + env(safe-area-inset-bottom))',
+          paddingBottom: '20px',
         }}
       >
         <div className="max-w-2xl mx-auto px-4">
+          {/* Suggestion Chips - Only when chatting */}
+          {hasMessages && (
+            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-3 mb-1 px-1">
+              <SuggestionChip
+                icon={<Shield className="w-3 h-3" />}
+                label="Защитить всё"
+                onClick={() => handleSendMessage('Виктор, защити все товары')}
+              />
+              <SuggestionChip
+                icon={<Calculator className="w-3 h-3" />}
+                label="Анализ прибыли"
+                onClick={() => handleSendMessage('Покажи мою чистую прибыль')}
+              />
+              <SuggestionChip
+                icon={<AlertTriangle className="w-3 h-3" />}
+                label="Найти риски"
+                onClick={() => handleSendMessage('Какие товары сейчас в зоне риска?')}
+              />
+              <SuggestionChip
+                icon={<Package className="w-3 h-3" />}
+                label="Синхронизация"
+                onClick={() => handleSendMessage('Синхронизируй каталог')}
+              />
+            </div>
+          )}
+
           <div className="flex items-end gap-2 bg-surface rounded-2xl border border-surface-dim shadow-lg p-2">
             {/* Attachment Button */}
             <button
@@ -540,6 +575,28 @@ function formatMessage(content: string): string {
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\n\n/g, '<br/><br/>')
     .replace(/\n/g, '<br/>');
+}
+
+interface SuggestionChipProps {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+}
+
+function SuggestionChip({ icon, label, onClick }: SuggestionChipProps) {
+  return (
+    <motion.button
+      whileTap={{ scale: 0.95 }}
+      onClick={() => {
+        hapticFeedback('light');
+        onClick();
+      }}
+      className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-surface/80 backdrop-blur-md border border-surface-dim hover:border-primary/50 text-text-main text-xs font-semibold whitespace-nowrap transition-all shadow-sm"
+    >
+      <span className="text-primary">{icon}</span>
+      {label}
+    </motion.button>
+  );
 }
 
 // Type declarations for Web Speech API

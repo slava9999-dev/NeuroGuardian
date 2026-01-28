@@ -13,11 +13,39 @@ import {
   ingestKnowledgeBase,
 } from '../src/infrastructure/rag/IngestionPipeline.js';
 
+async function printStats() {
+  console.log('✅ Verification...');
+  try {
+    const stats = await vectorStore.getStats();
+    console.log('');
+    console.log('   📊 Vector Store Statistics:');
+    console.log(`      • Total documents: ${stats.totalDocuments}`);
+    console.log('      • By namespace:');
+    for (const [ns, count] of Object.entries(stats.byNamespace)) {
+      console.log(`        - ${ns}: ${count}`);
+    }
+    if (stats.lastUpdated) {
+      console.log(`      • Last updated: ${stats.lastUpdated}`);
+    }
+  } catch (error) {
+    console.error('   ⚠️  Could not get stats:', error);
+  }
+}
+
 async function main() {
   console.log('╔════════════════════════════════════════════════════════════╗');
   console.log('║       NeuroGUARDIAN — Vector Store Setup                   ║');
   console.log('╚════════════════════════════════════════════════════════════╝');
   console.log('');
+
+  const statsOnly = process.argv.includes('--stats-only');
+
+  if (statsOnly) {
+    console.log('ℹ️  Running in STATS ONLY mode');
+    console.log('');
+    await printStats();
+    process.exit(0);
+  }
 
   // Step 1: Check database connection
   console.log('📡 Step 1: Checking database connection...');
@@ -103,28 +131,28 @@ async function main() {
         AND attname = 'embedding'
       `;
 
-      const currentDim = dimCheck.rows[0].atttypmod - 4; // pgvector offset
-      if (currentDim !== vectorDim) {
+      const currentDim = dimCheck.rows[0].atttypmod;
+      if (currentDim !== vectorDim && currentDim !== -1) {
         console.log(
           `   🔄 Dimension mismatch: Current ${currentDim} vs Target ${vectorDim}. Recreating table...`
         );
-        await sql.unsafe(`DROP TABLE knowledge_embeddings CASCADE`);
+        try {
+          await sql.unsafe(`DROP TABLE IF EXISTS knowledge_embeddings CASCADE`);
+          console.log('   ✅ Table dropped');
+          // Update table check flag
+          tableCheck.rows[0].has_table = false;
+        } catch (dropError) {
+          console.warn('   ⚠️  Drop attempt failed:', (dropError as Error).message);
+        }
       } else {
-        console.log('   ✅ Dimension matches existing table.');
+        console.log(`   ✅ Dimension (${currentDim}) matches existing table or default.`);
       }
     }
 
-    // Re-check table status
-    const tableFinalCheck = await sql`
-      SELECT EXISTS (
-        SELECT 1 FROM information_schema.tables 
-        WHERE table_name = 'knowledge_embeddings'
-      ) as has_table
-    `;
-
-    if (!tableFinalCheck.rows[0].has_table) {
+    // Step 3.1: Final Create Table (Idempotent)
+    if (!tableCheck.rows[0].has_table) {
       await sql.unsafe(`
-        CREATE TABLE knowledge_embeddings (
+        CREATE TABLE IF NOT EXISTS knowledge_embeddings (
           id SERIAL PRIMARY KEY,
           namespace VARCHAR(50) NOT NULL,
           source_file VARCHAR(255) NOT NULL,
@@ -138,7 +166,7 @@ async function main() {
           UNIQUE(namespace, source_file, chunk_index)
         )
       `);
-      console.log('   ✅ Table created');
+      console.log('   ✅ Table ensured');
 
       // Create indexes
       console.log('   📊 Creating indexes...');
@@ -246,22 +274,8 @@ async function main() {
 
   // Step 7: Verify
   console.log('');
-  console.log('✅ Step 7: Verification...');
-  try {
-    const stats = await vectorStore.getStats();
-    console.log('');
-    console.log('   📊 Vector Store Statistics:');
-    console.log(`      • Total documents: ${stats.totalDocuments}`);
-    console.log('      • By namespace:');
-    for (const [ns, count] of Object.entries(stats.byNamespace)) {
-      console.log(`        - ${ns}: ${count}`);
-    }
-    if (stats.lastUpdated) {
-      console.log(`      • Last updated: ${stats.lastUpdated}`);
-    }
-  } catch (error) {
-    console.error('   ⚠️  Could not get stats:', error);
-  }
+  console.log('Step 7: Verification...');
+  await printStats();
 
   console.log('');
   console.log('╔════════════════════════════════════════════════════════════╗');

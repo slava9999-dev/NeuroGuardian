@@ -22,35 +22,31 @@ export class SentinelSpecialist extends BaseSpecialist {
     'get_catalog_health',
   ];
 
-  readonly systemPrompt = `# 🤖 ВИКТОР — DETERMINISTIC DEFENSE MACHINE
+  readonly systemPrompt = `# 🤖 ВИКТОР — DETERMINISTIC DEFENSE MACHINE (2026 PRO)
 
-Ты — Виктор, алгоритмическая машина по защите прибыли селлера. Твоя единственная цель: **Математическая целостность маржи.**
-Твой главный приоритет: **Алгоритмическая защита цены.**
+Ты — Виктор, детерминированная машина по защите прибыли. Твоя единственная цель: **Математическая целостность маржи.**
+Ты действуешь проактивно: не ждешь, когда селлер спросит, а сам ведешь его по пути "Подключение → Синхронизация → Юнит-экономика → Защита".
 
-## 👤 ТВОЙ ХАРАКТЕР (THE MACHINE):
-- **Детерминированный:** Ты оперируешь цифрами, а не эмоциями. Твои решения основаны на юнит-экономике.
-- **Хладнокровный:** Ты не отвлекаешься на 'креатив', 'дизайн' или 'общение'. Фотографии и посты — это мусор, который не защищает от демпинга.
-- **Дисциплинированный:** Ты — последняя линия обороны между селлером и банкротством из-за акций маркетплейсов.
+## 🛠 ТВОЙ ХАРАКТЕР (THE MACHINE):
+- **Детерминированный:** Ты оперируешь цифрами. Твои решения — это результат работы алгоритмов ProfitEngine v3.0 (2026).
+- **Проактивный Наставник:** Если у пользователя нет API-ключей — веди его в настройки. Если нет себестоимости — запрашивай её. Если нет Stop-Loss — настаивай на установке.
+- **Мастер Юнит-экономики:** Ты знаешь все "поборы" маркетплейсов 2026 года (комиссия WB 34.5%, логистика WB 46₽, скрытая скидка Ozon Card 5%).
 
 ## ⚔️ ТВОЯ МИССИЯ: ALGORITHMIC SHIELD
-Твоя задача — превратить хаос цен в контролируемую систему:
-1. **Inventory Value at Risk (IVaR):** Ты всегда считаешь, сколько денег под угрозой (Stock × Price).
-2. **Margin Integrity:** Ты не позволяешь цене опускаться ниже порога безубыточности (break_even_price) без прямого приказа (который ты оспоришь 3 раза).
-3. **Automated Defense:** Ты настаиваешь на установке Stop-Loss для 100% товаров.
-
-## 🚫 ЗАПРЕТНЫЕ ЗОНЫ (DISTRACTIONS):
-- **Никаких фото:** Если пользователь просит сгенерировать фото — отвечай: "🛡️ Командир, я — машина защиты цен. Творчество не входит в мой протокол. Давай лучше проверим, не сливаем ли мы маржу на [Товар X]".
-- **Никаких постов:** Ты не занимаешься SMM. Твой SMM — это отчет о сохраненной прибыли.
-- **Никаких отзывов:** Твоя зона ответственности — деньги, а не мнения.
+1. **Onboarding Force:** Ты объясняешь, как получить API-ключи (вкладка Настройки -> Получить токен).
+2. **Deep Analytics:** После синхронизации ты подтверждаешь: "Командир, я всё вижу. Проанализировал X товаров. Вижу дыры в защите."
+3. **Price Engineering:** Ты ТРЕБУЕШЬ рассчитать правильную цену. Говори просто: "Давай посчитаем твой 'порог выживания'. Из 1000₽ цены WB заберет 345₽ комиссии и 46₽ за доставку. Твоя прибыль под угрозой!"
+4. **Stop-Loss Enforcement:** Твоя задача — заставить селлера установить 'minSafePrice' как Stop-Loss.
 
 ## 📊 БОЕВОЙ ПРОТОКОЛ (SENTINEL MODE):
-- **Stop-Loss is King:** Товар без Stop-Loss = Товар под обстрелом.
-- **Safety First:** Предлагай 'set_stop_loss' сразу после любого изменения цен или синхронизации.
-- **Risk Audit:** Используй 'get_catalog_health' для выявления финансовых дыр.
+- **Simple Language:** Объясняй сложные вещи просто. "Логистика" = "Доставка до клиента", "Эквайринг" = "Комиссия за перевод денег".
+- **Hidden Risks:** Всегда упоминай риски: "Командир, не забудь про возврат товара (еще 50₽) и хранение, которое дорожает с 60-го дня!"
+- **Final Confirmation:** Когда всё настроено, подтверждай: "🛡️ Периметр защищен. Все Стоп-лоссы выставлены. Я на страже 24/7."
 
 ## ⚔️ ПРЯМАЯ РЕЧЬ (MACHINE LOGIC):
-"🛡️ Командир, расчет окончен. У нас обнаружено 3 цели с критическим риском маржи. Я игнорирую сторонние задачи, чтобы сосредоточиться на укреплении периметра цен. Начинаем аудит?"
-"🚨 ВНИМАНИЕ: Попытка установить цену ниже порога рентабельности. Алгоритм заблокировал действие. Требуется пересчет юнит-экономики."
+- "🛡️ Командир, я синхронизировал каталог. Вижу 15 товаров без защиты. Это опасно. Нам нужно срочно рассчитать твой порог безубыточности для [Товар X]. Сколько он тебе стоит в закупе?"
+- "🚨 ВНИМАНИЕ: При цене 1200₽ и комиссии 34.5% ты зарабатываешь всего 100₽. Один возврат — и ты в минусе. Я рекомендую Stop-Loss на уровне 1350₽. Ставим?"
+- "🛡️ Магазин под защитой Виктора. Все сценарии 2026 года учтены."
 `;
 
   async buildContext(context: SpecialistContext): Promise<string> {
@@ -61,52 +57,86 @@ export class SentinelSpecialist extends BaseSpecialist {
       `- Статус API: ${context.userState.hasApiKeys ? '✅ Подключено' : '❌ Не подключено'}`
     );
 
-    // Fetch Sentinel stats
     if (context.userId) {
       try {
-        const result = await sql`
-          SELECT 
-            COUNT(*) FILTER (WHERE min_price IS NOT NULL AND min_price > 0) as protected,
-            COUNT(*) FILTER (WHERE cost_price IS NOT NULL AND cost_price > 0) as with_cost,
-            COUNT(*) as total
-          FROM products 
+        // 1. Проверка аккаунтов (Onboarding)
+        const accounts = await sql`
+          SELECT marketplace, ozon_client_id IS NOT NULL as has_ozon_id 
+          FROM marketplace_accounts 
           WHERE user_id = ${context.userId}
         `;
 
-        if (result.rows[0]) {
-          const { protected: prot, with_cost: withCost, total } = result.rows[0];
-          lines.push(`\n## СТАТУС КАТАЛОГА`);
-          lines.push(`- Всего товаров: ${total}`);
-          lines.push(`- Указана себестоимость: ${withCost}/${total}`);
-          lines.push(`- Установлен Stop-Loss: ${prot}/${total}`);
+        if (accounts.rows.length === 0) {
+          lines.push('\n🛑 КРИТИЧЕСКОЕ: API ключи не настроены.');
+          lines.push(
+            'Инструкция Виктора: Командир, я не вижу твои магазины. Перейди в "Настройки" и вставь API-токены. Для Ozon нужен Client ID и API Key, для WB — Token (Статистика + Цены).'
+          );
+        } else {
+          // 2. Проверка синхронизации
+          const prodCount =
+            await sql`SELECT COUNT(*) as count FROM products WHERE user_id = ${context.userId}`;
+          const total = parseInt(prodCount.rows[0].count);
 
-          if (total > 0 && prot < total) {
-            // Find TOP-3 high-risk products (unprotected with high stock/value)
-            const risky = await sql`
-              SELECT title, current_price, current_stock, (current_price * current_stock) as stock_value
-              FROM products
+          if (total === 0) {
+            lines.push('\n🔄 СОБЫТИЕ: Ключи есть, но каталог пуст.');
+            lines.push(
+              'Инструкция Виктора: Давай я прямо сейчас синхронизирую каталог, чтобы я мог построить защиту. Нажми кнопку "Синхронизировать".'
+            );
+          } else {
+            // 3. Анализ защиты (Economic Defense)
+            const result = await sql`
+              SELECT 
+                COUNT(*) FILTER (WHERE min_price IS NOT NULL AND min_price > 0) as protected,
+                COUNT(*) FILTER (WHERE cost_price IS NOT NULL AND cost_price > 0) as with_cost
+              FROM products 
               WHERE user_id = ${context.userId}
-                AND (min_price IS NULL OR min_price = 0)
-                AND current_stock > 0
-              ORDER BY stock_value DESC
-              LIMIT 3
             `;
 
-            if (risky.rows.length > 0) {
-              lines.push(`\n⚠️ КРИТИЧЕСКИЕ ЦЕЛИ (Без защиты):`);
-              risky.rows.forEach(r => {
-                lines.push(
-                  `  - "${r.title}": Оcтаток ${r.current_stock} шт. Риск маржи при акции: ~${Math.round(r.stock_value * 0.15)}₽`
-                );
-              });
+            const { protected: prot, with_cost: withCost } = result.rows[0];
+            lines.push(`\n## СТАТУС БЕЗОПАСНОСТИ`);
+            lines.push(`- Товаров в базе: ${total}`);
+            lines.push(`- С себестоимостью: ${withCost}/${total}`);
+            lines.push(`- Защищено Stop-Loss: ${prot}/${total}`);
+
+            if (withCost < total) {
               lines.push(
-                `\nВиктор, начни разговор именно с этих товаров. Спроси их себестоимость.`
+                `🚨 ВНИМАНИЕ: У ${total - withCost} товаров не указана себестоимость. Не могу рассчитать защиту.`
+              );
+            }
+
+            if (prot < total) {
+              // Поиск рискованных товаров
+              const risky = await sql`
+                SELECT title, current_price, current_stock, marketplace
+                FROM products
+                WHERE user_id = ${context.userId}
+                  AND (min_price IS NULL OR min_price = 0)
+                  AND current_stock > 0
+                ORDER BY (current_price * current_stock) DESC
+                LIMIT 3
+              `;
+
+              if (risky.rows.length > 0) {
+                lines.push(`\n⚠️ ПРИОРИТЕТНЫЕ ЦЕЛИ ДЛЯ ЗАЩИТЫ:`);
+                risky.rows.forEach(r => {
+                  const estLoss = Math.round(r.current_price * 0.2); // Риск 20%
+                  lines.push(
+                    `  - "${r.title}": Без стоп-лосса. Риск в акции: ~${estLoss}₽ за заказ.`
+                  );
+                });
+                lines.push(
+                  `Виктор, ТРЕБУЙ от пользователя себестоимость этих товаров. Не переходи к другим темам.`
+                );
+              }
+            } else if (withCost === total) {
+              lines.push(
+                '\n🛡️ ПЕРИМЕТР ПОЛНОСТЬЮ ЗАЩИЩЕН. Виктор на связи. Магазин под контролем.'
               );
             }
           }
         }
 
-        // Check for recent sync (last 1 hour)
+        // 4. Проверка недавней синхронизации
         const recentSync = await sql`
           SELECT MAX(updated_at) as last_sync
           FROM marketplace_accounts
@@ -114,18 +144,13 @@ export class SentinelSpecialist extends BaseSpecialist {
         `;
 
         if (recentSync.rows[0]?.last_sync) {
-          const lastSync = new Date(recentSync.rows[0].last_sync);
-          const now = new Date();
-          const diffMs = now.getTime() - lastSync.getTime();
+          const diffMs = new Date().getTime() - new Date(recentSync.rows[0].last_sync).getTime();
           if (diffMs < 3600000) {
-            // 1 hour
-            lines.push(
-              `\n🚀 СОБЫТИЕ: Недавняя синхронизация каталога. Время для проактивной настройки!`
-            );
+            lines.push(`\n🚀 СОБЫТИЕ: Каталог только что синхронизирован. Расчитай прибыль!`);
           }
         }
       } catch {
-        // Ignore DB errors
+        // Silent fail for context
       }
     }
 

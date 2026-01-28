@@ -23,6 +23,7 @@ export type EventType =
   | 'sentinel_alert'
   | 'sentinel_action'
   | 'agent_action'
+  | 'alert_acknowledged'
   | 'notification_sent'
   | 'system_error'
   | 'auth_failed'

@@ -10,7 +10,7 @@ import type { PanInfo } from 'framer-motion';
 import { X, ChevronDown, ChevronRight, Calculator, Info } from 'lucide-react';
 
 // Import constants and logic from shared service
-import { OZON_CARD_CONFIG, calculateUnitEconomics } from '../../api-lib/services/unit-economics';
+import { calculateUnitEconomics } from '../../api-lib/services/unit-economics';
 
 interface PriceCalculatorProps {
   marketplace: 'WB' | 'Ozon';
@@ -31,7 +31,8 @@ export function PriceCalculator({
   const [laborHours, setLaborHours] = useState<string>('');
   const [laborRate, setLaborRate] = useState<string>('200');
   const [logistics, setLogistics] = useState<string>(marketplace === 'Ozon' ? '80' : '50');
-  const [packaging, setPackaging] = useState<string>('15');
+  const [packaging, setPackaging] = useState<string>('20');
+  const [acceptanceFee, setAcceptanceFee] = useState<string>('35');
   const [adCost, setAdCost] = useState<string>('');
   const [targetMargin, setTargetMargin] = useState<string>('20');
   const [useOzonCard, setUseOzonCard] = useState<boolean>(true);
@@ -63,8 +64,8 @@ export function PriceCalculator({
   const calculationResult = useMemo(() => {
     const cost = parseFloat(costPrice) || 0;
     const labor = (parseFloat(laborHours) || 0) * (parseFloat(laborRate) || 0);
-    const log = parseFloat(logistics) || 0;
     const pack = parseFloat(packaging) || 0;
+    const accept = parseFloat(acceptanceFee) || 0;
     const ad = parseFloat(adCost) || 0;
     const margin = parseFloat(targetMargin) || 20;
     const days = parseFloat(storageDays) || 30;
@@ -74,154 +75,75 @@ export function PriceCalculator({
     // Total 'Cost Price' input for the calculator
     const totalGoodsCost = cost + labor + ad;
 
-    // Get rates from the service
+    // Use the comprehensive service for calculation
     const stats = calculateUnitEconomics({
-      price: 1000,
+      price: Math.max(1000, totalGoodsCost * 2), // Base price for rate determination
       costPrice: totalGoodsCost,
       marketplace,
       fulfillmentType: 'fbs',
       packagingCost: pack,
+      acceptanceFee: accept,
       targetMarginPercent: margin,
       useOzonCard: marketplace === 'Ozon' && useOzonCard,
       category,
       avgStorageDays: days,
       taxRate: tax,
       marketingRate: marketing,
+      riskBufferPercent: 0.05, // 5% Safety margin
     });
 
-    // Storage cost calculation
-    const storageCostPerDay = marketplace === 'WB' ? 0.08 : 0.75; // ₽/л/день
-    const storageCost = Math.round(storageCostPerDay * days);
+    // Real price needed for break-even
+    const minPrice = stats.recommendedMinPrice;
+    const breakEvenPrice = stats.minSafePrice;
 
-    // Fixed Costs from User Inputs:
-    const fixedCosts = totalGoodsCost + log + pack + storageCost;
-
-    // Variable Rates
-    const commissionRate = stats.commissionRate;
-    const acquiringRate = marketplace === 'Ozon' ? 0.015 : 0;
-    const sppRate = marketplace === 'WB' ? 0.08 : 0.05;
-    const ozonCardRate =
-      marketplace === 'Ozon' && useOzonCard
-        ? OZON_CARD_CONFIG.discountPercent * OZON_CARD_CONFIG.adoptionRate
-        : 0;
-
-    const bankCommission = 0.01; // ~1% withdrawal
-    const totalVariableRate =
-      commissionRate + acquiringRate + sppRate + ozonCardRate + bankCommission + tax + marketing;
-
-    // Target Margin Rate
-    const targetMarginRate = margin / 100;
-
-    // Build warnings array
-    const warnings: Array<{ type: 'critical' | 'warning' | 'info'; message: string }> = [];
-
-    // Check if calculation is possible
-    if (totalVariableRate + targetMarginRate >= 1) {
-      return {
-        price: 0,
-        breakEvenPrice: 0,
-        rates: {
-          commission: 0,
-          ozonCard: 0,
-          acquiring: 0,
-          spp: 0,
-          tax: 0,
-          marketing: 0,
-          bank: 0,
-          variableTotal: 0,
-        },
-        breakdown: {
-          goods: 0,
-          logistics: 0,
-          packaging: 0,
-          storage: 0,
-          margin: 0,
-          profit: 0,
-        },
-        warnings: [],
-        error: 'Комиссии превышают 100%',
-      };
-    }
-
-    // Break-even Price (margin = 0)
-    const breakEvenPrice = Math.ceil(fixedCosts / (1 - totalVariableRate));
-
-    // Recommended Price (with target margin)
-    const minPrice = Math.ceil(fixedCosts / (1 - totalVariableRate - targetMarginRate));
-
-    // Calculate expected profit at recommended price
-    const expectedProfit = minPrice * targetMarginRate;
-
-    // Real costs at recommended price
-    const priceCommission = Math.round(minPrice * commissionRate);
-    const priceAcquiring = Math.round(minPrice * acquiringRate);
-    const priceSpp = Math.round(minPrice * sppRate);
-    const priceOzonCard = Math.round(minPrice * ozonCardRate);
-    const priceTax = Math.round(minPrice * tax);
-    const priceMarketing = Math.round(minPrice * marketing);
-
-    // Warnings
-    if (marketplace === 'Ozon' && useOzonCard && ozonCardRate > 0) {
-      const ozonCardCost = Math.round(minPrice * ozonCardRate);
-      warnings.push({
-        type: 'warning',
-        message: `Ozon Card съедает ~${ozonCardCost}₽ с заказа (5% × 40% покупателей)`,
-      });
-    }
-
-    if (days > 45) {
-      warnings.push({
-        type: days > 60 ? 'critical' : 'warning',
-        message:
-          days > 60
-            ? `⚠️ ${days} дней на складе! Тариф хранения удвоен!`
-            : `${days} дней на складе — через ${60 - days} дней тариф удвоится`,
-      });
-    }
-
-    if (margin < 15) {
-      warnings.push({
-        type: 'info',
-        message: `Маржа ${margin}% — рискованно при возвратах и акциях`,
-      });
-    }
+    // Recalculate stats at the final recommended price
+    const finalStats = calculateUnitEconomics({
+      price: minPrice,
+      costPrice: totalGoodsCost,
+      marketplace,
+      fulfillmentType: 'fbs',
+      packagingCost: pack,
+      acceptanceFee: accept,
+      targetMarginPercent: margin,
+      useOzonCard: marketplace === 'Ozon' && useOzonCard,
+      category,
+      avgStorageDays: days,
+      taxRate: tax,
+      marketingRate: marketing,
+      riskBufferPercent: 0.05,
+    });
 
     return {
-      price: Math.ceil(minPrice / 10) * 10,
-      breakEvenPrice: Math.ceil(breakEvenPrice / 10) * 10,
+      price: minPrice,
+      breakEvenPrice: breakEvenPrice,
       rates: {
-        commission: commissionRate * 100,
-        ozonCard: ozonCardRate * 100,
-        acquiring: acquiringRate * 100,
-        spp: sppRate * 100,
-        tax: tax * 100,
-        marketing: marketing * 100,
-        bank: bankCommission * 100,
-        variableTotal: totalVariableRate * 100,
+        commission: finalStats.commissionRate * 100,
+        variableTotal: ((finalStats.totalCosts - totalGoodsCost) / minPrice) * 100,
       },
       breakdown: {
         goods: totalGoodsCost,
-        logistics: log,
-        packaging: pack,
-        storage: storageCost,
-        commission: priceCommission,
-        acquiring: priceAcquiring,
-        spp: priceSpp,
-        ozonCard: priceOzonCard,
-        tax: priceTax,
-        marketing: priceMarketing,
-        margin: margin,
-        profit: Math.round(expectedProfit),
+        logistics: finalStats.logistics,
+        packaging: finalStats.packagingCost,
+        acceptanceFee: finalStats.acceptanceFee,
+        storage: finalStats.storage,
+        commission: finalStats.commission,
+        acquiring: finalStats.acquiring,
+        spp: finalStats.spp,
+        ozonCard: finalStats.ozonCardCosts,
+        riskBuffer: finalStats.riskBuffer,
+        tax: finalStats.tax,
+        marketing: finalStats.marketing,
+        profit: finalStats.profit,
       },
-      warnings,
-      error: null,
+      warnings: finalStats.warnings.map(w => ({ type: w.type, message: w.message })),
+      error: minPrice <= 0 ? 'Ошибка расчета' : null,
     };
   }, [
     costPrice,
     laborHours,
     laborRate,
-    logistics,
     packaging,
+    acceptanceFee,
     adCost,
     targetMargin,
     marketplace,
@@ -477,6 +399,18 @@ export function PriceCalculator({
                           placeholder="10 %"
                         />
                       </div>
+                      <div className="bg-white p-3 rounded-xl border border-slate-100">
+                        <label className="text-[10px] uppercase font-bold text-slate-400 mb-1 block">
+                          Приемка (от шт)
+                        </label>
+                        <input
+                          type="number"
+                          value={acceptanceFee}
+                          onChange={e => setAcceptanceFee(e.target.value)}
+                          className="w-full font-bold text-slate-700 outline-none text-sm"
+                          placeholder="35 ₽"
+                        />
+                      </div>
                       <div className="col-span-2 bg-white p-3 rounded-xl border border-slate-100 flex gap-4">
                         <div className="flex-1">
                           <label className="text-[10px] uppercase font-bold text-slate-400 mb-1 block">
@@ -567,8 +501,10 @@ export function PriceCalculator({
                         color: 'bg-amber-400',
                       },
                       {
-                        label: 'Упаковка',
-                        value: calculationResult.breakdown.packaging || 0,
+                        label: 'Упаковка + Приемка',
+                        value:
+                          (calculationResult.breakdown.packaging || 0) +
+                          (calculationResult.breakdown.acceptanceFee || 0),
                         color: 'bg-yellow-400',
                       },
                       {
@@ -593,9 +529,15 @@ export function PriceCalculator({
                                 ]
                               : []),
                           ]
-                        : []),
+                        : [
+                            {
+                              label: 'Эквайринг + Транзакция',
+                              value: calculationResult.breakdown.acquiring || 0,
+                              color: 'bg-pink-400',
+                            },
+                          ]),
                       {
-                        label: `SPP ${marketplace === 'WB' ? '8%' : '5%'}`,
+                        label: `SPP (Скидка площадки)`,
                         value: calculationResult.breakdown.spp || 0,
                         color: 'bg-purple-400',
                       },
@@ -605,9 +547,14 @@ export function PriceCalculator({
                         color: 'bg-indigo-400',
                       },
                       {
-                        label: `Маркетинг ${marketingRate}%`,
+                        label: `Маркетинг (ДРР)`,
                         value: calculationResult.breakdown.marketing || 0,
                         color: 'bg-cyan-400',
+                      },
+                      {
+                        label: 'Риски 5% (Штрафы, возврат)',
+                        value: calculationResult.breakdown.riskBuffer || 0,
+                        color: 'bg-slate-300',
                       },
                     ]
                       .filter(item => item.value > 0)

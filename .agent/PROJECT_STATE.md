@@ -1,8 +1,37 @@
 # 📊 Project State — NeuroGUARDIAN
 
-Last Updated: 2026-01-28
+Last Updated: 2026-01-29
 
-### Session 2026-01-28 (Session 103 - Premium Reporting & API Resilience) 💎🛡️
+### Session 2026-01-29 (Session 104 - Telegram Interactions & RAG Stability) 🛡️📚
+
+**Objective: Implement interactive Sentinel alerts and harden RAG knowledge base.**
+
+> ✅ **INTERACTIVE ALERTS:** Implemented fully functional Telegram callback handlers (`ack_alert`, `check_product`, `raise_price`). Users can now acknowledge threats and trigger actions directly from alerts.
+> ✅ **RAG RESILIENCE:** "Battle-hardened" the `VectorStore` ingestion pipeline. Implemented an **Atomic Fallback** mechanism that recovers from connection drops during heavy embedding tasks by switching to single-document insertion.
+> ✅ **DATABASE STABILITY:** Optimized `database.ts` connection pool settings (aggressive idle timeout) and retry logic (5 attempts + jitter) to handle unstable serverless connections with Neon/Vercel.
+> ✅ **KNOWLEDGE BASE:** Successfully verified knowledge base population (10 documents) despite network instability.
+
+**Completed Actions:**
+
+- [x] **Telegram Handlers**: Added `ack_alert`, `check_product`, `raise_price` to `src/api-lib/handlers/telegram.ts`.
+- [x] **Vector Store Upgrade**: Implemented `ATOMIC FALLBACK` in `src/infrastructure/rag/VectorStore.ts`.
+- [x] **Database Optimization**: Tuned pool config in `src/api-lib/services/database.ts` for serverless environments.
+- [x] **Verification**: Confirmed successful RAG search via `test-rag-search.ts` (deleted after use).
+
+**Key Insights:**
+
+```
+Serverless Postgres (Neon) aggressively drops idle connections. When using slow external APIs (like HuggingFace embeddings taking 60s+), the DB connection often dies before the result is ready.
+Solution: "Fail fast" on connections (short idle timeout) + "Resilient Retries" (Atomic Fallback) ensures data integrity without crashing the pipeline.
+```
+
+**Next Steps (P0):**
+
+1.  Complete the ingestion of the full knowledge base.
+2.  Deploy the updated Telegram handlers to production.
+3.  Monitor the "Atomic Fallback" logs to ensure it's not being triggered too frequently (performance cost).
+
+---
 
 **Objective: Enhance Sentinel visual clarity, financial actionability, and resolve critical deployment blockers.**
 
