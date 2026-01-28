@@ -18,7 +18,6 @@ export class ProductsSpecialist extends BaseSpecialist {
     'update_product_settings',
     'get_low_margin_products',
     'get_real_price',
-    'generate_product_image',
   ];
 
   readonly systemPrompt = `# 🎯 ВИКТОР — ОПЕРАЦИОННЫЙ ДИРЕКТОР (ПРОДУКТЫ)

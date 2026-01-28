@@ -8,7 +8,7 @@
 import { GeminiProvider } from '../../infrastructure/llm/GeminiProvider.js';
 import { logger } from '../../api-lib/lib/logger.js';
 
-export type IntentCategory = 'PRODUCTS' | 'PRICING' | 'SENTINEL' | 'ANALYTICS' | 'CHAT' | 'SUPPORT';
+export type IntentCategory = 'PRODUCTS' | 'PRICING' | 'SENTINEL' | 'ANALYTICS' | 'CHAT';
 
 export interface ClassificationResult {
   category: IntentCategory;
@@ -63,14 +63,6 @@ Examples:
 
 **CHAT** — Greetings, help, general questions (not support related)
 
-**SUPPORT** — Reputation management, reviews, feedback, replies, customer complaints
-Examples:
-- "покажи последние отзывы"
-- "ответь на отзыв 123"
-- "жалуются ли на качество"
-- "сгенерируй ответ на 5 звезд"
-- "что пишут покупатели"
-
 ## ENTITY EXTRACTION:
 Also extract:
 - productIds: any article numbers (5+ digit numbers)
@@ -79,7 +71,7 @@ Also extract:
 
 ## OUTPUT FORMAT:
 Valid JSON only, no markdown:
-{"category": "PRODUCTS|PRICING|SENTINEL|ANALYTICS|CHAT|SUPPORT", "confidence": 0.0-1.0, "reasoning": "summary", "entities": {"productIds": [], "prices": [], "marketplace": null}}`;
+{"category": "PRODUCTS|PRICING|SENTINEL|ANALYTICS|CHAT", "confidence": 0.0-1.0, "reasoning": "summary", "entities": {"productIds": [], "prices": [], "marketplace": null}}`;
 
 /**
  * Rule-based fallback classifier
@@ -201,25 +193,6 @@ function classifyByRules(query: string): ClassificationResult {
     }
   }
 
-  // SUPPORT patterns (reviews, feedback, replies)
-  const supportPatterns = [
-    /(отзыв|feedback|review|репутац)/i,
-    /(жалоб|претензи|негатив|звезд|[1-5].?звезд)/i,
-    /(ответь|напиши ответ|автоответ|reply).*(отзыв)/i,
-    /(что пишут|мнение|комментар).*(покупател|клиент)/i,
-  ];
-
-  for (const pattern of supportPatterns) {
-    if (pattern.test(lowerQuery)) {
-      return {
-        ...baseResult,
-        category: 'SUPPORT',
-        confidence: 0.85,
-        reasoning: 'Rule: support/review pattern matched',
-      };
-    }
-  }
-
   // PRODUCTS patterns (products, search, sync)
   const productsPatterns = [
     /(товар|product|артикул|sku|позиц)/i,
@@ -284,7 +257,6 @@ async function classifyWithLLM(query: string): Promise<ClassificationResult | nu
       'SENTINEL',
       'ANALYTICS',
       'CHAT',
-      'SUPPORT',
     ];
     if (!validCategories.includes(parsed.category)) {
       throw new Error(`Invalid category: ${parsed.category}`);

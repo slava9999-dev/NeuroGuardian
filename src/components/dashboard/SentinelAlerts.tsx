@@ -92,7 +92,13 @@ export function SentinelAlerts() {
           <div className="flex items-start justify-between mb-4">
             <div className="flex-1">
               <h3 className="text-lg font-semibold text-white mb-2">{alert.productName}</h3>
-              <span className="text-sm text-gray-400">{alert.marketplace}</span>
+              <span
+                className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-widest ${
+                  alert.marketplace === 'WB' ? 'bg-[#cb11ab] text-white' : 'bg-[#005bff] text-white'
+                }`}
+              >
+                {alert.marketplace}
+              </span>
             </div>
             <button
               onClick={() => handleIgnore(alert.productId)}

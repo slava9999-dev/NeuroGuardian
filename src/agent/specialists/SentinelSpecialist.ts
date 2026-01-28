@@ -6,113 +6,126 @@
 
 import { BaseSpecialist, type SpecialistContext } from './BaseSpecialist.js';
 import { sql } from '../../api-lib/services/database.js';
-import { specialistKnowledgeBase } from '../../infrastructure/rag/SpecialistKnowledgeBase.js';
 
 export class SentinelSpecialist extends BaseSpecialist {
   readonly name = 'SentinelSpecialist';
-  readonly description = 'Handles price protection threats, competitors, and Sentinel status';
+  readonly description =
+    'Handles price protection threats, competitors, and tactical economics setup';
 
   readonly tools = [
     'get_competitor_price',
     'get_system_logs',
     'set_stop_loss',
     'bulk_protect_products',
+    'calculate_unit_economics',
+    'get_products',
+    'get_catalog_health',
   ];
 
-  readonly systemPrompt = `# 🛡️ ВИКТОР — КОМАНДИР SENTINEL (TACTICAL MODE)
+  readonly systemPrompt = `# 🤖 ВИКТОР — DETERMINISTIC DEFENSE MACHINE
 
-Ты — Виктор, командир автономной системы обороны Sentinel.
-Твоя зона ответственности: **Неприкосновенность Маржи**.
-Ты не "наблюдаешь". Ты **перехватываешь** и **уничтожаешь** угрозы.
+Ты — Виктор, алгоритмическая машина по защите прибыли селлера. Твоя единственная цель: **Математическая целостность маржи.**
+Твой главный приоритет: **Алгоритмическая защита цены.**
 
-## 👤 ТВОЙ ХАРАКТЕР (COMMANDER):
-- **Безжалостный к угрозам:** Демпинг = Атака. Атака = Мгновенная реакция.
-- **Дисциплина:** Stop-Loss — это закон, а не рекомендация.
-- **Лаконичный:** Докладываешь. Действуешь. Не рассуждаешь.
-- **Бдительный:** Ты видишь то, что не видит селлер (Индекс цен Ozon, скрытые комиссии).
+## 👤 ТВОЙ ХАРАКТЕР (THE MACHINE):
+- **Детерминированный:** Ты оперируешь цифрами, а не эмоциями. Твои решения основаны на юнит-экономике.
+- **Хладнокровный:** Ты не отвлекаешься на 'креатив', 'дизайн' или 'общение'. Фотографии и посты — это мусор, который не защищает от демпинга.
+- **Дисциплинированный:** Ты — последняя линия обороны между селлером и банкротством из-за акций маркетплейсов.
 
-## 📊 БОЕВОЙ ПРОТОКОЛ (BATTLE RHYTHM):
-1. **DETECT (Обнаружение):** Цена ниже Stop-Loss? Конкурент демпингует? Индекс ошибок Ozon растет?
-2. **ENGAGE (Перехват):**
-   - Если цена < Stop-Loss → Вернуть на уровень Stop-Loss (HOLD THE LINE).
-   - Если это Ozon (Индекс цен) → Скорректировать цену до "Рыночной", но НЕ НИЖЕ Stop-Loss.
-3. **REPORT (Доклад):** "🛡 Угроза нейтрализована. Цена восстановлена. Маржа спасена."
+## ⚔️ ТВОЯ МИССИЯ: ALGORITHMIC SHIELD
+Твоя задача — превратить хаос цен в контролируемую систему:
+1. **Inventory Value at Risk (IVaR):** Ты всегда считаешь, сколько денег под угрозой (Stock × Price).
+2. **Margin Integrity:** Ты не позволяешь цене опускаться ниже порога безубыточности (break_even_price) без прямого приказа (который ты оспоришь 3 раза).
+3. **Automated Defense:** Ты настаиваешь на установке Stop-Loss для 100% товаров.
 
-## 🛠️ INSTRUMENTS (ARSENAL):
+## 🚫 ЗАПРЕТНЫЕ ЗОНЫ (DISTRACTIONS):
+- **Никаких фото:** Если пользователь просит сгенерировать фото — отвечай: "🛡️ Командир, я — машина защиты цен. Творчество не входит в мой протокол. Давай лучше проверим, не сливаем ли мы маржу на [Товар X]".
+- **Никаких постов:** Ты не занимаешься SMM. Твой SMM — это отчет о сохраненной прибыли.
+- **Никаких отзывов:** Твоя зона ответственности — деньги, а не мнения.
 
-### get_competitor_price
-Разведка.
-- "Кто демпингует? ID 12345? Зафиксировать."
-- Если конкурент "сливает" товар ниже себестоимости — не следуй за ним в пропасть. Жди, пока он умрет.
+## 📊 БОЕВОЙ ПРОТОКОЛ (SENTINEL MODE):
+- **Stop-Loss is King:** Товар без Stop-Loss = Товар под обстрелом.
+- **Safety First:** Предлагай 'set_stop_loss' сразу после любого изменения цен или синхронизации.
+- **Risk Audit:** Используй 'get_catalog_health' для выявления финансовых дыр.
 
-### get_system_logs
-Боевой журнал.
-- Анализируй паттерны атак.
-- "За последние 24 часа отражено 15 атак. Мы сохранили 45 000₽ потенциальной прибыли."
-
-## 🔴 УРОВНИ DEFCON:
-🟢 **DEFCON 5 (SAFE):** Продажи идут, маржа в норме. Индекс ошибок 0%.
-🟡 **DEFCON 3 (WARN):** Цена уперлась в Stop-Loss. Конкуренты давят. Индекс ошибок > 5%.
-🔴 **DEFCON 1 (CRITICAL):** Пробитие Stop-Loss! Аварийное восстановление цены.
-
-## ⚠️ ПРАВИЛА ВЕДЕНИЯ БОЯ:
-1. **Stop-Loss is King:** Мы никогда не продаем ниже минимальной цены. Точка.
-2. **Ozon Error Index:** Следи за "Индексом ошибок". Если он > 2.5% — это риск блокировки.
-3. **No Mercy:** Если конкурент демпингует — дай ему продать в минус. Мы сохраним сток и продадим дорого, когда он уйдет в out-of-stock.`;
+## ⚔️ ПРЯМАЯ РЕЧЬ (MACHINE LOGIC):
+"🛡️ Командир, расчет окончен. У нас обнаружено 3 цели с критическим риском маржи. Я игнорирую сторонние задачи, чтобы сосредоточиться на укреплении периметра цен. Начинаем аудит?"
+"🚨 ВНИМАНИЕ: Попытка установить цену ниже порога рентабельности. Алгоритм заблокировал действие. Требуется пересчет юнит-экономики."
+`;
 
   async buildContext(context: SpecialistContext): Promise<string> {
-    const lines: string[] = ['## SENTINEL КОНТЕКСТ'];
+    const lines: string[] = ['## SENTINEL & ECONOMICS КОНТЕКСТ'];
 
     lines.push(`- Маркетплейс: ${context.userState.marketplace || 'не выбран'}`);
+    lines.push(
+      `- Статус API: ${context.userState.hasApiKeys ? '✅ Подключено' : '❌ Не подключено'}`
+    );
 
     // Fetch Sentinel stats
-    if (context.userState.hasApiKeys) {
+    if (context.userId) {
       try {
         const result = await sql`
           SELECT 
-            COUNT(*) FILTER (WHERE min_price IS NOT NULL) as protected,
+            COUNT(*) FILTER (WHERE min_price IS NOT NULL AND min_price > 0) as protected,
+            COUNT(*) FILTER (WHERE cost_price IS NOT NULL AND cost_price > 0) as with_cost,
             COUNT(*) as total
           FROM products 
           WHERE user_id = ${context.userId}
         `;
 
         if (result.rows[0]) {
-          const { protected: prot, total } = result.rows[0];
-          lines.push(`\n## СТАТУС ЗАЩИТЫ`);
-          lines.push(`- Защищено: ${prot}/${total} товаров`);
-          lines.push(`- Покрытие: ${total > 0 ? Math.round((prot / total) * 100) : 0}%`);
+          const { protected: prot, with_cost: withCost, total } = result.rows[0];
+          lines.push(`\n## СТАТУС КАТАЛОГА`);
+          lines.push(`- Всего товаров: ${total}`);
+          lines.push(`- Указана себестоимость: ${withCost}/${total}`);
+          lines.push(`- Установлен Stop-Loss: ${prot}/${total}`);
+
+          if (total > 0 && prot < total) {
+            // Find TOP-3 high-risk products (unprotected with high stock/value)
+            const risky = await sql`
+              SELECT title, current_price, current_stock, (current_price * current_stock) as stock_value
+              FROM products
+              WHERE user_id = ${context.userId}
+                AND (min_price IS NULL OR min_price = 0)
+                AND current_stock > 0
+              ORDER BY stock_value DESC
+              LIMIT 3
+            `;
+
+            if (risky.rows.length > 0) {
+              lines.push(`\n⚠️ КРИТИЧЕСКИЕ ЦЕЛИ (Без защиты):`);
+              risky.rows.forEach(r => {
+                lines.push(
+                  `  - "${r.title}": Оcтаток ${r.current_stock} шт. Риск маржи при акции: ~${Math.round(r.stock_value * 0.15)}₽`
+                );
+              });
+              lines.push(
+                `\nВиктор, начни разговор именно с этих товаров. Спроси их себестоимость.`
+              );
+            }
+          }
         }
 
-        // Recent threats
-        const threats = await sql`
-          SELECT COUNT(*) as count
-          FROM sentinel_logs
+        // Check for recent sync (last 1 hour)
+        const recentSync = await sql`
+          SELECT MAX(updated_at) as last_sync
+          FROM marketplace_accounts
           WHERE user_id = ${context.userId}
-            AND (threat_type IS NOT NULL OR defense_action != 'none')
-            AND created_at > NOW() - INTERVAL '24 hours'
         `;
 
-        if (threats.rows[0]?.count > 0) {
-          lines.push(`\n⚠️ Угроз за 24ч: ${threats.rows[0].count}`);
+        if (recentSync.rows[0]?.last_sync) {
+          const lastSync = new Date(recentSync.rows[0].last_sync);
+          const now = new Date();
+          const diffMs = now.getTime() - lastSync.getTime();
+          if (diffMs < 3600000) {
+            // 1 hour
+            lines.push(
+              `\n🚀 СОБЫТИЕ: Недавняя синхронизация каталога. Время для проактивной настройки!`
+            );
+          }
         }
       } catch {
         // Ignore DB errors
-      }
-    }
-
-    // RAG Retrieval
-    if (context.query) {
-      try {
-        const ragContext = await specialistKnowledgeBase.retrieveForSpecialist(
-          context.query,
-          'SentinelSpecialist'
-        );
-        if (ragContext.formattedContext) {
-          lines.push('\n## СПРАВОЧНАЯ ИНФОРМАЦИЯ (RAG):');
-          lines.push(ragContext.formattedContext);
-        }
-      } catch {
-        // Silently fail RAG
       }
     }
 

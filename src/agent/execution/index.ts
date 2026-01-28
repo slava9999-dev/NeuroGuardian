@@ -20,7 +20,7 @@ import { getProductsTool } from './tools/GetProductsTool.js';
 import { getOrdersTool } from './tools/GetOrdersTool.js';
 import { getWarehouseStocksTool } from './tools/GetWarehouseStocksTool.js';
 import { getMarketplaceAccountsTool } from './tools/GetMarketplaceAccountsTool.js';
-import { getReviewsTool } from './tools/GetReviewsTool.js';
+// import { getReviewsTool } from './tools/GetReviewsTool.js';
 
 // Analyze tools
 import { getSalesStatsTool } from './tools/GetSalesStatsTool.js';
@@ -28,6 +28,7 @@ import { calculateUnitEconomicsTool } from './tools/CalculateEconomicsTool.js';
 import { getAbcAnalysisTool } from './tools/GetAbcAnalysisTool.js';
 import { getStockForecastTool } from './tools/GetStockForecastTool.js';
 import { getLowMarginProductsTool } from './tools/GetLowMarginProductsTool.js';
+import { GetCatalogHealthTool } from './tools/GetCatalogHealthTool.js';
 
 // Write tools
 import { setStopLossTool } from './tools/SetStopLossTool.js';
@@ -36,7 +37,7 @@ import { updatePricesTool } from './tools/UpdatePricesTool.js';
 import { updateStocksTool } from './tools/UpdateStocksTool.js';
 import { updateProductSettingsTool } from './tools/UpdateProductSettingsTool.js';
 import { syncCatalogTool } from './tools/SyncCatalogTool.js';
-import { generateProductImageTool } from './tools/GenerateProductImageTool.js';
+// import { generateProductImageTool } from './tools/GenerateProductImageTool.js';
 
 // Search tools
 import { searchWebTool } from './tools/SearchWebTool.js';
@@ -60,7 +61,7 @@ export function registerAllTools(): void {
   toolRegistry.register(getOrdersTool);
   toolRegistry.register(getWarehouseStocksTool);
   toolRegistry.register(getMarketplaceAccountsTool);
-  toolRegistry.register(getReviewsTool);
+  // toolRegistry.register(getReviewsTool);
 
   // Analyze tools (calculations, stats)
   toolRegistry.register(getSalesStatsTool);
@@ -69,6 +70,7 @@ export function registerAllTools(): void {
   toolRegistry.register(getStockForecastTool);
   toolRegistry.register(getLowMarginProductsTool);
   toolRegistry.register(getRealPriceTool); // Digital Vision
+  toolRegistry.register(GetCatalogHealthTool);
 
   // Write tools (require confirmation)
   toolRegistry.register(setStopLossTool);
@@ -77,7 +79,7 @@ export function registerAllTools(): void {
   toolRegistry.register(updateStocksTool);
   toolRegistry.register(updateProductSettingsTool);
   toolRegistry.register(syncCatalogTool);
-  toolRegistry.register(generateProductImageTool);
+  // toolRegistry.register(generateProductImageTool);
 
   // Sentinel tools
   toolRegistry.register(AddCompetitorMonitorTool);
@@ -117,9 +119,10 @@ export { updateStocksTool } from './tools/UpdateStocksTool.js';
 export { updateProductSettingsTool } from './tools/UpdateProductSettingsTool.js';
 export { getSystemLogsTool } from './tools/GetSystemLogsTool.js';
 export { getCompetitorPriceTool } from './tools/GetCompetitorPriceTool.js';
-export { getReviewsTool } from './tools/GetReviewsTool.js';
+// export { getReviewsTool } from './tools/GetReviewsTool.js';
 export { getLowMarginProductsTool } from './tools/GetLowMarginProductsTool.js';
+export { GetCatalogHealthTool } from './tools/GetCatalogHealthTool.js';
 export { getRealPriceTool } from './tools/GetRealPriceTool.js';
 export { syncCatalogTool } from './tools/SyncCatalogTool.js';
-export { generateProductImageTool } from './tools/GenerateProductImageTool.js';
+// export { generateProductImageTool } from './tools/GenerateProductImageTool.js';
 export { AddCompetitorMonitorTool, CheckSentinelStatusTool } from './tools/SentinelTools.js';

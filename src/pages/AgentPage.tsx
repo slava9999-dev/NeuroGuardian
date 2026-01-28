@@ -172,7 +172,7 @@ export function AgentPage() {
             <div className="flex flex-col items-center pt-8 pb-6">
               <div className="relative mb-6">
                 <motion.div
-                  className="absolute inset-0 bg-gradient-to-br from-primary/20 via-violet-400/10 to-transparent blur-[50px] rounded-full scale-150"
+                  className="absolute inset-0 bg-linear-to-br from-primary/20 via-violet-400/10 to-transparent blur-[50px] rounded-full scale-150"
                   animate={{
                     scale: [1.5, 1.6, 1.5],
                     opacity: [0.3, 0.5, 0.3],
@@ -266,42 +266,34 @@ export function AgentPage() {
                 </div>
               </motion.div>
 
-              {/* Category: Creative */}
+              {/* Category: System & Risk */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.5 }}
               >
                 <div className="flex items-center gap-2 mb-3 px-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-violet-500" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-danger" />
                   <span className="text-[10px] font-bold tracking-widest text-text-muted uppercase">
-                    Креатив
+                    Аудит и Риски
                   </span>
                 </div>
                 <div className="grid grid-cols-2 gap-2.5">
                   <ActionCard
-                    icon={<span className="text-base">🖼️</span>}
-                    iconBg="bg-violet-500/10"
-                    iconColor="text-violet-600"
-                    title="Фото товара"
-                    subtitle="AI-генерация"
-                    onClick={() =>
-                      handleSendMessage(
-                        'Хочу сгенерировать lifestyle фото для карточки товара. Покажи мои товары чтобы я выбрал.'
-                      )
-                    }
+                    icon={<TrendingUp className="w-5 h-5" />}
+                    iconBg="bg-danger/10"
+                    iconColor="text-danger"
+                    title="Здоровье каталога"
+                    subtitle="Проверка рисков"
+                    onClick={() => handleSendMessage('проверь здоровье моего каталога')}
                   />
                   <ActionCard
-                    icon={<span className="text-base">✍️</span>}
-                    iconBg="bg-pink-500/10"
-                    iconColor="text-pink-600"
-                    title="SMM-пост"
-                    subtitle="Для соцсетей"
-                    onClick={() =>
-                      handleSendMessage(
-                        'Помоги написать продающий пост для Instagram. Покажи мои товары чтобы я выбрал, про какой писать.'
-                      )
-                    }
+                    icon={<Package className="w-5 h-5" />}
+                    iconBg="bg-primary/20"
+                    iconColor="text-primary-hover"
+                    title="Синхронизация"
+                    subtitle="Обновить товары"
+                    onClick={() => handleSendMessage('синхронизируй мой каталог')}
                   />
                 </div>
               </motion.div>

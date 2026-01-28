@@ -10,7 +10,6 @@ export { PricingSpecialist, pricingSpecialist } from './PricingSpecialist.js';
 export { SentinelSpecialist, sentinelSpecialist } from './SentinelSpecialist.js';
 export { AnalyticsSpecialist, analyticsSpecialist } from './AnalyticsSpecialist.js';
 export { ChatSpecialist, chatSpecialist } from './ChatSpecialist.js';
-export { SupportSpecialist, supportSpecialist } from './SupportSpecialist.js';
 export {
   classifyIntent,
   classifyIntentSync,
@@ -29,12 +28,11 @@ import { pricingSpecialist } from './PricingSpecialist.js';
 import { sentinelSpecialist } from './SentinelSpecialist.js';
 import { analyticsSpecialist } from './AnalyticsSpecialist.js';
 import { chatSpecialist } from './ChatSpecialist.js';
-import { supportSpecialist } from './SupportSpecialist.js';
 
 /**
  * Intent categories for routing
  */
-export type IntentCategory = 'PRODUCTS' | 'PRICING' | 'SENTINEL' | 'ANALYTICS' | 'CHAT' | 'SUPPORT';
+export type IntentCategory = 'PRODUCTS' | 'PRICING' | 'SENTINEL' | 'ANALYTICS' | 'CHAT';
 
 /**
  * Get specialist by intent category
@@ -49,8 +47,6 @@ export function getSpecialist(intent: IntentCategory): BaseSpecialist {
       return sentinelSpecialist;
     case 'ANALYTICS':
       return analyticsSpecialist;
-    case 'SUPPORT':
-      return supportSpecialist;
     case 'CHAT':
     default:
       return chatSpecialist;
@@ -65,6 +61,5 @@ export const specialists: Record<IntentCategory, BaseSpecialist> = {
   PRICING: pricingSpecialist,
   SENTINEL: sentinelSpecialist,
   ANALYTICS: analyticsSpecialist,
-  SUPPORT: supportSpecialist,
   CHAT: chatSpecialist,
 };

@@ -176,10 +176,21 @@ export function SentinelDashboard() {
                 className="bg-white p-4 rounded-xl border border-slate-200 flex justify-between items-center shadow-sm"
               >
                 <div>
-                  <div className="text-sm font-black italic text-slate-900 uppercase tracking-tight">
-                    {threat.productTitle}
+                  <div className="flex items-center gap-2 mb-1">
+                    <span
+                      className={`px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest ${
+                        threat.marketplace === 'WB'
+                          ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                          : 'bg-blue-100 text-blue-700 border border-blue-200'
+                      }`}
+                    >
+                      {threat.marketplace}
+                    </span>
+                    <div className="text-sm font-black italic text-slate-900 uppercase tracking-tight truncate max-w-[150px]">
+                      {threat.productTitle}
+                    </div>
                   </div>
-                  <div className="text-[10px] text-rose-600 font-bold uppercase mt-1">
+                  <div className="text-[10px] text-rose-600 font-bold uppercase">
                     {threat.message}
                   </div>
                 </div>

@@ -1740,4 +1740,31 @@ PgVector остается основным движком знаний.
 
 ---
 
-_Last updated: 2026-01-27T14:10:00+03:00_
+### Session 2026-01-28 (Session 105 - Critical Specialist Audit & Strategy Pivot) 🛡️🧠
+
+**Objective: Ruthless pruning of non-core features and centering the agent on Algorithmic Price Protection.**
+
+> ✅ **CORE MISSION ALIGNMENT:** Successfully removed all "creative" and "support" distractions (AI Photos, SMM posts, Review management) from the agent's interface and specialists.
+> ✅ **DETERMINISTIC DEFENSE MACHINE:** Pivoted Viktor's persona to a strict, profit-focused machine. Zero tolerance for nonsense; 100% focus on IVaR (Inventory Value at Risk) and Stop-Loss.
+> ✅ **AUDIT & RISKS:** Replaced "Creative" UI with "Risk Audit" and "Sync" actions. New `GetCatalogHealthTool` provides proactive margin alerts.
+> ✅ **CLEANUP:** Deleted `SupportSpecialist`, `ContentSpecialist`, and related tools to reduce attack surface and maintain focus.
+
+**Completed Actions:**
+
+- [x] **Agent UI**: `src/pages/AgentPage.tsx` (Removed Creative category, added Risk Audit).
+- [x] **Specialist Persona**: `SentinelSpecialist.ts` & `PromptBuilder.ts` (Updated to Deterministic Defense Machine).
+- [x] **Tool Purge**: Commented out and deleted `GenerateProductImageTool`, `GetReviewsTool`, `GenerateReviewReplyTool`, `GenerateContentTool`.
+- [x] **Intent Logic**: `IntentClassifier.ts` (Removed SUPPORT category, strictly routing to protection experts).
+- [x] **New Capability**: `GetCatalogHealthTool.ts` (Automated margin and risk analysis).
+- [x] **Prompt Engineering**: Global `CORE_PERSONALITY` now forbids distractions and prioritizes math over chat.
+
+**Key Insights:**
+
+```
+A multi-purpose agent is a weak agent. By narrowing the focus to algorithmic price protection, we maximize the value delivered to professional sellers who care about margin, not AI art.
+Deterministic persona reduces LLM "hallucination" by strictly bounding the agent's responsibilities to financial data and defensive actions.
+```
+
+---
+
+_Last updated: 2026-01-28T21:25:00+03:00_

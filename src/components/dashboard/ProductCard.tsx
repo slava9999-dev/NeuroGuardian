@@ -104,6 +104,9 @@ export function ProductCard({ product, onUpdate, onOpenCalculator }: ProductCard
         <div className="flex-1 min-w-0">
           {/* Status Badge */}
           <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <span className={`badge ${product.marketplace === 'WB' ? 'badge-wb' : 'badge-ozon'}`}>
+              {product.marketplace}
+            </span>
             <span className={`badge ${isProtected ? 'badge-success' : 'badge-warning'}`}>
               {isProtected ? (
                 <>
@@ -118,7 +121,7 @@ export function ProductCard({ product, onUpdate, onOpenCalculator }: ProductCard
               )}
             </span>
             <span className="text-[10px] font-mono text-text-muted bg-surface-hl px-2 py-0.5 rounded">
-              {product.nmId || product.id}
+              {product.nmId || product.offerId || product.id}
             </span>
           </div>
 

@@ -52,6 +52,9 @@ export const syncCatalogTool = defineTool<SyncCatalogArgs>({
               current_price: p.current_price,
               current_stock: p.current_stock,
               marketplace: mp,
+              width_cm: p.width_cm,
+              height_cm: p.height_cm,
+              depth_cm: p.depth_cm,
             }));
 
             await saveProducts(userId, dbProducts);
