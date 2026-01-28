@@ -81,14 +81,13 @@ describe('Specialists', () => {
       expect(productsSpecialist.description).toContain('product');
     });
 
-    it('should have 6 tools', () => {
-      expect(productsSpecialist.tools).toHaveLength(6);
+    it('should have 5 tools', () => {
+      expect(productsSpecialist.tools).toHaveLength(5);
       expect(productsSpecialist.tools).toContain('get_products');
       expect(productsSpecialist.tools).toContain('update_product_settings');
       expect(productsSpecialist.tools).toContain('get_low_margin_products');
       expect(productsSpecialist.tools).toContain('get_real_price');
       expect(productsSpecialist.tools).toContain('sync_catalog');
-      expect(productsSpecialist.tools).toContain('generate_product_image');
     });
 
     it('should have systemPrompt with key sections', () => {
@@ -156,25 +155,28 @@ describe('Specialists', () => {
       expect(sentinelSpecialist.name).toBe('SentinelSpecialist');
     });
 
-    it('should have 4 tools', () => {
-      expect(sentinelSpecialist.tools).toHaveLength(4);
+    it('should have 7 tools', () => {
+      expect(sentinelSpecialist.tools).toHaveLength(7);
       expect(sentinelSpecialist.tools).toContain('get_competitor_price');
       expect(sentinelSpecialist.tools).toContain('get_system_logs');
       expect(sentinelSpecialist.tools).toContain('set_stop_loss');
       expect(sentinelSpecialist.tools).toContain('bulk_protect_products');
+      expect(sentinelSpecialist.tools).toContain('calculate_unit_economics');
+      expect(sentinelSpecialist.tools).toContain('get_products');
+      expect(sentinelSpecialist.tools).toContain('get_catalog_health');
     });
 
-    it('should have systemPrompt with status system', () => {
+    it('should have systemPrompt with deterministic persona', () => {
       const prompt = sentinelSpecialist.systemPrompt;
-      expect(prompt).toContain('🟢');
-      expect(prompt).toContain('🟡');
-      expect(prompt).toContain('🔴');
-      expect(prompt).toContain('TACTICAL MODE');
+      expect(prompt).toContain('DETERMINISTIC DEFENSE MACHINE');
+      expect(prompt).toContain('IVaR');
+      expect(prompt).toContain('Stop-Loss is King');
     });
 
-    it('should require link for competitor analysis', () => {
+    it('should have redirection for creative distractions', () => {
       const prompt = sentinelSpecialist.systemPrompt;
-      expect(prompt).toContain('демпингует');
+      expect(prompt).toContain('Никаких фото');
+      expect(prompt).toContain('Никаких постов');
     });
 
     it('should build context with SENTINEL prefix', async () => {
