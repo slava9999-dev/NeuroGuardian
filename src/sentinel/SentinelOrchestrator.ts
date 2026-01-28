@@ -38,7 +38,6 @@ export class SentinelOrchestrator {
     this.threatDetector = new ThreatDetector();
     this.defenseExecutor = new SentinelDefenseExecutor();
     this.reportGenerator = new SentinelReportGenerator();
-    this.reportGenerator = new SentinelReportGenerator();
     this.alertSender = new SentinelAlertSender();
     this.marketplaceService = new MarketplaceService();
   }
@@ -515,6 +514,21 @@ export class SentinelOrchestrator {
                 .catch(() => {
                   /* Ignore logging errors */
                 });
+
+              // --- IMMEDIATE ALERTING ---
+              // For critical "Real Price" threats, send immediate Telegram alerts
+              for (const threat of scan.threats) {
+                if (
+                  threat.type === ThreatType.PROMO_PRICE_VIOLATION ||
+                  threat.type === ThreatType.BUYER_PRICE_BELOW_STOPLOSS
+                ) {
+                  this.alertSender
+                    .sendThreatAlert(user, product, threat, marketplace)
+                    .catch(err => {
+                      logger.error(`Failed to send immediate threat alert for ${product.id}`, err);
+                    });
+                }
+              }
 
               const stopLossThreat = scan.threats.find(
                 (t: Threat) => t.type === ThreatType.COMPETITOR_PRICE_DROP

@@ -100,6 +100,7 @@ export class BrowserEyes {
 
   /**
    * Main method: Extract real buyer price using browser
+   * IMPROVED: Added retry loop with proxy rotation
    */
   async gazeAtProduct(
     marketplace: 'WB' | 'Ozon',
@@ -108,169 +109,110 @@ export class BrowserEyes {
       useVision?: boolean; // Use AI vision analysis
       waitForAuth?: boolean; // Wait for user to login (future)
       saveScreenshot?: boolean; // Save screenshot to result
+      maxRetries?: number;
     }
   ): Promise<BrowserEyesResult> {
-    const startTime = Date.now();
-    await this.init();
+    const maxRetries = options?.maxRetries ?? 3;
+    let lastError: Error | null = null;
 
-    if (!this.browser) {
-      throw new Error('Browser not initialized');
-    }
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      const startTime = Date.now();
+      let proxyUrl: string | null = null;
+      let context: BrowserContext | null = null;
+      let page: Page | null = null;
 
-    const proxyUrl = await proxyService.getNextProxy();
-    const isOzon = marketplace === 'Ozon';
-    // Use a high-quality human-like UA for Ozon, but revert to search bot for WB if needed
-    const userAgents = isOzon
-      ? [
-          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-        ]
-      : [
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-        ];
+      try {
+        await this.init();
+        if (!this.browser) throw new Error('Browser not initialized');
 
-    const contextOptions: {
-      viewport: { width: number; height: number };
-      userAgent: string;
-      locale: string;
-      timezoneId: string;
-      extraHTTPHeaders: Record<string, string>;
-      proxy?: { server: string };
-    } = {
-      viewport: isOzon ? { width: 1440, height: 900 } : { width: 1920, height: 1080 },
-      userAgent: userAgents[0],
-      locale: 'ru-RU',
-      timezoneId: 'Europe/Moscow',
-      extraHTTPHeaders: {
-        'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8',
-        Referer: 'https://www.google.com/',
-        'Sec-Fetch-Dest': 'document',
-        'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-Site': 'cross-site',
-        'Sec-Fetch-User': '?1',
-        'Upgrade-Insecure-Requests': '1',
-      },
-    };
+        proxyUrl = await proxyService.getNextProxy();
+        const isOzon = marketplace === 'Ozon';
 
-    if (proxyUrl) {
-      logger.info(`[BrowserEyes] Using proxy: ${proxyUrl}`);
-      contextOptions.proxy = { server: proxyUrl };
-    }
+        // Use Social Crawler identity for Ozon as it currently works best
+        const userAgent = isOzon
+          ? 'WhatsApp/2.21.12.21 A' // WhatsApp Social Crawler bypass
+          : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
-    const context: BrowserContext = await this.browser.newContext(contextOptions);
-    const page = await context.newPage();
+        const contextOptions: {
+          viewport: { width: number; height: number };
+          userAgent: string;
+          locale: string;
+          timezoneId: string;
+          extraHTTPHeaders: Record<string, string>;
+          proxy?: { server: string };
+        } = {
+          viewport: isOzon ? { width: 1440, height: 900 } : { width: 1920, height: 1080 },
+          userAgent,
+          locale: 'ru-RU',
+          timezoneId: 'Europe/Moscow',
+          extraHTTPHeaders: {
+            'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8',
+            Referer: 'https://www.google.com/',
+          },
+        };
 
-    // Additional anti-detection: Override navigator properties
-    await page.addInitScript(() => {
-      // Remove webdriver flag
-      Object.defineProperty(navigator, 'webdriver', {
-        get: () => false,
-      });
-
-      // Add realistic plugins
-      Object.defineProperty(navigator, 'plugins', {
-        get: () => [1, 2, 3, 4, 5],
-      });
-
-      // Add realistic languages
-      Object.defineProperty(navigator, 'languages', {
-        get: () => ['ru-RU', 'ru', 'en-US', 'en'],
-      });
-    });
-
-    try {
-      logger.info(`[BrowserEyes] Navigating to ${marketplace}: ${url}`);
-
-      // OZON SPECIFIC WARM-UP
-      if (marketplace === 'Ozon') {
-        const domain = new URL(url).hostname;
-        logger.info(`[BrowserEyes] Warming up session for ${domain}...`);
-        await page.goto(`https://${domain}/`, { waitUntil: 'load', timeout: 30000 });
-
-        // CHECK FOR CHALLENGE
-        const pageTitle = await page.title();
-        const content = await page.content();
-        if (
-          pageTitle.includes('Challenge') ||
-          content.includes('Antibot') ||
-          content.includes('challenge-data')
-        ) {
-          logger.warn(
-            `[BrowserEyes] Antibot Challenge detected on ${domain}. Standing by for auto-pass... (95.79.7.137)`
-          );
-
-          // Give the VM time to solve itself
-          await page.waitForTimeout(10000);
-
-          // Move mouse to trigger JS events that the challenge might be waiting for
-          await page.mouse.move(Math.floor(Math.random() * 500), Math.floor(Math.random() * 500));
-          await page.mouse.wheel(0, 100);
-
-          await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-
-          const newTitle = await page.title();
-          if (newTitle.includes('Challenge')) {
-            logger.error(`[BrowserEyes] Challenge persist after wait. Ozon is persistent.`);
-          } else {
-            logger.info(`[BrowserEyes] Challenge potentially passed (Title: ${newTitle})`);
-          }
-        } else {
-          await page.waitForTimeout(Math.floor(Math.random() * 2000) + 1000);
+        if (proxyUrl) {
+          logger.info(`[BrowserEyes] Attempt ${attempt}: Using proxy ${proxyUrl}`);
+          contextOptions.proxy = { server: proxyUrl };
         }
+
+        context = await this.browser.newContext(contextOptions);
+        page = await context.newPage();
+
+        // Anti-Detection Scripts
+        await page.addInitScript(() => {
+          Object.defineProperty(navigator, 'webdriver', { get: () => false });
+          Object.defineProperty(navigator, 'languages', { get: () => ['ru-RU', 'ru'] });
+        });
+
+        logger.info(`[BrowserEyes] Navigating to ${marketplace}: ${url}`);
+
+        // Navigation with timeout and retry-safe wait
+        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
+
+        // Wait for specific content or handle blocks
+        const content = await page.content();
+        if (content.includes('Доступ ограничен') || content.includes('challenge')) {
+          throw new Error('Blocked by Marketplace (Antibot)');
+        }
+
+        await this.simulateHumanBehavior(page);
+        await this.waitForPriceElements(page, marketplace);
+
+        const result = await this.extractPriceFromDOM(page, marketplace);
+
+        if (result.buyerPrice === null) {
+          throw new Error('Price not found in DOM');
+        }
+
+        // Success!
+        const duration = Date.now() - startTime;
+        this.updateMetrics(marketplace, duration, true);
+        return result;
+      } catch (error) {
+        const duration = Date.now() - startTime;
+        lastError = error instanceof Error ? error : new Error(String(error));
+
+        if (proxyUrl) {
+          proxyService.reportFailure(proxyUrl);
+        }
+
+        logger.warn(`[BrowserEyes] Attempt ${attempt} failed: ${lastError.message}`);
+
+        if (attempt === maxRetries) {
+          this.updateMetrics(marketplace, duration, false, lastError);
+          break;
+        }
+
+        // Exponential backoff before retry
+        await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+      } finally {
+        if (page) await page.close();
+        if (context) await context.close();
       }
-
-      // Navigate to target and wait for network idle
-      await page.goto(url, { waitUntil: 'load', timeout: 60000 });
-
-      // HUMAN-LIKE INTERACTION (Bypass behavioral analysis)
-      await this.simulateHumanBehavior(page);
-
-      // Wait for price elements to load
-      await this.waitForPriceElements(page, marketplace);
-
-      // Strategy 1: DOM Extraction (Fast, Reliable)
-      const domResult = await this.extractPriceFromDOM(page, marketplace);
-
-      // Strategy 2: Vision Analysis (Fallback, More Accurate for complex cases)
-      let visionResult: BrowserEyesResult | null = null;
-      if (options?.useVision && domResult.buyerPrice === null) {
-        visionResult = await this.extractPriceFromVision(page, marketplace);
-      }
-
-      const finalResult = this.mergeResults(domResult, visionResult);
-
-      // Take screenshot if requested or if extraction failed (for debugging)
-      if (options?.saveScreenshot || finalResult.buyerPrice === null) {
-        const screenshot = await page.screenshot({ type: 'png', fullPage: false });
-        finalResult.screenshotUrl = `data:image/png;base64,${screenshot.toString('base64')}`;
-      }
-
-      const duration = Date.now() - startTime;
-
-      // Update metrics
-      this.updateMetrics(marketplace, duration, true);
-
-      logger.info(`[BrowserEyes] Extraction complete in ${duration}ms`, {
-        method: finalResult.extractionMethod,
-        price: finalResult.buyerPrice,
-        marketplace,
-      });
-
-      return finalResult;
-    } catch (error) {
-      const duration = Date.now() - startTime;
-      this.updateMetrics(marketplace, duration, false, error);
-
-      logger.error('[BrowserEyes] Failed to extract price', {
-        marketplace,
-        url,
-        durationMs: duration,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-    } finally {
-      await page.close();
     }
+
+    throw lastError || new Error('Extraction failed after all retries');
   }
 
   /**

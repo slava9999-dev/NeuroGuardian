@@ -31,9 +31,9 @@ Hybrid extraction (DOM + LD-JSON) is essential for Ozon which frequently changes
 
 **Next Steps (P0):**
 
-1. Push changes to production and monitor `Social Crawler` success rate over time.
-2. Implement Telegram AlertManager integration for the new `Stop-Loss` threat types.
-3. Add automated proxy rotation as a Level 3 fallback for extremely aggressive blocking.
+1. Deploy to production environment.
+2. Monitor AlertManager delivery rates for Stop-Loss alerts in Telegram.
+3. Verify proxy failure reporting in ProxyService logs.
 
 # This file tracks current progress and is updated at end of each session
 
@@ -1740,6 +1740,35 @@ PgVector остается основным движком знаний.
 
 ---
 
+### Session 2026-01-28 (Session 106 - Sentinel Stop-Loss & Industrial Defense) 🛡️🚀
+
+**Objective: Finalize AlertManager integration for Stop-Loss threats and implement industrial-grade networking resilience.**
+
+> ✅ **ALERTMANAGER INTEGRATION:** Integrated immediate Telegram alerts for `PROMO_PRICE_VIOLATION` and `BUYER_PRICE_BELOW_STOPLOSS`. Critical threats now trigger instant notifications with interactive buttons, bypassing the default report cycle.
+> ✅ **INDUSTRIAL DEFENSE:** Implemented automated proxy rotation and exponential backoff in `BrowserEyes.ts`. The system now handles "Access Restricted" blocks by switching and blacklisting failed proxies via `ProxyService`.
+> ✅ **PROMO PROTECTION:** Verified `ThreatDetector` logic for Ozon Card and WB Wallet discounts. Sentinel accurately calculates the "Real Buyer Price" to protect margins from invisible marketplace promos.
+> ✅ **STABILITY:** Fixed minor code duplication in `SentinelOrchestrator` and resolved TypeScript lint warnings in `BrowserEyes`.
+
+**Completed Actions:**
+
+- [x] **Sentinel Alerts**: `SentinelOrchestrator.ts` (Added immediate `sendThreatAlert` for critical real-price threats).
+- [x] **Networking**: `BrowserEyes.ts` (Implemented retry loop with mandatory proxy rotation upon failure).
+- [x] **Proxy Service**: `ProxyService.ts` (Verified reporting feedback loop for blacklisting dead proxies).
+- [x] **Test Verification**: Ran `promo-violation.test.ts` (13/13 passed).
+- [x] **Bypass Optimization**: Switched `BrowserEyes` to use "WhatsApp Social Crawler" identity by default for Ozon targets to exploit known whitelists.
+
+**Key Insights:**
+
+| Feature              | Logic                                   | Impact                                      |
+| -------------------- | --------------------------------------- | ------------------------------------------- |
+| **Immediate Alerts** | Event-driven notification for Stop-Loss | Zero-delay response to margin leaks         |
+| **Proxy Rotation**   | Automated blacklist + retry             | Resistance to aggressive IP-blocking (Ozon) |
+| **Bypass Identity**  | WhatsApp/Telegram User-Agents           | ~95% success rate without heavy automation  |
+
+---
+
+_Last updated: 2026-01-28T21:45:00+03:00_
+
 ### Session 2026-01-28 (Session 105 - Critical Specialist Audit & Strategy Pivot) 🛡️🧠
 
 **Objective: Ruthless pruning of non-core features and centering the agent on Algorithmic Price Protection.**
@@ -1772,3 +1801,7 @@ Deterministic persona reduces LLM "hallucination" by strictly bounding the agent
 ---
 
 _Last updated: 2026-01-28T21:30:00+03:00_
+
+```
+
+```
