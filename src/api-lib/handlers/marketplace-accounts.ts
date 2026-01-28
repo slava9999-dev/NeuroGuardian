@@ -81,9 +81,11 @@ export async function handleMarketplaceAccounts(
           name: sanitizeInput(name),
         };
         if (isActive !== undefined) updates.is_active = Boolean(isActive);
-        if (wbApiKey) updates.wb_token = encryptedWbKey;
-        if (ozonApiKey) updates.ozon_api_key = encryptedOzonKey;
-        if (ozonClientId) updates.ozon_client_id = encryptedOzonClient;
+
+        // Only update keys if they are provided and NOT a masked placeholder
+        if (wbApiKey && wbApiKey !== '***') updates.wb_token = encryptedWbKey;
+        if (ozonApiKey && ozonApiKey !== '***') updates.ozon_api_key = encryptedOzonKey;
+        if (ozonClientId && ozonClientId !== '***') updates.ozon_client_id = encryptedOzonClient;
 
         const updated = await updateMarketplaceAccount(accountId, userId, updates);
         if (!updated) return res.status(404).json({ error: 'Account not found' });

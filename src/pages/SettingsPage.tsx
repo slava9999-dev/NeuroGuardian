@@ -152,7 +152,14 @@ export function SettingsPage({
           <h2 className="section-title">🔑 Ключи маркетплейсов</h2>
           <button
             onClick={() => {
-              setEditingAccount({ marketplace: 'wb', is_active: true });
+              setEditingAccount({
+                marketplace: 'wb',
+                name: 'Wildberries',
+                is_active: true,
+                wb_token: '',
+                ozon_client_id: '',
+                ozon_api_key: '',
+              });
               setShowAccountModal(true);
             }}
             className="btn btn-ghost text-xs"
@@ -180,7 +187,14 @@ export function SettingsPage({
             <div className="flex gap-3 justify-center">
               <button
                 onClick={() => {
-                  setEditingAccount({ marketplace: 'wb', is_active: true });
+                  setEditingAccount({
+                    marketplace: 'wb',
+                    name: 'Wildberries',
+                    is_active: true,
+                    wb_token: '',
+                    ozon_client_id: '',
+                    ozon_api_key: '',
+                  });
                   setShowAccountModal(true);
                 }}
                 className="btn btn-primary"
@@ -190,7 +204,14 @@ export function SettingsPage({
               </button>
               <button
                 onClick={() => {
-                  setEditingAccount({ marketplace: 'ozon', is_active: true });
+                  setEditingAccount({
+                    marketplace: 'ozon',
+                    name: 'Ozon',
+                    is_active: true,
+                    wb_token: '',
+                    ozon_client_id: '',
+                    ozon_api_key: '',
+                  });
                   setShowAccountModal(true);
                 }}
                 className="btn btn-secondary"
@@ -486,21 +507,48 @@ export function SettingsPage({
               <div className="p-5 space-y-5">
                 {/* Marketplace Selection */}
                 <div>
-                  <label className="input-label">Маркетплейс</label>
-                  <div className="grid grid-cols-2 gap-3">
+                  <label className="input-label text-text-muted">Тип площадки</label>
+                  <div className="grid grid-cols-2 gap-3 mt-1">
                     {(['wb', 'ozon'] as const).map(m => (
                       <button
                         key={m}
                         type="button"
-                        onClick={() => setEditingAccount({ ...editingAccount, marketplace: m })}
-                        className={`p-4 rounded-xl border-2 transition-all flex items-center justify-center gap-2 ${
+                        onClick={() => {
+                          const currentName = editingAccount.name;
+                          const isDefaultName =
+                            currentName === 'Wildberries' || currentName === 'Ozon';
+                          setEditingAccount({
+                            ...editingAccount,
+                            marketplace: m,
+                            name: isDefaultName
+                              ? m === 'wb'
+                                ? 'Wildberries'
+                                : 'Ozon'
+                              : currentName,
+                            // Clear fields of other marketplace if BRAND NEW
+                            ...(editingAccount.id
+                              ? {}
+                              : {
+                                  wb_token: m === 'wb' ? editingAccount.wb_token : '',
+                                  ozon_client_id: m === 'ozon' ? editingAccount.ozon_client_id : '',
+                                  ozon_api_key: m === 'ozon' ? editingAccount.ozon_api_key : '',
+                                }),
+                          });
+                        }}
+                        className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-2 ${
                           editingAccount.marketplace === m
-                            ? 'border-primary bg-primary-dim font-semibold'
-                            : 'border-surface-dim hover:border-primary/30'
+                            ? 'border-primary bg-primary-dim ring-2 ring-primary/20'
+                            : 'border-surface-dim bg-surface-warm grayscale hover:grayscale-0 hover:border-primary/30'
                         }`}
                       >
-                        <Store className="w-4 h-4" />
-                        {m === 'wb' ? 'Wildberries' : 'Ozon'}
+                        <Store
+                          className={`w-6 h-6 ${
+                            editingAccount.marketplace === m ? 'text-primary' : 'text-text-muted'
+                          }`}
+                        />
+                        <span className="text-xs font-bold uppercase tracking-wider">
+                          {m === 'wb' ? 'Wildberries' : 'Ozon'}
+                        </span>
                       </button>
                     ))}
                   </div>
@@ -519,85 +567,124 @@ export function SettingsPage({
                   <p className="input-hint">Для удобства идентификации</p>
                 </div>
 
-                {/* Ozon Client ID (only for Ozon) */}
+                {/* Ozon Specific Fields */}
                 {editingAccount.marketplace === 'ozon' && (
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <label className="input-label mb-0">Client ID</label>
-                      <button
-                        type="button"
-                        onClick={() => setShowHelp('ozon')}
-                        className="text-text-muted hover:text-primary"
-                      >
-                        <HelpCircle className="w-4 h-4" />
-                      </button>
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="space-y-4 pt-2 border-t border-surface-dim/50"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="input-label mb-0">Client ID</label>
+                        <button
+                          type="button"
+                          onClick={() => setShowHelp('ozon')}
+                          className="flex items-center gap-1 text-[10px] uppercase font-bold text-primary hover:opacity-80 transition-opacity"
+                        >
+                          <HelpCircle className="w-3 h-3" />
+                          Где взять?
+                        </button>
+                      </div>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={editingAccount.ozon_client_id || ''}
+                          onChange={e =>
+                            setEditingAccount({ ...editingAccount, ozon_client_id: e.target.value })
+                          }
+                          className="input pl-10"
+                          placeholder="Введите Client ID..."
+                        />
+                        <Package className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+                      </div>
                     </div>
-                    <input
-                      type="text"
-                      value={editingAccount.ozon_client_id || ''}
-                      onChange={e =>
-                        setEditingAccount({ ...editingAccount, ozon_client_id: e.target.value })
-                      }
-                      className="input mt-1"
-                      placeholder="Например: 123456"
-                    />
-                  </div>
+
+                    <div>
+                      <label className="input-label mb-1.5">Ozon API Key</label>
+                      <div className="relative">
+                        <input
+                          type="password"
+                          value={editingAccount.ozon_api_key || ''}
+                          onChange={e =>
+                            setEditingAccount({ ...editingAccount, ozon_api_key: e.target.value })
+                          }
+                          className="input pl-10 pr-10"
+                          placeholder={editingAccount.id ? '********' : 'Вставьте API Key...'}
+                        />
+                        <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+                        <Shield className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-success/50" />
+                      </div>
+                    </div>
+                  </motion.div>
                 )}
 
-                {/* API Key */}
-                <div>
-                  <div className="flex items-center gap-2">
-                    <label className="input-label mb-0">
-                      {editingAccount.marketplace === 'ozon' ? 'API Key' : 'API Token'}
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setShowHelp(editingAccount.marketplace || 'wb')}
-                      className="text-text-muted hover:text-primary"
-                    >
-                      <HelpCircle className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <div className="relative mt-1">
-                    <input
-                      type="password"
-                      value={
-                        editingAccount.marketplace === 'ozon'
-                          ? editingAccount.ozon_api_key || ''
-                          : editingAccount.wb_token || ''
-                      }
-                      onChange={e =>
-                        setEditingAccount({
-                          ...editingAccount,
-                          [editingAccount.marketplace === 'ozon' ? 'ozon_api_key' : 'wb_token']:
-                            e.target.value,
-                        })
-                      }
-                      className="input pr-10"
-                      placeholder="Вставьте ключ сюда..."
-                    />
-                    <Shield className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-                  </div>
-                  <p className="input-hint flex items-center gap-1">
-                    <Shield className="w-3 h-3" />
-                    Ключ шифруется и хранится безопасно
-                  </p>
-                </div>
+                {/* Wildberries Specific Fields */}
+                {editingAccount.marketplace === 'wb' && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="space-y-4 pt-2 border-t border-surface-dim/50"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="input-label mb-0">WB API Token</label>
+                        <button
+                          type="button"
+                          onClick={() => setShowHelp('wb')}
+                          className="flex items-center gap-1 text-[10px] uppercase font-bold text-primary hover:opacity-80 transition-opacity"
+                        >
+                          <HelpCircle className="w-3 h-3" />
+                          Где взять?
+                        </button>
+                      </div>
+                      <div className="relative">
+                        <textarea
+                          rows={3}
+                          value={editingAccount.wb_token || ''}
+                          onChange={e =>
+                            setEditingAccount({ ...editingAccount, wb_token: e.target.value })
+                          }
+                          className="input min-h-[80px] py-3 pr-10 text-xs font-mono"
+                          placeholder={
+                            editingAccount.id ? '********' : 'Вставьте длинный токен WB...'
+                          }
+                        />
+                        <Shield className="absolute right-3 top-4 w-4 h-4 text-success/50" />
+                      </div>
+                      <p className="text-[10px] text-text-muted mt-2 flex items-center gap-1.5">
+                        <Shield className="w-3 h-3 text-success" />
+                        Токен шифруется по стандарту AES-256-GCM
+                      </p>
+                    </div>
+                  </motion.div>
+                )}
               </div>
 
               {/* Modal Footer */}
               <div className="p-5 border-t border-surface-dim bg-surface-warm">
                 <button
                   onClick={handleSaveAccount}
-                  disabled={isSaving || !editingAccount.name}
-                  className="w-full btn btn-primary py-4"
+                  disabled={
+                    isSaving ||
+                    !editingAccount.name ||
+                    (editingAccount.marketplace === 'wb' &&
+                      !editingAccount.wb_token &&
+                      !editingAccount.id) ||
+                    (editingAccount.marketplace === 'ozon' &&
+                      (!editingAccount.ozon_api_key || !editingAccount.ozon_client_id) &&
+                      !editingAccount.id)
+                  }
+                  className="w-full btn btn-primary py-4 shadow-lg shadow-primary/20"
                 >
                   {isSaving ? (
-                    <RefreshCcw className="w-4 h-4 animate-spin" />
+                    <RefreshCcw className="w-5 h-5 animate-spin" />
                   ) : (
                     <>
-                      <CheckCircle2 className="w-4 h-4" />
-                      {editingAccount.id ? 'Сохранить изменения' : 'Подключить аккаунт'}
+                      <CheckCircle2 className="w-5 h-5" />
+                      <span>
+                        {editingAccount.id ? 'Сохранить изменения' : 'Подключить аккаунт'}
+                      </span>
                     </>
                   )}
                 </button>
