@@ -795,24 +795,31 @@ export class SentinelOrchestrator {
     const totalScanned = (result.productsScanned?.wb || 0) + (result.productsScanned?.ozon || 0);
 
     const message = [
-      `🎩 ИТОГИ ЦИКЛА: ${time} (МСК)`,
-      hasErrors ? '🛑 Есть ошибки' : hasActions ? '⚔️ Защита сработала!' : '🟢 Система штатно',
+      `🚀 *МОНИТОРИНГ: СТАТУС ЦИКЛА*`,
+      `🕒 Время выполнения: ${time} (МСК)`,
+      `━━━━━━━━━━━━━━━━━━━━`,
       ``,
-      `👥 Магазинов: ${result.usersProcessed}`,
-      `📦 Проверено: ${totalScanned}`,
-      `⚠️ Угроз: ${result.threatsDetected}`,
-      hasActions ? `⚔️ Отражено: ${result.actionsTaken}` : '',
-      hasErrors ? `❌ Ошибок: ${result.errors.length}` : '',
+      `📊 *ОПЕРАЦИОННАЯ СВОДКА:*`,
+      `├─ Статус: ${hasErrors ? '🔴 КРИТИЧНО' : hasActions ? '🛡️ ЗАЩИТА АКТИВНА' : '🟢 ШТАТНО'}`,
+      `├─ Пользователей: ${result.usersProcessed}`,
+      `├─ SKU в проверке: ${totalScanned}`,
+      `└─ Рисков выявлено: ${result.threatsDetected}`,
+      ``,
+      hasActions ? `⚡ *ОТРАЖЕНО АТАК:* ${result.actionsTaken}` : '',
+      hasErrors ? `⚠️ *ОШИБОК СИСТЕМЫ:* ${result.errors.length}` : '',
+      `━━━━━━━━━━━━━━━━━━━━`,
     ]
-      .filter(Boolean)
+      .filter(line => line !== '')
       .join('\n');
 
     if (hasErrors) {
       const errorDetails = result.errors
         .slice(0, 5)
-        .map(e => `• ${e}`)
+        .map(e => `   └ _${e}_`)
         .join('\n');
-      await this.alertSender.sendAdminSummary(`${message}\n\n🔍 Детали ошибок:\n${errorDetails}`);
+      await this.alertSender.sendAdminSummary(
+        `${message}\n\n🔍 *ЖУРНАЛ ОШИБОК:* \n${errorDetails}`
+      );
     } else {
       await this.alertSender.sendAdminSummary(message);
     }

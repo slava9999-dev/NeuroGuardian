@@ -361,6 +361,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'apply-min-prices':
       case 'batch-update-costs':
       case 'bulk-costs':
+      case 'loss-products':
+      case 'generate-content':
+      case 'content-quota':
       case 'sentinel-logs': {
         const auth = await extractAnyAuthAsync(req);
         if (auth.success === false) {

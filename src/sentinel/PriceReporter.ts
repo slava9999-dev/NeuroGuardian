@@ -31,54 +31,61 @@ export class SentinelPriceReporter {
       return (b.current_price || 0) - (a.current_price || 0);
     });
 
-    const displayList = sortedProducts.slice(0, 15); // Telegram message limit protection
+    const displayList = sortedProducts.slice(0, 15);
 
-    let report = `📊 *ОТЧЕТ ПО ЦЕНАМ: ${time}*\n`;
-    report += `Всего на мониторинге: ${totalCount}\n\n`;
+    let report = `🤖 *Виктор ИИ | Мониторинг Цен*\n`;
+    report += `📅 *${time} (МСК)*\n\n`;
+    report += `📊 Объектов под защитой: *${totalCount}*\n`;
+    report += `━━━━━━━━━━━━━━━━━━━━\n\n`;
 
     let breachCount = 0;
+    let totalRiskPotential = 0;
 
     for (const p of displayList) {
       const sellerPrice = p.current_price || 0;
-      const buyerPrice = p.estimated_buyer_price || sellerPrice; // Default to seller if no vision data yet
+      const buyerPrice = p.estimated_buyer_price || sellerPrice;
       const stopLoss = p.min_price || 0;
-      const marketplace = p.marketplace === 'WB' ? '🟣 WB' : '🔵 OZ';
+      const marketplace = p.marketplace === 'WB' ? '🟣' : '🔵';
       const name = p.title
-        ? p.title.substring(0, 20) + (p.title.length > 20 ? '...' : '')
+        ? p.title.substring(0, 25) + (p.title.length > 25 ? '...' : '')
         : 'Товар';
 
       const isBreach = sellerPrice < stopLoss;
 
-      if (isBreach) breachCount++;
+      if (isBreach) {
+        breachCount++;
+        totalRiskPotential += stopLoss - sellerPrice;
+      }
 
-      const statusIcon = isBreach ? '🔴' : '✅';
+      const statusIcon = isBreach ? '🚨' : '🛡️';
       const discount = Math.round(((sellerPrice - buyerPrice) / sellerPrice) * 100);
 
-      report += `${statusIcon} *${name}* (${marketplace})\n`;
-      report += `   💰 Вы ставите: *${sellerPrice}₽*\n`;
+      report += `${statusIcon} *${name}* ${marketplace}\n`;
+      report += `   └ Ваша цена: *${sellerPrice}₽*\n`;
 
       if (discount > 0) {
-        report += `   👀 Покупатель видит: *${buyerPrice}₽* (Скидка ${discount}%)\n`;
-      } else {
-        report += `   👀 Покупатель видит: ${buyerPrice}₽\n`;
+        report += `   └ Покупатель видит: *${buyerPrice}₽* (-${discount}%)\n`;
       }
 
       if (isBreach) {
-        report += `   ⚠️ *НИЖЕ STOP LOSS (${stopLoss}₽)*\n`;
+        report += `   ⚠️ *НИЖЕ СТОП-ЛОССА (${stopLoss}₽)*\n`;
       } else if (stopLoss > 0) {
-        report += `   🛡️ Stop Loss: ${stopLoss}₽\n`;
+        report += `   ✅ Лимит: ${stopLoss}₽\n`;
       }
       report += `\n`;
     }
 
     if (totalCount > 15) {
-      report += `_...и еще ${totalCount - 15} товаров_\n`;
+      report += `_...и еще ${totalCount - 15} позиций в списке_\n`;
     }
 
+    report += `━━━━━━━━━━━━━━━━━━━━\n`;
+
     if (breachCount > 0) {
-      report += `\n🚨 *ВНИМАНИЕ: ${breachCount} товаров продаются ниже минимальной цены!*`;
+      report += `\n🔴 *ВНИМАНИЕ:* ${breachCount} поз. нарушают лимит!`;
+      report += `\n💸 Потенциальный убыток: *~${totalRiskPotential.toLocaleString('ru-RU')}₽ / день*`;
     } else {
-      report += `\n✨ Все товары в пределах маржинальности.`;
+      report += `\n🟢 *БЕЗОПАСНОСТЬ:* Все товары торгуются выше стоп-лосса. Маржа защищена.`;
     }
 
     return report;

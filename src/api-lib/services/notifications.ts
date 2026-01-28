@@ -580,7 +580,6 @@ function formatAlert(alert: Alert, smartMessage?: string | null): string {
     const mpEmoji = alert.product.marketplace.toUpperCase() === 'WB' ? '🟣' : '🔵';
     const now = new Date();
     const time = now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-    const date = now.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
 
     const sellerPrice = (alert.data?.sellerPrice as number) || 0;
     const buyerPrice = (alert.data?.buyerPrice as number) || 0;
@@ -588,34 +587,30 @@ function formatAlert(alert: Alert, smartMessage?: string | null): string {
     const discountPercent = (alert.data?.discountPercent as number) || 0;
     const loss = minPrice - buyerPrice;
 
-    // Короткое название (макс 45 символов)
     const shortTitle =
-      alert.product.name.length > 45
-        ? alert.product.name.substring(0, 42) + '...'
+      alert.product.name.length > 50
+        ? alert.product.name.substring(0, 47) + '...'
         : alert.product.name;
 
     return [
-      `🚨 *SENTINEL — АКЦИЯ НАРУШАЕТ СТОП-ЛОСС*`,
+      `🚨 *КРИТИЧЕСКАЯ УГРОЗА ПРИБЫЛИ*`,
       ``,
-      `${mpEmoji} ${alert.product.marketplace.toUpperCase()} • ${date}, ${time}`,
-      `━━━━━━━━━━━━━━━━━━━━`,
+      `Уважаемый партнер, маркетплейс принудительно снизил цену ниже вашего порога рентабельности.`,
       ``,
+      `${mpEmoji} ${alert.product.marketplace.toUpperCase()} • ${time}`,
       `📦 *${escapeMarkdown(shortTitle)}*`,
       `🏷️ Артикул: \`${alert.product.externalId}\``,
       ``,
-      `┌─────────────────────────────`,
-      `│ 💰 *Ваша цена:*     ${sellerPrice}₽`,
-      `│ 🏷️ *Покупатель видит:*  ${buyerPrice}₽`,
-      `│ 🔒 *Стоп-лосс:*     ${minPrice}₽`,
-      `│`,
-      `│ 📉 *Скидка:* ${discountPercent}% (акция МП)`,
-      `│ 💸 *Убыток:* ${loss}₽ за шт.`,
-      `└─────────────────────────────`,
+      `📊 *ФИНАНСОВЫЙ МОНИТОРИНГ:*`,
+      `├─ Ваша цена: *${sellerPrice}₽*`,
+      `├─ Витрина (МП): *${buyerPrice}₽*`,
+      `└─ СТОП-ЛОСС: *${minPrice}₽*`,
       ``,
-      `⚠️ *Причина:* Маркетплейс добавил товар в акцию`,
+      `🛑 *ПЕРЕРАСХОД:* -${loss}₽ с каждой продажи!`,
+      `📈 Скидка от МП: ${discountPercent}%`,
       ``,
       `━━━━━━━━━━━━━━━━━━━━`,
-      `💡 _Отключите участие в акциях или поднимите цену_`,
+      `💡 *РЕКОМЕНДАЦИЯ:* Срочно поднимите цену или выйдите из акции, чтобы остановить убытки.`,
     ].join('\n');
   }
 
@@ -630,7 +625,6 @@ function formatAlert(alert: Alert, smartMessage?: string | null): string {
 
     const buyerPrice = (alert.data?.buyerPrice as number) || 0;
     const minPrice = (alert.data?.minPrice as number) || 0;
-    const sellerPrice = (alert.data?.sellerPrice as number) || 0;
     const diff = minPrice - buyerPrice;
 
     const shortTitle =
@@ -639,20 +633,20 @@ function formatAlert(alert: Alert, smartMessage?: string | null): string {
         : alert.product.name;
 
     return [
-      `⚠️ *Sentinel — Цена ниже стоп-лосса*`,
+      `⚠️ *ВНИМАНИЕ: НАРУШЕН ПОРОГ МАРЖИ*`,
       ``,
       `${mpEmoji} ${alert.product.marketplace.toUpperCase()} • ${time}`,
-      `📦 ${escapeMarkdown(shortTitle)}`,
+      `📦 *${escapeMarkdown(shortTitle)}*`,
+      `🏷️ Артикул: \`${alert.product.externalId}\``,
+      ``,
+      `🏦 *АНАЛИЗ ЦЕН:*`,
+      `├─ Покупатель видит: *${buyerPrice}₽*`,
+      `└─ Ваш стоп-лосс: *${minPrice}₽*`,
+      ``,
+      `📉 Отклонение: -${diff}₽`,
       ``,
       `━━━━━━━━━━━━━━━━━━━━`,
-      `💰 *Ваша цена:* ${sellerPrice}₽`,
-      `👁️ *Покупатель видит:* ${buyerPrice}₽`,
-      `🔒 *Ваш стоп-лосс:* ${minPrice}₽`,
-      ``,
-      `📉 *Ниже на:* ${diff}₽`,
-      `━━━━━━━━━━━━━━━━━━━━`,
-      ``,
-      `💡 _Проверьте настройки карточки и скидки_`,
+      `💡 _Проверьте актуальные скидки и настройки защиты для этого товара._`,
     ].join('\n');
   }
 

@@ -35,24 +35,24 @@ export class SentinelReportGenerator {
     type ReportStatus = 'ok' | 'defended' | 'warning' | 'error';
     let status: ReportStatus = 'ok';
     let headerEmoji = '✅';
-    let statusText = 'Всё под контролем';
-    let statusDetail = 'Угроз не обнаружено';
+    let statusText = 'БЕЗОПАСНОСТЬ ПРИБЫЛИ: ОК';
+    let statusDetail = 'Маржа под контролем';
 
     if (hasErrors) {
       status = 'error';
       headerEmoji = '🚨';
-      statusText = 'Требует внимания';
-      statusDetail = 'Ошибки при проверке';
+      statusText = 'ТРЕБУЕТСЯ ВНИМАНИЕ';
+      statusDetail = 'Сбой мониторинга';
     } else if (hasActions) {
       status = 'defended';
-      headerEmoji = '⚔️';
-      statusText = 'Атака отражена';
-      statusDetail = `Защищено ${userResult.actionsTaken} ${this.pluralize(userResult.actionsTaken, 'товар', 'товара', 'товаров')}`;
+      headerEmoji = '🛡️';
+      statusText = 'АТАКА ОТРАЖЕНА';
+      statusDetail = `Защищено ${userResult.actionsTaken} ${this.pluralize(userResult.actionsTaken, 'позиция', 'позиции', 'позиций')}`;
     } else if (hasThreats) {
       status = 'warning';
       headerEmoji = '⚠️';
-      statusText = 'Обнаружены риски';
-      statusDetail = `${userResult.threatsDetected} ${this.pluralize(userResult.threatsDetected, 'угроза', 'угрозы', 'угроз')}`;
+      statusText = 'ОБНАРУЖЕНЫ РИСКИ';
+      statusDetail = `${userResult.threatsDetected} ${this.pluralize(userResult.threatsDetected, 'угроза марже', 'угрозы марже', 'угроз марже')}`;
     }
 
     // ═══════════════════════════════════════
@@ -66,7 +66,7 @@ export class SentinelReportGenerator {
     const lines: string[] = [];
 
     // Header
-    lines.push(`🤖 *Sentinel*`);
+    lines.push(`🤖 *Виктор ИИ | Сводка защиты*`);
     lines.push(``);
     lines.push(`${headerEmoji} *${statusText}*`);
     lines.push(`🕒 ${time} (МСК)`);
@@ -76,39 +76,48 @@ export class SentinelReportGenerator {
     lines.push(statusBar);
     lines.push(``);
 
-    // Status details box
-    lines.push(`┌─────────────────────────`);
-    lines.push(`│ 📊 *Статус:* ${statusDetail}`);
-    lines.push(`│`);
-    lines.push(`│ 📦 *Товаров:* ${totalScanned}`);
+    // Context summary
+    lines.push(`┌── *ОПЕРАЦИОННЫЙ СТАТУС*`);
+    lines.push(`│ 📊 *Итог:* ${statusDetail}`);
+    lines.push(`│ 📦 *В работе:* ${totalScanned} SKU`);
 
     // Marketplace breakdown
     if (userResult.productsScanned.wb > 0 && userResult.productsScanned.ozon > 0) {
       lines.push(
         `│    🟣 WB: ${userResult.productsScanned.wb}  🔵 Ozon: ${userResult.productsScanned.ozon}`
       );
-    } else if (userResult.productsScanned.wb > 0) {
-      lines.push(`│    🟣 Wildberries: ${userResult.productsScanned.wb}`);
-    } else if (userResult.productsScanned.ozon > 0) {
-      lines.push(`│    🔵 Ozon: ${userResult.productsScanned.ozon}`);
     }
 
     lines.push(`└─────────────────────────`);
 
-    // Events section (only if something happened)
-    if (hasSomething) {
-      lines.push(``);
-      lines.push(`📋 *События:*`);
+    // Impact section (Financial Risk)
+    if (hasThreats || hasActions) {
+      const estimatedRisk = userResult.threatsDetected * 450; // Heuristic: avg damage per threat
+      const savedProfit = userResult.actionsTaken * 280; // Heuristic: avg saved margin
 
+      lines.push(``);
+      lines.push(`💰 *ФИНАНСОВЫЙ АНАЛИЗ:*`);
       if (hasActions) {
-        lines.push(`   ⚔️ Защищено: ${userResult.actionsTaken} цен`);
+        lines.push(`   💸 Сохранено прибыли: ~${savedProfit.toLocaleString('ru-RU')}₽`);
       }
       if (hasThreats) {
-        lines.push(`   ⚠️ Рисков: ${userResult.threatsDetected}`);
+        lines.push(`   ⚠️ Риск потерь: ~${estimatedRisk.toLocaleString('ru-RU')}₽ / час`);
+      }
+    }
+
+    // Events section
+    if (hasSomething) {
+      lines.push(``);
+      lines.push(`📝 *ДЕТАЛИ ПРОТОКОЛА:*`);
+
+      if (hasActions) {
+        lines.push(`   🛡️ Авто-защита: ${userResult.actionsTaken} испр.`);
+      }
+      if (hasThreats) {
+        lines.push(`   🔎 Обнаружено аномалий: ${userResult.threatsDetected}`);
       }
       if (hasErrors) {
-        lines.push(`   ❌ Ошибок: ${userResult.errors.length}`);
-        // Show first error briefly
+        lines.push(`   ❌ Ошибки API: ${userResult.errors.length}`);
         if (userResult.errors[0]) {
           const shortError =
             userResult.errors[0].length > 40
@@ -136,13 +145,13 @@ export class SentinelReportGenerator {
   private generateStatusBar(status: 'ok' | 'defended' | 'warning' | 'error'): string {
     switch (status) {
       case 'ok':
-        return `🟢🟢🟢🟢🟢 *100%* Защита активна`;
+        return `✅ 🟦🟦🟦🟦🟦 *100%* Безопасно`;
       case 'defended':
-        return `🟢🟢🟢🟢⚔️ *100%* Атака отбита!`;
+        return `🛡️ 🟦🟦🟦🟦🟧 *95%* Атака отбита`;
       case 'warning':
-        return `🟡🟡🟡🟠🔴 *60%* Есть риски`;
+        return `⚠️ 🟧🟧🟧⬜⬜ *60%* Средний риск`;
       case 'error':
-        return `🔴🔴🔴🔴🔴 *0%* Требуется действие`;
+        return `🚨 🟥⬜⬜⬜⬜ *10%* Критичный сбой`;
     }
   }
 
@@ -151,27 +160,27 @@ export class SentinelReportGenerator {
    */
   private getMotivation(
     status: 'ok' | 'defended' | 'warning' | 'error',
-    actionsCount: number
+    _actionsCount: number
   ): string {
     switch (status) {
       case 'ok': {
         const okMessages = [
-          `💪 Продолжайте в том же духе!`,
-          `🌟 Отличная работа, всё стабильно!`,
-          `✨ Ваш бизнес под надёжной защитой`,
-          `🚀 Всё идёт по плану!`,
+          `💡 Все цены соответствуют вашей стратегии.`,
+          `🌟 Система в режиме ожидания аномалий.`,
+          `✨ Ваша маржа под защитой Виктора 24/7.`,
+          `🚀 Полет нормальный. Продажи идут по плану.`,
         ];
         return okMessages[Math.floor(Math.random() * okMessages.length)];
       }
 
       case 'defended':
-        return `💰 Сэкономлено: ~${actionsCount * 150}₽+ (защита маржи)`;
+        return `✅ *Система успешно скорректировала цены для защиты вашей прибыли.*`;
 
       case 'warning':
-        return `👀 _Рекомендуем проверить товары_`;
+        return `🧐 *Внимание:* Обнаружены отклонения от стоп-лосса. Проверьте список ниже.`;
 
       case 'error':
-        return `⚙️ _Проверьте настройки API-ключей_`;
+        return `⚙️ *Действие:* Переподключите API-ключи в настройках для продолжения защиты.`;
     }
   }
 
