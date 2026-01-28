@@ -1,4 +1,7 @@
+import { eq } from 'drizzle-orm';
+import { db, products } from '../../infrastructure/database/db.js';
 import { fetchWithRetry } from '../lib/index.js';
+import { logger } from '../lib/logger.js';
 
 export interface RealPriceInfo {
   marketplace: 'wb' | 'ozon';
@@ -56,11 +59,30 @@ export class PriceParserService {
 
       const result = await browserEyes.gazeAtProduct('WB', url);
       if (result.buyerPrice && result.buyerPrice > 0) {
+        // Calculate REAL SPP for future safety checks
+        const currentSellerPrice = result.originalPrice || result.buyerPrice;
+        const sppPercent = Math.round(
+          ((currentSellerPrice - result.buyerPrice) / currentSellerPrice) * 100
+        );
+
+        // Save observed SPP to database for PriceGuard
+        if (sppPercent > 0) {
+          try {
+            await db
+              .update(products)
+              .set({ sppBufferPercent: sppPercent })
+              .where(eq(products.nmId, String(article)));
+            logger.info(`[PriceParser] Learned real WB SPP for ${article}: ${sppPercent}%`);
+          } catch (dbErr) {
+            logger.warn(`[PriceParser] Failed to save SPP to DB: ${dbErr}`);
+          }
+        }
+
         return {
           marketplace: 'wb',
           productId: nmIdStr,
-          title: productTitle || 'WB Product', // BrowserEyes doesn't extract title yet, keep default or enhance later
-          sellerPrice: result.originalPrice || result.buyerPrice,
+          title: productTitle || 'WB Product',
+          sellerPrice: currentSellerPrice,
           buyerPrice: result.buyerPrice,
           currency,
           rating,
@@ -211,7 +233,86 @@ export class PriceParserService {
       // Use BrowserEyes to bypass Ozon anti-bot protection
       const { browserEyes } = await import('../../sentinel/BrowserEyes.js');
       const url = `https://www.ozon.ru/product/${sku}/`;
+
+      // Step A: Try Social Crawler Identity (WhatsApp) - FAST & CURRENTLY WORKING
+      logger.info(`[PriceParser] Attempting Social Crawler (WhatsApp) bypass for Ozon SKU: ${sku}`);
+      try {
+        const socialResponse = await fetch(url, {
+          headers: {
+            'User-Agent': 'WhatsApp/2.21.12.21 A',
+            Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'ru-RU,ru;q=0.9',
+          },
+        });
+
+        if (socialResponse.ok) {
+          const html = await socialResponse.text();
+          // Extract from JSON-LD
+          const jsonLdMatch = html.match(
+            /<script [^>]*type="application\/ld\+json"[^>]*>(.*?)<\/script>/s
+          );
+          if (jsonLdMatch) {
+            try {
+              const ldData = JSON.parse(jsonLdMatch[1]);
+              const price =
+                ldData.offers?.price ||
+                (Array.isArray(ldData) ? ldData.find((i: any) => i.offers)?.offers?.price : null);
+              if (price) {
+                logger.info(
+                  `[PriceParser] Social Crawler SUCCESS for Ozon SKU: ${sku}, Price: ${price}`
+                );
+                return {
+                  marketplace: 'ozon',
+                  productId: sku,
+                  buyerPrice: parseInt(String(price)),
+                  currency: 'RUB',
+                  stockStatus: ldData.offers?.availability?.includes('InStock')
+                    ? 'in_stock'
+                    : 'out_of_stock',
+                  extractionMethod: 'social_crawler',
+                };
+              }
+            } catch (e) {
+              /* Fallback */
+            }
+          }
+        }
+      } catch (e) {
+        logger.warn(`[PriceParser] Social Crawler bypass failed for Ozon SKU: ${sku}`, e);
+      }
+
+      // Step B: Try BrowserEyes (Local/Remote Playwright) - HEAVY FALLBACK
+      logger.info(`[PriceParser] Attempting BrowserEyes for Ozon SKU: ${sku}`);
       const result = await browserEyes.gazeAtProduct('Ozon', url);
+
+      // Step B: Fallback to ScraperAPI if BrowserEyes failed (and we have a key)
+      const scraperKey = process.env.SCRAPERAPI_KEY;
+      if (
+        result.buyerPrice === null &&
+        scraperKey &&
+        scraperKey !== '81496d6ea864a96278584d837c7b6179'
+      ) {
+        // Don't use the trial key if it's known to fail for Ozon
+        logger.info(`[PriceParser] BrowserEyes failed, trying ScraperAPI fallback for Ozon...`);
+        try {
+          const scraperUrl = `https://api.scraperapi.com/?api_key=${scraperKey}&url=${encodeURIComponent(url)}&render=true&country_code=ru&premium=true`;
+          const response = await fetch(scraperUrl);
+          if (response.ok) {
+            const html = await response.text();
+            // Basic regex-based price extraction from HTML if DOM failed
+            const priceMatch = html.match(/"price":"(\d+)"/);
+            if (priceMatch) {
+              result.buyerPrice = parseInt(priceMatch[1]);
+              result.extractionMethod = 'vision'; // Treat as vision/external
+              result.confidence = 0.8;
+            }
+          }
+        } catch (e) {
+          logger.warn(
+            `[PriceParser] ScraperAPI fallback failed: ${e instanceof Error ? e.message : 'Unknown error'}`
+          );
+        }
+      }
 
       if (result.buyerPrice && result.buyerPrice > 0) {
         return {

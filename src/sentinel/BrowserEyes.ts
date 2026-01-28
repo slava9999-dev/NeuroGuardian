@@ -118,22 +118,38 @@ export class BrowserEyes {
     }
 
     const proxyUrl = await proxyService.getNextProxy();
+    const isOzon = marketplace === 'Ozon';
+    // Use a high-quality human-like UA for Ozon, but revert to search bot for WB if needed
+    const userAgents = isOzon
+      ? [
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+        ]
+      : [
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        ];
+
     const contextOptions: {
       viewport: { width: number; height: number };
       userAgent: string;
       locale: string;
       timezoneId: string;
-      geolocation: { latitude: number; longitude: number };
-      permissions: string[];
+      extraHTTPHeaders: Record<string, string>;
       proxy?: { server: string };
     } = {
-      viewport: { width: 1920, height: 1080 },
-      userAgent:
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+      viewport: isOzon ? { width: 1440, height: 900 } : { width: 1920, height: 1080 },
+      userAgent: userAgents[0],
       locale: 'ru-RU',
       timezoneId: 'Europe/Moscow',
-      geolocation: { latitude: 55.7558, longitude: 37.6173 }, // Moscow
-      permissions: ['geolocation'],
+      extraHTTPHeaders: {
+        'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8',
+        Referer: 'https://www.google.com/',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'cross-site',
+        'Sec-Fetch-User': '?1',
+        'Upgrade-Insecure-Requests': '1',
+      },
     };
 
     if (proxyUrl) {
@@ -165,8 +181,49 @@ export class BrowserEyes {
     try {
       logger.info(`[BrowserEyes] Navigating to ${marketplace}: ${url}`);
 
-      // Navigate and wait for network idle
-      await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+      // OZON SPECIFIC WARM-UP
+      if (marketplace === 'Ozon') {
+        const domain = new URL(url).hostname;
+        logger.info(`[BrowserEyes] Warming up session for ${domain}...`);
+        await page.goto(`https://${domain}/`, { waitUntil: 'load', timeout: 30000 });
+
+        // CHECK FOR CHALLENGE
+        const pageTitle = await page.title();
+        const content = await page.content();
+        if (
+          pageTitle.includes('Challenge') ||
+          content.includes('Antibot') ||
+          content.includes('challenge-data')
+        ) {
+          logger.warn(
+            `[BrowserEyes] Antibot Challenge detected on ${domain}. Standing by for auto-pass... (95.79.7.137)`
+          );
+
+          // Give the VM time to solve itself
+          await page.waitForTimeout(10000);
+
+          // Move mouse to trigger JS events that the challenge might be waiting for
+          await page.mouse.move(Math.floor(Math.random() * 500), Math.floor(Math.random() * 500));
+          await page.mouse.wheel(0, 100);
+
+          await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+
+          const newTitle = await page.title();
+          if (newTitle.includes('Challenge')) {
+            logger.error(`[BrowserEyes] Challenge persist after wait. Ozon is persistent.`);
+          } else {
+            logger.info(`[BrowserEyes] Challenge potentially passed (Title: ${newTitle})`);
+          }
+        } else {
+          await page.waitForTimeout(Math.floor(Math.random() * 2000) + 1000);
+        }
+      }
+
+      // Navigate to target and wait for network idle
+      await page.goto(url, { waitUntil: 'load', timeout: 60000 });
+
+      // HUMAN-LIKE INTERACTION (Bypass behavioral analysis)
+      await this.simulateHumanBehavior(page);
 
       // Wait for price elements to load
       await this.waitForPriceElements(page, marketplace);
@@ -214,6 +271,38 @@ export class BrowserEyes {
     } finally {
       await page.close();
     }
+  }
+
+  /**
+   * Simulate human-like behavior to avoid bot detection
+   */
+  private async simulateHumanBehavior(page: Page): Promise<void> {
+    logger.info('[BrowserEyes] Simulating human behavior...');
+
+    // 1. Random mouse movements
+    for (let i = 0; i < 3; i++) {
+      const x = Math.floor(Math.random() * 800);
+      const y = Math.floor(Math.random() * 600);
+      await page.mouse.move(x, y, { steps: 5 });
+    }
+
+    // 2. Random scrolling
+    await page.evaluate(() => {
+      window.scrollBy({
+        top: Math.floor(Math.random() * 500) + 200,
+        behavior: 'smooth',
+      });
+    });
+
+    await page.waitForTimeout(Math.floor(Math.random() * 2000) + 1000);
+
+    // 3. Scroll back up slightly
+    await page.evaluate(() => {
+      window.scrollBy({
+        top: -Math.floor(Math.random() * 100),
+        behavior: 'smooth',
+      });
+    });
   }
 
   /**
@@ -358,9 +447,44 @@ export class BrowserEyes {
           });
         }
 
+        // Check stock status
         const outOfStock =
           document.body.textContent?.includes('Нет в наличии') ||
           document.body.textContent?.includes('Товара нет');
+
+        // STRATEGY: Try to find data in JSON-LD or NEXT_DATA if DOM is blocked
+        const jsonLd = document.querySelector('script[type="application/ld+json"]');
+        const nextData = document.getElementById('__NEXT_DATA__');
+
+        if (jsonLd && !buyerPrice) {
+          try {
+            const ldData = JSON.parse(jsonLd.textContent || '{}');
+            const offers = Array.isArray(ldData)
+              ? ldData.find(i => i.offers)?.offers
+              : ldData.offers;
+            if (offers && offers.price) {
+              buyerPrice = parseFloat(offers.price);
+            }
+          } catch {
+            /* Silent */
+          }
+        }
+
+        if (nextData && !buyerPrice) {
+          try {
+            const data = JSON.parse(nextData.textContent || '{}');
+            // Deep search for price in Ozon's next.js state
+            const state = data.props?.pageProps?.initialState;
+            if (state) {
+              const jsonState = JSON.stringify(state);
+              const priceMatch =
+                jsonState.match(/"price":(\d+)/) || jsonState.match(/"price":"(\d+)"/);
+              if (priceMatch) buyerPrice = parseInt(priceMatch[1]);
+            }
+          } catch {
+            /* Silent */
+          }
+        }
 
         return {
           buyerPrice,
@@ -374,15 +498,63 @@ export class BrowserEyes {
           originalPrice: null,
           cardPrice: null,
           stockStatus: 'out_of_stock',
-          error: String(e),
         };
       }
     });
 
+    // --- FALLBACK: Node-level Search API (if product page is blocked) ---
+    if (
+      !priceData.buyerPrice &&
+      ((await page.content()).includes('Доступ ограничен') ||
+        (await page.content()).includes('challenge'))
+    ) {
+      try {
+        const currentUrl = page.url();
+        const skuMatch = currentUrl.match(/\/product\/([^/]+)/);
+        const sku = skuMatch ? skuMatch[1] : null;
+
+        if (sku) {
+          logger.info(
+            `[BrowserEyes] Product page blocked. Attempting search fallback for SKU: ${sku}`
+          );
+          const searchUrl = `https://www.ozon.ru/api/composer-api.bx/page/json/v2?url=${encodeURIComponent(`/search/?text=${sku}&from_global=true`)}`;
+
+          // We must use page.evaluate to fetch so it uses the browser's cookies and IP session
+          const searchResult = await page.evaluate(async fetchUrl => {
+            try {
+              const response = await fetch(fetchUrl, {
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+              });
+              if (!response.ok) return null;
+              const data = await response.json();
+              return JSON.stringify(data);
+            } catch {
+              return null;
+            }
+          }, searchUrl);
+
+          if (searchResult) {
+            const sPriceMatch =
+              searchResult.match(/"price":"(\d+)"/) || searchResult.match(/"price":(\d+)/);
+            if (sPriceMatch) {
+              priceData.buyerPrice = parseInt(sPriceMatch[1]);
+              logger.info(
+                `[BrowserEyes] Search fallback SUCCESS: found price ${priceData.buyerPrice}`
+              );
+            }
+          }
+        }
+      } catch (err) {
+        logger.warn('[BrowserEyes] Search fallback failed', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
     return {
       ...priceData,
       extractionMethod: 'dom',
-      confidence: priceData.buyerPrice ? 0.85 : 0.3,
+      confidence: priceData.buyerPrice ? 0.9 : 0.3,
     } as BrowserEyesResult;
   }
 
