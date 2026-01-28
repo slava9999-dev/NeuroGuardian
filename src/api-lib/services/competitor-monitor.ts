@@ -26,29 +26,34 @@ export function extractNmIdFromUrl(input: string | number): number | null {
   if (typeof input === 'number') return input;
 
   // If it's a pure number string
-  const numericOnly = input.replace(/\D/g, '');
-  if (/^\d{6,12}$/.test(input.trim())) {
-    return parseInt(input.trim());
+  if (/^\d{6,12}$/.test(String(input).trim())) {
+    return parseInt(String(input).trim());
   }
 
-  // Try to extract from WB URL patterns
-  const wbPatterns = [
+  // Try to extract from WB/Ozon URL patterns
+  const patterns = [
+    // Wildberries
     /wildberries\.ru\/catalog\/(\d+)/i,
     /wb\.ru\/catalog\/(\d+)/i,
     /wbx\.ru\/(\d+)/i,
     /card\.wb\.ru\/.*nm=(\d+)/i,
+    // Ozon
+    /ozon\.ru\/product\/.*-(\d+)\//i,
+    /ozon\.ru\/product\/(\d+)\//i,
+    /ozon\.ru\/product\/(\d+)/i,
   ];
 
-  for (const pattern of wbPatterns) {
-    const match = input.match(pattern);
+  for (const pattern of patterns) {
+    const match = String(input).match(pattern);
     if (match && match[1]) {
       return parseInt(match[1]);
     }
   }
 
-  // Last resort: find any sequence of 6-12 digits (likely nm_id)
-  if (numericOnly.length >= 6 && numericOnly.length <= 12) {
-    return parseInt(numericOnly);
+  // Last resort: find any sequence of 6-12 digits (likely nm_id or Ozon SKU)
+  const digits = String(input).match(/\d{6,12}/);
+  if (digits) {
+    return parseInt(digits[0]);
   }
 
   return null;

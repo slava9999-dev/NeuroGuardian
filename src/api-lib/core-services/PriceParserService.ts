@@ -272,13 +272,17 @@ export class PriceParserService {
                   extractionMethod: 'social_crawler',
                 };
               }
-            } catch (e) {
-              /* Fallback */
+            } catch (err: unknown) {
+              logger.warn(`[PriceParser] JSON-LD parse failed for Ozon SKU: ${sku}`, {
+                error: err instanceof Error ? err.message : String(err),
+              });
             }
           }
         }
-      } catch (e) {
-        logger.warn(`[PriceParser] Social Crawler bypass failed for Ozon SKU: ${sku}`, e);
+      } catch (err: unknown) {
+        logger.warn(`[PriceParser] Social Crawler bypass failed for Ozon SKU: ${sku}`, {
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
 
       // Step B: Try BrowserEyes (Local/Remote Playwright) - HEAVY FALLBACK

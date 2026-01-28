@@ -6,11 +6,8 @@
 
 import { logger } from '../api-lib/lib/logger.js';
 import { sql } from '../api-lib/services/database.js';
-import {
-  fetchWbCompetitorData,
-  extractNmIdFromUrl,
-} from '../api-lib/services/competitor-monitor.js';
-import { browserEyes } from './BrowserEyes.js';
+import { extractNmIdFromUrl } from '../api-lib/services/competitor-monitor.js';
+import { priceParserService } from '../api-lib/core-services/PriceParserService.js';
 
 export interface CompetitorAlert {
   productId: number;
@@ -31,33 +28,43 @@ export class SentinelAgent {
   async monitorAllProducts(): Promise<CompetitorAlert[]> {
     logger.info('[SentinelAgent] Starting competitor monitoring cycle');
 
-    // Get all products with competitor_url set
+    // Get all products with competitor_url or stop-loss monitoring enabled
     const products = await sql`
       SELECT 
         id,
+        product_id,
         title,
         marketplace,
         nm_id,
         current_price,
         min_price,
         competitor_url,
-        price_strategy
+        price_strategy,
+        is_monitored
       FROM products
-      WHERE competitor_url IS NOT NULL
-        AND competitor_url != ''
-        AND is_monitored = true
+      WHERE is_monitored = true
+        AND (competitor_url IS NOT NULL OR min_price > 0)
     `;
 
     const alerts: CompetitorAlert[] = [];
 
     for (const product of products.rows) {
       try {
-        const alert = await this.checkCompetitor(product);
-        if (alert) {
-          alerts.push(alert);
+        // 1. Check for Stop-Loss breach (Self-Protection)
+        const selfAlert = await this.checkSelfProtection(product);
+        if (selfAlert) {
+          alerts.push(selfAlert);
+        }
+
+        // 2. Check Competitor (Market Strategy)
+        if (product.competitor_url && product.competitor_url.length > 5) {
+          const alert = await this.checkCompetitor(product);
+          if (alert) {
+            alerts.push(alert);
+          }
         }
       } catch (error) {
-        logger.error('[SentinelAgent] Failed to check competitor', {
+        logger.error('[SentinelAgent] Failed to check product cycle', {
           productId: product.id,
           error: error instanceof Error ? error.message : String(error),
         });
@@ -130,34 +137,78 @@ export class SentinelAgent {
   }
 
   /**
-   * Fetch competitor price using appropriate method
+   * Check if our own price breached stop-loss due to MP discounts
+   */
+  private async checkSelfProtection(product: any): Promise<CompetitorAlert | null> {
+    const marketplace = (product.marketplace || 'WB').toUpperCase() as 'WB' | 'OZON';
+    const id = marketplace === 'WB' ? product.nm_id || product.product_id : product.product_id;
+
+    if (!id) {
+      logger.warn(`[SentinelAgent] Missing product ID for ${product.title}`);
+      return null;
+    }
+
+    logger.info(`[SentinelAgent] Checking Stop-Loss for: ${product.title} (${id})`);
+
+    try {
+      const realInfo =
+        marketplace === 'WB'
+          ? await priceParserService.getWbRealPrice(id)
+          : await priceParserService.getOzonRealPrice(String(id));
+
+      if (realInfo.buyerPrice && product.min_price > 0 && realInfo.buyerPrice < product.min_price) {
+        const lossPercent = Math.round(
+          ((product.min_price - realInfo.buyerPrice) / product.min_price) * 100
+        );
+
+        logger.error(
+          `[SentinelAgent] 🛑 STOP-LOSS BREACH! ${product.title}: Buyer Price ${realInfo.buyerPrice} < Min ${product.min_price}`
+        );
+
+        return {
+          productId: product.id,
+          productName: product.title,
+          yourPrice: realInfo.buyerPrice,
+          competitorPrice: product.min_price, // Using this as the threshold
+          competitorUrl:
+            marketplace === 'WB'
+              ? `https://www.wildberries.ru/catalog/${id}/detail.aspx`
+              : `https://www.ozon.ru/product/${id}/`,
+          priceDropPercent: lossPercent,
+          marketplace: marketplace as 'WB' | 'Ozon',
+          recommendedAction: 'lower_price', // In this context it means "URGENT ACTION NEEDED"
+          recommendedPrice: product.min_price,
+        };
+      }
+    } catch (e: unknown) {
+      logger.warn(`[SentinelAgent] Self-protection check failed for ${product.title}`, {
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+    return null;
+  }
+
+  /**
+   * Fetch competitor price using centralized service
    */
   private async fetchCompetitorPrice(
     marketplace: 'WB' | 'Ozon',
     url: string
   ): Promise<number | null> {
-    if (marketplace === 'WB') {
-      // Use WB API (fast and reliable)
-      const nmId = extractNmIdFromUrl(url);
-      if (!nmId) {
-        logger.warn('[SentinelAgent] Could not extract NM_ID from URL', { url });
-        return null;
-      }
+    const nmId = extractNmIdFromUrl(url);
+    if (!nmId) return null;
 
-      const data = await fetchWbCompetitorData(nmId);
-      return data?.price || null;
-    } else if (marketplace === 'Ozon') {
-      // Use Browser Eyes for Ozon
-      try {
-        const result = await browserEyes.gazeAtProduct('Ozon', url);
-        return result.buyerPrice;
-      } catch (error) {
-        logger.error('[SentinelAgent] Browser Eyes failed for Ozon', { error });
-        return null;
-      }
+    try {
+      const info =
+        marketplace === 'WB'
+          ? await priceParserService.getWbRealPrice(nmId)
+          : await priceParserService.getOzonRealPrice(String(nmId));
+
+      return info.buyerPrice || null;
+    } catch (error) {
+      logger.error('[SentinelAgent] Failed to fetch competitor price', { marketplace, error });
+      return null;
     }
-
-    return null;
   }
 
   /**

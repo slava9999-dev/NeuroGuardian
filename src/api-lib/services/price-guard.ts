@@ -54,6 +54,10 @@ const LIMITS = {
 
   // Anomaly detection
   ANOMALY_DETECTION_THRESHOLD: 0.25, // 25% sudden change = possible API error
+
+  // Marketplace standard discounts for safety calculation
+  ESTIMATED_MAX_WB_SPP: 35, // Assume WB can take up to 35% as SPP
+  ESTIMATED_OZON_CARD_DISCOUNT: 10, // Assume Ozon Card is ~10%
 };
 
 /**
@@ -243,6 +247,31 @@ export async function validatePriceUpdate(
 ): Promise<PriceSecurityResult> {
   const { userId, productId, currentPrice, proposedPrice, minPrice, marketplace } = check;
 
+  // Calculate ESTIMATED buyer price (what the client actually sees)
+  // Logic: RealPrice = PortalPrice * (1 - KnownSPP)
+  let estimatedBuyerPrice = proposedPrice;
+  let discountFactor = 0.7; // Default for WB
+
+  if (marketplace === 'WB') {
+    try {
+      const prodIdStr = String(productId);
+      const res = await sql`
+        SELECT spp_buffer_percent FROM products 
+        WHERE user_id = ${userId} AND (product_id = ${prodIdStr} OR nm_id = ${check.nmId || 0})
+        LIMIT 1
+      `;
+      if (res.rows[0] && res.rows[0].spp_buffer_percent) {
+        discountFactor = (100 - res.rows[0].spp_buffer_percent) / 100;
+      }
+    } catch (e) {
+      // Fallback to default block if DB fetch fails
+    }
+    estimatedBuyerPrice = Math.round(proposedPrice * discountFactor);
+  } else {
+    discountFactor = 0.9; // Default for Ozon
+    estimatedBuyerPrice = Math.round(proposedPrice * discountFactor);
+  }
+
   // 1. Kill switch check
   const killSwitch = await checkKillSwitch(userId, marketplace, productId);
   if (killSwitch.user || killSwitch.product || killSwitch.global) {
@@ -295,14 +324,17 @@ export async function validatePriceUpdate(
     };
   }
 
-  // 5. Stop-loss check
-  if (minPrice && minPrice > 0 && proposedPrice < minPrice) {
+  // 5. Stop-Loss Check (REAL PRICE AWARENESS)
+  if (minPrice && minPrice > 0 && estimatedBuyerPrice < minPrice) {
+    // Determine what portal price is needed to keep buyer price >= minPrice
+    const requiredPortalPrice = Math.ceil(minPrice / discountFactor);
+
     return {
       allowed: true,
-      safePrice: minPrice,
-      reason: `Цена ${proposedPrice}₽ ниже Stop-Loss (${minPrice}₽). Ограничено.`,
+      safePrice: requiredPortalPrice,
+      reason: `RECOVERY: Ваша цена ${proposedPrice}₽ приведет к цене покупателя ~${estimatedBuyerPrice}₽ (с учетом СПП ${Math.round((1 - discountFactor) * 100)}%), что ниже Stop-Loss ${minPrice}₽. Минимально допустимая цена в портале для безопасности: ${requiredPortalPrice}₽.`,
       isAdjusted: true,
-      severity: 'warning',
+      severity: 'critical',
       action: 'adjust',
     };
   }
