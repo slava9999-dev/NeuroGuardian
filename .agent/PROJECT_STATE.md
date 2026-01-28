@@ -1706,7 +1706,7 @@ PgVector остается основным движком знаний.
 
 | Metric              | Value         | Target |
 | ------------------- | ------------- | ------ |
-| Unit/Int Tests      | 466           | 250+   |
+| Unit/Int Tests      | 509           | 250+   |
 | Knowledge Base Docs | 13            | 10+    |
 | Pass Typecheck      | ✅ Passed     | ✅     |
 | Production status   | ✅ Live       | ✅     |
@@ -1747,7 +1747,8 @@ PgVector остается основным движком знаний.
 > ✅ **CORE MISSION ALIGNMENT:** Successfully removed all "creative" and "support" distractions (AI Photos, SMM posts, Review management) from the agent's interface and specialists.
 > ✅ **DETERMINISTIC DEFENSE MACHINE:** Pivoted Viktor's persona to a strict, profit-focused machine. Zero tolerance for nonsense; 100% focus on IVaR (Inventory Value at Risk) and Stop-Loss.
 > ✅ **AUDIT & RISKS:** Replaced "Creative" UI with "Risk Audit" and "Sync" actions. New `GetCatalogHealthTool` provides proactive margin alerts.
-> ✅ **CLEANUP:** Deleted `SupportSpecialist`, `ContentSpecialist`, and related tools to reduce attack surface and maintain focus.
+> ✅ **MARKETPLACE CLARITY:** Implemented branded visual indicators (WB/Ozon) across the UI to prevent user errors when setting stop-losses.
+> ✅ **CLEANUP:** Deleted `SupportSpecialist`, `ContentSpecialist`, and related tools to reduce attack surface and maintain focus. Fixed all unit tests to align with the new mission.
 
 **Completed Actions:**
 
@@ -1756,6 +1757,9 @@ PgVector остается основным движком знаний.
 - [x] **Tool Purge**: Commented out and deleted `GenerateProductImageTool`, `GetReviewsTool`, `GenerateReviewReplyTool`, `GenerateContentTool`.
 - [x] **Intent Logic**: `IntentClassifier.ts` (Removed SUPPORT category, strictly routing to protection experts).
 - [x] **New Capability**: `GetCatalogHealthTool.ts` (Automated margin and risk analysis).
+- [x] **Marketplace Identification**: Integrated `.badge-wb` and `.badge-ozon` styles and updated `ProductCard.tsx`, `SentinelDashboard.tsx`, and `SentinelAlerts.tsx`.
+- [x] **Data Integrity**: Switched Ozon UI to use `offerId` for better seller-side identification.
+- [x] **Test Compliance**: Fixed `specialists.test.ts` and removed obsolete `reviews-tool.test.ts`. Verified 509 tests passing.
 - [x] **Prompt Engineering**: Global `CORE_PERSONALITY` now forbids distractions and prioritizes math over chat.
 
 **Key Insights:**
@@ -1767,4 +1771,4 @@ Deterministic persona reduces LLM "hallucination" by strictly bounding the agent
 
 ---
 
-_Last updated: 2026-01-28T21:25:00+03:00_
+_Last updated: 2026-01-28T21:30:00+03:00_
