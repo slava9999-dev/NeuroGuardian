@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '../stores';
 import { hapticFeedback } from '../lib/telegram';
+import { AccountCardSkeleton } from '../components/ui/Skeleton';
 import {
   settingsApi,
   marketplaceAccountsApi,
@@ -42,6 +43,7 @@ export function SettingsPage({
   onNavigate?: (page: string) => void;
 }) {
   const { user, defenseMode, setUser, setVoiceEnabled } = useAppStore();
+  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<{ success: boolean; count: number } | null>(null);
@@ -57,11 +59,14 @@ export function SettingsPage({
   }, []);
 
   const loadAccounts = async () => {
+    setIsLoading(true);
     try {
       const res = await marketplaceAccountsApi.getAccounts();
       if (res.success) setAccounts(res.accounts);
     } catch (e) {
       console.error('Load Accounts Error:', e);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -169,8 +174,16 @@ export function SettingsPage({
           </button>
         </div>
 
+        {/* Loading State */}
+        {isLoading && (
+          <div className="space-y-3">
+            <AccountCardSkeleton />
+            <AccountCardSkeleton />
+          </div>
+        )}
+
         {/* Empty State */}
-        {accounts.length === 0 && (
+        {!isLoading && accounts.length === 0 && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -252,7 +265,12 @@ export function SettingsPage({
               <div className="flex gap-2">
                 <button
                   onClick={() => {
-                    setEditingAccount(acc);
+                    setEditingAccount({
+                      ...acc,
+                      wb_token: acc.wb_token === '***' ? '' : acc.wb_token,
+                      ozon_api_key: acc.ozon_api_key === '***' ? '' : acc.ozon_api_key,
+                      ozon_client_id: acc.ozon_client_id === '***' ? '' : acc.ozon_client_id,
+                    });
                     setShowAccountModal(true);
                   }}
                   className="p-2 rounded-lg hover:bg-surface-hl text-text-muted hover:text-primary transition-colors"

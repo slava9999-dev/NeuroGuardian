@@ -28,7 +28,7 @@ export async function handleMarketplaceAccounts(
         ...acc,
         wb_token: acc.wb_token ? '***' : undefined,
         ozon_api_key: acc.ozon_api_key ? '***' : undefined,
-        ozon_client_id: acc.ozon_client_id ? acc.ozon_client_id : undefined, // Client ID is not super secret usually, but can be masked
+        ozon_client_id: acc.ozon_client_id ? '***' : undefined,
       }));
       return res.json({ success: true, accounts: safeAccounts });
     }
