@@ -12,8 +12,44 @@
 **Focus:** 🏁 Operation Stability & UX Polish
 
 > ✅ **FULL SYNC SUCCESS:** Successfully synchronized 44 products (22 WB + 22 Ozon).
-> ✅ **UI OVERHAUL:** Redesigned Marketplace Settings UI to prevent cross-contamination of API keys.
-> ✅ **DECRYPTION RESOLVED:** Unified encryption/decryption logic across all services.
+> ✅ **UI POLISH:** Implemented Skeleton loading for Settings Page to prevent layout shifts.
+> ✅ **SECURITY:** Masked Ozon Client ID in API responses and fixed edit modal behavior for encrypted keys.
+
+### Session 2026-01-28 (Session 101 - Settings UI & Security) 💎
+
+**Objective: Polish Settings Page UX and secure API Key handling.**
+
+> ✅ **SKELETONS:** Implemented `AccountCardSkeleton` to fix "old interface jump" during loading.
+> ✅ **SECURE MASKING:** Ozon Client ID is now masked (`***`) in API responses, preventing accidental re-encryption of ciphertext.
+> ✅ **CLEAN EDITING:** Edit modal now automatically clears masked values, showing proper placeholders.
+> ✅ **PRE-FLIGHT PASSED:** All tests, linting, and build checks passed successfully.
+> ✅ **HOTFIX APPLIED:** Manually corrected corrupted/cross-contaminated API keys directly in the database for User 7548070478. Resolves Ozon 400 & WB 401 errors.
+> ✅ **SYNC VERIFIED:** User confirmed successful product synchronization for both marketplaces.
+> ✅ **DIGITAL VISION (WB):** Verified successful browser-based price extraction for Wildberries (Price: 438, Confidence: 0.9).
+> ⚠️ **DIGITAL VISION (OZON):** Suspended. RU proxy (`217.29...`) persistently failing (502 Bad Gateway). User needs to replace proxy provider.
+
+**Completed Actions:**
+
+- [x] **UI Components**: `src/components/ui/Skeleton.tsx` (Added AccountCardSkeleton).
+- [x] **Settings Page**: `src/pages/SettingsPage.tsx` (Integrated loading state and skeleton).
+- [x] **API Handler**: `src/api-lib/handlers/marketplace-accounts.ts` (Masked ozon_client_id).
+- [x] **DB Verification**: Ran `debug_keys.ts` and `cleanup_keys.ts` to identify and fix corrupted data.
+- [x] **Digital Vision Test**: Ran `test_vision.ts`. WB Success, Ozon Failed (No Proxy).
+- [x] **Deployment**: Pushed to `main` (Commit `8b6543a`).
+
+**Key Insights:**
+
+```
+Residential proxies are critical for Ozon. US proxies are blocked immediately, and low-quality RU proxies return 502/504 errors.
+WB is surprisingly permissive and allows price extraction without proxies in headless mode (likely due to good bot detection heuristics or luck).
+Manual DB intervention was required to fix corrupted keys; the UI should ideally handle "Reset Keys" flows more gracefully in the future.
+```
+
+**Next Steps (P0):**
+
+1. Obtain high-quality Residential RU Proxy for Ozon.
+2. Add `PROXY_URLS` to `.env`.
+3. Re-enable Digital Vision for Ozon.
 
 ### Session 2026-01-27 (Session 98 - Production Connectivity Recovery) 🚀
 

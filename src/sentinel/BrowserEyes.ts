@@ -320,44 +320,63 @@ export class BrowserEyes {
    */
   private async extractOzonPriceFromDOM(page: Page): Promise<BrowserEyesResult> {
     const priceData = await page.evaluate(() => {
-      const priceSelectors = [
-        '[data-widget="webPrice"] span', // Main Ozon price widget
-        '.price span',
-        '[class*="Price"] span',
-      ];
+      try {
+        if (!document || !document.body)
+          return {
+            buyerPrice: null,
+            originalPrice: null,
+            cardPrice: null,
+            stockStatus: 'out_of_stock',
+          };
 
-      let buyerPrice: number | null = null;
-      let originalPrice: number | null = null;
+        const priceSelectors = [
+          '[data-widget="webPrice"] span', // Main Ozon price widget
+          '.price span',
+          '[class*="Price"] span',
+        ];
 
-      for (const selector of priceSelectors) {
-        const elems = document.querySelectorAll(selector);
-        elems.forEach(elem => {
-          const text = elem.textContent || '';
-          const match = text.match(/(\d[\d\s]*)/);
-          if (match) {
-            const price = parseInt(match[1].replace(/\s/g, ''));
-            if (price > 0) {
-              if (!buyerPrice) {
-                buyerPrice = price;
-              } else if (price < buyerPrice) {
-                originalPrice = buyerPrice;
-                buyerPrice = price;
+        let buyerPrice: number | null = null;
+        let originalPrice: number | null = null;
+
+        for (const selector of priceSelectors) {
+          const elems = document.querySelectorAll(selector);
+          elems.forEach(elem => {
+            if (!elem) return; // Safety check
+            const text = elem.textContent || '';
+            const match = text.match(/([\d\s]+)\s*₽?/); // Improved regex
+            if (match) {
+              const price = parseInt(match[1].replace(/\s/g, ''));
+              if (price > 0) {
+                if (!buyerPrice) {
+                  buyerPrice = price;
+                } else if (price < buyerPrice) {
+                  originalPrice = buyerPrice;
+                  buyerPrice = price;
+                }
               }
             }
-          }
-        });
+          });
+        }
+
+        const outOfStock =
+          document.body.textContent?.includes('Нет в наличии') ||
+          document.body.textContent?.includes('Товара нет');
+
+        return {
+          buyerPrice,
+          originalPrice,
+          cardPrice: null,
+          stockStatus: outOfStock ? 'out_of_stock' : 'in_stock',
+        };
+      } catch (e) {
+        return {
+          buyerPrice: null,
+          originalPrice: null,
+          cardPrice: null,
+          stockStatus: 'out_of_stock',
+          error: String(e),
+        };
       }
-
-      const outOfStock =
-        document.body.textContent?.includes('Нет в наличии') ||
-        document.body.textContent?.includes('Товара нет');
-
-      return {
-        buyerPrice,
-        originalPrice,
-        cardPrice: null,
-        stockStatus: outOfStock ? 'out_of_stock' : 'in_stock',
-      };
     });
 
     return {
