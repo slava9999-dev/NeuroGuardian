@@ -5,13 +5,13 @@
 // ============================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { sql } from '../services/database.js';
+import { sql, logSentinelAction } from '../services/database.js';
 import { orchestrateV5 } from '../../agent/core/AgentOrchestratorV5.js';
 import { logger, config } from '../lib/index.js';
 import { inferGender } from '../../agent/utils/genderDetection.js';
 import { stateManager } from '../../agent/core/StateManager.js';
-import { db, systemFlags, users } from '../../infrastructure/database/db.js';
-import { eq } from 'drizzle-orm';
+import { db, systemFlags, users, products } from '../../infrastructure/database/db.js';
+import { eq, and, or } from 'drizzle-orm';
 import { VoiceService } from '../services/VoiceService.js';
 import { logOpsEvent } from '../services/ops-logger.js';
 // Using built-in Node 18+ FormData and Blob
@@ -33,6 +33,9 @@ interface TelegramMessage {
   date: number;
   text?: string;
   entities?: TelegramMessageEntity[];
+  reply_markup?: {
+    inline_keyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>>;
+  };
 }
 
 interface TelegramUser {
@@ -184,6 +187,36 @@ async function answerCallbackQuery(callbackQueryId: string, text?: string): Prom
     });
   } catch {
     // Ignore errors
+  }
+}
+
+async function editTelegramMessageReplyMarkup(
+  chatId: number,
+  messageId: number,
+  replyMarkup: object
+): Promise<boolean> {
+  try {
+    const token = getBotToken();
+    const response = await fetch(`${TELEGRAM_API}${token}/editMessageReplyMarkup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        message_id: messageId,
+        reply_markup: replyMarkup,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      logger.error('Telegram editMessageReplyMarkup error', { error, chatId, messageId });
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    logger.error('Failed to edit Telegram message reply markup', error);
+    return false;
   }
 }
 
@@ -800,131 +833,214 @@ async function handleCallbackQuery(query: TelegramCallbackQuery): Promise<void> 
         }
       );
       break;
-
-      // --- ACK ALERT (Quiet Sentinel) ---
-      if (data.startsWith('ack_alert:')) {
-        const externalId = data.split(':')[1];
-        await logOpsEvent({
-          eventType: 'alert_acknowledged',
-          eventSource: 'manual',
-          userId: query.from.id,
-          externalId: externalId,
-          payload: { externalId, action: 'acknowledge' },
-        });
-
-        await sendTelegramMessage(
-          Number(chatId),
-          `✅ *Принято!*\n\nЯ зафиксировал, что вы в курсе ситуации с товаром \`${externalId}\`. Я временно снижу приоритет уведомлений по этой позиции, чтобы не отвлекать вас от работы.`,
-          { parseMode: 'Markdown' }
-        );
-        return;
-      }
-
-      // --- CHECK PRODUCT ---
-      if (data.startsWith('check_product:')) {
-        const externalId = data.split(':')[1];
-        await sendTelegramMessage(
-          Number(chatId),
-          `🔍 Запрашиваю свежие данные по товару \`${externalId}\`...`
-        );
-        await handleUserMessage(
-          Number(chatId),
-          query.from.id,
-          `Проверь статус товара ${externalId}`,
-          query.from.first_name
-        );
-        return;
-      }
-
-      // --- RAISE PRICE (Manual fix) ---
-      if (data.startsWith('raise_price:')) {
-        const parts = data.split(':');
-        const mp = parts[1];
-        const externalId = parts[2];
-
-        await sendTelegramMessage(
-          Number(chatId),
-          `🚀 Готов поднять цену для защиты маржи.\n\nНа какую цену установить? (Напишите просто число в ответ или выберите из вариантов)`,
-          {
-            replyMarkup: {
-              inline_keyboard: [
-                [
-                  {
-                    text: '🎯 На +10%',
-                    callback_data: `confirm:raise_percent:${mp}:${externalId}:10`,
-                  },
-                  {
-                    text: '🎯 На +20%',
-                    callback_data: `confirm:raise_percent:${mp}:${externalId}:20`,
-                  },
-                ],
-                [
-                  {
-                    text: '🛡️ Вернуть к РРЦ',
-                    callback_data: `confirm:restore_rrc:${mp}:${externalId}`,
-                  },
-                ],
-                [{ text: '❌ Отмена', callback_data: `cancel_action` }],
-              ],
-            },
-          }
-        );
-        return;
-      }
-
-      // --- RAISE PERCENT CONFIRMATION ---
-      if (data.startsWith('confirm:raise_percent:')) {
-        const parts = data.split(':');
-        const mp = parts[2];
-        const eid = parts[3];
-        const pct = parts[4];
-
-        await sendTelegramMessage(
-          Number(chatId),
-          `💰 *Подтвердите повышение цены на ${pct}%*\n\nЭто поможет выйти из убыточной зоны. Виктор рассчитает новую цену и отправит запрос на маркетплейс.`,
-          {
-            parseMode: 'Markdown',
-            replyMarkup: {
-              inline_keyboard: [
-                [
-                  { text: '🚀 Подтверждаю', callback_data: `do_raise_percent:${mp}:${eid}:${pct}` },
-                  { text: '❌ Отмена', callback_data: `cancel_action` },
-                ],
-              ],
-            },
-          }
-        );
-        return;
-      }
-
-      // --- DO RAISE PERCENT ---
-      if (data.startsWith('do_raise_percent:')) {
-        const parts = data.split(':');
-        const mp = parts[1];
-        const eid = parts[2];
-        const pct = parts[3];
-        const userId = query.from.id;
-
-        await sendTelegramMessage(Number(chatId), `⏳ Рассчитываю и обновляю цену на ${pct}%...`);
-        const command = `Подними цену на товар ${eid} на ${pct}% на ${mp}`;
-
-        try {
-          const result = await orchestrateV5(command, {
-            userId,
-            isFirstContact: false,
-            userName: query.from.first_name,
-          });
-
-          await sendTelegramMessage(Number(chatId), result.message, { parseMode: 'HTML' });
-        } catch (e) {
-          logger.error('Failed to raise price via callback', e);
-          await sendTelegramMessage(Number(chatId), `❌ Ошибка при повышении цены.`);
-        }
-        return;
-      }
-
-    // --- SENTINEL ADMIN ACTIONS ---
   }
+
+  // --- ACK ALERT (Quiet Sentinel) ---
+  if (data.startsWith('ack_alert:')) {
+    const externalId = data.split(':')[1];
+    const userId = String(query.from.id);
+
+    // 1. Update DB: Stop monitoring
+    await db
+      .update(products)
+      .set({ isMonitored: false, updatedAt: new Date() })
+      .where(
+        and(
+          eq(products.userId, userId),
+          or(eq(products.productId, externalId), eq(products.nmId, externalId))
+        )
+      );
+
+    // 2. Log to Sentinel Logs to satisfy Deduplication logic in Orchestrator
+    // We don't have all details here, but ID + User + Action is what matters for 24h suppression
+    await logSentinelAction({
+      user_id: query.from.id,
+      product_id: externalId,
+      product_title: 'Acknowledge User Action',
+      detected_price: 0,
+      min_price: 0,
+      defense_action: 'ALERT_ACKNOWLEDGED',
+      saved_amount: 0,
+      marketplace: 'manual',
+      threat_type: 'user_acknowledge',
+    }).catch(err => logger.error('Failed to log sentinel ack', err));
+
+    await logOpsEvent({
+      eventType: 'alert_acknowledged',
+      eventSource: 'manual',
+      userId: query.from.id,
+      externalId: externalId,
+      payload: { externalId, action: 'acknowledge' },
+    });
+
+    // 3. Update Keyboard: Change "Понял, проверю" to "🛡️ Включить защиту"
+    if (query.message?.reply_markup) {
+      const keyboard = query.message.reply_markup.inline_keyboard;
+      const newKeyboard = keyboard.map(row =>
+        row.map(btn => {
+          if (btn.callback_data === data) {
+            return {
+              text: '🛡️ Включить защиту',
+              callback_data: `enable_protection:${externalId}`,
+            };
+          }
+          return btn;
+        })
+      );
+
+      await editTelegramMessageReplyMarkup(Number(chatId), query.message.message_id, {
+        inline_keyboard: newKeyboard,
+      });
+    }
+
+    await answerCallbackQuery(query.id, 'Защита приостановлена для этого товара');
+    return;
+  }
+
+  // --- ENABLE PROTECTION ---
+  if (data.startsWith('enable_protection:')) {
+    const externalId = data.split(':')[1];
+    const userId = String(query.from.id);
+
+    // 1. Update DB: Resume monitoring
+    await db
+      .update(products)
+      .set({ isMonitored: true, updatedAt: new Date() })
+      .where(
+        and(
+          eq(products.userId, userId),
+          or(eq(products.productId, externalId), eq(products.nmId, externalId))
+        )
+      );
+
+    // 2. Update Keyboard back to "Понял, проверю"
+    if (query.message?.reply_markup) {
+      const keyboard = query.message.reply_markup.inline_keyboard;
+      const newKeyboard = keyboard.map(row =>
+        row.map(btn => {
+          if (btn.callback_data === data) {
+            return {
+              text: '✅ Понял, проверю',
+              callback_data: `ack_alert:${externalId}`,
+            };
+          }
+          return btn;
+        })
+      );
+
+      await editTelegramMessageReplyMarkup(Number(chatId), query.message.message_id, {
+        inline_keyboard: newKeyboard,
+      });
+    }
+
+    await answerCallbackQuery(query.id, 'Защита включена');
+    return;
+  }
+
+  // --- CHECK PRODUCT ---
+  if (data.startsWith('check_product:')) {
+    const externalId = data.split(':')[1];
+    await sendTelegramMessage(
+      Number(chatId),
+      `🔍 Запрашиваю свежие данные по товару \`${externalId}\`...`
+    );
+    await handleUserMessage(
+      Number(chatId),
+      query.from.id,
+      `Проверь статус товара ${externalId}`,
+      query.from.first_name
+    );
+    return;
+  }
+
+  // --- RAISE PRICE (Manual fix) ---
+  if (data.startsWith('raise_price:')) {
+    const parts = data.split(':');
+    const mp = parts[1];
+    const externalId = parts[2];
+
+    await sendTelegramMessage(
+      Number(chatId),
+      `🚀 Готов поднять цену для защиты маржи.\n\nНа какую цену установить? (Напишите просто число в ответ или выберите из вариантов)`,
+      {
+        replyMarkup: {
+          inline_keyboard: [
+            [
+              {
+                text: '🎯 На +10%',
+                callback_data: `confirm:raise_percent:${mp}:${externalId}:10`,
+              },
+              {
+                text: '🎯 На +20%',
+                callback_data: `confirm:raise_percent:${mp}:${externalId}:20`,
+              },
+            ],
+            [
+              {
+                text: '🛡️ Вернуть к РРЦ',
+                callback_data: `confirm:restore_rrc:${mp}:${externalId}`,
+              },
+            ],
+            [{ text: '❌ Отмена', callback_data: `cancel_action` }],
+          ],
+        },
+      }
+    );
+    return;
+  }
+
+  // --- RAISE PERCENT CONFIRMATION ---
+  if (data.startsWith('confirm:raise_percent:')) {
+    const parts = data.split(':');
+    const mp = parts[2];
+    const eid = parts[3];
+    const pct = parts[4];
+
+    await sendTelegramMessage(
+      Number(chatId),
+      `💰 *Подтвердите повышение цены на ${pct}%*\n\nЭто поможет выйти из убыточной зоны. Виктор рассчитает новую цену и отправит запрос на маркетплейс.`,
+      {
+        parseMode: 'Markdown',
+        replyMarkup: {
+          inline_keyboard: [
+            [
+              { text: '🚀 Подтверждаю', callback_data: `do_raise_percent:${mp}:${eid}:${pct}` },
+              { text: '❌ Отмена', callback_data: `cancel_action` },
+            ],
+          ],
+        },
+      }
+    );
+    return;
+  }
+
+  // --- DO RAISE PERCENT ---
+  if (data.startsWith('do_raise_percent:')) {
+    const parts = data.split(':');
+    const mp = parts[1];
+    const eid = parts[2];
+    const pct = parts[3];
+    const userId = query.from.id;
+
+    await sendTelegramMessage(Number(chatId), `⏳ Рассчитываю и обновляю цену на ${pct}%...`);
+    const command = `Подними цену на товар ${eid} на ${pct}% на ${mp}`;
+
+    try {
+      const result = await orchestrateV5(command, {
+        userId,
+        isFirstContact: false,
+        userName: query.from.first_name,
+      });
+
+      await sendTelegramMessage(Number(chatId), result.message, { parseMode: 'HTML' });
+    } catch (e) {
+      logger.error('Failed to raise price via callback', e);
+      await sendTelegramMessage(Number(chatId), `❌ Ошибка при повышении цены.`);
+    }
+    return;
+  }
+
+  // --- SENTINEL ADMIN ACTIONS ---
 }
 
 // ============================================

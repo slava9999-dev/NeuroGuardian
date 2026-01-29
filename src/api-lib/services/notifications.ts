@@ -244,8 +244,8 @@ function getAlertButtons(alert: Alert): Record<string, unknown> | undefined {
         callback_data: `check_protection:${alert.product.externalId}`,
       },
       {
-        text: `❌ Игнорировать`,
-        callback_data: `ignore_alert:${alert.product.externalId}`,
+        text: `✅ Понял, проверю`,
+        callback_data: `ack_alert:${alert.product.externalId}`,
       },
     ]);
   }
