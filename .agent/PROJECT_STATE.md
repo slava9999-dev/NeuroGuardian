@@ -2,6 +2,31 @@
 
 Last Updated: 2026-01-29 (Session 110)
 
+### Session 2026-01-29 (Session 111 - Sentinel Emergency Stop & API Stabilization) 🛡️🚨
+
+**Objective: Address Sentinel alert spam, fix the Emergency Stop mechanism, and stabilize Marketplace API integrations.**
+
+> ✅ **EMERGENCY STOP (GLOBAL):** Fixed the admin Sentinel dashboard. The "🛑 ОСТАНОВИТЬ SENTINEL" button now correctly updates the `system_flags` table, acting as a global kill-switch.
+> ✅ **USER CONTROL (STATUS):** Integrated a protection toggle into the Telegram `/status` command. Users can now "Остановить всю защиту" or "Включить защиту" with one tap.
+> ✅ **SPAM PREVENTION:** Updated `SentinelOrchestrator` to strictly respect the `isMonitored` flag. Sentinel no longer alerts on products where the user has clicked "Понял, проверю".
+> ✅ **MARKETPLACE RESILIENCE:** Updated Ozon (v3) and Wildberries clients with modern endpoints and integrated `fetchWithRetry` for professional-grade stability.
+> ✅ **"NEURO-FLASH" DESIGN:** Authored the new Design Specification (`.agent/DESIGN_SPEC_STITCH.md`).
+
+**Completed Actions:**
+
+- [x] **Telegram Handlers**: `src/api-lib/handlers/telegram.ts` (Implemented sentinel and user control callback handlers).
+- [x] **Sentinel Engine**: `src/sentinel/SentinelOrchestrator.ts` (Added Master Switch check and strict `isMonitored` filtering).
+- [x] **Notifications**: `src/api-lib/services/notifications.ts` (Standardized action buttons across all alert types).
+- [x] **Marketplace Clients**: `src/integrations/ozon/client.ts` and `src/integrations/wildberries/client.ts` (Switched to v3/v4 APIs, added retries).
+- [x] **Design Docs**: Created `.agent/DESIGN_SPEC_STITCH.md`.
+- [x] **Test Setup**: Fixed global `fetch` mock and LLM mocking in `tests/setup.ts`.
+
+**Next Steps:**
+
+- [ ] Implement the first phase of the "Neuro-Flash" design (Core Components).
+- [ ] Monitor Sentinel logs to confirm that "Stop All" effectively kills background cycles.
+- [ ] Verify Ozon v3 product info parsing with real production data.
+
 ### Session 2026-01-29 (Session 110 - Viktor Brain Upgrade) 🧠🔨
 
 **Objective: Critical analysis and fixing of Viktor's "stupidity" in complex dialogues.**
