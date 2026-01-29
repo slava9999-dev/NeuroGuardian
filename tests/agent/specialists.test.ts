@@ -162,7 +162,7 @@ describe('Specialists', () => {
       expect(sentinelSpecialist.tools).toContain('set_stop_loss');
       expect(sentinelSpecialist.tools).toContain('bulk_protect_products');
       expect(sentinelSpecialist.tools).toContain('calculate_unit_economics');
-      expect(sentinelSpecialist.tools).toContain('get_products');
+      expect(sentinelSpecialist.tools).toContain('get_inventory_stats');
       expect(sentinelSpecialist.tools).toContain('get_catalog_health');
     });
 
