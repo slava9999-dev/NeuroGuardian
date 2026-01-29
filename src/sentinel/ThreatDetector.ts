@@ -196,13 +196,13 @@ export class ThreatDetector {
       });
     }
 
-    if (!isEstimated && economics.profit > 0 && economics.margin < 10) {
+    if (!isEstimated && economics.profit > 0 && economics.margin < 3) {
       threats.push({
         type: ThreatType.MARGIN_BELOW_ZERO,
         severity: 'high',
         productId: product.product_id,
         nmId: product.nm_id,
-        message: `Низкая маржинальность (${economics.margin}%)`,
+        message: `Критически низкая маржинальность (${economics.margin}%) — продажа почти в ноль или убыток по налогам.`,
         data: economics,
       });
     }

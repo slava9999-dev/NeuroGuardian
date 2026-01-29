@@ -125,8 +125,42 @@ export class SentinelOrchestrator {
           await this.processUser(user, result, userResult, options);
 
           const report = this.reportGenerator.generateUserReport(user, userResult);
-          if (report) {
-            await this.alertSender.sendReport(user, report);
+
+          if (report && userResult.threatsDetected > 0) {
+            // SILENCE LOGIC: Don't send identical summary if threat count matches last reported state
+            const lastReport = await db.execute(drizzleSql`
+              SELECT details FROM sentinel_logs 
+              WHERE user_id = ${user.id} AND threat_type = 'CYCLE_SUMMARY' 
+              ORDER BY created_at DESC LIMIT 1
+            `);
+
+            const lastCount =
+              lastReport.length > 0
+                ? JSON.parse(lastReport[0].details as string).threatsDetected
+                : -1;
+
+            if (userResult.threatsDetected !== lastCount || options.sendPriceReport) {
+              await this.alertSender.sendReport(user, report);
+
+              // Log this summary state
+              await db.insert(sentinelLogs).values({
+                userId: String(user.id),
+                productId: 'SYSTEM',
+                productTitle: 'Cycle Summary',
+                detectedPrice: 0,
+                minPrice: 0,
+                defenseAction: 'SUMMARY_SENT',
+                savedAmount: 0,
+                marketplace: 'ALL',
+                threatType: 'CYCLE_SUMMARY',
+                success: true,
+                details: JSON.stringify({ threatsDetected: userResult.threatsDetected }),
+              });
+            } else {
+              logger.info(
+                `Skipping summary for user ${user.id} - threat count unchanged (${lastCount})`
+              );
+            }
           }
         } catch (err) {
           logger.error('User processing failed', err, { userId: user.id });
@@ -516,35 +550,29 @@ export class SentinelOrchestrator {
                 });
 
               // --- IMMEDIATE ALERTING ---
-              // For critical "Real Price" threats, send immediate Telegram alerts
+              // For ANY threat, send immediate Telegram alerts with action buttons
               // SILENCE LOGIC: Don't alert if user acknowledged this specific threat in the last 6 hours
               for (const threat of scan.threats) {
-                if (
-                  threat.type === ThreatType.PROMO_PRICE_VIOLATION ||
-                  threat.type === ThreatType.BUYER_PRICE_BELOW_STOPLOSS
-                ) {
-                  const ackCheck = await db.execute(drizzleSql`
-                    SELECT 1 FROM ops_events 
-                    WHERE user_id = ${user.id} 
-                      AND external_id = ${product.product_id}
-                      AND event_type = 'alert_acknowledged'
-                      AND created_at > NOW() - INTERVAL '6 hours'
-                    LIMIT 1
-                  `);
+                const ackCheck = await db.execute(drizzleSql`
+                  SELECT 1 FROM ops_events 
+                  WHERE user_id = ${user.id} 
+                    AND external_id = ${product.product_id}
+                    AND event_type = 'alert_acknowledged'
+                    AND created_at > NOW() - INTERVAL '6 hours'
+                  LIMIT 1
+                `);
 
-                  if (ackCheck.length > 0) {
-                    logger.debug(
-                      `[Sentinel] Skipping alert for ${product.product_id} - already acknowledged in last 6h`
-                    );
-                    continue;
-                  }
-
-                  this.alertSender
-                    .sendThreatAlert(user, product, threat, marketplace)
-                    .catch(err => {
-                      logger.error(`Failed to send immediate threat alert for ${product.id}`, err);
-                    });
+                if (ackCheck.length > 0) {
+                  logger.debug(
+                    `[Sentinel] Skipping alert for ${product.product_id} - already acknowledged in last 6h`
+                  );
+                  continue;
                 }
+
+                // Send detailed threat alert with action buttons via AlertSender
+                this.alertSender.sendThreatAlert(user, product, threat, marketplace).catch(err => {
+                  logger.error(`Failed to send immediate threat alert for ${product.id}`, err);
+                });
               }
 
               const stopLossThreat = scan.threats.find(

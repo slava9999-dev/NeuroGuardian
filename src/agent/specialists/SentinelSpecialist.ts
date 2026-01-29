@@ -18,8 +18,8 @@ export class SentinelSpecialist extends BaseSpecialist {
     'set_stop_loss',
     'bulk_protect_products',
     'calculate_unit_economics',
-    'get_products',
     'get_catalog_health',
+    'get_inventory_stats',
   ];
 
   readonly systemPrompt = `# 🤖 ВИКТОР — DETERMINISTIC DEFENSE MACHINE (2026 PRO)
@@ -72,10 +72,24 @@ export class SentinelSpecialist extends BaseSpecialist {
             'Инструкция Виктора: Командир, я не вижу твои магазины. Перейди в "Настройки" и вставь API-токены. Для Ozon нужен Client ID и API Key, для WB — Token (Статистика + Цены).'
           );
         } else {
-          // 2. Проверка синхронизации
-          const prodCount =
-            await sql`SELECT COUNT(*) as count FROM products WHERE user_id = ${context.userId}`;
-          const total = parseInt(prodCount.rows[0].count);
+          // 2. Проверка синхронизации с подробным делением
+          const counts = await sql`
+            SELECT marketplace, COUNT(*) as count 
+            FROM products 
+            WHERE user_id = ${context.userId}
+            GROUP BY marketplace
+          `;
+
+          let total = 0;
+          let ozonCount = 0;
+          let wbCount = 0;
+
+          counts.rows.forEach(r => {
+            const c = parseInt(r.count);
+            total += c;
+            if (r.marketplace === 'Ozon') ozonCount = c;
+            if (r.marketplace === 'WB') wbCount = c;
+          });
 
           if (total === 0) {
             lines.push('\n🔄 СОБЫТИЕ: Ключи есть, но каталог пуст.');
@@ -94,7 +108,7 @@ export class SentinelSpecialist extends BaseSpecialist {
 
             const { protected: prot, with_cost: withCost } = result.rows[0];
             lines.push(`\n## СТАТУС БЕЗОПАСНОСТИ`);
-            lines.push(`- Товаров в базе: ${total}`);
+            lines.push(`- Товаров в базе: ${total} (Ozon: ${ozonCount}, Wildberries: ${wbCount})`);
             lines.push(`- С себестоимостью: ${withCost}/${total}`);
             lines.push(`- Защищено Stop-Loss: ${prot}/${total}`);
 

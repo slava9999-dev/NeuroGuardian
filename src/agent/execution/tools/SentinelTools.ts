@@ -127,3 +127,34 @@ export const CheckSentinelStatusTool = defineTool({
     };
   },
 });
+
+/**
+ * Tool to get overall inventory statistics (Ozon vs WB counts)
+ */
+export const GetInventoryStatsTool = defineTool({
+  name: 'get_inventory_stats',
+  description: 'Возвращает статистику по количеству товаров на Ozon и Wildberries.',
+  category: 'read',
+  requiresConfirmation: false,
+  schema: z.object({}),
+  examples: ['Сколько у меня товаров?', 'Статистика по маркетплейсам'],
+  execute: async (userId, _args) => {
+    // Count all products grouped by marketplace
+    const allProducts = await db.query.products.findMany({
+      where: eq(products.userId, String(userId)),
+      columns: { marketplace: true },
+    });
+
+    const stats = {
+      ozon: allProducts.filter(p => p.marketplace === 'Ozon').length,
+      wb: allProducts.filter(p => p.marketplace === 'WB').length,
+      total: allProducts.length,
+    };
+
+    return {
+      success: true,
+      data: stats,
+      message: `📊 **Ваш каталог:**\n- Ozon: ${stats.ozon} товаров\n- Wildberries: ${stats.wb} товаров\n- Всего: ${stats.total} товаров`,
+    };
+  },
+});

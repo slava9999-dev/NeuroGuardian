@@ -58,11 +58,18 @@ export class SentinelAlertSender {
     };
 
     // Determine alert type based on threat type
-    let alertType: 'promo_violation' | 'stoploss_breach' | 'sentinel_alert' = 'sentinel_alert';
-    if (threat.type === 'promo_price_violation') {
+    let alertType: 'promo_violation' | 'stoploss_breach' | 'sentinel_alert' | 'margin_warning' =
+      'sentinel_alert';
+
+    if (threat.type === 'promo_price_violation' || threat.type === 'flash_crash') {
       alertType = 'promo_violation';
-    } else if (threat.type === 'buyer_price_below_stoploss') {
+    } else if (
+      threat.type === 'buyer_price_below_stoploss' ||
+      threat.type === 'competitor_price_drop'
+    ) {
       alertType = 'stoploss_breach';
+    } else if (threat.type === 'margin_below_zero') {
+      alertType = 'margin_warning';
     }
 
     for (const member of teamMembers) {
