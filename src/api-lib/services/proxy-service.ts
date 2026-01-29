@@ -1,7 +1,15 @@
+import 'dotenv/config';
 import { logger } from '../lib/logger.js';
+
+export interface ProxyConfig {
+  server: string;
+  username?: string;
+  password?: string;
+}
 
 interface ProxyStatus {
   url: string;
+  config: ProxyConfig;
   isAlive: boolean;
   latencyMs: number;
   failureCount: number;
@@ -25,13 +33,19 @@ export class ProxyService {
   private refreshPool() {
     const rawProxies = process.env.PROXY_URLS ? process.env.PROXY_URLS.split(',') : [];
 
-    this.proxies = rawProxies.map(url => ({
-      url: url.trim(),
-      isAlive: true,
-      latencyMs: 0,
-      failureCount: 0,
-      lastUsed: new Date(0),
-    }));
+    this.proxies = rawProxies.map(urlStr => {
+      const url = urlStr.trim();
+      const config = this.parseProxyUrl(url);
+
+      return {
+        url,
+        config,
+        isAlive: true,
+        latencyMs: 0,
+        failureCount: 0,
+        lastUsed: new Date(0),
+      };
+    });
 
     if (this.proxies.length > 0) {
       logger.info(`[ProxyService] Pool initialized with ${this.proxies.length} proxies.`);
@@ -41,12 +55,47 @@ export class ProxyService {
   }
 
   /**
-   * Returns the best available proxy URL
+   * Parses protocol://user:pass@host:port or protocol://host:port
+   */
+  private parseProxyUrl(urlStr: string): ProxyConfig {
+    try {
+      const url = new URL(urlStr);
+      const server = `${url.protocol}//${url.host}`;
+      const username = url.username ? decodeURIComponent(url.username) : undefined;
+      const password = url.password ? decodeURIComponent(url.password) : undefined;
+
+      return { server, username, password };
+    } catch {
+      // Fallback for simple host:port if protocol is missing
+      return { server: urlStr };
+    }
+  }
+
+  /**
+   * Returns the best available proxy config
+   */
+  async getNextProxyConfig(): Promise<ProxyConfig | null> {
+    const proxy = this.getBestAvailable();
+    if (!proxy) return null;
+
+    proxy.lastUsed = new Date();
+    return proxy.config;
+  }
+
+  /**
+   * Legacy method for backward compatibility
    */
   async getNextProxy(): Promise<string | null> {
+    const proxy = this.getBestAvailable();
+    if (!proxy) return null;
+
+    proxy.lastUsed = new Date();
+    return proxy.url;
+  }
+
+  private getBestAvailable(): ProxyStatus | null {
     if (this.proxies.length === 0) return null;
 
-    // Filtration: find alive proxies, sort by last used (Round Robin behavior)
     const available = this.proxies
       .filter(p => p.isAlive)
       .sort((a, b) => a.lastUsed.getTime() - b.lastUsed.getTime());
@@ -56,21 +105,19 @@ export class ProxyService {
       return null;
     }
 
-    const proxy = available[0];
-    proxy.lastUsed = new Date();
-    return proxy.url;
+    return available[0];
   }
 
   /**
    * Report a proxy failure (Industrial feedback loop)
    */
   reportFailure(url: string) {
-    const proxy = this.proxies.find(p => p.url === url);
+    const proxy = this.proxies.find(p => p.url === url || p.config.server === url);
     if (proxy) {
       proxy.failureCount++;
       if (proxy.failureCount > 3) {
         proxy.isAlive = false;
-        logger.error(`[ProxyService] Proxy blacklisted: ${url}`);
+        logger.error(`[ProxyService] Proxy blacklisted: ${proxy.url}`);
       }
     }
   }

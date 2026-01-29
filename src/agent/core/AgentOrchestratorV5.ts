@@ -97,6 +97,20 @@ export class AgentOrchestratorV5 {
         directExecution: !!resolvedContext.directExecution,
       });
 
+      // Record successful resolution if user confirmed a pending action
+      if (
+        resolvedContext.responseType === 'confirmation' &&
+        resolvedContext.extractedValue === true &&
+        userState.pendingAction
+      ) {
+        await experienceLearning.recordIssue(
+          `Пользователь подтвердил инструмент: ${userState.pendingAction.type}`,
+          `Планировщик верно выбрал инструмент ${userState.pendingAction.type} для запроса.`,
+          message,
+          'successful_resolution'
+        );
+      }
+
       // ========================================
       // MEMORY: Save user message
       // ========================================
@@ -219,6 +233,7 @@ export class AgentOrchestratorV5 {
       // PHASE 4.5: Response Validation (Guardrails)
       // ========================================
       let finalMessage = answer.message;
+      let validationIssues: string[] | undefined;
 
       try {
         const validation = await responseValidator.validate(answer.message, {
@@ -236,16 +251,15 @@ export class AgentOrchestratorV5 {
                 : undefined,
         });
 
+        validationIssues = validation.isValid ? undefined : validation.issues.map(i => i.message);
+
         if (!validation.isValid) {
-          logger.warn('[Orchestrator] Response failed validation', {
+          finalMessage =
+            validation.correctedResponse || 'Извините, я не могу предоставить корректный ответ.';
+          logger.warn('[Orchestrator] Response validation FAILED. Using corrected/fallback.', {
             score: validation.score,
             issues: validation.issues.length,
           });
-
-          // Use corrected response if available
-          if (validation.correctedResponse) {
-            finalMessage = validation.correctedResponse;
-          }
         }
       } catch (validationError) {
         logger.warn('[Orchestrator] Validation failed', { error: validationError });
@@ -278,7 +292,8 @@ export class AgentOrchestratorV5 {
           context.userId,
           message,
           finalMessage,
-          previousAgentMessage
+          previousAgentMessage,
+          validationIssues
         );
       } catch (learnError) {
         logger.warn('Experience learning failed', { error: learnError });
