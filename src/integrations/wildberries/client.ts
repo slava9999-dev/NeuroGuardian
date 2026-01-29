@@ -60,7 +60,7 @@ export class WildberriesClient {
       await this.rateLimiter.acquire();
       const response = await fetch(url, options);
 
-      if (response.status === 429 && retries > 0) {
+      if (response?.status === 429 && retries > 0) {
         const retryAfter = response.headers.get('Retry-After');
         const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : backoff;
 
@@ -73,7 +73,7 @@ export class WildberriesClient {
         return this.fetchWithRetry(url, options, retries - 1, backoff * 2);
       }
 
-      if (response.status >= 500 && retries > 0) {
+      if (response?.status && response.status >= 500 && retries > 0) {
         console.warn(`[WildberriesClient] ${response.status} Server Error. Retrying...`, {
           url,
           retriesRemaining: retries,
@@ -113,8 +113,8 @@ export class WildberriesClient {
         }
       );
 
-      if (!response.ok) {
-        throw new Error(`Failed to get products: ${response.status}`);
+      if (!response || !response.ok) {
+        throw new Error(`Failed to get products: ${response?.status || 'Unknown error'}`);
       }
 
       const data = await response.json();
@@ -131,8 +131,8 @@ export class WildberriesClient {
       headers: { Authorization: this.config.apiKey },
     });
 
-    if (!response.ok) {
-      throw new Error(`Failed to get prices: ${response.status}`);
+    if (!response || !response.ok) {
+      throw new Error(`Failed to get prices: ${response?.status || 'Unknown error'}`);
     }
 
     return response.json();
@@ -149,8 +149,8 @@ export class WildberriesClient {
       body: JSON.stringify([{ nmId, price }]),
     });
 
-    if (!response.ok) {
-      const error = await response.text();
+    if (!response || !response.ok) {
+      const error = response ? await response.text() : 'Network error (fetch returned undefined)';
       throw new Error(`Failed to update price: ${error}`);
     }
 

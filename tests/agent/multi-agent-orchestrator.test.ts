@@ -19,7 +19,7 @@ vi.mock('../../src/api-lib/lib/logger.js', () => ({
 // Mock all dependencies
 vi.mock('../../src/infrastructure/llm/GeminiProvider.js', () => ({
   GeminiProvider: vi.fn().mockImplementation(() => ({
-    complete: vi.fn().mockImplementation(async (messages: any[]) => {
+    complete: vi.fn().mockImplementation(async (messages: { role: string; content: string }[]) => {
       // Find the last user message to avoid matching keywords in system prompts
       const userMessage = messages.filter(m => m.role === 'user').pop()?.content || '';
       const prompt = userMessage.toLowerCase();
@@ -53,7 +53,7 @@ vi.mock('../../src/infrastructure/llm/GeminiProvider.js', () => ({
 
 vi.mock('../../src/api-lib/services/database.js', () => ({
   sql: Object.assign(
-    vi.fn().mockImplementation(async (strings: any, ...args: any[]) => {
+    vi.fn().mockImplementation(async (strings: string | string[], ..._args: unknown[]) => {
       const query = typeof strings === 'string' ? strings : strings[0];
       if (query.includes('pg_extension')) return { rows: [{ has_vector: true }] };
       if (query.includes('information_schema.tables')) return { rows: [{ has_table: true }] };

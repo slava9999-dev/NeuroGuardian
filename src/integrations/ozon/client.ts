@@ -82,8 +82,8 @@ export class OzonClient {
       }),
     });
 
-    if (!response.ok) {
-      throw new Error(`Failed to get products: ${response.status}`);
+    if (!response || !response.ok) {
+      throw new Error(`Failed to get products: ${response?.status || 'Unknown error'}`);
     }
 
     const data = await response.json();
@@ -102,8 +102,8 @@ export class OzonClient {
       }),
     });
 
-    if (!response.ok) {
-      throw new Error(`Failed to get product info: ${response.status}`);
+    if (!response || !response.ok) {
+      throw new Error(`Failed to get product info: ${response?.status || 'Unknown error'}`);
     }
 
     const data = await response.json();
@@ -123,8 +123,8 @@ export class OzonClient {
       }),
     });
 
-    if (!response.ok) {
-      throw new Error(`Failed to get prices: ${response.status}`);
+    if (!response || !response.ok) {
+      throw new Error(`Failed to get prices: ${response?.status || 'Unknown error'}`);
     }
 
     const data = await response.json();
@@ -141,8 +141,8 @@ export class OzonClient {
       body: JSON.stringify({ prices: updates }),
     });
 
-    if (!response.ok) {
-      const error = await response.text();
+    if (!response || !response.ok) {
+      const error = response ? await response.text() : 'Network error (fetch returned undefined)';
       throw new Error(`Failed to update prices: ${error}`);
     }
 

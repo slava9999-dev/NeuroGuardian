@@ -139,7 +139,14 @@ export class SentinelAgent {
   /**
    * Check if our own price breached stop-loss due to MP discounts
    */
-  private async checkSelfProtection(product: any): Promise<CompetitorAlert | null> {
+  private async checkSelfProtection(product: {
+    id: number;
+    title: string;
+    marketplace: string;
+    product_id?: string;
+    nm_id?: number;
+    min_price: number;
+  }): Promise<CompetitorAlert | null> {
     const marketplace = (product.marketplace || 'WB').toUpperCase() as 'WB' | 'OZON';
     const id = marketplace === 'WB' ? product.nm_id || product.product_id : product.product_id;
 
