@@ -1,8 +1,36 @@
 # 📊 Project State — NeuroGUARDIAN
 
-Last Updated: 2026-01-29 (Session 108)
+Last Updated: 2026-01-29 (Session 109)
 
-### Session 2026-01-29 (Session 108 - Sentinel Real Prices & Vision Fixed) 🛡️👁️
+### Session 2026-01-29 (Session 109 - Telegram Smart Alert Buttons) 🛡️✅
+
+**Objective: Implement "Smart Pause" logic for Telegram alerts and enhance user interaction.**
+
+> ✅ **SMART PAUSE/RESUME:** Implemented "Понял, проверю" (Understood, check) button logic. Clicking it stops Sentinel monitoring for the product (`isMonitored = false`) and changes the button to "🛡️ Включить защиту" (Enable protection).
+> ✅ **ID MATCHING ROBUSTNESS:** Enhanced callback handling to match products by both `productId` and `nmId` using `or` logic, solving issues with marketplace-specific ID formats.
+> ✅ **SENTINEL DEDUPLICATION:** Re-integrated `ack_alert` with `sentinel_logs` (`ALERT_ACKNOWLEDGED` action). This satisfies the 24-hour suppression filter in `SentinelOrchestrator`, preventing duplicate alerts for acknowledged items.
+> ✅ **UI UNIFICATION:** Updated all Sentinel alerts (v2.2) to use the new smart toggle buttons consistently. Removed legacy "Ignore" button in favor of the active protection manager.
+> ✅ **API STABILITY:** Fixed syntax errors in `telegram.ts` and successfully verified the full loop through 490+ integration tests.
+
+**Completed Actions:**
+
+- [x] **Telegram Handlers**: `src/api-lib/handlers/telegram.ts` (Implemented `ack_alert`, `enable_protection`, and `editTelegramMessageReplyMarkup`).
+- [x] **Notification Templates**: `src/api-lib/services/notifications.ts` (Unified buttons across all alert types to use the smart acknowledgment flow).
+- [x] **Database Integration**: Used Drizzle ORM `or` and `and` for reliable product lookups.
+- [x] **Operations Logging**: Added `logSentinelAction` to the Telegram verification loop.
+- [x] **Deployment**: Pushed to `main` after passing Pre-Flight.
+
+**Key Insights:**
+
+```
+Giving users a clear feedback loop (button text change) builds trust. The "Smart Pause" functionality acts as a manual override that users can easily undo, reducing fear of technical errors.
+Syncing Telegram actions with Sentinel logs is critical; without it, the automated monitoring engine doesn't know the human has already "handled" the threat, leading to spam.
+```
+
+**Next Steps (P0):**
+
+1. Verify real-world button response time on mobile devices.
+2. Monitor `sentinel_logs` to ensure `ALERT_ACKNOWLEDGED` correctly suppresses alerts for 24h.
 
 **Objective: Fix "Digital Vision" buyer price extraction and ensure accurate price display in Sentinel alerts.**
 
