@@ -136,15 +136,16 @@ export class SentinelOrchestrator {
 
             let lastCount = -1;
             try {
-              if (lastReport.length > 0 && lastReport[0].details) {
+              const rows = lastReport as unknown as any[];
+              if (rows.length > 0 && rows[0].details) {
                 const details =
-                  typeof lastReport[0].details === 'string'
-                    ? JSON.parse(lastReport[0].details)
-                    : lastReport[0].details; // Drizzle might return object
+                  typeof rows[0].details === 'string'
+                    ? JSON.parse(rows[0].details)
+                    : rows[0].details; // Drizzle might return object
                 lastCount = details?.threatsDetected ?? -1;
               }
             } catch (e) {
-              logger.warn('Failed to parse last report stats, following safe path', e);
+              logger.warn('Failed to parse last report stats, following safe path', { error: e });
             }
 
             if (userResult.threatsDetected !== lastCount || options.sendPriceReport) {
@@ -570,7 +571,7 @@ export class SentinelOrchestrator {
                   LIMIT 1
                 `);
 
-                if (ackCheck.length > 0) {
+                if ((ackCheck as unknown as any[]).length > 0) {
                   logger.debug(
                     `[Sentinel] Skipping alert for ${product.product_id} - already acknowledged in last 6h`
                   );
