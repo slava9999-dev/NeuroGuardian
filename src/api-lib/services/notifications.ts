@@ -288,11 +288,12 @@ function getAlertButtons(alert: Alert): Record<string, unknown> | undefined {
     const { externalId, marketplace } = alert.product;
     const mpLower = marketplace.toLowerCase().includes('ozon') ? 'ozon' : 'wb';
 
-    // Ссылка на товар
+    // Ссылка на товар (очищаем ID от префиксов для корректной ссылки)
+    const cleanId = externalId.replace(/^(wb-|ozon-)/, '');
     const productUrl =
       mpLower === 'wb'
-        ? `https://www.wildberries.ru/catalog/${externalId}/detail.aspx`
-        : `https://www.ozon.ru/product/${externalId}`;
+        ? `https://www.wildberries.ru/catalog/${cleanId}/detail.aspx`
+        : `https://www.ozon.ru/product/${cleanId}`;
 
     // Первый ряд: ссылки на товар
     buttons.push([
@@ -581,6 +582,7 @@ function formatAlert(alert: Alert, smartMessage?: string | null): string {
       ``,
       `━━━━━━━━━━━━━━━━━━━━`,
       `💡 *РЕКОМЕНДАЦИЯ:* Проверьте себестоимость и комиссии. Срочно поднимите цену.`,
+      `_ver: 2.2_`,
     ].join('\n');
   }
 
@@ -642,6 +644,7 @@ function formatAlert(alert: Alert, smartMessage?: string | null): string {
       ``,
       `━━━━━━━━━━━━━━━━━━━━`,
       `💡 *РЕКОМЕНДАЦИЯ:* Срочно поднимите цену или выйдите из акции, чтобы остановить убытки.`,
+      `_ver: 2.2_`,
     ].join('\n');
   }
 
@@ -690,6 +693,7 @@ function formatAlert(alert: Alert, smartMessage?: string | null): string {
       ``,
       `━━━━━━━━━━━━━━━━━━━━`,
       `💡 *РЕКОМЕНДАЦИЯ:* Срочно поднимите цену или выйдите из акции, чтобы остановить убытки.`,
+      `_ver: 2.2_`,
     ].join('\n');
   }
 

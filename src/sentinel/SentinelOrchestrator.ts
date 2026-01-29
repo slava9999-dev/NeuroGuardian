@@ -580,16 +580,21 @@ export class SentinelOrchestrator {
               for (const threat of finalThreats) {
                 // CORRECT ID LOGIC: Match AlertSender's logic strictly
                 const externalId =
-                  marketplace === 'WB' ? String(product.nm_id) : product.product_id;
+                  marketplace === 'WB'
+                    ? product.nm_id
+                      ? String(product.nm_id)
+                      : product.product_id
+                    : product.product_id;
 
-                // DEDUPLICATION: Check specific threat type within last 24h
+                // DEDUPLICATION: Check if we already alerted about this specific threat for this product in last 24h
+                // We check sentinel_logs because that's where logSentinelAction writes to.
                 const ackCheck = await db.execute(drizzleSql`
-                  SELECT 1 FROM ops_events 
+                  SELECT id FROM sentinel_logs 
                   WHERE user_id = ${user.id} 
-                    AND external_id = ${externalId}
+                    AND product_id = ${externalId}
                     AND (
-                      event_type = 'alert_acknowledged' 
-                      OR (event_type = 'sentinel_alert' AND details->>'threatType' = ${threat.type})
+                      threat_type = ${threat.type} 
+                      OR defense_action = 'ALERT_ACKNOWLEDGED'
                     )
                     AND created_at > NOW() - INTERVAL '24 hours'
                   LIMIT 1
@@ -597,7 +602,7 @@ export class SentinelOrchestrator {
 
                 if ((ackCheck as unknown as any[]).length > 0) {
                   logger.debug(
-                    `[Sentinel] Skipping alert for ${externalId} (${threat.type}) - already sent/acked in last 24h`
+                    `[Sentinel] Skipping alert for ${externalId} (${threat.type}) - already logged in last 24h`
                   );
                   continue;
                 }
@@ -616,13 +621,18 @@ export class SentinelOrchestrator {
                   product_title: product.title,
                   detected_price: livePrice,
                   min_price: product.min_price || 0,
-                  defense_action: 'ALERT_SENT',
+                  defense_action: 'SENTINEL_ALERT',
                   saved_amount: 0,
                   marketplace,
                   threat_type: threat.type,
                   success: true,
-                  details: { threat },
-                });
+                  details: {
+                    threatType: threat.type,
+                    buyerPrice: (threat.data as any)?.buyerPrice,
+                    profit: (threat.data as any)?.profit,
+                    margin: (threat.data as any)?.margin,
+                  },
+                }).catch(err => logger.error('Failed to log sentinel action:', err));
               }
 
               const stopLossThreat = scan.threats.find(
