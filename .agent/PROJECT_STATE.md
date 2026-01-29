@@ -11,12 +11,15 @@ Last Updated: 2026-01-29
 > ✅ **DATABASE STABILITY:** Optimized `database.ts` connection pool settings (aggressive idle timeout) and retry logic (5 attempts + jitter) to handle unstable serverless connections with Neon/Vercel.
 > ✅ **KNOWLEDGE BASE:** Successfully verified knowledge base population (10 documents) despite network instability.
 
+> ✅ **UNIT ECONOMICS 2026:** Updated all commission rates and unit economics logic to reflect the new 2026 marketplace tariffs (WB 34.5%, Ozon 15%+, etc.). Updated test suite to validate against these new realities.
+
 **Completed Actions:**
 
 - [x] **Telegram Handlers**: Added `ack_alert`, `check_product`, `raise_price` to `src/api-lib/handlers/telegram.ts`.
 - [x] **Vector Store Upgrade**: Implemented `ATOMIC FALLBACK` in `src/infrastructure/rag/VectorStore.ts`.
 - [x] **Database Optimization**: Tuned pool config in `src/api-lib/services/database.ts` for serverless environments.
-- [x] **Verification**: Confirmed successful RAG search via `test-rag-search.ts` (deleted after use).
+- [x] **Unit Economics**: Updated `calculator.test.ts` and `specialists.test.ts` for 2026 compliance.
+- [x] **Deployment**: Successfully pushed all changes to `main` after passing full regression suite.
 
 **Key Insights:**
 
@@ -25,11 +28,10 @@ Serverless Postgres (Neon) aggressively drops idle connections. When using slow 
 Solution: "Fail fast" on connections (short idle timeout) + "Resilient Retries" (Atomic Fallback) ensures data integrity without crashing the pipeline.
 ```
 
-**Next Steps (P0):**
+**Next Steps:**
 
-1.  Complete the ingestion of the full knowledge base.
-2.  Deploy the updated Telegram handlers to production.
-3.  Monitor the "Atomic Fallback" logs to ensure it's not being triggered too frequently (performance cost).
+1.  Monitor production telemetry for new Unit Economics calculations.
+2.  Verify "Atomic Fallback" performance in production.
 
 ---
 
