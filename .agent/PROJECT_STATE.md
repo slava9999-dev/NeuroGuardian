@@ -1,8 +1,24 @@
 # 📊 Project State — NeuroGUARDIAN
 
-Last Updated: 2026-01-29 (Session 107)
+Last Updated: 2026-01-29 (Session 108)
 
-### Session 2026-01-29 (Session 107 - Sentinel Hardening & SQL Fixes) 🛡️🚀
+### Session 2026-01-29 (Session 108 - Sentinel Real Prices & Vision Fixed) 🛡️👁️
+
+**Objective: Fix "Digital Vision" buyer price extraction and ensure accurate price display in Sentinel alerts.**
+
+> ✅ **VISION RECOVERY:** Fixed "Digital Vision" extraction for WB and Ozon. Now captures "WB Wallet" prices and handles complex currency formatting (NBSP, ₽ symbols).
+> ✅ **ID MAPPING STABILITY:** Standardized technical ID mapping to strings across `PriceMonitor` and `SentinelOrchestrator`, fixing Ozon price lookups.
+> ✅ **ACCURATE ALERTS:** Fixed `margin_warning` template to display the real **Showcase (MP)** price instead of the seller price.
+> ✅ **HIGH-FREQUENCY SYNC:** Implemented `last_vision_sync` tracking. Real buyer prices now refresh every **1 hour** to catch aggressive marketplace promos.
+> ✅ **ENGINE OPTIMIZATION:** Streamlined `PriceParserService` to prevent redundant browser/API calls during Sentinel cycles.
+
+**Completed Actions:**
+
+- [x] **BrowserEyes**: Updated selectors (`.price-block__wallet-price`) and wait strategies (`waitUntil: load`).
+- [x] **PriceMonitor**: Converged all internal maps to `Map<string, number>` for key consistency.
+- [x] **ThreatDetector**: Ensured `livePrice` and `buyerPrice` are passed correctly to alert payloads.
+- [x] **Database**: Added `last_vision_sync` column to `products` table via migration.
+- [x] **Typecheck**: Resolved all syntax errors and linting warnings in `PriceParserService`.
 
 **Objective: Fix critical deduplication logic, correct Ozon/WB ID mapping, and unify alert formatting to premium style (v2.2).**
 
