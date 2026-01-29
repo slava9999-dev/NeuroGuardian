@@ -279,6 +279,12 @@ export class SentinelOrchestrator {
     userResult?: UserCycleResult,
     options: { limit?: number; skipDigitalVision?: boolean; sendPriceReport?: boolean } = {}
   ): Promise<void> {
+    // MASTER SWITCH: If user explicitly disabled protection, skip monitoring entirely to stop spam
+    if (user.protection_enabled === false) {
+      logger.info(`[Sentinel] Skipping User ${user.id} - Protection is globally DISABLED`);
+      return;
+    }
+
     const monitoredProducts = await db
       .select({ id: products.id })
       .from(products)
@@ -286,7 +292,7 @@ export class SentinelOrchestrator {
       .where(
         and(
           eq(products.userId, String(user.id)),
-          drizzleSql`(${products.isMonitored} = true OR ${products.minPrice} > 0)`,
+          eq(products.isMonitored, true), // STRICT: only monitor what is explicitly enabled
           drizzleSql`(${products.accountId} IS NULL OR ${marketplaceAccounts.isActive} = true)`
         )
       )

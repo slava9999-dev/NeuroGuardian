@@ -3,7 +3,7 @@
 // Global test configuration
 // ============================================
 
-import { vi } from 'vitest';
+import { vi, beforeEach } from 'vitest';
 
 // Mock environment variables for tests
 process.env.POSTGRES_URL = 'postgresql://localhost:5432/test';
@@ -17,8 +17,17 @@ process.env.CRON_SECRET = 'test-cron-secret-16+';
 process.env.OPENAI_API_KEY = 'test-openai-key';
 process.env.VITE_DEV_MODE = 'true';
 
-// Mock fetch globally
-vi.stubGlobal('fetch', vi.fn());
+// Mock fetch globally with a safe default
+vi.stubGlobal(
+  'fetch',
+  vi.fn().mockResolvedValue({
+    ok: true,
+    status: 200,
+    json: async () => ({}),
+    text: async () => '',
+    blob: async () => new Blob(),
+  })
+);
 
 // Reset mocks between tests
 beforeEach(() => {

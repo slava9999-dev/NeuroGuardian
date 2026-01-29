@@ -208,13 +208,15 @@ function getAlertButtons(alert: Alert): Record<string, unknown> | undefined {
     const mpLower = marketplace.toLowerCase().includes('ozon') ? 'ozon' : 'wb';
     const cleanId = externalId.replace(/^(wb-|ozon-)/, '');
 
-    // Only show link to product on marketplace
-    const link =
+    const productUrl =
       mpLower === 'wb'
         ? `https://www.wildberries.ru/catalog/${cleanId}/detail.aspx`
         : `https://www.ozon.ru/product/${cleanId}`;
 
-    buttons.push([{ text: '🔗 Открыть товар на маркетплейсе', url: link }]);
+    buttons.push([
+      { text: '🔗 Открыть товар', url: productUrl },
+      { text: '📊 Проверить карточку', callback_data: `check_product:${externalId}` },
+    ]);
   }
 
   // Defense Confirmation - Manual approval required
@@ -233,7 +235,10 @@ function getAlertButtons(alert: Alert): Record<string, unknown> | undefined {
         : `https://www.ozon.ru/product/${cleanId}`;
 
     // First row: Open product
-    buttons.push([{ text: '🔗 Открыть товар', url: productUrl }]);
+    buttons.push([
+      { text: '🔗 Открыть товар', url: productUrl },
+      { text: '📊 Проверить карточку', callback_data: `check_product:${externalId}` },
+    ]);
 
     // Second row: Actions
     buttons.push([
@@ -259,7 +264,10 @@ function getAlertButtons(alert: Alert): Record<string, unknown> | undefined {
         ? `https://www.wildberries.ru/catalog/${cleanId}/detail.aspx`
         : `https://www.ozon.ru/product/${cleanId}`;
 
-    buttons.push([{ text: '🔗 Открыть товар', url: productUrl }]);
+    buttons.push([
+      { text: '🔗 Открыть товар', url: productUrl },
+      { text: '📊 Проверить карточку', callback_data: `check_product:${externalId}` },
+    ]);
 
     buttons.push([
       {
@@ -294,10 +302,6 @@ function getAlertButtons(alert: Alert): Record<string, unknown> | undefined {
     ]);
   }
 
-  // ═══════════════════════════════════════════════════
-  // 🚨 PROMO & STOPLOSS VIOLATION ALERTS
-  // Кнопки для быстрых действий
-  // ═══════════════════════════════════════════════════
   // ═══════════════════════════════════════════════════
   // 🚨 PROMO & STOPLOSS VIOLATION ALERTS + MARGIN WARNING + STOCK & COMPETITOR
   // Кнопки для быстрых действий

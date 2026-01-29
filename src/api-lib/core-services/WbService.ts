@@ -68,6 +68,8 @@ export class WbService {
       current_price: priceMap.get(card.nmID) || 0,
       current_stock: stockMap.get(card.nmID) || 0,
       marketplace: 'WB' as const,
+      barcode: card.sizes?.[0]?.skus?.[0],
+      official_sku: card.vendorCode,
       width_cm: card.dimensions?.width,
       height_cm: card.dimensions?.height,
       depth_cm: card.dimensions?.length,

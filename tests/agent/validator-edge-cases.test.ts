@@ -28,6 +28,16 @@ vi.mock('../../src/api-lib/lib/logger.js', () => ({
   },
 }));
 
+// Mock llmRouter to avoid real API calls during tests
+vi.mock('../../src/infrastructure/llm/LLMRouter.js', () => ({
+  llmRouter: {
+    complete: vi.fn().mockResolvedValue({
+      content: '[]', // Default empty JSON for self-audit
+      usage: { totalTokens: 0 },
+    }),
+  },
+}));
+
 describe('ResponseValidator Edge Cases', () => {
   let validator: ResponseValidator;
   let baseContext: ValidationContext;

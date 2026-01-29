@@ -1,4 +1,5 @@
 import { RateLimiter } from '@/lib/rateLimiter';
+import { fetchWithRetry } from '@/api-lib/lib/index.js';
 
 interface OzonConfig {
   clientId: string;
@@ -73,12 +74,13 @@ export class OzonClient {
     if (!this.config.apiKey) return [];
     await this.rateLimiter.acquire();
 
-    const response = await fetch(`${this.config.baseUrl}/v2/product/list`, {
+    const response = await fetchWithRetry(`${this.config.baseUrl}/v3/product/list`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify({
-        page,
-        page_size: pageSize,
+        filter: { visibility: 'ALL' },
+        last_id: '',
+        limit: pageSize,
       }),
     });
 
@@ -87,14 +89,14 @@ export class OzonClient {
     }
 
     const data = await response.json();
-    return data.result.items || [];
+    return data.result?.items || data.items || [];
   }
 
   async getProductInfo(productIds: number[]): Promise<OzonProductInfo[]> {
     if (productIds.length === 0 || !this.config.apiKey) return [];
     await this.rateLimiter.acquire();
 
-    const response = await fetch(`${this.config.baseUrl}/v2/product/info/list`, {
+    const response = await fetchWithRetry(`${this.config.baseUrl}/v3/product/info/list`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify({
@@ -107,14 +109,14 @@ export class OzonClient {
     }
 
     const data = await response.json();
-    return data.result.items || [];
+    return data.result?.items || data.items || [];
   }
 
   async getPrices(productIds: number[]): Promise<OzonPrice[]> {
     if (productIds.length === 0 || !this.config.apiKey) return [];
     await this.rateLimiter.acquire();
 
-    const response = await fetch(`${this.config.baseUrl}/v4/product/info/prices`, {
+    const response = await fetchWithRetry(`${this.config.baseUrl}/v4/product/info/prices`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify({
@@ -128,14 +130,14 @@ export class OzonClient {
     }
 
     const data = await response.json();
-    return data.result.items || [];
+    return data.result?.items || data.items || [];
   }
 
   async updatePrices(updates: OzonPriceUpdate[]): Promise<Record<string, unknown>> {
     if (!this.config.apiKey) return {};
     await this.rateLimiter.acquire();
 
-    const response = await fetch(`${this.config.baseUrl}/v1/product/import/prices`, {
+    const response = await fetchWithRetry(`${this.config.baseUrl}/v1/product/import/prices`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify({ prices: updates }),

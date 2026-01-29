@@ -130,7 +130,9 @@ export class ProductRepository {
           spp_buffer_percent = COALESCE(products.spp_buffer_percent, EXCLUDED.spp_buffer_percent),
           -- Keep existing monitoring settings if already set
           is_monitored = COALESCE(products.is_monitored, EXCLUDED.is_monitored),
-          barcode = COALESCE(products.barcode, EXCLUDED.barcode),
+          barcode = COALESCE(CASE WHEN EXCLUDED.barcode IS NOT NULL THEN EXCLUDED.barcode ELSE products.barcode END, products.barcode),
+          official_sku = COALESCE(CASE WHEN EXCLUDED.official_sku IS NOT NULL THEN EXCLUDED.official_sku ELSE products.official_sku END, products.official_sku),
+          offer_id = COALESCE(CASE WHEN EXCLUDED.offer_id IS NOT NULL THEN EXCLUDED.offer_id ELSE products.offer_id END, products.offer_id),
           min_margin = COALESCE(products.min_margin, EXCLUDED.min_margin),
           updated_at = NOW()
       `;

@@ -508,7 +508,20 @@ ${protectionOn ? '🛡️' : '⚠️'} Защита цен: ${protectionOn ? 'В
 ${!isActive ? '\n💡 Оформите подписку для продолжения работы!' : ''}
 `;
 
-    await sendTelegramMessage(chatId, statusMessage, { parseMode: 'HTML' });
+    await sendTelegramMessage(chatId, statusMessage, {
+      parseMode: 'HTML',
+      replyMarkup: {
+        inline_keyboard: [
+          [
+            {
+              text: protectionOn ? '🛑 Остановить всю защиту' : '🛡️ Включить защиту',
+              callback_data: protectionOn ? 'user_stop_all' : 'user_start_all',
+            },
+          ],
+          [{ text: '🔄 Обновить информацию', callback_data: 'status' }],
+        ],
+      },
+    });
   } catch (error) {
     logger.error('Failed to get user status', error);
     await sendTelegramMessage(chatId, '❌ Ошибка получения статуса. Попробуйте позже.');
@@ -1040,7 +1053,53 @@ async function handleCallbackQuery(query: TelegramCallbackQuery): Promise<void> 
     return;
   }
 
+  // --- USER PROTECTION CONTROL ---
+  if (data === 'user_stop_all' || data === 'user_start_all') {
+    const enable = data === 'user_start_all';
+    const userId = query.from.id;
+
+    await db
+      .update(users)
+      .set({ protectionEnabled: enable, updatedAt: new Date() })
+      .where(eq(users.id, String(userId)));
+
+    await handleStatusCommand(chatId, userId);
+    await answerCallbackQuery(query.id, enable ? '🛡️ Защита включена' : '🛑 Защита остановлена');
+    return;
+  }
+
   // --- SENTINEL ADMIN ACTIONS ---
+
+  if (data === 'sentinel_stop' || data === 'sentinel_start') {
+    if (String(query.from.id) !== String(config.ADMIN_TELEGRAM_ID)) {
+      await answerCallbackQuery(query.id, '⛔ Нет прав');
+      return;
+    }
+
+    const enable = data === 'sentinel_stop';
+
+    await db
+      .insert(systemFlags)
+      .values({
+        key: 'sentinel_emergency_stop',
+        valueBool: enable,
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: systemFlags.key,
+        set: { valueBool: enable, updatedAt: new Date() },
+      });
+
+    await handleSentinelDashboard(chatId);
+    await answerCallbackQuery(query.id, enable ? '🔴 Sentinel Остановлен' : '🟢 Sentinel Запущен');
+    return;
+  }
+
+  if (data === 'refresh_sentinel') {
+    await handleSentinelDashboard(chatId);
+    await answerCallbackQuery(query.id, '🔄 Обновлено');
+    return;
+  }
 }
 
 // ============================================

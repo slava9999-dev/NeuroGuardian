@@ -24,11 +24,14 @@ Last Updated: 2026-01-29 (Session 110)
   - Implemented proactive input handling.
   - **Brain v2:** Orchestration updated to ground the Answerer turn in full context.
 - [x] `src/api-lib/services/unit-economics.ts`: Verified high-precision 2026 rules (Ozon Card, logistics hikes, acceptance fees).
-- [x] **Telegram Product Links**: Fixed broken links and robust marketplace detection in `src/api-lib/services/notifications.ts`.
-- [x] **Ozon Sync Restoration**: Added `offer_id`, `sku`, and `barcode` to `src/api-lib/core-services/OzonService.ts` for reliable defense actions.
+- [x] **Telegram Product Links**: Standardized buttons to "Open Product" and "Check Card" across all alerts (Price Protection, Sentinel, Stock, Competitor).
+- [x] **Marketplace API Resilience**: Integrated `fetchWithRetry` and modern endpoints (Ozon v3, WB discounts-prices) in integration clients.
+- [x] **Data Synchronization**: Added `barcode`, `official_sku`, and `offer_id` persistence for robust product identification.
+- [x] **Test Stability**: Fixed integration tests for Ozon/WB and mocked LLM in unit tests.
 
 **Next Steps:**
 
+- [ ] Implement new "Stitch & Flash" design vision according to `.agent/DESIGN_SPEC_STITCH.md`.
 - [ ] Test the "Multi-Fact" extraction with a list of 5+ products.
 - [ ] Verify that `awaiting_input` correctly clears after the planner successfully extracts the value from a sentence.
 

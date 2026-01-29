@@ -1,4 +1,5 @@
 import { RateLimiter } from '@/lib/rateLimiter';
+import { fetchWithRetry } from '@/api-lib/lib/index.js';
 
 interface WBConfig {
   apiKey: string;
@@ -24,7 +25,7 @@ export class WildberriesClient {
   constructor() {
     this.config = {
       apiKey: this.requireEnv('WB_API_KEY'),
-      baseUrl: process.env.WB_API_URL || 'https://suppliers-api.wildberries.ru',
+      baseUrl: process.env.WB_API_URL || 'https://content-api.wildberries.ru',
     };
 
     // WB limits: ~100 requests per minute
@@ -47,71 +48,22 @@ export class WildberriesClient {
     return value;
   }
 
-  /**
-   * Universal fetch with retries for 429 (Rate Limit) and 5xx errors
-   */
-  private async fetchWithRetry(
-    url: string,
-    options: RequestInit,
-    retries = 3,
-    backoff = 2000
-  ): Promise<Response> {
-    try {
-      await this.rateLimiter.acquire();
-      const response = await fetch(url, options);
-
-      if (response?.status === 429 && retries > 0) {
-        const retryAfter = response.headers.get('Retry-After');
-        const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : backoff;
-
-        console.warn(`[WildberriesClient] 429 Rate Limit hit. Retrying in ${waitTime}ms...`, {
-          url,
-          retriesRemaining: retries,
-        });
-
-        await new Promise(resolve => setTimeout(resolve, waitTime));
-        return this.fetchWithRetry(url, options, retries - 1, backoff * 2);
-      }
-
-      if (response?.status && response.status >= 500 && retries > 0) {
-        console.warn(`[WildberriesClient] ${response.status} Server Error. Retrying...`, {
-          url,
-          retriesRemaining: retries,
-        });
-        await new Promise(resolve => setTimeout(resolve, backoff));
-        return this.fetchWithRetry(url, options, retries - 1, backoff * 2);
-      }
-
-      return response;
-    } catch (error) {
-      if (retries > 0) {
-        console.warn('[WildberriesClient] Network error, retrying...', { error: String(error) });
-        await new Promise(resolve => setTimeout(resolve, backoff));
-        return this.fetchWithRetry(url, options, retries - 1, backoff * 2);
-      }
-      throw error;
-    }
-  }
-
   async getProducts(): Promise<WBProduct[]> {
     if (!this.config.apiKey) return [];
     try {
-      const response = await this.fetchWithRetry(
-        `${this.config.baseUrl}/content/v2/get/cards/list`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: this.config.apiKey,
-            'Content-Type': 'application/json',
+      const response = await fetchWithRetry(`${this.config.baseUrl}/content/v2/get/cards/list`, {
+        method: 'POST',
+        headers: {
+          Authorization: this.config.apiKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          settings: {
+            cursor: { limit: 100 },
+            filter: { withPhoto: -1 },
           },
-          body: JSON.stringify({
-            settings: {
-              cursor: { limit: 100 },
-              filter: { withPhoto: -1 },
-            },
-          }),
-        }
-      );
+        }),
+      });
 
       if (!response || !response.ok) {
         throw new Error(`Failed to get products: ${response?.status || 'Unknown error'}`);
@@ -127,7 +79,14 @@ export class WildberriesClient {
 
   async getPrices(): Promise<WBPrice[]> {
     if (!this.config.apiKey) return [];
-    const response = await this.fetchWithRetry(`${this.config.baseUrl}/public/api/v1/info`, {
+    // Modern Prices API - Requires limit/offset for v2
+    const baseUrl = 'https://discounts-prices-api.wildberries.ru';
+    const url = new URL(`${baseUrl}/api/v2/list/goods/filter`);
+    url.searchParams.set('limit', '1000');
+    url.searchParams.set('offset', '0');
+
+    const response = await fetchWithRetry(url.toString(), {
+      method: 'GET',
       headers: { Authorization: this.config.apiKey },
     });
 
@@ -135,18 +94,26 @@ export class WildberriesClient {
       throw new Error(`Failed to get prices: ${response?.status || 'Unknown error'}`);
     }
 
-    return response.json();
+    const data = await response.json();
+    const goods = (data.data?.listGoods || []) as Array<{ nmID: number; price: number }>;
+    return goods.map(g => ({
+      nmId: g.nmID,
+      price: g.price,
+    }));
   }
 
   async updatePrice(nmId: number, price: number): Promise<boolean> {
     if (!this.config.apiKey) return false;
-    const response = await this.fetchWithRetry(`${this.config.baseUrl}/public/api/v1/prices`, {
+    const baseUrl = 'https://discounts-prices-api.wildberries.ru';
+    const response = await fetchWithRetry(`${baseUrl}/api/v2/upload/task`, {
       method: 'POST',
       headers: {
         Authorization: this.config.apiKey,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify([{ nmId, price }]),
+      body: JSON.stringify({
+        data: [{ nmID: nmId, price, discount: 0 }],
+      }),
     });
 
     if (!response || !response.ok) {
@@ -163,7 +130,7 @@ export class WildberriesClient {
 
     for (const nmId of nmIds) {
       try {
-        const response = await this.fetchWithRetry(
+        const response = await fetchWithRetry(
           `https://card.wb.ru/cards/v1/detail?appType=1&curr=rub&nm=${nmId}`,
           {}
         );
