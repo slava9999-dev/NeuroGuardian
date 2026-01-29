@@ -1,36 +1,40 @@
 # 📊 Project State — NeuroGUARDIAN
 
-Last Updated: 2026-01-29
+Last Updated: 2026-01-29 (Session 107)
 
-### Session 2026-01-29 (Session 106 - Sentinel Alert Fixes & Spam Reduction) 🛡️🚨
+### Session 2026-01-29 (Session 107 - Sentinel Hardening & SQL Fixes) 🛡️🚀
 
-**Objective: Resolve critical issues with Sentinel alerts (ugly templates, lost financial data, spamming user) and harden the Agent code.**
+**Objective: Fix critical deduplication logic, correct Ozon/WB ID mapping, and unify alert formatting to premium style (v2.2).**
 
-> ✅ **PREMIUM ALERTS:** Designed and implemented "Critical Profit Threat" alerts for `margin_warning`, `defense_confirmation`.
-> ✅ **SPAM PREVENTION:** Implemented robust deduplication (24h cooldown) based on `sentinel_alert` events, preventing alert flooding.
-> ✅ **DATA INTEGRITY:** Fixed data loss flow in `AlertSender.ts` to ensuring `profit` and `margin` reach the notification template.
-> ✅ **STABILITY:** Added JSON parsing protection to `SentinelOrchestrator` to prevent crashes on malformed logs.
-> ✅ **TESTS:** Updated Unit Tests (`specialists.test.ts`) to reflect accurate toolsets.
+> ✅ **DEDUPLICATION FIX:** Corrected SQL syntax in `SentinelOrchestrator.ts` to use `sentinel_logs` table and proper `threat_type` + `product_id` filtering. Resolved alert spam issue.
+> ✅ **ID MAPPING:** Fixed external ID logic specifically for Ozon (product_id vs ozon- prefix) to ensure consistent tracking.
+> ✅ **PREMIUM ALERTS v2.2:** Implemented unified premium formatting for all threat types with `ver: 2.2` tag.
+> ✅ **PRODUCT LINKS:** Stripped technical prefixes (`ozon-`, `wb-`) from marketplace URLs in Telegram buttons, ensuring users can open cards with one tap.
+> ✅ **DATA INTEGRITY:** Fixed payload mapping in `logSentinelAction` to preserve `profit` and `margin` data for history logs.
 
 **Completed Actions:**
 
-- [x] **Templates:** `src/api-lib/services/notifications.ts` (Margin Warning & Defense Confirmation premium templates).
-- [x] **Data Flow:** `src/sentinel/AlertSender.ts` (Mapped profit/margin from threat detector).
-- [x] **Spam Logic:** `src/sentinel/SentinelOrchestrator.ts` (24h deduplication logic).
-- [x] **Safety:** `src/sentinel/SentinelOrchestrator.ts` (JSON.parse try-catch).
-- [x] **Cleanup:** Removed temporary diagnostic scripts.
+- [x] **Deduplication:** `src/sentinel/SentinelOrchestrator.ts` (Fixed table names, SQL syntax, and cooling period).
+- [x] **ID Logic:** `src/sentinel/SentinelOrchestrator.ts` (Refined WB nm_id vs Ozon product_id mapping).
+- [x] **Templates:** `src/api-lib/services/notifications.ts` (Added versioning, fixed links, ensured buttons for `margin_warning`).
+- [x] **Verification:** Confirmed "Digital Vision" flow via `BrowserEyes` successfully extracts buyer prices.
+- [x] **Deployment:** Pushed to `main` after passing 490+ tests.
 
 **Key Insights:**
 
 ```
-Users perceive value through clarity. Replacing "Margin: 0%" with "Loss: -1641₽" transforms a confusing bug into a valuable financial insight.
-Silence is golden. Deduplicating alerts isn't just UX; it's essential for preventing "Notification Fatigue" where users ignore critical warnings.
+Correct SQL queries and proper product ID mapping are the backbone of a reliable sentinel; without them, the "eyes" fail and the user is flooded with noise.
+Version tagging in alerts (ver: 2.2) is a simple but effective dev tool for confirming deployment in a fast-moving CI/CD environment.
 ```
 
 **Next Steps (P0):**
 
-1. Monitor production logs for the new "Critical Profit Threat" alerts.
-2. Confirm user feedback on the new format.
+1. Monitor live alerts in Telegram to ensure deduplication holds for 24h.
+2. Confirm links open correctly on mobile devices.
+
+---
+
+### Session 2026-01-29 (Session 106 - Sentinel Alert Fixes & Spam Reduction) 🛡️🚨
 
 ---
 
