@@ -275,7 +275,16 @@ function getAlertButtons(alert: Alert): Record<string, unknown> | undefined {
   // 🚨 PROMO & STOPLOSS VIOLATION ALERTS
   // Кнопки для быстрых действий
   // ═══════════════════════════════════════════════════
-  if ((alert.type === 'promo_violation' || alert.type === 'stoploss_breach') && alert.product) {
+  // ═══════════════════════════════════════════════════
+  // 🚨 PROMO & STOPLOSS VIOLATION ALERTS + MARGIN WARNING
+  // Кнопки для быстрых действий
+  // ═══════════════════════════════════════════════════
+  if (
+    (alert.type === 'promo_violation' ||
+      alert.type === 'stoploss_breach' ||
+      alert.type === 'margin_warning') &&
+    alert.product
+  ) {
     const { externalId, marketplace } = alert.product;
     const mpLower = marketplace.toLowerCase().includes('ozon') ? 'ozon' : 'wb';
 
