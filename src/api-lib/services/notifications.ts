@@ -225,7 +225,17 @@ function getAlertButtons(alert: Alert): Record<string, unknown> | undefined {
     // Use existing handler in telegram.ts: apply_price:marketplace:id:price
     // Marketplace should be short/lowercase (wb/ozon)
     const mp = marketplace.toLowerCase().includes('ozon') ? 'ozon' : 'wb';
+    const cleanId = externalId.replace(/^(wb-|ozon-)/, '');
 
+    const productUrl =
+      mp === 'wb'
+        ? `https://www.wildberries.ru/catalog/${cleanId}/detail.aspx`
+        : `https://www.ozon.ru/product/${cleanId}`;
+
+    // First row: Open product
+    buttons.push([{ text: '🔗 Открыть товар', url: productUrl }]);
+
+    // Second row: Actions
     buttons.push([
       {
         text: `✅ Подтвердить защиту (${price}₽)`,
@@ -240,14 +250,25 @@ function getAlertButtons(alert: Alert): Record<string, unknown> | undefined {
 
   // Sentinel Alerts
   if (alert.type === 'sentinel_alert' && alert.product) {
+    const { externalId, marketplace } = alert.product;
+    const mp = marketplace.toLowerCase().includes('ozon') ? 'ozon' : 'wb';
+    const cleanId = externalId.replace(/^(wb-|ozon-)/, '');
+
+    const productUrl =
+      mp === 'wb'
+        ? `https://www.wildberries.ru/catalog/${cleanId}/detail.aspx`
+        : `https://www.ozon.ru/product/${cleanId}`;
+
+    buttons.push([{ text: '🔗 Открыть товар', url: productUrl }]);
+
     buttons.push([
       {
         text: '🛡️ Настроить защиту',
-        callback_data: `check_protection:${alert.product.externalId}`,
+        callback_data: `check_protection:${externalId}`,
       },
       {
         text: `✅ Понял, проверю`,
-        callback_data: `ack_alert:${alert.product.externalId}`,
+        callback_data: `ack_alert:${externalId}`,
       },
     ]);
   }
