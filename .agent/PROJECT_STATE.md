@@ -2,6 +2,38 @@
 
 Last Updated: 2026-01-29
 
+### Session 2026-01-29 (Session 106 - Sentinel Alert Fixes & Spam Reduction) 🛡️🚨
+
+**Objective: Resolve critical issues with Sentinel alerts (ugly templates, lost financial data, spamming user) and harden the Agent code.**
+
+> ✅ **PREMIUM ALERTS:** Designed and implemented "Critical Profit Threat" alerts for `margin_warning`, `defense_confirmation`.
+> ✅ **SPAM PREVENTION:** Implemented robust deduplication (24h cooldown) based on `sentinel_alert` events, preventing alert flooding.
+> ✅ **DATA INTEGRITY:** Fixed data loss flow in `AlertSender.ts` to ensuring `profit` and `margin` reach the notification template.
+> ✅ **STABILITY:** Added JSON parsing protection to `SentinelOrchestrator` to prevent crashes on malformed logs.
+> ✅ **TESTS:** Updated Unit Tests (`specialists.test.ts`) to reflect accurate toolsets.
+
+**Completed Actions:**
+
+- [x] **Templates:** `src/api-lib/services/notifications.ts` (Margin Warning & Defense Confirmation premium templates).
+- [x] **Data Flow:** `src/sentinel/AlertSender.ts` (Mapped profit/margin from threat detector).
+- [x] **Spam Logic:** `src/sentinel/SentinelOrchestrator.ts` (24h deduplication logic).
+- [x] **Safety:** `src/sentinel/SentinelOrchestrator.ts` (JSON.parse try-catch).
+- [x] **Cleanup:** Removed temporary diagnostic scripts.
+
+**Key Insights:**
+
+```
+Users perceive value through clarity. Replacing "Margin: 0%" with "Loss: -1641₽" transforms a confusing bug into a valuable financial insight.
+Silence is golden. Deduplicating alerts isn't just UX; it's essential for preventing "Notification Fatigue" where users ignore critical warnings.
+```
+
+**Next Steps (P0):**
+
+1. Monitor production logs for the new "Critical Profit Threat" alerts.
+2. Confirm user feedback on the new format.
+
+---
+
 ### Session 2026-01-29 (Session 105 - Agentic Skills Diagnostics & Key Integration) 🛡️🔑
 
 **Objective: Standardize Agentic Skills infrastructure, verify credentials, and prepare for automated defense cycles.**
