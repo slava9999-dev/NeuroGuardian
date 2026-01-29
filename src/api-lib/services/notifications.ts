@@ -549,6 +549,7 @@ function formatAlert(alert: Alert, smartMessage?: string | null): string {
     const margin = (alert.data?.margin as number) || 0;
     const profit = (alert.data?.profit as number) || 0;
     const livePrice = (alert.data?.livePrice as number) || 0;
+    const buyerPrice = (alert.data?.price as number) || livePrice;
 
     // Determine status emoji/text based on profit
     const status =
@@ -573,7 +574,7 @@ function formatAlert(alert: Alert, smartMessage?: string | null): string {
       ``,
       `📊 *ФИНАНСОВЫЙ МОНИТОРИНГ:*`,
       `├─ Ваша цена: *${livePrice}₽*`,
-      `├─ Витрина (МП): *${livePrice}₽*`, // Fallback as we might not have buyer price in margin alerts
+      `├─ Витрина (МП): *${buyerPrice}₽*`,
       alert.data?.minPrice ? `└─ СТОП-ЛОСС: *${alert.data.minPrice}₽*` : `└─ СТОП-ЛОСС: *Не задан*`,
       ``,
       `${status}`,

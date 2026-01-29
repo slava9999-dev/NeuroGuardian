@@ -172,7 +172,11 @@ export class BrowserEyes {
         logger.info(`[BrowserEyes] Navigating to ${marketplace}: ${url}`);
 
         // Navigation with timeout and retry-safe wait
-        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
+        // WB is heavy, wait for load to ensure JS-rendered prices are ready
+        await page.goto(url, {
+          waitUntil: marketplace === 'WB' ? 'load' : 'domcontentloaded',
+          timeout: 60000,
+        });
 
         // Wait for specific content or handle blocks
         const content = await page.content();
@@ -295,10 +299,12 @@ export class BrowserEyes {
     const priceData = await page.evaluate(() => {
       // Strategy: Find price elements by common WB patterns
       const priceSelectors = [
-        '.price-block__final-price', // Main price
-        '[class*="wallet-price"]', // WB Wallet price
+        '.price-block__wallet-price', // WB Wallet price specific
+        '.price-block__final-price', // Main final price
+        '[class*="wallet-price"]', // WB Wallet price generic
+        '.price-block__content ins', // Another final price variant
         '.product-page__price-block ins', // Sale price
-        '.price-block__content ins',
+        'ins.price-block__final-price', // Explicit ins tags
       ];
 
       let buyerPrice: number | null = null;
@@ -378,7 +384,11 @@ export class BrowserEyes {
           elems.forEach(elem => {
             if (!elem) return; // Safety check
             const text = elem.textContent || '';
-            const match = text.match(/([\d\s]+)\s*₽?/); // Improved regex
+            // Handle both Space and NBSP (\xa0)
+            const normalizedText = text.replace(/\xa0/g, ' ').trim();
+            const match =
+              normalizedText.match(/([\d\s]+)\s*(?:₽|P|р|руб)/i) ||
+              normalizedText.match(/([\d\s]+)/);
             if (match) {
               const price = parseInt(match[1].replace(/\s/g, ''));
               if (price > 0) {

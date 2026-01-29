@@ -322,6 +322,7 @@ export class SentinelOrchestrator {
           estimated_buyer_price: r.estimatedBuyerPrice,
           marketplace_discount_percent: r.marketplaceDiscountPercent,
           updated_at: r.updatedAt,
+          last_vision_sync: r.lastVisionSync,
           competitor_url: r.competitorUrl,
           competitor_price: r.competitorPrice,
           price_strategy: r.priceStrategy,
@@ -375,12 +376,16 @@ export class SentinelOrchestrator {
         productBatch.map(async product => {
           try {
             const marketplace = product.marketplace as 'WB' | 'Ozon';
+            const priceMap = marketplace === 'WB' ? prices.wb : prices.ozon;
+
+            // Key must match PriceMonitor stringified keys
             const key =
               marketplace === 'WB'
-                ? Number(product.nm_id)
-                : parseInt(product.product_id.replace('ozon-', ''));
+                ? String(product.nm_id)
+                : product.product_id.startsWith('ozon-')
+                  ? product.product_id.replace('ozon-', '')
+                  : product.product_id;
 
-            const priceMap = marketplace === 'WB' ? prices.wb : prices.ozon;
             const livePrice = priceMap.get(key);
 
             // SANITY CHECK: Ignore 0/invalid prices from API glitches
@@ -390,9 +395,12 @@ export class SentinelOrchestrator {
 
             // --- Digital Vision Update ---
             if (!options.skipDigitalVision) {
-              const lastUpdate = product.updated_at ? new Date(product.updated_at).getTime() : 0;
+              const lastVisionUpdate = product.last_vision_sync
+                ? new Date(product.last_vision_sync).getTime()
+                : 0;
               const shouldRefreshRealPrice =
-                !product.estimated_buyer_price || Date.now() - lastUpdate > 12 * 60 * 60 * 1000;
+                !product.estimated_buyer_price ||
+                Date.now() - lastVisionUpdate > 1 * 60 * 60 * 1000; // Refresh every 1 hour
 
               if (shouldRefreshRealPrice) {
                 try {
@@ -402,9 +410,7 @@ export class SentinelOrchestrator {
                       : product.product_id.replace('ozon-', '');
 
                   // --- INDUSTRIAL AGENT LOGIC: DIGITAL VISION FIRST ---
-                  // We ALWAYS start with Digital Vision (BrowserEyes) to see what the customer sees.
-                  // Only if that fails do we fallback to API.
-
+                  // We ALWAYS start with Digital Vision (BrowserEyes)
                   let buyerPrice = 0;
                   let originalPrice = 0;
 
@@ -420,41 +426,33 @@ export class SentinelOrchestrator {
                     originalPrice = eyeResult?.originalPrice ?? 0;
 
                     if (buyerPrice > 0) {
-                      logger.info(
-                        `[Sentinel Agent] Digital Vision Success for ${sku}: ${buyerPrice}₽ (Seller: ${product.current_price}₽)`
-                      );
+                      logger.info(`[Sentinel] Digital Vision Success for ${sku}: ${buyerPrice}₽`);
                     }
                   } catch (eyeError) {
                     logger.warn(
-                      `[Sentinel Agent] Digital Vision interrupted for ${sku}, engaging Fallback Protocols`,
-                      {
-                        error: eyeError,
-                      }
+                      `[Sentinel] Digital Vision failed for ${sku}: ${eyeError instanceof Error ? eyeError.message : String(eyeError)}`
                     );
-                    buyerPrice = 0;
                   }
 
-                  // 2. Fallback Protocol: API Parser
+                  // 2. API Fallback (if vision failed or returned 0)
                   if (buyerPrice === 0) {
                     try {
+                      // Pass flag to skip redundant browser call inside parser
                       const realPriceInfo =
                         marketplace === 'WB'
                           ? await priceParserService.getWbRealPrice(sku)
                           : await priceParserService.getOzonRealPrice(sku);
 
                       buyerPrice = realPriceInfo.buyerPrice;
-                      originalPrice =
-                        (realPriceInfo as unknown as { originalPrice?: number }).originalPrice || 0;
+                      originalPrice = (realPriceInfo as any).originalPrice || 0;
 
                       if (buyerPrice > 0) {
-                        logger.info(
-                          `[Sentinel Agent] API Fallback Success for ${sku}: ${buyerPrice}₽`
-                        );
+                        logger.info(`[Sentinel] API Fallback Success for ${sku}: ${buyerPrice}₽`);
                       }
-                    } catch (error) {
-                      logger.warn(`[Sentinel Agent] All pricing protocols failed for ${sku}`, {
-                        error,
-                      });
+                    } catch (apiErr) {
+                      logger.warn(
+                        `[Sentinel] API Fallback failed for ${sku}: ${apiErr instanceof Error ? apiErr.message : String(apiErr)}`
+                      );
                     }
                   }
 
@@ -468,11 +466,13 @@ export class SentinelOrchestrator {
                       .set({
                         estimatedBuyerPrice: buyerPrice,
                         marketplaceDiscountPercent: String(Math.round(discountPercent)),
+                        lastVisionSync: new Date(),
                         updatedAt: new Date(),
                       })
                       .where(eq(products.id, product.id));
 
                     product.estimated_buyer_price = buyerPrice;
+                    product.last_vision_sync = new Date();
                     product.marketplace_discount_percent = discountPercent;
                   }
                 } catch (e) {
@@ -653,7 +653,7 @@ export class SentinelOrchestrator {
                 try {
                   await logSentinelAction({
                     user_id: user.id,
-                    product_id: product.product_id,
+                    product_id: marketplace === 'WB' ? String(product.nm_id) : product.product_id,
                     product_title: product.title,
                     detected_price: livePrice,
                     min_price: product.min_price || 0,

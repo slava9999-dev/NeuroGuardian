@@ -195,6 +195,7 @@ export interface DBProduct {
   pending_task_id: number | null; // BIGINT
   pending_status: PendingPriceStatus | null; // VARCHAR(20)
   pending_since: Date | null; // TIMESTAMP
+  last_vision_sync?: Date | null; // TIMESTAMP
   created_at: Date; // TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   updated_at: Date; // TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 }

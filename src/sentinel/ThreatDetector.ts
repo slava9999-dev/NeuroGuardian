@@ -179,7 +179,13 @@ export class ThreatDetector {
           productId: product.product_id,
           nmId: product.nm_id,
           message: warning.message,
-          data: { ...economics, warningDetails: warning, minPrice: product.min_price || 0 },
+          data: {
+            ...economics,
+            warningDetails: warning,
+            minPrice: product.min_price || 0,
+            livePrice: livePrice,
+            price: economics.revenue,
+          },
         });
       }
     } else if (economics.profit < (product.min_margin || 0)) {
@@ -192,7 +198,12 @@ export class ThreatDetector {
           economics.profit < 0
             ? `Убыток (${economics.profit}₽) — проверьте себестоимость!`
             : `Маржа ниже установленного минимума (${economics.profit}₽ < ${product.min_margin}₽)`,
-        data: { ...economics, minPrice: product.min_price || 0 },
+        data: {
+          ...economics,
+          minPrice: product.min_price || 0,
+          livePrice: livePrice,
+          price: economics.revenue,
+        },
       });
     }
 
@@ -203,7 +214,12 @@ export class ThreatDetector {
         productId: product.product_id,
         nmId: product.nm_id,
         message: `Критически низкая маржинальность (${economics.margin}%) — продажа почти в ноль или убыток по налогам.`,
-        data: economics,
+        data: {
+          ...economics,
+          livePrice: livePrice,
+          price: economics.revenue,
+          minPrice: product.min_price || 0,
+        },
       });
     }
 

@@ -6,8 +6,8 @@ import type { PriceMonitor } from './types.js';
 export class SentinelPriceMonitor implements PriceMonitor {
   async fetchAll(user: DBUser, products: DBProduct[]) {
     const prices = {
-      wb: new Map<number, number>(),
-      ozon: new Map<number, number>(),
+      wb: new Map<string, number>(),
+      ozon: new Map<string, number>(),
       errors: [] as string[],
     };
 
@@ -60,7 +60,7 @@ export class SentinelPriceMonitor implements PriceMonitor {
           }
 
           for (const [id, price] of result.prices.entries()) {
-            prices.wb.set(Number(id), price);
+            prices.wb.set(String(id), price);
           }
         } catch (err) {
           prices.errors.push(
@@ -99,7 +99,8 @@ export class SentinelPriceMonitor implements PriceMonitor {
           }
 
           for (const [id, price] of result.prices.entries()) {
-            prices.ozon.set(Number(id), price);
+            // Store as raw ID string to match product.product_id logic
+            prices.ozon.set(String(id), price);
           }
         } catch (err) {
           prices.errors.push(

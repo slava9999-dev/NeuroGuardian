@@ -30,8 +30,8 @@ export interface PriceMonitor {
     user: DBUser,
     products: DBProduct[]
   ): Promise<{
-    wb: Map<number, number>;
-    ozon: Map<number, number>;
+    wb: Map<string, number>;
+    ozon: Map<string, number>;
     errors: string[];
   }>;
 }
