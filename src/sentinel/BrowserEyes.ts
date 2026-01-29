@@ -117,7 +117,7 @@ export class BrowserEyes {
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       const startTime = Date.now();
-      let proxyUrl: string | null = null;
+      let proxyConfig: import('../api-lib/services/proxy-service.js').ProxyConfig | null = null;
       let context: BrowserContext | null = null;
       let page: Page | null = null;
 
@@ -125,7 +125,7 @@ export class BrowserEyes {
         await this.init();
         if (!this.browser) throw new Error('Browser not initialized');
 
-        proxyUrl = await proxyService.getNextProxy();
+        proxyConfig = await proxyService.getNextProxyConfig();
         const isOzon = marketplace === 'Ozon';
 
         // Use Social Crawler identity for Ozon as it currently works best
@@ -139,7 +139,7 @@ export class BrowserEyes {
           locale: string;
           timezoneId: string;
           extraHTTPHeaders: Record<string, string>;
-          proxy?: { server: string };
+          proxy?: { server: string; username?: string; password?: string };
         } = {
           viewport: isOzon ? { width: 1440, height: 900 } : { width: 1920, height: 1080 },
           userAgent,
@@ -151,9 +151,13 @@ export class BrowserEyes {
           },
         };
 
-        if (proxyUrl) {
-          logger.info(`[BrowserEyes] Attempt ${attempt}: Using proxy ${proxyUrl}`);
-          contextOptions.proxy = { server: proxyUrl };
+        if (proxyConfig) {
+          logger.info(`[BrowserEyes] Attempt ${attempt}: Using proxy ${proxyConfig.server}`);
+          contextOptions.proxy = {
+            server: proxyConfig.server,
+            username: proxyConfig.username,
+            password: proxyConfig.password,
+          };
         }
 
         context = await this.browser.newContext(contextOptions);
@@ -193,8 +197,8 @@ export class BrowserEyes {
         const duration = Date.now() - startTime;
         lastError = error instanceof Error ? error : new Error(String(error));
 
-        if (proxyUrl) {
-          proxyService.reportFailure(proxyUrl);
+        if (proxyConfig) {
+          proxyService.reportFailure(proxyConfig.server);
         }
 
         logger.warn(`[BrowserEyes] Attempt ${attempt} failed: ${lastError.message}`);
@@ -434,7 +438,7 @@ export class BrowserEyes {
           cardPrice: null,
           stockStatus: outOfStock ? 'out_of_stock' : 'in_stock',
         };
-      } catch (e) {
+      } catch {
         return {
           buyerPrice: null,
           originalPrice: null,

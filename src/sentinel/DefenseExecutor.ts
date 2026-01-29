@@ -44,7 +44,7 @@ export class SentinelDefenseExecutor {
           externalId: product.nm_id ? String(product.nm_id) : product.product_id,
           userId: user.id,
         },
-        message: `⚠️ <b>ОПАСНОСТЬ: Цена ниже минимума!</b>\n\nТекущая цена: ${livePrice}₽\nМинимальная цена: ${minPrice}₽\n\nСработал Stop-Loss. Требуется подтверждение для изменения цены.`,
+        message: `Defense Confirmation Needed`,
         analysis: {
           currentPrice: livePrice,
           recommendedPrice: minPrice,

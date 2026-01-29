@@ -691,6 +691,48 @@ function formatAlert(alert: Alert, smartMessage?: string | null): string {
     ].join('\n');
   }
 
+  // ═══════════════════════════════════════════════════
+  // 🛡️ DEFENSE CONFIRMATION - ЗАПРОС НА ЗАЩИТУ
+  // Премиум-шаблон для подтверждения действий
+  // ═══════════════════════════════════════════════════
+  if (alert.type === 'defense_confirmation' && alert.product && alert.analysis) {
+    const mpEmoji = alert.product.marketplace.toUpperCase() === 'WB' ? '🟣' : '🔵';
+    const now = new Date();
+    const time = now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+
+    const currentPrice = alert.analysis.currentPrice;
+    const minPrice = alert.analysis.recommendedPrice;
+    const diff = minPrice - currentPrice;
+
+    // Safety check for discount calculation
+    const discountPercent =
+      currentPrice > 0 ? Math.round(((minPrice - currentPrice) / minPrice) * 100) : 0;
+
+    const shortTitle =
+      alert.product.name.length > 50
+        ? alert.product.name.substring(0, 47) + '...'
+        : alert.product.name;
+
+    return [
+      `🛡️ *SENTINEL: ТРЕБУЕТСЯ ВМЕШАТЕЛЬСТВО*`,
+      ``,
+      `Командир, цена упала ниже допустимого минимума. Авто-защита ждет вашего приказа.`,
+      ``,
+      `${mpEmoji} ${alert.product.marketplace.toUpperCase()} • ${time}`,
+      `📦 *${escapeMarkdown(shortTitle)}*`,
+      `🏷️ Артикул: \`${alert.product.externalId}\``,
+      ``,
+      `📉 *АНАЛИЗ СИТУАЦИИ:*`,
+      `├─ Текущая цена: *${currentPrice}₽*`,
+      `└─ Минимальная (Stop-Loss): *${minPrice}₽*`,
+      ``,
+      `🛑 *ОПАСНОСТЬ:* Демпинг на ${diff}₽ (${discountPercent}%)`,
+      ``,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      `💡 *РЕШЕНИЕ:* Подтвердите возврат цены к безопасному уровню.`,
+    ].join('\n');
+  }
+
   // Default format
   return `${emoji} *${alert.type}*\n\n${alert.message || 'No details'}`;
 }

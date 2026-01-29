@@ -514,14 +514,24 @@ export class ExperienceLearningManager {
     return `exp_${type}_${Math.abs(hash).toString(36)}`;
   }
 
-  private mapRowToExperience(row: any): ExperienceRecord {
+  private mapRowToExperience(row: {
+    id: string;
+    type: string;
+    user_query: string;
+    agent_response: string;
+    issue: string | null;
+    resolution: string | null;
+    tags: string[] | null;
+    created_at: Date | string;
+    frequency: number;
+  }): ExperienceRecord {
     return {
       id: row.id,
       type: row.type as ExperienceType,
       userQuery: row.user_query,
       agentResponse: row.agent_response,
-      issue: row.issue,
-      resolution: row.resolution,
+      issue: row.issue || undefined,
+      resolution: row.resolution || undefined,
       tags: row.tags || [],
       createdAt: new Date(row.created_at),
       frequency: row.frequency,

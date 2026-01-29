@@ -134,10 +134,18 @@ export class SentinelOrchestrator {
               ORDER BY created_at DESC LIMIT 1
             `);
 
-            const lastCount =
-              lastReport.length > 0
-                ? JSON.parse(lastReport[0].details as string).threatsDetected
-                : -1;
+            let lastCount = -1;
+            try {
+              if (lastReport.length > 0 && lastReport[0].details) {
+                const details =
+                  typeof lastReport[0].details === 'string'
+                    ? JSON.parse(lastReport[0].details)
+                    : lastReport[0].details; // Drizzle might return object
+                lastCount = details?.threatsDetected ?? -1;
+              }
+            } catch (e) {
+              logger.warn('Failed to parse last report stats, following safe path', e);
+            }
 
             if (userResult.threatsDetected !== lastCount || options.sendPriceReport) {
               await this.alertSender.sendReport(user, report);

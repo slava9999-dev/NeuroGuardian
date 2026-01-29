@@ -96,9 +96,17 @@ export class MultiAgentOrchestrator {
                 : undefined,
         });
 
-        if (!validation.isValid && validation.correctedResponse) {
-          finalMessage = validation.correctedResponse;
-          logger.info('[MultiAgent] Response corrected by validator', { score: validation.score });
+        if (!validation.isValid) {
+          finalMessage =
+            validation.correctedResponse ||
+            'Извините, я не могу предоставить корректный ответ на этот вопрос.';
+          logger.warn(
+            '[MultiAgent] Response validation FAILED. Using corrected/fallback response.',
+            {
+              score: validation.score,
+              issueCount: validation.issues.length,
+            }
+          );
         }
       } catch (valError) {
         logger.warn('[MultiAgent] Validation skipped due to error', { error: valError });

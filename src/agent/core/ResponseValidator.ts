@@ -6,6 +6,7 @@
 
 import { logger } from '../../api-lib/lib/logger.js';
 import { validationLogService } from '../../api-lib/services/validation-log.service.js';
+import { llmRouter } from '../../infrastructure/llm/LLMRouter.js';
 
 /**
  * Validation result with detailed feedback
@@ -20,7 +21,15 @@ export interface ValidationResult {
 }
 
 export interface ValidationIssue {
-  type: 'hallucination' | 'irrelevant' | 'unsafe' | 'quality' | 'factual' | 'tone' | 'link';
+  type:
+    | 'hallucination'
+    | 'irrelevant'
+    | 'unsafe'
+    | 'quality'
+    | 'factual'
+    | 'tone'
+    | 'link'
+    | 'confidentiality';
   severity: 'low' | 'medium' | 'high' | 'critical';
   message: string;
   location?: string;
@@ -151,11 +160,25 @@ export class ResponseValidator {
     const toneIssues = this.checkTone(response);
     issues.push(...toneIssues);
 
-    // 7. Check links (NEW)
+    // 7. Check links
     const linkIssues = this.checkLinks(response);
     issues.push(...linkIssues);
 
-    // Calculate score
+    // 8. Critical Check: LLM-based Self-Audit (Internal Critic)
+    const heuristicsScore = this.calculateScore(issues);
+    const isRiskyTopic = /гарантир|выгод|прибыль|обход|налог/i.test(response);
+    const isLongResponse = response.length > 500;
+    const heuristicsFlagged =
+      issues.some(i => i.severity === 'high' || i.severity === 'critical') || heuristicsScore < 85;
+
+    const needsAudit = heuristicsFlagged || (isRiskyTopic && isLongResponse);
+
+    if (needsAudit) {
+      const auditIssues = await this.selfAudit(response, context);
+      issues.push(...auditIssues);
+    }
+
+    // Calculate final score
     const score = this.calculateScore(issues);
 
     // Update running average
@@ -519,8 +542,8 @@ export class ResponseValidator {
 
       // Check Ozon links
       if (url.includes('ozon.ru')) {
-        // Extract product ID from Ozon URL
-        const productMatch = url.match(/product\/[^/]*-(\d+)/);
+        // Extract product ID from Ozon URL (matches /product/slug-ID/ or /product/ID/)
+        const productMatch = url.match(/product\/(?:[^/]*?|-)?(\d+)/);
         if (productMatch) {
           const productId = parseInt(productMatch[1]);
           // Sanity check: Ozon IDs are typically 6-12 digits
@@ -606,6 +629,51 @@ export class ResponseValidator {
     }
 
     return suggestions;
+  }
+
+  /**
+   * LLM-based Self-Audit (The "Internal Critic" phase)
+   * Uses Gemini Flash to scrutinize the response for subtle issues
+   */
+  private async selfAudit(
+    response: string,
+    context: ValidationContext
+  ): Promise<ValidationIssue[]> {
+    const issues: ValidationIssue[] = [];
+
+    try {
+      const prompt = `System: Ты — Критик качества ответов AI-агента Виктора. Твоя задача — проверить ответ на ошибки, галлюцинации и неуместный тон.
+      
+Контекст запроса: "${context.userQuery}"
+Инструменты (JSON): ${JSON.stringify(context.toolResults || [])}
+
+Анализируемый ответ:
+"${response}"
+
+Найди в ответе:
+1. Фактические ошибки (цены не совпадают с результатами инструментов).
+2. Выдуманные ссылки или функции.
+3. Упоминание того, что он "ИИ" или "бот" (он должен быть Виктором, управляющим).
+4. Утечку внутренних логов, ключей или программного кода.
+
+Верни только JSON массив объектов вида:
+[{"type": "hallucination" | "factual" | "tone" | "confidentiality", "severity": "high" | "medium", "message": "почему это ошибка"}]
+Если ошибок нет, верни []`;
+
+      const auditResult = await llmRouter.complete([{ role: 'system', content: prompt }], {
+        temperature: 0,
+        jsonMode: true,
+      });
+
+      const parsedAudit = JSON.parse(auditResult.content);
+      if (Array.isArray(parsedAudit)) {
+        issues.push(...parsedAudit);
+      }
+    } catch (error) {
+      logger.warn('[ResponseValidator] Self-audit failed, skipping...', { error });
+    }
+
+    return issues;
   }
 
   private attemptCorrection(response: string, _issues: ValidationIssue[]): string {
