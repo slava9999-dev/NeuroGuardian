@@ -92,6 +92,9 @@ export class SentinelAlertSender {
             sellerPrice: threatData.sellerPrice || product.current_price || 0,
             minPrice: threatData.minPrice || product.min_price || 0,
             discountPercent: threatData.discountPercent || 0,
+            // Economics data for margin alerts
+            profit: (threatData as any).profit || 0,
+            margin: (threatData as any).margin || 0,
             // Legacy support
             livePrice: threatData.livePrice || product.current_price,
           },

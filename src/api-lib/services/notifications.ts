@@ -538,18 +538,39 @@ function formatAlert(alert: Alert, smartMessage?: string | null): string {
   if (alert.type === 'margin_warning' && alert.product) {
     const margin = (alert.data?.margin as number) || 0;
     const profit = (alert.data?.profit as number) || 0;
+    const livePrice = (alert.data?.livePrice as number) || 0;
+
+    // Determine status emoji/text based on profit
+    const status =
+      profit < 0 ? '🛑 *УБЫТОК (ОТРИЦАТЕЛЬНАЯ ПРИБЫЛЬ)*' : '⚠️ *КРИТИЧЕСКИ НИЗКАЯ МАРЖА*';
+    const mpEmoji = alert.product.marketplace.toUpperCase() === 'WB' ? '🟣' : '🔵';
+    const now = new Date();
+    const time = now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+
+    const shortTitle =
+      alert.product.name.length > 50
+        ? alert.product.name.substring(0, 47) + '...'
+        : alert.product.name;
+
     return [
-      `💸 *Виктор ИИ — Внимание к марже!*`,
+      `🚨 *КРИТИЧЕСКАЯ УГРОЗА ПРИБЫЛИ*`,
       ``,
-      `${emoji} *Низкая маржинальность*`,
+      `Уважаемый партнер, эффективность продаж данного товара упала до критических значений.`,
       ``,
-      `📦 *${escapeMarkdown(alert.product.name)}*`,
+      `${mpEmoji} ${alert.product.marketplace.toUpperCase()} • ${time}`,
+      `📦 *${escapeMarkdown(shortTitle)}*`,
       `🏷️ Артикул: \`${alert.product.externalId}\``,
       ``,
-      `📊 Маржа: *${margin.toFixed(1)}%*`,
-      `💰 Прибыль: *${profit}₽* за шт.`,
+      `📊 *ФИНАНСОВЫЙ МОНИТОРИНГ:*`,
+      `├─ Текущая цена: *${livePrice}₽*`,
+      `├─ Маржинальность: *${margin.toFixed(1)}%*`,
+      `└─ Чистая прибыль: *${Math.round(profit)}₽*`,
       ``,
-      `💡 ${alert.message || 'Рекомендую пересмотреть цену или себестоимость'}`,
+      `${status}`,
+      `📉 Вы теряете деньги или работаете в ноль!`,
+      ``,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      `💡 *РЕКОМЕНДАЦИЯ:* Проверьте себестоимость и комиссии. Срочно поднимите цену.`,
     ].join('\n');
   }
 

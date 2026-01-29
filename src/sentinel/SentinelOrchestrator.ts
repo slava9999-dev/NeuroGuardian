@@ -566,8 +566,8 @@ export class SentinelOrchestrator {
                   SELECT 1 FROM ops_events 
                   WHERE user_id = ${user.id} 
                     AND external_id = ${product.product_id}
-                    AND event_type = 'alert_acknowledged'
-                    AND created_at > NOW() - INTERVAL '6 hours'
+                    AND (event_type = 'alert_acknowledged' OR event_type = 'sentinel_alert')
+                    AND created_at > NOW() - INTERVAL '24 hours'
                   LIMIT 1
                 `);
 
