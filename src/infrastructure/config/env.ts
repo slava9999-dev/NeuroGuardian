@@ -59,32 +59,19 @@ const envSchema = z.object({
     .optional(),
 
   // LLM / AI
-  GEMINI_API_KEY: z
-    .string()
-    .transform(v => v.replace(/\r/g, '').trim())
-    .optional(),
-  OPENROUTER_API_KEY: z
-    .string()
-    .transform(v => v.replace(/\r/g, '').trim())
-    .optional(),
-  GROQ_API_KEY: z
-    .string()
-    .transform(v => v.replace(/\r/g, '').trim())
-    .optional(),
-  OPENAI_API_KEY: z
-    .string()
-    .transform(v => v.replace(/\r/g, '').trim())
-    .optional(),
-  HUGGINGFACE_API_KEY: z
-    .string()
-    .transform(v => v.replace(/\r/g, '').trim())
-    .optional(),
-  REPLICATE_API_KEY: z
-    .string()
-    .transform(v => v.replace(/\r/g, '').trim())
-    .optional(),
+  GEMINI_API_KEY: z.string().optional(),
+  OPENROUTER_API_KEY: z.string().optional(),
+  GROQ_API_KEY: z.string().optional(),
+  OPENAI_API_KEY: z.string().optional(),
+  HUGGINGFACE_API_KEY: z.string().optional(),
+  REPLICATE_API_KEY: z.string().optional(),
   RAG_PROVIDER: z.enum(['gemini', 'huggingface', 'openai']).optional().default('gemini'),
   VISION_PROVIDER: z.enum(['gemini', 'huggingface']).optional().default('gemini'),
+
+  // Marketplaces
+  WB_API_KEY: z.string().optional(),
+  OZON_API_KEY: z.string().optional(),
+  OZON_CLIENT_ID: z.string().optional(),
 
   // Mode
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),

@@ -19,6 +19,8 @@ triggers:
 - `src/api-lib/services/marketplace/WbService.ts`: Клиент для Wildberries (v2/v4 API).
 - `src/api-lib/services/marketplace/OzonService.ts`: Клиент для Ozon Seller API.
 - `src/api-lib/services/MarketplaceService.ts`: Унифицированный интерфейс для всех маркетплейсов.
+- `scripts/diagnostic.ts`: Диагностика подключения к БД и наличия API ключей.
+- `scripts/verify-keys.ts`: Проверка валидности API ключей (WB/Ozon) через внешний запрос.
 - `scripts/test-marketplace-api.ts`: Верификация API ключей и доступа к методам.
 
 ## 📋 Протокол Действий (Workflow)

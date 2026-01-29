@@ -17,7 +17,8 @@ triggers:
 ## 🛠️ Инструментарий (Tools & Scripts)
 
 - `src/sentinel/BrowserEyes.ts`: Основной модуль управления Playwright (Stealth + Proxy).
-- `scripts/test-vision.ts`: Быстрая проверка визуального парсинга.
+- `scripts/check-eye.ts`: Быстрая диагностика браузерного зрения (Skill Check).
+- `scripts/test-vision.ts`: Быстрая проверка визуального парсинга (Legacy).
 - `scripts/test-wb-real-price.ts`: Верификация цен на Wildberries.
 - `scripts/debug-browser-eyes.ts`: Режим отладки браузерных сессий.
 

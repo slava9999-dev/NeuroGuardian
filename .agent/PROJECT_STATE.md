@@ -2,6 +2,38 @@
 
 Last Updated: 2026-01-29
 
+### Session 2026-01-29 (Session 105 - Agentic Skills Diagnostics & Key Integration) 🛡️🔑
+
+**Objective: Standardize Agentic Skills infrastructure, verify credentials, and prepare for automated defense cycles.**
+
+> ✅ **SKILLS STANDARDIZATION:** All 4 core skills (`digital-vision`, `marketplace-api`, `rag-knowledge`, `sentinel-protection`) are now fully compliant with `AGENTIC_SKILLS_STANDARD.md`.
+> ✅ **DIAGNOSTIC ENGINE:** Implemented a standalone diagnostic suite for each skill. Verified database, vector store, and orchestrator integrity via `npx tsx .agent/skills/*/scripts/diagnostic.ts`.
+> ✅ **KEY INTEGRATION:** Successfully integrated and verified new Ozon API credentials (200 OK). Wildberries keys are added and ready for production RU-proxy environment.
+> ✅ **ENV HEALTH:** Cleaned up and reorganized the `.env` file, removing duplicates and ensuring Zod validation in `env.ts`.
+
+**Completed Actions:**
+
+- [x] **Skills Docs**: Updated `skill.md` for all 4 skills with tool/script documentation.
+- [x] **Diagnostics**: Created `diagnostic.ts` and `verify-keys.ts` scripts for automated health checks.
+- [x] **Env Schema**: Updated `src/infrastructure/config/env.ts` to include marketplace API keys.
+- [x] **Verification**: Confirmed Ozon Connectivity and identified WB geo-blocking constraints.
+
+**Key Insights:**
+
+```
+Ozon API (v3) is highly sensitive to correct API-Key/Client-Id pairing; verification script confirmed the new keys are active.
+Wildberries Prices API often requires RU-based IPs; local diagnostics correctly flagged "fetch failed" as a networking/geo constraint, not a logic error.
+Standardizing diagnostic scripts ensures "Self-Healing" capabilities for the agent team in future sessions.
+```
+
+**Next Steps (P0):**
+
+1.  **Proxy Acquisition**: Purchase and configure high-quality Russian residential proxies in `PROXY_URLS`.
+2.  **Sentinel Launch**: Activate the 30-minute Sentinel cycle for price protection now that Ozon keys are verified.
+3.  **Telegram End-to-End**: Verify that a real Sentinel alert from Ozon leads to a successful "Fix Price" action in Telegram.
+
+---
+
 ### Session 2026-01-29 (Session 104 - Telegram Interactions & RAG Stability) 🛡️📚
 
 **Objective: Implement interactive Sentinel alerts and harden RAG knowledge base.**

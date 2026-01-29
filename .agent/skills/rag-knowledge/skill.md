@@ -17,6 +17,7 @@ triggers:
 ## 🛠️ Инструментарий (Tools & Scripts)
 
 - `scripts/rag-migrate.ts`: Миграция схемы (автоматическое определение размерности).
+- `scripts/diagnostic.ts`: Проверка подключения к векторной БД и целостности конфигурации.
 - `scripts/rebuild-vector-store.ts`: Полная переиндексация базы знаний.
 - `scripts/test-rag-system.ts`: Полная проверка работоспособности RAG (Step-by-step).
 - `src/infrastructure/rag/IngestionPipeline.ts`: Ядро логики обработки документов.

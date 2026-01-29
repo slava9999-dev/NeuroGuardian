@@ -17,6 +17,7 @@ triggers:
 ## 🛠️ Инструментарий (Tools & Scripts)
 
 - `src/sentinel/SentinelOrchestrator.ts`: Координатор циклов защиты (Chunk-processing).
+- `scripts/diagnostic.ts`: Проверка конфигурации и статуса Оркестратора.
 - `scripts/run-sentinel-cycle.ts`: Запуск полного цикла мониторинга.
 - `scripts/test-sentinel-agent.ts`: Тестирование автономных действий агента.
 - `scripts/test-sentinel-defense.ts`: Верификация механизмов защиты (Ask-before-Action).

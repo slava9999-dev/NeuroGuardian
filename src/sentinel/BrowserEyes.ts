@@ -73,7 +73,7 @@ export class BrowserEyes {
       chromium.use(StealthPlugin());
 
       this.browser = await chromium.launch({
-        headless: true,
+        headless: process.env.HEADLESS !== 'false',
         args: [
           '--disable-blink-features=AutomationControlled',
           '--disable-dev-shm-usage',
