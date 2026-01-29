@@ -6,6 +6,9 @@ export interface MarketplaceProduct {
   current_price: number;
   current_stock: number;
   marketplace: 'WB' | 'Ozon';
+  offer_id?: string;
+  official_sku?: string;
+  barcode?: string;
   width_cm?: number;
   height_cm?: number;
   depth_cm?: number;

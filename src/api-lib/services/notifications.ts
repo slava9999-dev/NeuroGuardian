@@ -299,13 +299,15 @@ function getAlertButtons(alert: Alert): Record<string, unknown> | undefined {
   // Кнопки для быстрых действий
   // ═══════════════════════════════════════════════════
   // ═══════════════════════════════════════════════════
-  // 🚨 PROMO & STOPLOSS VIOLATION ALERTS + MARGIN WARNING
+  // 🚨 PROMO & STOPLOSS VIOLATION ALERTS + MARGIN WARNING + STOCK & COMPETITOR
   // Кнопки для быстрых действий
   // ═══════════════════════════════════════════════════
   if (
     (alert.type === 'promo_violation' ||
       alert.type === 'stoploss_breach' ||
-      alert.type === 'margin_warning') &&
+      alert.type === 'margin_warning' ||
+      alert.type === 'stock_warning' ||
+      alert.type === 'competitor_alert') &&
     alert.product
   ) {
     const { externalId, marketplace } = alert.product;
@@ -324,11 +326,24 @@ function getAlertButtons(alert: Alert): Record<string, unknown> | undefined {
       { text: '📊 Проверить карточку', callback_data: `check_product:${externalId}` },
     ]);
 
-    // Второй ряд: действия
-    buttons.push([
-      { text: '💰 Поднять цену', callback_data: `raise_price:${mpLower}:${externalId}` },
-      { text: '🛡️ Настроить защиту', callback_data: `check_protection:${externalId}` },
-    ]);
+    // Второй ряд: действия (разные для разных типов)
+    if (alert.type === 'stock_warning') {
+      buttons.push([
+        { text: '📦 Продлить остатки', callback_data: `check_product:${externalId}` },
+        { text: '🛡️ Настройки', callback_data: `check_protection:${externalId}` },
+      ]);
+    } else if (alert.type === 'competitor_alert') {
+      buttons.push([
+        { text: '💰 Атаковать (снизить)', callback_data: `raise_price:${mpLower}:${externalId}` },
+        { text: '🛡️ Настроить защиту', callback_data: `check_protection:${externalId}` },
+      ]);
+    } else {
+      // PROMO / STOPLOSS / MARGIN
+      buttons.push([
+        { text: '💰 Поднять цену', callback_data: `raise_price:${mpLower}:${externalId}` },
+        { text: '🛡️ Настроить защиту', callback_data: `check_protection:${externalId}` },
+      ]);
+    }
 
     // Третий ряд: dismiss
     buttons.push([{ text: '✅ Понял, проверю', callback_data: `ack_alert:${externalId}` }]);
