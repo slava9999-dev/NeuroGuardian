@@ -562,12 +562,13 @@ function formatAlert(alert: Alert, smartMessage?: string | null): string {
       `🏷️ Артикул: \`${alert.product.externalId}\``,
       ``,
       `📊 *ФИНАНСОВЫЙ МОНИТОРИНГ:*`,
-      `├─ Текущая цена: *${livePrice}₽*`,
-      `├─ Маржинальность: *${margin.toFixed(1)}%*`,
-      `└─ Чистая прибыль: *${Math.round(profit)}₽*`,
+      `├─ Ваша цена: *${livePrice}₽*`,
+      `├─ Витрина (МП): *${livePrice}₽*`, // Fallback as we might not have buyer price in margin alerts
+      alert.data?.minPrice ? `└─ СТОП-ЛОСС: *${alert.data.minPrice}₽*` : `└─ СТОП-ЛОСС: *Не задан*`,
       ``,
       `${status}`,
-      `📉 Вы теряете деньги или работаете в ноль!`,
+      `📉 Чистая прибыль: *${Math.round(profit)}₽*`,
+      `📉 Маржинальность: *${margin.toFixed(1)}%*`,
       ``,
       `━━━━━━━━━━━━━━━━━━━━`,
       `💡 *РЕКОМЕНДАЦИЯ:* Проверьте себестоимость и комиссии. Срочно поднимите цену.`,
@@ -644,9 +645,17 @@ function formatAlert(alert: Alert, smartMessage?: string | null): string {
     const now = new Date();
     const time = now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 
-    const buyerPrice = (alert.data?.buyerPrice as number) || 0;
+    const sellerPrice =
+      (alert.data?.sellerPrice as number) || (alert.data?.livePrice as number) || 0;
+    const buyerPrice = (alert.data?.buyerPrice as number) || sellerPrice; // If no buyer price, use seller price
     const minPrice = (alert.data?.minPrice as number) || 0;
-    const diff = minPrice - buyerPrice;
+
+    // Financials
+    const profit = (alert.data?.profit as number) || 0;
+    const margin = (alert.data?.margin as number) || 0;
+
+    // Loss calculation: difference between Stop Loss and Actual Price
+    const overspend = minPrice - buyerPrice;
 
     const shortTitle =
       alert.product.name.length > 50
@@ -654,20 +663,24 @@ function formatAlert(alert: Alert, smartMessage?: string | null): string {
         : alert.product.name;
 
     return [
-      `⚠️ *ВНИМАНИЕ: НАРУШЕН ПОРОГ МАРЖИ*`,
+      `🚨 *КРИТИЧЕСКАЯ УГРОЗА ПРИБЫЛИ*`,
+      ``,
+      `Уважаемый партнер, маркетплейс принудительно снизил цену ниже вашего порога рентабельности.`,
       ``,
       `${mpEmoji} ${alert.product.marketplace.toUpperCase()} • ${time}`,
       `📦 *${escapeMarkdown(shortTitle)}*`,
       `🏷️ Артикул: \`${alert.product.externalId}\``,
       ``,
-      `🏦 *АНАЛИЗ ЦЕН:*`,
-      `├─ Покупатель видит: *${buyerPrice}₽*`,
-      `└─ Ваш стоп-лосс: *${minPrice}₽*`,
+      `📊 *ФИНАНСОВЫЙ МОНИТОРИНГ:*`,
+      `├─ Ваша цена: *${sellerPrice}₽*`,
+      `├─ Витрина (МП): *${buyerPrice}₽*`,
+      `└─ СТОП-ЛОСС: *${minPrice}₽*`,
       ``,
-      `📉 Отклонение: -${diff}₽`,
+      `🛑 *ПЕРЕРАСХОД:* -${overspend}₽ с каждой продажи!`,
+      `📉 *Чистая прибыль:* ${Math.round(profit)}₽ (${margin.toFixed(1)}%)`,
       ``,
       `━━━━━━━━━━━━━━━━━━━━`,
-      `💡 _Проверьте актуальные скидки и настройки защиты для этого товара._`,
+      `💡 *РЕКОМЕНДАЦИЯ:* Срочно поднимите цену или выйдите из акции, чтобы остановить убытки.`,
     ].join('\n');
   }
 

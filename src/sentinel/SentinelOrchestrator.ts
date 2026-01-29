@@ -558,29 +558,70 @@ export class SentinelOrchestrator {
                   /* Ignore logging errors */
                 });
 
+              // --- THREAT PRIORITIZATION ---
+              // Filter out lower-priority threats if CRITICAL ones are present
+              const criticalThreats = scan.threats.filter(
+                t =>
+                  t.type === ThreatType.PROMO_PRICE_VIOLATION ||
+                  t.type === ThreatType.BUYER_PRICE_BELOW_STOPLOSS ||
+                  t.type === ThreatType.COMPETITOR_PRICE_DROP
+              );
+
+              // If we have critical threats, ignore generic financial warnings (spam reduction)
+              const threatsToSend =
+                criticalThreats.length > 0
+                  ? criticalThreats
+                  : scan.threats.filter(t => t.type !== 'margin_below_zero'); // Only send margin warning if it's the ONLY issue
+
+              // Fallback: If we filtered everything out (e.g. only had margin warning but logic was weird), send original
+              const finalThreats = threatsToSend.length > 0 ? threatsToSend : scan.threats;
+
               // --- IMMEDIATE ALERTING ---
-              // For ANY threat, send immediate Telegram alerts with action buttons
-              // SILENCE LOGIC: Don't alert if user acknowledged this specific threat in the last 6 hours
-              for (const threat of scan.threats) {
+              for (const threat of finalThreats) {
+                // CORRECT ID LOGIC: Match AlertSender's logic strictly
+                const externalId =
+                  marketplace === 'WB' ? String(product.nm_id) : product.product_id;
+
+                // DEDUPLICATION: Check specific threat type within last 24h
                 const ackCheck = await db.execute(drizzleSql`
                   SELECT 1 FROM ops_events 
                   WHERE user_id = ${user.id} 
-                    AND external_id = ${product.product_id}
-                    AND (event_type = 'alert_acknowledged' OR event_type = 'sentinel_alert')
+                    AND external_id = ${externalId}
+                    AND (
+                      event_type = 'alert_acknowledged' 
+                      OR (event_type = 'sentinel_alert' AND details->>'threatType' = ${threat.type})
+                    )
                     AND created_at > NOW() - INTERVAL '24 hours'
                   LIMIT 1
                 `);
 
                 if ((ackCheck as unknown as any[]).length > 0) {
                   logger.debug(
-                    `[Sentinel] Skipping alert for ${product.product_id} - already acknowledged in last 6h`
+                    `[Sentinel] Skipping alert for ${externalId} (${threat.type}) - already sent/acked in last 24h`
                   );
                   continue;
                 }
 
                 // Send detailed threat alert with action buttons via AlertSender
-                this.alertSender.sendThreatAlert(user, product, threat, marketplace).catch(err => {
-                  logger.error(`Failed to send immediate threat alert for ${product.id}`, err);
+                await this.alertSender
+                  .sendThreatAlert(user, product, threat, marketplace)
+                  .catch(err => {
+                    logger.error(`Failed to send immediate threat alert for ${product.id}`, err);
+                  });
+
+                // Log the event so deduplication works next time
+                await logSentinelAction({
+                  user_id: user.id,
+                  product_id: externalId,
+                  product_title: product.title,
+                  detected_price: livePrice,
+                  min_price: product.min_price || 0,
+                  defense_action: 'ALERT_SENT',
+                  saved_amount: 0,
+                  marketplace,
+                  threat_type: threat.type,
+                  success: true,
+                  details: { threat },
                 });
               }
 
