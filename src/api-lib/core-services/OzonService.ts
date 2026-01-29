@@ -81,6 +81,9 @@ export class OzonService {
 
       return {
         product_id: `ozon-${item.id}`,
+        offer_id: item.offer_id,
+        official_sku: item.sku?.toString(),
+        barcode: item.barcode,
         title: item.name || 'Без названия',
         image_url:
           (typeof item.primary_image === 'string'

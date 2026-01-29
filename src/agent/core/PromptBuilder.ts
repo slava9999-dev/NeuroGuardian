@@ -10,6 +10,7 @@ import { toolRegistry } from '../execution/ToolRegistry.js';
 import { knowledgeBase } from './KnowledgeBase.js';
 import { memoryManager } from './MemoryManager.js';
 import { experienceLearning } from './ExperienceLearning.js';
+import { productRepository } from '../../api-lib/repositories/ProductRepository.js';
 import { logger } from '../../api-lib/lib/logger.js';
 
 /**
@@ -55,6 +56,26 @@ ${context}
 </KNOWLEDGE_BASE>`;
     } catch (error) {
       logger.warn('RAG Error', { error });
+      return '';
+    }
+  }
+
+  /**
+   * Build a brief summary of top products for LLM context grounding
+   */
+  private async buildCatalogSummary(userId?: number): Promise<string> {
+    if (!userId) return '';
+    try {
+      const products = await productRepository.getFiltered(userId, { limit: 10 });
+      if (products.length === 0) return '';
+
+      const lines = ['## КАТАЛОГ ТОВАРОВ (для справки):'];
+      for (const p of products) {
+        lines.push(`- ${p.title} (ID: ${p.product_id}, Артикул: ${p.nm_id || p.product_id})`);
+      }
+      return lines.join('\n');
+    } catch (error) {
+      logger.warn('Catalog summary error', { error });
       return '';
     }
   }
@@ -142,6 +163,9 @@ ${context}
     // 4. RAG knowledge
     sections.push(await this.buildKnowledgeContext(query));
 
+    // 4.1 Product Catalog Summary (for grounding)
+    sections.push(await this.buildCatalogSummary(context.userId));
+
     // 5. Tool descriptions
     sections.push(toolRegistry.generatePrompt({ includeExamples: true }));
 
@@ -185,14 +209,24 @@ ${context}
   }
 
   /**
-   * Build answerer prompt
+   * Build answerer prompt - grounds the final response in facts and results
    */
-  buildAnswererPrompt(context: PromptContext): string {
+  async buildAnswererPrompt(context: PromptContext, query: string): Promise<string> {
     const sections: string[] = [];
 
     sections.push(CORE_PERSONALITY);
     sections.push(ANSWERER_RULES);
     sections.push(this.buildUserContext(context.userState));
+
+    // Grounding: Keep answerer informed of the same context as planner
+    sections.push(await this.buildKnowledgeContext(query));
+
+    if (context.userId) {
+      sections.push(await this.buildCatalogSummary(context.userId));
+      sections.push(await this.buildMemoryContext(context.userId, query));
+      sections.push(await experienceLearning.generateLearningContext(query));
+    }
+
     sections.push(ANSWERER_OUTPUT_FORMAT);
 
     return sections.filter(Boolean).join('\n\n');
@@ -302,8 +336,9 @@ const CORE_PERSONALITY = `# 🤖 ВИКТОР — DETERMINISTIC DEFENSE MACHINE
 1. **Никакой воды:** Каждое слово должно служить делу защиты прибыли.
 2. **Факты и цифры:** Оперируй юнит-экономикой, стоками и IVaR (Inventory Value at Risk).
 3. **Бескомпромиссность:** Если маржа под угрозой — ты должен ПРЕДУПРЕЖДАТЬ и ПРЕДЛАГАТЬ защиту (Stop-Loss).
-4. **Отказ от креатива:** Если просят фото, посты или отзывы — вежливо, но твердо отказывай, переводя разговор на финансы.
-5. **Точность:** Не придумывай данные. Ошибка в расчетах = банкротство селлера.`;
+4. **Отказ от приветствий:** НЕ ПРИВЕТСТВУЙ пользователя в каждом сообщении. Если диалог продолжается, сразу переходи к делу. Никаких "Привет, Вячеслав!" больше одного раза за сессию.
+5. **Проверка фактов:** НИКОГДА не утверждай, что товары защищены или данные верны, ПОКА не получишь подтверждение из результатов инструментов. Если инструментов в плане нет — ты НЕ ЗНАЕШЬ статус.
+6. **Извлечение данных:** Если пользователь прислал список цен или параметров (например, "рейлинг 850, держатель 600"), ты ОБЯЗАН вызвать инструменты обновления для КАЖДОГО упомянутого товара.`;
 
 const FIRST_CONTACT_INSTRUCTIONS = `## 🚀 ПЕРВЫЙ КОНТАКТ
 
@@ -427,11 +462,12 @@ const PLANNER_OUTPUT_FORMAT = `## ФОРМАТ ОТВЕТА
 
 const ANSWERER_RULES = `## ПРАВИЛА ОТВЕТА
 
-1. Используй ТОЛЬКО данные из результатов инструментов
-2. НЕ придумывай ссылки — бери только из available_urls
-3. Форматируй цены с ₽, используй эмодзи для акцентов
-4. Если есть проблема — предложи конкретное действие
-5. Если нужно подтверждение — чётко спроси да/нет`;
+1. Используй ТОЛЬКО данные из результатов инструментов. Если инструмент не был запущен — не придумывай статус.
+2. Подтверждай выполненные действия: "Себестоимость обновлена для 3 товаров", а не просто "Хорошо".
+3. НЕ приветствуй пользователя, если диалог уже идет. Сразу к сути.
+4. Если ты обновил себестоимость или другие параметры, СРАЗУ покажи обновленный расчет (например, чистую прибыль), чтобы пользователь увидел результат своих действий.
+5. Форматируй цены с ₽, используй эмодзи для акцентов.
+6. Если есть финансовая угроза (низкая маржа) — выдели её жирным.`;
 
 const ANSWERER_OUTPUT_FORMAT = `## ФОРМАТ ОТВЕТА
 

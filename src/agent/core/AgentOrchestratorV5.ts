@@ -447,10 +447,14 @@ export class AgentOrchestratorV5 {
     tokensUsed: number;
   }> {
     try {
-      const systemPrompt = promptBuilder.buildAnswererPrompt({
-        userState,
-        recentHistory: conversationHistory || [],
-      });
+      const systemPrompt = await promptBuilder.buildAnswererPrompt(
+        {
+          userState,
+          recentHistory: conversationHistory || [],
+          userId: userState.userId,
+        },
+        originalMessage
+      );
 
       const userMessage = `Пользователь спросил: "${originalMessage}"
 
@@ -531,6 +535,30 @@ ${JSON.stringify(toolResults, null, 2)}
 
     if (productIds.length > 0) {
       await stateManager.trackMentionedProducts(userId, productIds);
+    }
+
+    // Proactive Input Handling: if a tool failed because of missing input, set up awaiting state
+    for (const result of toolResults) {
+      const data = result.data as
+        | { needsInput?: string; question?: string; forProductId?: string }
+        | undefined;
+      if (!result.success && data?.needsInput) {
+        await stateManager.setAwaitingInput(
+          userId,
+          data.needsInput as
+            | 'cost_price'
+            | 'period'
+            | 'product_name'
+            | 'min_price'
+            | 'confirmation'
+            | 'percentage'
+            | 'nm_id',
+          data.question || `Введите ${data.needsInput}:`,
+          data.forProductId
+        );
+        logger.debug('Proactive awaiting input set', { userId, type: data.needsInput });
+        break; // Only one wait state at a time
+      }
     }
   }
 

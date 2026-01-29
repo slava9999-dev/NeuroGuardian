@@ -1,8 +1,36 @@
 # 📊 Project State — NeuroGUARDIAN
 
-Last Updated: 2026-01-29 (Session 109)
+Last Updated: 2026-01-29 (Session 110)
 
-### Session 2026-01-29 (Session 109 - Telegram Smart Alert Buttons) 🛡️✅
+### Session 2026-01-29 (Session 110 - Viktor Brain Upgrade) 🧠🔨
+
+**Objective: Critical analysis and fixing of Viktor's "stupidity" in complex dialogues.**
+
+> ✅ **CATALOG GROUNDING:** Implemented `buildCatalogSummary` in `PromptBuilder`. Viktor now "sees" product names and IDs directly in his planner context, enabling instant mapping of natural language to tool arguments without extra search turns.
+> ✅ **MULTI-FACT EXTRACTION:** Updated `CORE_PERSONALITY` to explicitly require extracting and updating multiple data points from a single user message (e.g., list of cost prices).
+> ✅ **ANTI-REPETITION GUARDRAILS:** Added redundancy checks in `ResponseValidator` and `PromptBuilder` to kill the "Greeting Loop" (repeating "Привет, Вячеслав" in every turn).
+> ✅ **PROACTIVE STATE TRANSITION:** The Orchestrator now automatically sets `awaitingInput` status if any tool (like `calculate_unit_economics`) fails with a `needsInput` flag.
+> ✅ **ROBOTIC PRECISION:** Switched personality to a strictly professional "Deterministic Defense Machine" style, prioritizing math over "water".
+
+**Completed Actions:**
+
+- [x] `src/agent/core/PromptBuilder.ts`:
+  - Added Catalog summary and Multi-fact rules.
+  - **Brain v2:** `buildAnswererPrompt` made async and fully grounded in RAG/Memory/Catalog.
+- [x] `src/agent/core/ResponseValidator.ts`:
+  - Added greeting redundancy check.
+  - **Brain v2:** Enhanced `selfAudit` (Internal Critic) with "Hard Audit" instructions for math precision and water detection.
+- [x] `src/agent/core/AgentOrchestratorV5.ts`:
+  - Implemented proactive input handling.
+  - **Brain v2:** Orchestration updated to ground the Answerer turn in full context.
+- [x] `src/api-lib/services/unit-economics.ts`: Verified high-precision 2026 rules (Ozon Card, logistics hikes, acceptance fees).
+- [x] **Telegram Product Links**: Fixed broken links and robust marketplace detection in `src/api-lib/services/notifications.ts`.
+- [x] **Ozon Sync Restoration**: Added `offer_id`, `sku`, and `barcode` to `src/api-lib/core-services/OzonService.ts` for reliable defense actions.
+
+**Next Steps:**
+
+- [ ] Test the "Multi-Fact" extraction with a list of 5+ products.
+- [ ] Verify that `awaiting_input` correctly clears after the planner successfully extracts the value from a sentence.
 
 **Objective: Implement "Smart Pause" logic for Telegram alerts and enhance user interaction.**
 

@@ -157,7 +157,7 @@ export class ResponseValidator {
     issues.push(...factualIssues);
 
     // 6. Check tone
-    const toneIssues = this.checkTone(response);
+    const toneIssues = this.checkTone(response, context);
     issues.push(...toneIssues);
 
     // 7. Check links
@@ -467,8 +467,20 @@ export class ResponseValidator {
     return issues;
   }
 
-  private checkTone(response: string): ValidationIssue[] {
+  private checkTone(response: string, context: ValidationContext): ValidationIssue[] {
     const issues: ValidationIssue[] = [];
+
+    // REDUNDANCY: Check for greetings if conversation is ongoing
+    const isOngoing = context.userHistory && context.userHistory.length > 0;
+    const hasGreeting = /^(Привет|Здравствуйте|Добрый день|Хай|Хелло)/i.test(response);
+
+    if (isOngoing && hasGreeting) {
+      issues.push({
+        type: 'tone',
+        severity: 'low',
+        message: 'Повторное приветствие в середине диалога — Виктор должен быть лаконичнее',
+      });
+    }
 
     // Too formal
     if (/уважаемый\s*(?:пользователь|клиент)/i.test(response)) {
@@ -642,8 +654,12 @@ export class ResponseValidator {
     const issues: ValidationIssue[] = [];
 
     try {
-      const prompt = `System: Ты — Критик качества ответов AI-агента Виктора. Твоя задача — проверить ответ на ошибки, галлюцинации и неуместный тон.
-      
+      const prompt = `System: Ты — Критик качества ответов AI-агента Виктора. Твоя задача — провести жесткий аудит ответа.
+Важнейшие критерии:
+1. **МАТЕМАТИЧЕСКАЯ ТОЧНОСТЬ:** Цифры в ответе (цены, маржа, прибыль) ДОЛЖНЫ СТОГО соответствовать результатам из JSON инструментов. Любое несовпадение = критическая ошибка (factual).
+2. **ОТСУТСТВИЕ ВОДЫ:** Виктор — детерминированная машина. Если в ответе есть лишние приветствия (кроме первого), пустые фразы "я готов помочь" или "я постараюсь", это ошибка (tone).
+3. **GROUNDING:** Ответ не должен содержать ссылок или ID товаров, которых не было в результатах инструментов.
+
 Контекст запроса: "${context.userQuery}"
 Инструменты (JSON): ${JSON.stringify(context.toolResults || [])}
 
@@ -651,10 +667,10 @@ export class ResponseValidator {
 "${response}"
 
 Найди в ответе:
-1. Фактические ошибки (цены не совпадают с результатами инструментов).
-2. Выдуманные ссылки или функции.
-3. Упоминание того, что он "ИИ" или "бот" (он должен быть Виктором, управляющим).
-4. Утечку внутренних логов, ключей или программного кода.
+1. Фактические ошибки в цифрах.
+2. Лишние приветствия и ритуальные фразы ("вода").
+3. Упоминание того, что он "ИИ" или "бот".
+4. Выдуманные ссылки или функции.
 
 Верни только JSON массив объектов вида:
 [{"type": "hallucination" | "factual" | "tone" | "confidentiality", "severity": "high" | "medium", "message": "почему это ошибка"}]

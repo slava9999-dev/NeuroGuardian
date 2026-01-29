@@ -205,12 +205,14 @@ function getAlertButtons(alert: Alert): Record<string, unknown> | undefined {
   // Just show a link to view the product
   if (alert.type === 'price_protection' && alert.product) {
     const { externalId, marketplace } = alert.product;
+    const mpLower = marketplace.toLowerCase().includes('ozon') ? 'ozon' : 'wb';
+    const cleanId = externalId.replace(/^(wb-|ozon-)/, '');
 
     // Only show link to product on marketplace
     const link =
-      marketplace.toLowerCase() === 'wb'
-        ? `https://www.wildberries.ru/catalog/${externalId}/detail.aspx`
-        : `https://www.ozon.ru/product/${externalId}`;
+      mpLower === 'wb'
+        ? `https://www.wildberries.ru/catalog/${cleanId}/detail.aspx`
+        : `https://www.ozon.ru/product/${cleanId}`;
 
     buttons.push([{ text: '🔗 Открыть товар на маркетплейсе', url: link }]);
   }
