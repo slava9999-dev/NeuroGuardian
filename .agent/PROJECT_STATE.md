@@ -1,6 +1,34 @@
 # 📊 Project State — NeuroGUARDIAN
 
-Last Updated: 2026-01-30 (Session 113)
+Last Updated: 2026-01-30 (Session 114) — 17:15 MSK
+
+### Session 2026-01-30 (Session 114 - Database Schema Synchronization & System Recovery) 🛡️🛠️
+
+**Objective: Resolve critical production crashes caused by Drizzle schema mismatches and restore accidentally deleted infrastructure.**
+
+> ✅ **CRITICAL FIX: PRODUCT SCHEMA:** Synchronized the `products` table in Drizzle ORM with the actual database. Removed the non-existent `groupId` (root cause of Vercel crashes) and added 10+ active columns (`status`, `barcode`, `offer_id`, VGH dimensions).
+> ✅ **USER SCHEMA SYNC:** Found and fixed massive discrepancies in the `users` table schema, adding 15+ missing properties including API keys, subscription limits, and settings.
+> ✅ **METADATA HARDENING:** Corrected types and column names for `sentinel_logs` (switched `details` to `jsonb`), `system_flags`, and `system_settings`.
+> ✅ **OPS LOGS INTEGRATION:** Added missing `ops_events` and `ops_audit` tables to the Drizzle registry to enable holistic system monitoring.
+> ✅ **INFRASTRUCTURE SELF-HEALING:** Hardened `initializeDatabase` to automatically create or repair missing tables (`validation_logs`, `threat_history`) on deployment.
+> ✅ **DISASTER RECOVERY:** Successfully restored accidentally deleted core project files (UI pages, repositories, and backend types) to bring the project back to a buildable state.
+
+**Completed Actions:**
+
+- [x] **Drizzle Schema**: `src/infrastructure/database/schema.ts` (Comprehensive sync of `products`, `users`, and system tables).
+- [x] **Database Init**: `src/api-lib/services/database.ts` (Added missing table creation SQL and ensured schema resilience).
+- [x] **Restoration**: Restored `src/api-lib/lib/`, `src/api-lib/repositories/`, `src/components/`, and `src/pages/` from Git history.
+- [x] **Verification**: Confirmed successful product fetching and relational query execution via diagnostic scripts.
+
+**New Issues Discovered:**
+
+- **Hybrid Schema Management**: The project currently uses raw SQL for initialization but Drizzle for queries. This mismatch led to the `groupId` hallucination. A full migration to Drizzle Migrations (`drizzle-kit push`) is recommended.
+
+**Next Steps:**
+
+- [ ] Migrate all raw SQL `CREATE TABLE` statements to `drizzle-kit` managed migrations for better sync visibility.
+- [ ] Audit remaining integration tests to ensure they account for the new schema properties.
+- [ ] Push the current fix to Vercel to verify the "Digital Vision" buyer price extraction in the live environment.
 
 ### Session 2026-01-30 (Session 113 - Neuro-Flash UI & Design System) 🎨✨
 
