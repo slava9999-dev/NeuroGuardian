@@ -433,7 +433,62 @@ export async function initializeDatabase(): Promise<void> {
     )
   `;
 
-  // 7. Marketplace Orders (Sales history)
+  // 7. System Flags & Settings
+  await sql`
+    CREATE TABLE IF NOT EXISTS system_flags (
+      key TEXT PRIMARY KEY,
+      value_bool BOOLEAN,
+      value_text TEXT,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS system_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+
+  // 8. Validation Logs (ResponseValidator Analytics)
+  await sql`
+    CREATE TABLE IF NOT EXISTS validation_logs (
+      id SERIAL PRIMARY KEY,
+      user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+      score INTEGER NOT NULL,
+      passed BOOLEAN NOT NULL,
+      issue_types TEXT,
+      issue_count INTEGER DEFAULT 0,
+      has_critical BOOLEAN DEFAULT false,
+      query_preview VARCHAR(100),
+      response_length INTEGER,
+      processing_time_ms INTEGER,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+
+  // 9. Threat History (Sentinel Analytics)
+  await sql`
+    CREATE TABLE IF NOT EXISTS threat_history (
+      id SERIAL PRIMARY KEY,
+      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      product_id VARCHAR(255) NOT NULL,
+      nm_id VARCHAR(255),
+      marketplace VARCHAR(50) NOT NULL,
+      threat_type VARCHAR(100) NOT NULL,
+      severity VARCHAR(20) NOT NULL,
+      message TEXT,
+      threat_data TEXT,
+      action_taken VARCHAR(50),
+      price_before_fix INTEGER,
+      price_after_fix INTEGER,
+      resolved_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+
+  // 10. Marketplace Orders (Sales history)
   await sql`
     CREATE TABLE IF NOT EXISTS marketplace_orders (
       id SERIAL PRIMARY KEY,
@@ -461,13 +516,15 @@ export async function initializeDatabase(): Promise<void> {
   // Ensure account_id exists
   await sql`ALTER TABLE marketplace_orders ADD COLUMN IF NOT EXISTS account_id INTEGER REFERENCES marketplace_accounts(id) ON DELETE SET NULL`;
 
-  // 8. Indexes
+  // 11. Indexes
   await sql`CREATE INDEX IF NOT EXISTS idx_products_user_id ON products(user_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_sentinel_logs_user_id ON sentinel_logs(user_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_orders_user_id ON marketplace_orders(user_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_orders_account_id ON marketplace_orders(account_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_users_protection ON users(protection_enabled, subscription_active) WHERE protection_enabled = true`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_validation_logs_user_id ON validation_logs(user_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_threat_history_user_id ON threat_history(user_id)`;
 
   // 9. User State (Agent V5)
   await sql`
