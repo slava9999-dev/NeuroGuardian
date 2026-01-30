@@ -9,12 +9,16 @@ async function testBrowserEyes() {
       marketplace: 'WB' as const,
       url: 'https://www.wildberries.ru/catalog/153373282/detail.aspx',
     },
-    // Uncomment to test Ozon
-    // {
-    //   name: 'Ozon Product',
-    //   marketplace: 'Ozon' as const,
-    //   url: 'https://www.ozon.ru/product/...',
-    // },
+    {
+      name: 'WB Product (Classic)',
+      marketplace: 'WB' as const,
+      url: 'https://www.wildberries.ru/catalog/153373282/detail.aspx',
+    },
+    {
+      name: 'Ozon Product (Classic)',
+      marketplace: 'Ozon' as const,
+      url: 'https://www.ozon.ru/product/smart-chasy-apple-watch-se-40mm-alyuminiy-midnight-sport-band-midnight-685125301/',
+    },
   ];
 
   for (const testCase of testCases) {

@@ -3,7 +3,7 @@ process.env.NODE_ENV = 'production';
 
 // Load environment variables immediately
 import * as dotenv from 'dotenv';
-dotenv.config({ path: '.env.production' });
+dotenv.config({ path: '.env' });
 
 // Verify critical env vars
 if (!process.env.POSTGRES_URL && !process.env.DATABASE_URL) {

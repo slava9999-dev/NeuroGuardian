@@ -6,7 +6,7 @@ import {
   systemFlags,
   marketplaceAccounts,
 } from '../infrastructure/database/db.js';
-import { eq, and, sql as drizzleSql, inArray } from 'drizzle-orm';
+import { eq, and, or, isNull, sql as drizzleSql, inArray } from 'drizzle-orm';
 
 import { logSentinelAction } from '../api-lib/services/database.js';
 import type { DBUser, DBProduct } from '../api-lib/lib/types.js';
@@ -289,8 +289,8 @@ export class SentinelOrchestrator {
       .where(
         and(
           eq(products.userId, String(user.id)),
-          eq(products.isMonitored, true), // STRICT: only monitor what is explicitly enabled
-          drizzleSql`(${products.accountId} IS NULL OR ${marketplaceAccounts.isActive} = true)`
+          eq(products.isMonitored, true),
+          or(isNull(products.accountId), eq(marketplaceAccounts.isActive, true))
         )
       )
       .limit(options.limit || 2000);
@@ -704,8 +704,41 @@ export class SentinelOrchestrator {
       }
     }
 
-    // 5. Price Parity Analysis (WB Index Protection)
-    await this.analyzePriceParity(Number(user.id), allProducts);
+    // 5. Price Parity Analysis (WB Index Protection) — Integrated into Threat History
+    const parityThreats = this.threatDetector.detectParityThreats(allProducts);
+    if (parityThreats.length > 0) {
+      summary.threatsDetected += parityThreats.length;
+      if (userResult) userResult.threatsDetected += parityThreats.length;
+
+      // Log and Alert for parity group issues
+      await this.threatDetector.logThreatsToHistory(String(user.id), parityThreats, 'WB'); // Default to WB for parity as it triggers the risk
+
+      for (const threat of parityThreats) {
+        // Send alert for the group (using first item title for context)
+        const sampleProduct =
+          allProducts.find(p => (p as any).group_id === (threat.data as any).groupId) ||
+          allProducts[0];
+
+        await this.alertSender
+          .sendThreatAlert(user, sampleProduct, threat, 'WB')
+          .catch(err => logger.error('[Sentinel] Failed to send parity alert', err));
+
+        // Also log to legacy action table for dashboard compatibility
+        await logSentinelAction({
+          user_id: user.id,
+          product_id: threat.productId,
+          product_title: sampleProduct.title,
+          detected_price: (threat.data as any).wbPrice,
+          min_price: 0,
+          defense_action: 'PARITY_ALERT',
+          saved_amount: 0,
+          marketplace: 'WB',
+          threat_type: threat.type,
+          success: true,
+          details: threat.data as Record<string, unknown>,
+        }).catch(() => {});
+      }
+    }
 
     // 6. Logistics Optimization (VGH/Volume Analysis)
     await this.analyzeLogisticsOptimization(Number(user.id), allProducts);
@@ -897,76 +930,6 @@ export class SentinelOrchestrator {
       }
     } catch (e) {
       logger.error(`[Hunter] Error processing product ${product.product_id}`, e);
-    }
-  }
-
-  /**
-   * Price Parity Mode: Compare prices between marketplaces for linked products
-   */
-  private async analyzePriceParity(userId: number, productsList: DBProduct[]) {
-    const grouped = new Map<string, DBProduct[]>();
-
-    for (const p of productsList) {
-      if (p.group_id) {
-        if (!grouped.has(p.group_id)) grouped.set(p.group_id, []);
-        grouped.get(p.group_id)!.push(p);
-      }
-    }
-
-    for (const [groupId, items] of grouped) {
-      if (items.length < 2) continue;
-
-      const wbItem = items.find(i => i.marketplace === 'WB');
-      const ozonItem = items.find(i => i.marketplace === 'Ozon');
-
-      if (wbItem && ozonItem) {
-        const wbPrice = wbItem.estimated_buyer_price || wbItem.current_price;
-        const ozonPrice = ozonItem.estimated_buyer_price || ozonItem.current_price;
-
-        if (wbPrice > 0 && ozonPrice > 0) {
-          // WB Index Trigger: if Ozon is > 3% cheaper, WB will flag as "Expensive"
-          const diffPercent = ((wbPrice - ozonPrice) / wbPrice) * 100;
-
-          if (diffPercent > 3) {
-            logger.warn(
-              `[Sentinel] Price Parity Risk for group ${groupId}: WB ${wbPrice} vs Ozon ${ozonPrice} (${diffPercent.toFixed(1)}%)`
-            );
-
-            await this.alertSender.sendAlert({
-              type: 'price_disparity',
-              urgency: 'high',
-              message:
-                `⚖️ **Нарушение паритета цен (Риск индекса WB)**\n\n` +
-                `Товар на Ozon значительно дешевле, чем на WB. Это приведет к потере СПП и снижению выдачи!\n\n` +
-                `🛒 **WB:** ${wbPrice}₽\n` +
-                `🛒 **Ozon:** ${ozonPrice}₽\n` +
-                `📉 Разница: ${diffPercent.toFixed(1)}%\n\n` +
-                `💡 *Рекомендуемое действие:* Поднимите цену на Ozon или временно обнулите остаток для "ослепления" индекса.`,
-              product: {
-                name: wbItem.title,
-                marketplace: 'ALL',
-                externalId: groupId,
-                userId: userId,
-              },
-            });
-
-            // Log threat
-            await logSentinelAction({
-              user_id: userId,
-              product_id: `GROUP-${groupId}`,
-              product_title: wbItem.title,
-              detected_price: wbPrice,
-              min_price: 0,
-              defense_action: 'PARITY_ALERT',
-              saved_amount: 0,
-              marketplace: 'ALL',
-              threat_type: 'market_disparity_risk',
-              success: true,
-              details: { wbPrice, ozonPrice, diffPercent, groupId },
-            }).catch(err => logger.error('Failed to log parity action:', err));
-          }
-        }
-      }
     }
   }
 

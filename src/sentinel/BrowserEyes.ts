@@ -152,11 +152,17 @@ export class BrowserEyes {
         };
 
         if (proxyConfig) {
-          logger.info(`[BrowserEyes] Attempt ${attempt}: Using proxy ${proxyConfig.server}`);
+          const proxyUrl = new URL(proxyConfig.server);
+          if (proxyConfig.username && proxyConfig.password) {
+            proxyUrl.username = proxyConfig.username;
+            proxyUrl.password = proxyConfig.password;
+          }
+
+          logger.info(
+            `[BrowserEyes] Attempt ${attempt}: Using proxy ${proxyUrl.protocol}//${proxyUrl.host}`
+          );
           contextOptions.proxy = {
-            server: proxyConfig.server,
-            username: proxyConfig.username,
-            password: proxyConfig.password,
+            server: proxyUrl.toString(),
           };
         }
 

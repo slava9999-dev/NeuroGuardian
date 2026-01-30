@@ -280,4 +280,54 @@ export class ThreatDetector {
         threats.some(t => t.type === ThreatType.COMPETITOR_PRICE_DROP),
     };
   }
+
+  /**
+   * Analyze price parity risks (WB vs Ozon)
+   */
+  public detectParityThreats(products: DBProduct[]): Threat[] {
+    const threats: Threat[] = [];
+    const grouped = new Map<string, DBProduct[]>();
+
+    for (const p of products) {
+      if (p.group_id) {
+        if (!grouped.has(p.group_id)) grouped.set(p.group_id, []);
+        grouped.get(p.group_id)!.push(p);
+      }
+    }
+
+    for (const [groupId, items] of grouped) {
+      if (items.length < 2) continue;
+
+      const wbItem = items.find(i => i.marketplace === 'WB');
+      const ozonItem = items.find(i => i.marketplace === 'Ozon');
+
+      if (wbItem && ozonItem) {
+        const wbPrice = wbItem.estimated_buyer_price || wbItem.current_price || 0;
+        const ozonPrice = ozonItem.estimated_buyer_price || ozonItem.current_price || 0;
+
+        if (wbPrice > 0 && ozonPrice > 0) {
+          // WB Index Trigger: if Ozon is > 3% cheaper, WB will flag as "Expensive"
+          const diffPercent = ((wbPrice - ozonPrice) / wbPrice) * 100;
+
+          if (diffPercent > 3) {
+            threats.push({
+              type: ThreatType.MARKET_DISPARITY_RISK,
+              severity: diffPercent > 10 ? 'critical' : 'high',
+              productId: `GROUP-${groupId}`,
+              nmId: wbItem.nm_id,
+              message: `Нарушение паритета цен: WB (${wbPrice}₽) vs Ozon (${ozonPrice}₽). Риск потери СПП на WB!`,
+              data: {
+                wbPrice,
+                ozonPrice,
+                diffPercent: Math.round(diffPercent * 10) / 10,
+                groupId,
+              },
+            });
+          }
+        }
+      }
+    }
+
+    return threats;
+  }
 }
