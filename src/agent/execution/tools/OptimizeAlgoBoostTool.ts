@@ -1,7 +1,11 @@
 import { z } from 'zod';
 import { defineTool } from '../ToolRegistry.js';
 import { logger } from '../../../api-lib/lib/logger.js';
-import { marketplaceService } from '../../../api-lib/core-services/MarketplaceService.js';
+
+const schema = z.object({
+  productId: z.string().describe('ID товара'),
+  marketplace: z.enum(['WB', 'Ozon']).describe('Маркетплейс'),
+});
 
 /**
  * Algo-Boost Optimizer Tool
@@ -12,19 +16,18 @@ export const optimizeAlgoBoostTool = defineTool({
   description:
     'Анализирует факторы ранжирования товара (Цена, Логистика, Остатки) и дает точные инструкции по бустингу в поисковой выдаче.',
   category: 'analyze',
-  schema: z.object({
-    productId: z.string().describe('ID товара'),
-    marketplace: z.enum(['WB', 'Ozon']).describe('Маркетплейс'),
-  }),
+  requiresConfirmation: false,
+  schema: schema,
   execute: async (userId, args) => {
     try {
-      logger.info(`[AlgoBoost] Auditing product ${args.productId} for user ${userId}`);
+      const typedArgs = args as z.infer<typeof schema>;
+      logger.info(`[AlgoBoost] Auditing product ${typedArgs.productId} for user ${userId}`);
 
       // In a real scenario, we would fetch fresh VGH and Stock data
       // For now, we provide the Strategic Analysis framework based on the 2025 Strategy Doc
 
       const audit = {
-        marketplace: args.marketplace,
+        marketplace: typedArgs.marketplace,
         healthScore: 72, // 1-100
         issues: [
           {

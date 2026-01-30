@@ -3,6 +3,17 @@ import { defineTool } from '../ToolRegistry.js';
 import { logger } from '../../../api-lib/lib/logger.js';
 import { llmRouter } from '../../../infrastructure/llm/LLMRouter.js';
 
+const schema = z.object({
+  productCategory: z
+    .string()
+    .describe('Ниша или категория товара (например: косметика, электроника, мебель)'),
+  targetAudience: z
+    .string()
+    .optional()
+    .describe('Целевая аудитория (например: профессиональные мастера, домохозяйки)'),
+  features: z.string().optional().describe('Ключевые особенности товара'),
+});
+
 /**
  * Universal Semantic Core Generator Tool
  * Generates a full 1000-keyword semantic core for any niche/product.
@@ -12,22 +23,15 @@ export const generateSemanticCoreTool = defineTool({
   description:
     'Генерирует комплексное семантическое ядро (ВЧ, СЧ, НЧ, LSI) для любого товара на WB/Ozon. Подходит для любой ниши.',
   category: 'analyze',
-  schema: z.object({
-    productCategory: z
-      .string()
-      .describe('Ниша или категория товара (например: косметика, электроника, мебель)'),
-    targetAudience: z
-      .string()
-      .optional()
-      .describe('Целевая аудитория (например: профессиональные мастера, домохозяйки)'),
-    features: z.string().optional().describe('Ключевые особенности товара'),
-  }),
+  requiresConfirmation: false,
+  schema: schema,
   execute: async (userId, args) => {
     try {
-      logger.info(`[SemanticCore] Generating core for niche: ${args.productCategory}`);
+      const typedArgs = args as z.infer<typeof schema>;
+      logger.info(`[SemanticCore] Generating core for niche: ${typedArgs.productCategory}`);
 
       const systemPrompt = `Ты — ведущий SEO-аналитик маркетплейсов Wildberries и Ozon.
-Твоя задача: спроектировать полное семантическое ядро для товара в нише "${args.productCategory}".
+Твоя задача: спроектировать полное семантическое ядро для товара в нише "${typedArgs.productCategory}".
 
 СТРУКТУРА ЯДРА (выдай в формате JSON):
 1. HIGH_FREQUENCY: 10-15 самых мощных запросов для заголовка.
@@ -49,21 +53,33 @@ export const generateSemanticCoreTool = defineTool({
   "recommendations": "..."
 }`;
 
-      const userPrompt = `Категория: ${args.productCategory}
-Целевая аудитория: ${args.targetAudience || 'общая'}
-Особенности: ${args.features || 'не указаны'}`;
+      const userPrompt = `Категория: ${typedArgs.productCategory}
+Целевая аудитория: ${typedArgs.targetAudience || 'общая'}
+Особенности: ${typedArgs.features || 'не указаны'}`;
 
-      const response = await llmRouter.generateStructuredResponse(
+      const response = await llmRouter.complete(
         [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
-        { temperature: 0.5, jsonMode: true }
+        { temperature: 0.5 }
       );
+
+      let data;
+      try {
+        const jsonMatch = response.content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          data = JSON.parse(jsonMatch[0]);
+        } else {
+          data = { text: response.content };
+        }
+      } catch (e) {
+        data = { text: response.content };
+      }
 
       return {
         success: true,
-        data: response,
+        data: data,
       };
     } catch (error) {
       logger.error('Semantic core generation failed', error);

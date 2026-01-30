@@ -3,6 +3,14 @@ import { defineTool } from '../ToolRegistry.js';
 import { logger } from '../../../api-lib/lib/logger.js';
 import { llmRouter } from '../../../infrastructure/llm/LLMRouter.js';
 
+const schema = z.object({
+  productId: z.string().describe('ID товара для оптимизации'),
+  marketplace: z.enum(['WB', 'Ozon']).describe('Маркетплейс'),
+  currentTitle: z.string().describe('Текущий заголовок'),
+  currentDescription: z.string().optional().describe('Текущее описание'),
+  category: z.string().optional().describe('Категория (например: панно, рейлинг)'),
+});
+
 /**
  * Optimize Product SEO Tool
  * Uses the 2025-2026 Semantic Core strategies from Arbarea strategy docs
@@ -12,16 +20,12 @@ export const optimizeProductSEOTool = defineTool({
   description:
     'Оптимизирует заголовок и описание товара на основе семантического ядра 2025 года. Использует LSI-фразы, кластеры WB и эмоциональный интент.',
   category: 'analyze',
-  schema: z.object({
-    productId: z.string().describe('ID товара для оптимизации'),
-    marketplace: z.enum(['WB', 'Ozon']).describe('Маркетплейс'),
-    currentTitle: z.string().describe('Текущий заголовок'),
-    currentDescription: z.string().optional().describe('Текущее описание'),
-    category: z.string().optional().describe('Категория (например: панно, рейлинг)'),
-  }),
+  requiresConfirmation: false,
+  schema: schema,
   execute: async (userId, args) => {
     try {
-      logger.info(`[SEO] Optimizing product ${args.productId} for ${args.marketplace}`);
+      const typedArgs = args as z.infer<typeof schema>;
+      logger.info(`[SEO] Optimizing product ${typedArgs.productId} for ${typedArgs.marketplace}`);
 
       const systemPrompt = `Ты — эксперт по SEO для маркетплейсов WB и Ozon, специализирующийся на бренде Arbarea (Loft, Handmade, Дерево).
 Твоя задача: переписать заголовок и описание товара, используя семантическое ядро 2025 года.
@@ -45,27 +49,39 @@ export const optimizeProductSEOTool = defineTool({
   "strategyApplied": "..."
 }`;
 
-      const userPrompt = `Товар: ${args.currentTitle}
-Категория: ${args.category || 'автоопределение'}
-Маркетплейс: ${args.marketplace}
-Текущее описание: ${args.currentDescription || 'отсутствует'}
+      const userPrompt = `Товар: ${typedArgs.currentTitle}
+Категория: ${typedArgs.category || 'автоопределение'}
+Маркетплейс: ${typedArgs.marketplace}
+Текущее описание: ${typedArgs.currentDescription || 'отсутствует'}
 
 Выполни оптимизацию.`;
 
-      const response = await llmRouter.generateStructuredResponse(
+      const response = await llmRouter.complete(
         [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
         {
           temperature: 0.7,
-          jsonMode: true,
         }
       );
 
+      let data;
+      try {
+        // Find JSON in the response
+        const jsonMatch = response.content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          data = JSON.parse(jsonMatch[0]);
+        } else {
+          data = { text: response.content };
+        }
+      } catch (e) {
+        data = { text: response.content };
+      }
+
       return {
         success: true,
-        data: response,
+        data: data,
       };
     } catch (error) {
       logger.error('SEO optimization failed', error);
