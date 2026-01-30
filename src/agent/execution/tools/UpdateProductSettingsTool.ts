@@ -44,6 +44,12 @@ export const updateProductSettingsTool = defineTool({
       if (args.is_monitored !== undefined)
         changes.push(`мониторинг: ${monitored ? 'ВКЛ' : 'ВЫКЛ'}`);
     }
+    if (args.group_id !== undefined) {
+      const { productRepository } =
+        await import('../../../api-lib/repositories/ProductRepository.js');
+      await productRepository.updateGroupId(userId, p.product_id, args.group_id);
+      changes.push(`группа (мэтчинг): ${args.group_id || 'СБРОШЕНО'}`);
+    }
 
     return {
       success: true,

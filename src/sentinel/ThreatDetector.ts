@@ -15,6 +15,8 @@ export const ThreatType = {
   BUYER_PRICE_BELOW_STOPLOSS: 'buyer_price_below_stoploss',
   // NEW: Product was added to a promo/sale that drops buyer price
   PROMO_PRICE_VIOLATION: 'promo_price_violation',
+  // NEW: Price imbalance between marketplaces (WB Index Risk)
+  MARKET_DISPARITY_RISK: 'market_disparity_risk',
 } as const;
 
 export type ThreatType = (typeof ThreatType)[keyof typeof ThreatType];

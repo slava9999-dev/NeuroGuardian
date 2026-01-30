@@ -156,6 +156,7 @@ export interface DBProduct {
   id: number; // SERIAL PRIMARY KEY
   user_id: string; // VARCHAR(50) NOT NULL REFERENCES users(id)
   product_id: string; // VARCHAR(255) NOT NULL
+  group_id: string | null; // VARCHAR(255) (Cross-marketplace group ID)
   nm_id: string | null; // VARCHAR(50) (WB nmId)
   offer_id: string | null; // VARCHAR(255) (Ozon offer_id - migration 007)
   official_sku: string | null; // VARCHAR(255)

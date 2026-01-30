@@ -30,6 +30,8 @@ export type AlertType =
   | 'defense_confirmation' // Manual confirmation for defense action
   | 'promo_violation' // NEW: Product added to promo, buyer price below stoploss
   | 'stoploss_breach' // NEW: Real buyer price is below stoploss
+  | 'price_disparity' // NEW: WB vs Ozon price imbalance
+  | 'logistics_optimization' // NEW: Suggestion to optimize packaging/VGH
   | 'welcome';
 
 export interface Alert {
@@ -311,7 +313,9 @@ function getAlertButtons(alert: Alert): Record<string, unknown> | undefined {
       alert.type === 'stoploss_breach' ||
       alert.type === 'margin_warning' ||
       alert.type === 'stock_warning' ||
-      alert.type === 'competitor_alert') &&
+      alert.type === 'competitor_alert' ||
+      alert.type === 'price_disparity' ||
+      alert.type === 'logistics_optimization') &&
     alert.product
   ) {
     const { externalId, marketplace } = alert.product;
@@ -736,6 +740,78 @@ function formatAlert(alert: Alert, smartMessage?: string | null): string {
       ``,
       `━━━━━━━━━━━━━━━━━━━━`,
       `💡 *РЕКОМЕНДАЦИЯ:* Срочно поднимите цену или выйдите из акции, чтобы остановить убытки.`,
+      `_ver: 2.2_`,
+    ].join('\n');
+  }
+
+  // Price Disparity alert (WB vs Ozon parity)
+  if (alert.type === 'price_disparity' && alert.product) {
+    const now = new Date();
+    const time = now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+
+    const wbPrice = (alert.data?.wbPrice as number) || 0;
+    const ozonPrice = (alert.data?.ozonPrice as number) || 0;
+    const diffPercent = (alert.data?.diffPercent as number) || 0;
+
+    const shortTitle =
+      alert.product.name.length > 50
+        ? alert.product.name.substring(0, 47) + '...'
+        : alert.product.name;
+
+    return [
+      `⚖️ *РИСК ПАРИТЕТА: ИНДЕКС WB*`,
+      ``,
+      `Обнаружен ценовой дисбаланс между маркетплейсами. Ozon дешевле более чем на 3%, что приведет к статусу "Дорого" на WB.`,
+      ``,
+      `🕒 Время: ${time} (МСК)`,
+      `📦 *${escapeMarkdown(shortTitle)}*`,
+      ``,
+      `📊 *СРАВНЕНИЕ ЦЕН:*`,
+      `├─ Цена WB: *${wbPrice}₽*`,
+      `├─ Цена Ozon: *${ozonPrice}₽*`,
+      `└─ Разница: *${diffPercent.toFixed(1)}%*`,
+      ``,
+      `⚠️ *ПОСЛЕДСТВИЯ:* Снятие СПП на Wildberries, падение в выдаче, блокировка участия в акциях.`,
+      ``,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      `💡 *РЕКОМЕНДАЦИЯ:* Сравняйте цены или временно обнулите остаток на Ozon для сброса индекса WB.`,
+      `_ver: 2.2_`,
+    ].join('\n');
+  }
+
+  // Logistics Optimization alert (VGH)
+  if (alert.type === 'logistics_optimization' && alert.product) {
+    const now = new Date();
+    const time = now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+
+    const currentVol = (alert.data?.currentVol as number) || 0;
+    const currentCost = (alert.data?.currentCost as number) || 0;
+    const targetVol = (alert.data?.targetVol as number) || 0;
+    const targetCost = (alert.data?.targetCost as number) || 0;
+    const recommendation = (alert.data?.recommendation as string) || '';
+
+    const shortTitle =
+      alert.product.name.length > 50
+        ? alert.product.name.substring(0, 47) + '...'
+        : alert.product.name;
+
+    return [
+      `📦 *ОПТИМИЗАЦИЯ ЛОГИСТИКИ (ВГХ)*`,
+      ``,
+      `Командир, ваши габариты упаковки находятся на «границе» тарифа. Небольшое изменение позволит существенно сэкономить!`,
+      ``,
+      `🕒 Время: ${time} (МСК)`,
+      `📦 *${escapeMarkdown(shortTitle)}*`,
+      ``,
+      `📊 *АНАЛИЗ ЗАТРАТ:*`,
+      `├─ Сейчас: *${currentVol.toFixed(2)}л* (${currentCost}₽)`,
+      `├─ После опт.: *${targetVol.toFixed(2)}л* (${targetCost}₽)`,
+      `└─ Экономия: *${currentCost - targetCost}₽* с единицы!`,
+      ``,
+      `💡 *РЕКОМЕНДАЦИЯ:* ${recommendation}`,
+      ``,
+      `━━━━━━━━━━━━━━━━━━━━`,
+      `💰 *ИТОГО:* При 100 заказах в месяц вы сэкономите **${(currentCost - targetCost) * 100}₽** только на этом товаре.`,
       `_ver: 2.2_`,
     ].join('\n');
   }

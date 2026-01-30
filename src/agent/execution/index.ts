@@ -29,6 +29,10 @@ import { getAbcAnalysisTool } from './tools/GetAbcAnalysisTool.js';
 import { getStockForecastTool } from './tools/GetStockForecastTool.js';
 import { getLowMarginProductsTool } from './tools/GetLowMarginProductsTool.js';
 import { GetCatalogHealthTool } from './tools/GetCatalogHealthTool.js';
+import { optimizeProductSEOTool } from './tools/OptimizeProductSEOTool.js';
+import { getLocalizationAnalysisTool } from './tools/GetLocalizationAnalysisTool.js';
+import { generateSemanticCoreTool } from './tools/GenerateSemanticCoreTool.js';
+import { optimizeAlgoBoostTool } from './tools/OptimizeAlgoBoostTool.js';
 
 // Write tools
 import { setStopLossTool } from './tools/SetStopLossTool.js';
@@ -71,6 +75,10 @@ export function registerAllTools(): void {
   toolRegistry.register(getLowMarginProductsTool);
   toolRegistry.register(getRealPriceTool); // Digital Vision
   toolRegistry.register(GetCatalogHealthTool);
+  toolRegistry.register(optimizeProductSEOTool);
+  toolRegistry.register(getLocalizationAnalysisTool);
+  toolRegistry.register(generateSemanticCoreTool);
+  toolRegistry.register(optimizeAlgoBoostTool);
 
   // Write tools (require confirmation)
   toolRegistry.register(setStopLossTool);
@@ -122,6 +130,10 @@ export { getCompetitorPriceTool } from './tools/GetCompetitorPriceTool.js';
 // export { getReviewsTool } from './tools/GetReviewsTool.js';
 export { getLowMarginProductsTool } from './tools/GetLowMarginProductsTool.js';
 export { GetCatalogHealthTool } from './tools/GetCatalogHealthTool.js';
+export { optimizeProductSEOTool } from './tools/OptimizeProductSEOTool.js';
+export { getLocalizationAnalysisTool } from './tools/GetLocalizationAnalysisTool.js';
+export { generateSemanticCoreTool } from './tools/GenerateSemanticCoreTool.js';
+export { optimizeAlgoBoostTool } from './tools/OptimizeAlgoBoostTool.js';
 export { getRealPriceTool } from './tools/GetRealPriceTool.js';
 export { syncCatalogTool } from './tools/SyncCatalogTool.js';
 // export { generateProductImageTool } from './tools/GenerateProductImageTool.js';

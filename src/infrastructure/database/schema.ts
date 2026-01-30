@@ -71,6 +71,7 @@ export const products = pgTable(
     competitorPrice: integer('competitor_price').default(0),
     priceStrategy: varchar('price_strategy', { length: 50 }).default('passive'),
     minMargin: integer('min_margin').default(0),
+    groupId: varchar('group_id', { length: 255 }), // For linking WB/Ozon products (Entity Merging)
     lastVisionSync: timestamp('last_vision_sync'),
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow(),

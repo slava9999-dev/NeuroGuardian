@@ -329,6 +329,7 @@ export class SentinelOrchestrator {
           competitor_url: r.competitorUrl,
           competitor_price: r.competitorPrice,
           price_strategy: r.priceStrategy,
+          group_id: r.groupId,
         })) as unknown as DBProduct[];
 
         allProducts.push(...legacyRows);
@@ -703,6 +704,12 @@ export class SentinelOrchestrator {
       }
     }
 
+    // 5. Price Parity Analysis (WB Index Protection)
+    await this.analyzePriceParity(Number(user.id), allProducts);
+
+    // 6. Logistics Optimization (VGH/Volume Analysis)
+    await this.analyzeLogisticsOptimization(Number(user.id), allProducts);
+
     // === SENTINEL PRICE REPORT ===
     if (options.sendPriceReport) {
       try {
@@ -890,6 +897,135 @@ export class SentinelOrchestrator {
       }
     } catch (e) {
       logger.error(`[Hunter] Error processing product ${product.product_id}`, e);
+    }
+  }
+
+  /**
+   * Price Parity Mode: Compare prices between marketplaces for linked products
+   */
+  private async analyzePriceParity(userId: number, productsList: DBProduct[]) {
+    const grouped = new Map<string, DBProduct[]>();
+
+    for (const p of productsList) {
+      if (p.group_id) {
+        if (!grouped.has(p.group_id)) grouped.set(p.group_id, []);
+        grouped.get(p.group_id)!.push(p);
+      }
+    }
+
+    for (const [groupId, items] of grouped) {
+      if (items.length < 2) continue;
+
+      const wbItem = items.find(i => i.marketplace === 'WB');
+      const ozonItem = items.find(i => i.marketplace === 'Ozon');
+
+      if (wbItem && ozonItem) {
+        const wbPrice = wbItem.estimated_buyer_price || wbItem.current_price;
+        const ozonPrice = ozonItem.estimated_buyer_price || ozonItem.current_price;
+
+        if (wbPrice > 0 && ozonPrice > 0) {
+          // WB Index Trigger: if Ozon is > 3% cheaper, WB will flag as "Expensive"
+          const diffPercent = ((wbPrice - ozonPrice) / wbPrice) * 100;
+
+          if (diffPercent > 3) {
+            logger.warn(
+              `[Sentinel] Price Parity Risk for group ${groupId}: WB ${wbPrice} vs Ozon ${ozonPrice} (${diffPercent.toFixed(1)}%)`
+            );
+
+            await this.alertSender.sendAlert({
+              type: 'price_disparity',
+              urgency: 'high',
+              message:
+                `⚖️ **Нарушение паритета цен (Риск индекса WB)**\n\n` +
+                `Товар на Ozon значительно дешевле, чем на WB. Это приведет к потере СПП и снижению выдачи!\n\n` +
+                `🛒 **WB:** ${wbPrice}₽\n` +
+                `🛒 **Ozon:** ${ozonPrice}₽\n` +
+                `📉 Разница: ${diffPercent.toFixed(1)}%\n\n` +
+                `💡 *Рекомендуемое действие:* Поднимите цену на Ozon или временно обнулите остаток для "ослепления" индекса.`,
+              product: {
+                name: wbItem.title,
+                marketplace: 'ALL',
+                externalId: groupId,
+                userId: userId,
+              },
+            });
+
+            // Log threat
+            await logSentinelAction({
+              user_id: userId,
+              product_id: `GROUP-${groupId}`,
+              product_title: wbItem.title,
+              detected_price: wbPrice,
+              min_price: 0,
+              defense_action: 'PARITY_ALERT',
+              saved_amount: 0,
+              marketplace: 'ALL',
+              threat_type: 'market_disparity_risk',
+              success: true,
+              details: { wbPrice, ozonPrice, diffPercent, groupId },
+            }).catch(err => logger.error('Failed to log parity action:', err));
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Logistics Optimization Analysis (VGH/Volume)
+   * Formula 2025: L = 38 + (V - 1) * 9.5
+   */
+  private async analyzeLogisticsOptimization(userId: number, productsList: DBProduct[]) {
+    for (const p of productsList) {
+      if (p.marketplace !== 'WB') continue; // WB has the most aggressive volume-based pricing
+      if (!p.width_cm || !p.height_cm || !p.depth_cm) continue;
+
+      const calcVolume = (w: number, h: number, d: number) => (w * h * d) / 1000;
+      const calcCost = (v: number) => 38 + Math.max(0, v - 1) * 9.5;
+
+      const currentVol = calcVolume(p.width_cm, p.height_cm, p.depth_cm);
+      const currentCost = Math.round(calcCost(currentVol));
+
+      // Try shrinking each dimension by 1cm to see if it drops the cost significantly
+      const dimensions = [
+        { name: 'ширину', val: p.width_cm },
+        { name: 'высоту', val: p.height_cm },
+        { name: 'длину', val: p.depth_cm },
+      ];
+
+      for (const dim of dimensions) {
+        if (dim.val <= 2) continue; // Don't shrink below 2cm
+
+        const testVol = currentVol * ((dim.val - 1) / dim.val);
+        const testCost = Math.round(calcCost(testVol));
+
+        // If 1cm saving leads to > 5% cost reduction or > 10 RUB saving
+        if (currentCost - testCost >= 10) {
+          logger.info(
+            `[Sentinel] Logistics Opt found for ${p.product_id}: -1cm ${dim.name} saves ${currentCost - testCost}₽`
+          );
+
+          await this.alertSender.sendAlert({
+            type: 'logistics_optimization',
+            urgency: 'medium',
+            message: '', // Formatted by notification service
+            product: {
+              name: p.title,
+              marketplace: p.marketplace,
+              externalId: p.product_id,
+              userId: userId,
+            },
+            data: {
+              currentVol,
+              currentCost,
+              targetVol: testVol,
+              targetCost: testCost,
+              recommendation: `Уменьшите **${dim.name}** упаковки всего на **1 см**. Это снизит расчетный объем заказа и сэкономит вам деньги на логистике маркетплейса.`,
+            },
+          });
+
+          break; // Only one alert per product
+        }
+      }
     }
   }
 

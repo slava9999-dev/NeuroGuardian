@@ -126,6 +126,7 @@ export const UpdateProductSettingsArgsSchema = z.object({
   category: z.string().optional(),
   min_price: z.number().int().min(0).optional(),
   is_monitored: z.boolean().optional(),
+  group_id: z.string().optional().describe('ID группы для объединения товаров (WB + Ozon)'),
   account_id: z.number().optional().describe('Account ID filter'),
 });
 

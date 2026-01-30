@@ -151,6 +151,10 @@ export class ProductRepository {
     await sql`UPDATE products SET cost_price = ${costPrice}, updated_at = NOW() WHERE user_id = ${userId} AND product_id = ${productId}`;
   }
 
+  async updateGroupId(userId: number, productId: string, groupId: string | null): Promise<void> {
+    await sql`UPDATE products SET group_id = ${groupId}, updated_at = NOW() WHERE user_id = ${userId} AND product_id = ${productId}`;
+  }
+
   async batchUpdateCostPrices(
     userId: number,
     updates: Array<{ productId: string; costPrice: number }>
