@@ -4,51 +4,58 @@ import { useChatStore } from '../../stores';
 interface ViktorCoreProps {
   size?: 'sm' | 'md' | 'lg';
   status?: 'idle' | 'processing' | 'alert' | 'success';
+  animate?: boolean;
 }
 
-export function ViktorCore({ size = 'md', status: manualStatus }: ViktorCoreProps) {
+export function ViktorCore({
+  size = 'md',
+  status: manualStatus,
+  animate: forceAnimate = false,
+}: ViktorCoreProps) {
   const isProcessing = useChatStore(state => state.isProcessing);
   const status = manualStatus || (isProcessing ? 'processing' : 'idle');
 
   const containerSizes = {
-    sm: 'w-12 h-12',
-    md: 'w-24 h-24',
-    lg: 'w-32 h-32', // Slightly smaller than the orb to look realistic
+    sm: 'size-10',
+    md: 'size-20',
+    lg: 'size-28',
   };
 
   const statusColors = {
-    idle: 'border-slate-200 shadow-[0_0_20px_rgba(15,23,42,0.08)]',
-    processing: 'border-primary shadow-[0_0_24px_var(--color-primary-dim)]',
-    alert: 'border-rose-300 shadow-[0_0_24px_rgba(244,63,94,0.2)]',
-    success: 'border-emerald-300 shadow-[0_0_24px_rgba(16,185,129,0.2)]',
+    idle: 'border-black/5 shadow-xl',
+    processing: 'border-primary/40 shadow-[0_0_20px_rgba(0,0,0,0.05)]',
+    alert: 'border-toxic-orange/40 shadow-[0_0_24px_rgba(255,107,0,0.1)]',
+    success: 'border-peace-green/40 shadow-[0_0_24px_rgba(16,185,129,0.1)]',
+  };
+
+  const pulseColor = {
+    idle: 'bg-black/5',
+    processing: 'bg-primary/20',
+    alert: 'bg-toxic-orange/20',
+    success: 'bg-peace-green/20',
   };
 
   return (
     <div className="relative flex items-center justify-center">
-      {/* Ambient Ring */}
+      {/* Tactical Radar Ring */}
       <motion.div
-        className={`absolute rounded-full ${containerSizes[size]} border border-slate-200/80`}
+        className={`absolute rounded-full ${containerSizes[size]} border border-black/[0.03]`}
         animate={{
-          scale: [1, 1.05, 1],
-          opacity: [0.35, 0.6, 0.35],
+          scale: [1, 1.15, 1],
+          opacity: [0.3, 0.6, 0.3],
         }}
-        transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
+        transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
       />
 
       {/* Pulse Status Ring */}
-      {status !== 'idle' && (
+      {(status !== 'idle' || forceAnimate) && (
         <motion.div
-          className={`absolute rounded-full border-2 ${containerSizes[size]} opacity-50`}
-          style={{
-            borderColor:
-              status === 'processing' ? '#6366f1' : status === 'alert' ? '#f43f5e' : '#10b981',
-          }}
+          className={`absolute rounded-full ${containerSizes[size]} ${pulseColor[status]} blur-xl opacity-30`}
           animate={{
-            scale: [1, 1.25, 1],
-            opacity: [0.6, 0, 0.6],
+            scale: [1, 1.4, 1],
           }}
           transition={{
-            duration: 1.6,
+            duration: 2,
             repeat: Infinity,
             ease: 'easeInOut',
           }}
@@ -57,46 +64,58 @@ export function ViktorCore({ size = 'md', status: manualStatus }: ViktorCoreProp
 
       {/* Main Avatar Container */}
       <motion.div
-        className={`${containerSizes[size]} relative rounded-2xl overflow-hidden border-2 bg-white shadow-2xl z-10 transition-colors duration-500 ${statusColors[status]}`}
+        className={`${containerSizes[size]} relative rounded-3xl overflow-hidden border bg-white shadow-2xl z-10 transition-all duration-500 ${statusColors[status]}`}
         layout
-        animate={{ scale: [1, 1.02, 1], rotate: [0, 0.4, 0] }}
-        transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+        animate={{
+          rotate: status === 'processing' ? [0, 1, -1, 0] : 0,
+        }}
+        transition={{ duration: 5, repeat: Infinity }}
       >
         <img
           src="/viktor-human.png"
-          className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-700"
-          alt="8:B>@"
+          className="w-full h-full object-cover grayscale-[0.3] transition-all duration-700 hover:grayscale-0"
+          alt="Viktor Core"
         />
 
-        {/* Glass Reflection Overlay */}
-        <div className="absolute inset-0 bg-linear-to-tr from-white/25 via-transparent to-transparent pointer-events-none" />
-        <div className="absolute inset-0 bg-linear-to-b from-transparent via-transparent to-slate-200/40 pointer-events-none" />
+        {/* Tactical HUD Overlay (Glass) */}
+        <div className="absolute inset-0 bg-linear-to-tr from-white/10 via-transparent to-black/[0.02] pointer-events-none" />
 
-        {/* Processing Waveform Overlay */}
+        {/* Processing Waveform (Compact Tactical) */}
         {status === 'processing' && (
-          <div className="absolute bottom-0 left-0 right-0 h-1/3 bg-linear-to-t from-indigo-400/30 to-transparent flex items-end justify-center pb-2 gap-1 pointer-events-none">
-            {[1, 2, 3, 4].map(i => (
+          <div className="absolute inset-x-0 bottom-2 flex items-end justify-center gap-0.5 h-4 pointer-events-none">
+            {[1, 2, 3, 4, 3, 2].map((i, idx) => (
               <motion.div
-                key={i}
-                className="w-1 bg-indigo-500/70 rounded-full"
-                animate={{ height: [4, 12, 4] }}
+                key={idx}
+                className="w-0.5 bg-primary/60 rounded-full"
+                animate={{ height: [`${i * 20}%`, `${i * 30}%`, `${i * 20}%`] }}
                 transition={{
-                  duration: 0.8,
+                  duration: 0.6,
                   repeat: Infinity,
-                  delay: i * 0.1,
-                  ease: 'easeInOut',
+                  delay: idx * 0.05,
                 }}
               />
             ))}
           </div>
         )}
 
-        {/* Subtle scan line */}
+        {/* Scanning Sweep Line */}
         <motion.div
-          className="absolute inset-x-0 top-0 h-1 bg-primary/30"
-          animate={{ y: ['0%', '100%', '0%'] }}
-          transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+          className={`absolute inset-x-0 h-[1px] ${status === 'alert' ? 'bg-toxic-orange/40' : 'bg-primary/20'} z-20`}
+          animate={{ top: ['0%', '100%', '0%'] }}
+          transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
         />
+
+        {/* Success / Alert Flush */}
+        <AnimatePresence>
+          {(status === 'success' || status === 'alert') && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.15 }}
+              exit={{ opacity: 0 }}
+              className={`absolute inset-0 ${status === 'success' ? 'bg-peace-green' : 'bg-toxic-orange'}`}
+            />
+          )}
+        </AnimatePresence>
       </motion.div>
     </div>
   );

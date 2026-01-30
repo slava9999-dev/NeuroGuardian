@@ -1,6 +1,6 @@
 // ============================================
-// NeuroGUARDIAN — Products Page V7.0 (Warm Light)
-// Aesthetic: Clean, Spacious, Warm Light Mode
+// NeuroGUARDIAN — Products Page v2.0
+// Aesthetic: Transparent Intelligence | Tactical Control
 // ============================================
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -16,8 +16,10 @@ import {
   Settings,
   RefreshCcw,
   CheckCircle2,
+  LayoutGrid,
+  Zap,
 } from 'lucide-react';
-import { useProductsStore } from '../stores';
+import { useProductsStore, useAppStore } from '../stores';
 import { productsApi } from '../lib/api';
 import { GlobalSwitch } from '../components/controls/GlobalSwitch';
 import { DashboardGrid } from '../components/dashboard/DashboardGrid';
@@ -60,8 +62,6 @@ export function ProductsPage({
   const [showFilters, setShowFilters] = useState(false);
 
   const [selectedForCalculator, setSelectedForCalculator] = useState<Product | null>(null);
-
-  // Load products on mount
 
   const loadProducts = useCallback(async () => {
     setIsLoading(true);
@@ -114,179 +114,149 @@ export function ProductsPage({
     };
   }, [products]);
 
-  const viktorStatus = useMemo(() => {
-    if (stats.triggered > 0) {
-      return {
-        tone: 'alert' as const,
-        badge: 'ТРЕБУЕТ ВНИМАНИЯ',
-        title: 'Обнаружены угрозы по ценам',
-        message: `${stats.triggered} товара под атакой. Рекомендую перейти в центр защиты.`,
-      };
-    }
-    if (stats.unprotected > 0) {
-      return {
-        tone: 'processing' as const,
-        badge: 'РЕКОМЕНДАЦИЯ',
-        title: 'Часть товаров без защиты',
-        message: `Без защиты осталось ${stats.unprotected} товаров. Настройте стоп-лоссы.`,
-      };
-    }
-    return {
-      tone: 'success' as const,
-      badge: 'ВСЕ СПОКОЙНО',
-      title: 'Каталог под защитой',
-      message: 'Все товары защищены. Мониторинг каждые 30 минут.',
-    };
+  const designMode = useMemo(() => {
+    if (stats.triggered > 0) return 'critical';
+    return 'peace';
   }, [stats]);
 
-  const viktorToneStyles: Record<typeof viktorStatus.tone, string> = {
-    alert: 'border-danger/20 bg-danger-soft',
-    processing: 'border-warning/20 bg-warning-soft',
-    success: 'border-success/20 bg-success-soft',
-  };
-
   return (
-    <div className="min-h-full pb-24 bg-page relative overflow-x-hidden" role="main">
-      {/* Header */}
-      <header className="sticky top-0 z-30 bg-surface/95 backdrop-blur-xl border-b border-surface-dim">
-        <div className="px-4 py-3">
-          <div className="flex items-center justify-between gap-3">
-            {/* Back + Title */}
-            <div className="flex items-center gap-3 min-w-0">
-              <button
-                onClick={() => {
-                  hapticFeedback('light');
-                  onBack();
-                }}
-                className="p-2.5 rounded-xl bg-surface border border-surface-dim hover:border-primary transition-all"
-                aria-label="Назад"
-              >
-                <ArrowLeft className="w-5 h-5 text-text-secondary" />
-              </button>
-              <div className="min-w-0">
-                <h1 className="text-lg font-bold text-text-main tracking-tight">Товары</h1>
-                <p className="text-xs font-medium text-text-muted">
-                  {stats.total} SKU • {stats.protected} защищено
-                </p>
+    <div className={`min-h-full pb-32 font-display relative overflow-x-hidden mode-${designMode}`}>
+      {/* Header (Premium Glass) */}
+      <header className="sticky top-0 z-40 glass-nav border-b border-black/5 px-4 py-4">
+        <div className="flex items-center justify-between max-w-2xl mx-auto">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                hapticFeedback('light');
+                onBack();
+              }}
+              className="size-10 flex items-center justify-center rounded-xl fused-card border border-black/5 active:scale-90 transition-transform"
+            >
+              <ArrowLeft size={18} />
+            </button>
+            <div>
+              <h1 className="text-base font-black tracking-tight text-text-main">Склад</h1>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[9px] uppercase tracking-widest font-black text-black/40">
+                  {stats.total} SKU • {stats.protected} под защитой
+                </span>
               </div>
             </div>
+          </div>
 
-            {/* Actions */}
-            <div className="shrink-0 flex items-center gap-2">
-              <button
-                onClick={() => {
-                  hapticFeedback('light');
-                  onNavigate?.('settings');
-                }}
-                className="p-2 rounded-xl hover:bg-surface-hl transition-all text-text-muted hover:text-primary"
-                aria-label="Настройки"
-              >
-                <Settings className="w-5 h-5" />
-              </button>
-              <GlobalSwitch compact />
-            </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                hapticFeedback('light');
+                onNavigate?.('settings');
+              }}
+              className="p-2 rounded-xl bg-black/5 text-black/40 hover:text-primary transition-colors"
+            >
+              <Settings size={18} />
+            </button>
+            <GlobalSwitch compact />
           </div>
         </div>
       </header>
 
-      <div className="relative z-10 px-4 py-6 space-y-5">
-        {/* Sync Result Toast */}
+      <div className="px-4 py-6 space-y-6 max-w-2xl mx-auto">
+        {/* Sync Result notification */}
         <AnimatePresence>
           {syncResult && (
             <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0 }}
-              className={`p-4 rounded-xl flex items-center gap-3 ${
+              className={`p-4 rounded-2xl flex items-center gap-3 border shadow-sm ${
                 syncResult.success
-                  ? 'bg-success-soft border border-success/20'
-                  : 'bg-danger-soft border border-danger/20'
+                  ? 'bg-peace-green/10 border-peace-green/20 text-peace-green'
+                  : 'bg-toxic-orange/10 border-toxic-orange/20 text-toxic-orange'
               }`}
             >
-              <CheckCircle2
-                className={`w-5 h-5 ${syncResult.success ? 'text-success' : 'text-danger'}`}
-              />
-              <div>
-                <span
-                  className={`font-semibold ${syncResult.success ? 'text-success' : 'text-danger'}`}
-                >
-                  {syncResult.success ? 'Синхронизировано!' : 'Ошибка синхронизации'}
-                </span>
-                {syncResult.success && (
-                  <p className="text-sm text-text-secondary">
-                    Загружено товаров: <strong>{syncResult.count}</strong>
-                  </p>
-                )}
+              <CheckCircle2 size={18} />
+              <div className="text-xs font-black uppercase tracking-tight">
+                {syncResult.success
+                  ? `Синхронизировано: ${syncResult.count} товаров`
+                  : 'Ошибка синхронизации'}
               </div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Viktor Status Panel */}
+        {/* Viktor status widget */}
         {!isLoading && products.length > 0 && (
-          <motion.div
-            className={`p-4 rounded-2xl border flex items-start gap-4 ${viktorToneStyles[viktorStatus.tone]}`}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
+          <div
+            className={`fused-card p-4 flex gap-4 border-l-4 ${designMode === 'critical' ? 'border-l-toxic-orange' : 'border-l-peace-green'}`}
           >
-            <div className="shrink-0 mt-0.5">
-              <ViktorCore size="sm" status={viktorStatus.tone} />
+            <div className="shrink-0">
+              <ViktorCore size="sm" animate={designMode === 'critical'} />
             </div>
-            <div className="flex-1 min-w-0">
+            <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
-                <span className="badge badge-neutral text-[9px]">{viktorStatus.badge}</span>
+                <span
+                  className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter ${designMode === 'critical' ? 'bg-toxic-orange text-black' : 'bg-peace-green/20 text-peace-green'}`}
+                >
+                  {designMode === 'critical' ? 'Alert: Демпинг' : 'System: Стабильно'}
+                </span>
               </div>
-              <p className="text-sm font-semibold text-text-main mb-1">{viktorStatus.title}</p>
-              <p className="text-xs text-text-secondary leading-relaxed">{viktorStatus.message}</p>
+              <p className="text-[11px] font-medium text-black/60 leading-relaxed">
+                {designMode === 'critical'
+                  ? `${stats.triggered} товара находятся в зоне ценовой атаки. Стоп-лосс активирован.`
+                  : 'Все торговые позиции синхронизированы. Угроз не обнаружено.'}
+              </p>
             </div>
-          </motion.div>
+          </div>
         )}
 
-        {/* Search + Filter Bar */}
-        <div className="flex gap-2">
-          <div className="flex-1 relative group">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted group-focus-within:text-primary transition-colors" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Поиск товаров..."
-              className="input pl-10"
-            />
-          </div>
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`px-4 rounded-xl border transition-all ${
-              showFilters || marketplaceFilter !== 'all' || statusFilter !== 'all'
-                ? 'bg-primary-dim border-primary/30 text-primary'
-                : 'bg-surface border-surface-dim text-text-muted hover:border-primary/30'
-            }`}
-          >
-            <Filter className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Filter Panel */}
-        <AnimatePresence>
-          {showFilters && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="overflow-hidden"
+        {/* Search + Filter UI */}
+        <div className="space-y-3">
+          <div className="flex gap-2">
+            <div className="flex-1 relative group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-4 text-black/30 group-focus-within:text-primary transition-colors" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Поиск по артикулу..."
+                className="w-full h-12 bg-white rounded-2xl border border-black/5 pl-11 pr-4 text-sm font-medium focus:ring-2 focus:ring-primary/10 outline-none transition-all shadow-inner"
+              />
+            </div>
+            <button
+              onClick={() => {
+                hapticFeedback('light');
+                setShowFilters(!showFilters);
+              }}
+              className={`size-12 shrink-0 flex items-center justify-center rounded-2xl border transition-all ${
+                showFilters || marketplaceFilter !== 'all' || statusFilter !== 'all'
+                  ? 'bg-primary border-primary text-white shadow-lg'
+                  : 'bg-white border-black/5 text-black/40 hover:border-primary/20 shadow-sm'
+              }`}
             >
-              <div className="p-4 rounded-2xl card space-y-4">
+              <Filter size={20} />
+            </button>
+          </div>
+
+          <AnimatePresence>
+            {showFilters && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="fused-card p-4 space-y-4 shadow-xl"
+              >
                 <div>
-                  <p className="input-label mb-2">Маркетплейс</p>
+                  <label className="text-[9px] font-black uppercase tracking-widest text-black/30 mb-2 block">
+                    Маркетплейс
+                  </label>
                   <div className="flex gap-2">
                     {(['all', 'WB', 'Ozon'] as const).map(m => (
                       <button
                         key={m}
                         onClick={() => setMarketplaceFilter(m)}
-                        className={`flex-1 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all border ${
+                        className={`flex-1 h-9 rounded-xl text-[10px] font-black uppercase tracking-tight transition-all border ${
                           marketplaceFilter === m
-                            ? 'bg-primary-dim border-primary/30 text-primary'
-                            : 'bg-surface-warm border-surface-dim text-text-secondary hover:border-primary/30'
+                            ? 'bg-primary border-primary text-white shadow-lg'
+                            : 'bg-black/5 border-transparent text-black/40'
                         }`}
                       >
                         {m === 'all' ? 'Все' : m}
@@ -294,25 +264,26 @@ export function ProductsPage({
                     ))}
                   </div>
                 </div>
-
                 <div>
-                  <p className="input-label mb-2">Статус</p>
+                  <label className="text-[9px] font-black uppercase tracking-widest text-black/30 mb-2 block">
+                    Режим
+                  </label>
                   <div className="flex flex-wrap gap-2">
                     {(
                       [
                         { id: 'all', label: 'Все' },
-                        { id: 'active', label: 'Активные' },
-                        { id: 'protected', label: 'Защита' },
-                        { id: 'triggered', label: 'Атаки' },
+                        { id: 'active', label: 'В продаже' },
+                        { id: 'protected', label: 'В охране' },
+                        { id: 'triggered', label: 'В огне' },
                       ] as const
                     ).map(s => (
                       <button
                         key={s.id}
                         onClick={() => setStatusFilter(s.id)}
-                        className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all border ${
+                        className={`px-4 h-9 rounded-xl text-[10px] font-black uppercase tracking-tight transition-all border ${
                           statusFilter === s.id
-                            ? 'bg-primary-dim border-primary/30 text-primary'
-                            : 'bg-surface-warm border-surface-dim text-text-secondary hover:border-primary/30'
+                            ? 'bg-primary border-primary text-white shadow-lg'
+                            : 'bg-black/5 border-transparent text-black/40'
                         }`}
                       >
                         {s.label}
@@ -320,58 +291,48 @@ export function ProductsPage({
                     ))}
                   </div>
                 </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
-        {/* Quick Actions Row */}
-        <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 no-scrollbar">
+        {/* Tactical Actions Row */}
+        <div className="flex gap-2 overflow-x-auto no-scrollbar py-2">
           <button
             onClick={() => {
               hapticFeedback('medium');
               setShowBulkStopLoss(true);
             }}
-            className="flex-1 min-w-[140px] btn btn-primary py-3"
+            className="h-12 px-5 rounded-2xl bg-primary text-white flex items-center gap-2 shadow-lg shadow-primary/20 active:scale-95 transition-all text-xs font-black uppercase tracking-tight shrink-0"
           >
-            <Shield className="w-4 h-4" />
-            Защитить все
+            <Shield size={16} /> Накрыть все защитой
           </button>
 
           <button
-            disabled={isSyncing}
             onClick={handleSync}
-            className="p-3 min-w-[48px] btn btn-secondary"
-            title="Синхронизировать"
+            disabled={isSyncing}
+            className="size-12 shrink-0 flex items-center justify-center rounded-2xl bg-white border border-black/5 text-black/40 active:bg-gray-50 transition-colors shadow-sm"
           >
-            <RefreshCcw className={`w-5 h-5 ${isSyncing ? 'animate-spin' : ''}`} />
+            <RefreshCcw size={18} className={isSyncing ? 'animate-spin text-primary' : ''} />
           </button>
 
           <button
-            onClick={() => {
-              hapticFeedback('light');
-              setShowBulkCosts(true);
-            }}
-            className="p-3 min-w-[48px] btn btn-secondary"
-            title="Загрузить себестоимость"
+            onClick={() => setShowBulkCosts(true)}
+            className="size-12 shrink-0 flex items-center justify-center rounded-2xl bg-white border border-black/5 text-black/40 active:bg-gray-50 transition-colors shadow-sm"
           >
-            <Upload className="w-5 h-5" />
+            <Upload size={18} />
           </button>
 
           <button
-            onClick={() => {
-              hapticFeedback('light');
-              setShowLogHistory(true);
-            }}
-            className="p-3 min-w-[48px] btn btn-secondary"
-            title="История"
+            onClick={() => setShowLogHistory(true)}
+            className="size-12 shrink-0 flex items-center justify-center rounded-2xl bg-white border border-black/5 text-black/40 active:bg-gray-50 transition-colors shadow-sm"
           >
-            <History className="w-5 h-5" />
+            <History size={18} />
           </button>
         </div>
 
-        {/* Products Grid or Skeleton Loading */}
-        <div className="min-h-[200px]">
+        {/* Inventory Flow Matrix (Grid) */}
+        <div className="min-h-[400px]">
           {isLoading ? (
             <div className="space-y-4">
               {[1, 2, 3].map(i => (
@@ -383,31 +344,27 @@ export function ProductsPage({
           )}
         </div>
 
-        {/* Empty Catalog State */}
+        {/* Zero state */}
         {!isLoading && products.length === 0 && (
-          <div className="text-center py-20 px-4">
-            <div className="w-24 h-24 rounded-2xl bg-surface border border-surface-dim flex items-center justify-center mx-auto mb-8">
-              <Package className="w-12 h-12 text-text-muted" />
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="size-20 rounded-3xl bg-black/5 flex items-center justify-center mb-6">
+              <LayoutGrid size={32} className="text-black/10" />
             </div>
-            <h3 className="text-xl font-bold text-text-main mb-2">Каталог пуст</h3>
-            <p className="text-text-secondary text-sm max-w-[240px] mx-auto mb-8">
-              Подключите аккаунты маркетплейсов в настройках для синхронизации товаров.
+            <h3 className="text-lg font-black text-black/80 tracking-tight">Склад пуст</h3>
+            <p className="text-xs font-medium text-black/40 max-w-[200px] mt-2 mb-8">
+              Подключите API ключи WB/Ozon для автоматической загрузки каталога.
             </p>
             <button
-              onClick={() => {
-                hapticFeedback('medium');
-                onNavigate?.('settings');
-              }}
-              className="btn btn-primary py-4 px-8"
+              onClick={() => onNavigate?.('settings')}
+              className="h-12 px-8 rounded-2xl bg-black text-white text-[10px] font-black uppercase tracking-widest"
             >
-              <Settings className="w-4 h-4" />
-              Подключить API
+              Настройки API
             </button>
           </div>
         )}
       </div>
 
-      {/* MODALS */}
+      {/* Modals Bridge */}
       <AnimatePresence>
         {showBulkStopLoss && (
           <BulkStopLossModal isOpen={showBulkStopLoss} onClose={() => setShowBulkStopLoss(false)} />
@@ -420,16 +377,10 @@ export function ProductsPage({
         )}
       </AnimatePresence>
 
-      {/* Calculator */}
       {selectedForCalculator && (
         <PriceCalculator
           marketplace={selectedForCalculator.marketplace}
-          initialCostPrice={
-            selectedForCalculator.costPrice ||
-            (selectedForCalculator.minPrice > 0
-              ? Math.round(selectedForCalculator.minPrice * 0.7)
-              : undefined)
-          }
+          initialCostPrice={selectedForCalculator.costPrice}
           onClose={() => setSelectedForCalculator(null)}
           onCalculated={async price => {
             hapticFeedback('success');
@@ -438,11 +389,8 @@ export function ProductsPage({
               const res = await productsApi.updateProductParams(selectedForCalculator.id, {
                 minPrice: price,
               });
-              if (res.success) {
-                updateProduct(selectedForCalculator.id, { minPrice: price });
-              }
+              if (res.success) updateProduct(selectedForCalculator.id, { minPrice: price });
             } catch (error) {
-              console.error('Failed to apply calculated price', error);
               hapticFeedback('error');
             }
           }}

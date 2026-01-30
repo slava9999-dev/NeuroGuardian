@@ -1,21 +1,22 @@
 // ============================================
-// NeuroAgent — Main App Entry V4.0 (Premium)
-// Aesthetic: System Initialization | Tactical Dashboard
+// NeuroGUARDIAN — Neuro-Flash UI v2.0
+// Architecture: Stitch (Intelligence thru Transparency)
 // ============================================
 
-import React, { useEffect, useState, useRef, lazy } from 'react';
+import React, { useEffect, useState, useRef, lazy, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAppStore, useProductsStore } from './stores';
 import { initTelegramWebApp, isTelegramWebApp, getInitData, hapticFeedback } from './lib/telegram';
 import { authApi, productsApi } from './lib/api';
 import type { User, Product } from './types';
-import { Package, Settings, Info, Cpu } from 'lucide-react';
+import { LayoutGrid, Package, Settings, Info, Cpu, Shield } from 'lucide-react';
 import { ViktorCore } from './components/ui/ViktorCore';
 import './index.css';
 
 import { AgentPage } from './pages/AgentPage';
 import { ProductsPage } from './pages/ProductsPage';
 import { SettingsPage } from './pages/SettingsPage';
+
 const LegalPage = lazy(() => import('./pages/LegalPage').then(m => ({ default: m.LegalPage })));
 const OpsPanelPage = lazy(() =>
   import('./pages/OpsPanelPage').then(m => ({ default: m.OpsPanelPage }))
@@ -27,29 +28,26 @@ const GodModePage = lazy(() =>
   import('./pages/GodModePage').then(m => ({ default: m.GodModePage }))
 );
 
-// Premium Loading Screen V6.0 (Human)
+// Premium Loading Screen (Neuro-Flash Ghost Skeleton)
 function LoadingScreen() {
   return (
     <div className="h-dvh flex flex-col items-center justify-center bg-background overflow-hidden relative">
-      <div className="bg-cosmic" />
-      {/* Nebula glow removed for cleaner Human UI */}
-
+      <div className="aura-layer" />
       <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
         className="text-center relative z-20"
       >
-        <div className="relative mb-10">
+        <div className="relative mb-8 skeleton-pulse rounded-full p-4">
           <ViktorCore size="lg" />
         </div>
-
-        <div className="flex flex-col items-center gap-2">
-          <h1 className="text-3xl font-black italic tracking-tighter text-slate-900 uppercase">
-            NEURO<span className="text-indigo-600">GUARDIAN</span>
+        <div className="flex flex-col items-center gap-1">
+          <h1 className="text-3xl font-black tracking-tighter text-slate-900 font-display">
+            NEURO<span className="text-primary italic">FLASH</span>
           </h1>
-          <div className="flex items-center gap-3 text-[10px] font-mono text-slate-400 font-bold uppercase tracking-[0.4em]">
-            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_var(--color-success)]" />
-            Инициализация...
+          <div className="flex items-center gap-2 text-[10px] font-bold text-primary/40 uppercase tracking-[0.3em]">
+            <span className="size-1.5 rounded-full bg-primary animate-pulse" />
+            Био-синхронизация...
           </div>
         </div>
       </motion.div>
@@ -70,9 +68,11 @@ const DEV_USER = {
 };
 
 type Page = 'agent' | 'products' | 'settings' | 'info' | 'ops' | 'subscription' | 'god-mode';
+type DesignMode = 'peace' | 'hunt' | 'critical';
 
 function App() {
   const { setUser, setLoading, isLoading, user } = useAppStore();
+  const { products } = useProductsStore();
   const [isInitialized, setIsInitialized] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState<Page>(() => {
@@ -81,6 +81,15 @@ function App() {
   });
 
   const initPerformed = useRef(false);
+
+  // Dynamic Mode Detection
+  const designMode = useMemo<DesignMode>(() => {
+    if (!products || products.length === 0) return 'peace';
+    const hasCritical = products.some(p => p.status === 'triggered');
+    if (hasCritical) return 'critical';
+    const isHunting = products.some(p => p.isMonitored);
+    return isHunting ? 'hunt' : 'peace';
+  }, [products]);
 
   useEffect(() => {
     if (initPerformed.current) return;
@@ -93,16 +102,7 @@ function App() {
           setUser(DEV_USER as User);
           const productsResult = await productsApi.getProducts();
           if (productsResult.products) {
-            const products = productsResult.products.map(p => ({
-              ...p,
-              vendorCode: p.vendorCode || '',
-              imageUrl: p.imageUrl || '',
-              lastCheckedAt: new Date(),
-              lastTriggeredAt: null,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            }));
-            useProductsStore.getState().setProducts(products as Product[]);
+            useProductsStore.getState().setProducts(productsResult.products as Product[]);
           }
         } else if (isTelegramWebApp()) {
           initTelegramWebApp();
@@ -112,16 +112,7 @@ function App() {
             setUser(authResult.user);
             const productsResult = await productsApi.getProducts();
             if (productsResult.products) {
-              const products = productsResult.products.map(p => ({
-                ...p,
-                vendorCode: p.vendorCode || '',
-                imageUrl: p.imageUrl || '',
-                lastCheckedAt: new Date(),
-                lastTriggeredAt: null,
-                createdAt: new Date(),
-                updatedAt: new Date(),
-              }));
-              useProductsStore.getState().setProducts(products as Product[]);
+              useProductsStore.getState().setProducts(productsResult.products as Product[]);
             }
           }
         } else {
@@ -142,15 +133,12 @@ function App() {
   if (authError) {
     return (
       <div className="h-dvh flex flex-col items-center justify-center bg-background p-8 text-center relative overflow-hidden">
-        <div className="bg-cosmic" />
-        <h1 className="text-xl font-black italic text-slate-900 mb-2 uppercase tracking-tighter relative z-10">
+        <div className="aura-layer" />
+        <h1 className="text-xl font-black text-hot-neon mb-2 uppercase tracking-tighter font-display">
           СИСТЕМНАЯ ОШИБКА
         </h1>
-        <p className="text-slate-500 text-sm mb-8 font-medium relative z-10">{authError}</p>
-        <a
-          href="https://t.me/NeuroGuardianBot"
-          className="btn-premium w-full max-w-xs relative z-10"
-        >
+        <p className="text-slate-500 text-sm mb-8 font-medium">{authError}</p>
+        <a href="https://t.me/NeuroGuardianBot" className="btn btn-primary w-full max-w-xs">
           ПЕРЕПОДКЛЮЧИТЬСЯ
         </a>
       </div>
@@ -188,52 +176,86 @@ function App() {
     }
   };
 
-  const PageWrapper = ({ children, pageId }: { children: React.ReactNode; pageId: string }) => (
-    <motion.div
-      key={pageId}
-      initial={{ opacity: 0, y: 5 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -5 }}
-      transition={{ duration: 0.3, ease: 'easeOut' }}
-      className="h-full"
-    >
-      {children}
-    </motion.div>
-  );
-
   return (
-    <div className="h-dvh flex flex-col relative overflow-hidden bg-background">
-      {/* Global Cosmic Layer (Subtle Gradient) */}
-      <div className="bg-cosmic" />
+    <div
+      className={`h-dvh flex flex-col relative overflow-hidden bg-background mode-${designMode}`}
+    >
+      {/* L2: Aura Canvas */}
+      <div className="aura-layer" />
 
-      <main className="flex-1 relative min-h-0 overflow-y-auto no-scrollbar">
+      {/* L3: Critical HUD Alert (Only in Critical Mode) */}
+      {designMode === 'critical' && (
+        <motion.div initial={{ y: -50 }} animate={{ y: 0 }} className="hud-alert">
+          <div className="flex items-center gap-2">
+            <Shield className="size-4 animate-pulse text-black" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-black">
+              Sentinel: Внимание, обнаружены угрозы демпинга
+            </span>
+          </div>
+          <button
+            onClick={() => setCurrentPage('ops')}
+            className="text-[9px] font-black bg-black text-toxic-orange px-2 py-1 rounded"
+          >
+            ЛОГИ
+          </button>
+        </motion.div>
+      )}
+
+      {/* Main Context Layer */}
+      <main
+        className={`flex-1 relative min-h-0 overflow-y-auto no-scrollbar ${designMode === 'critical' ? 'pt-12' : ''}`}
+      >
         <AnimatePresence mode="wait" initial={false}>
-          <PageWrapper pageId={currentPage}>
+          <motion.div
+            key={currentPage}
+            initial={{ opacity: 0, y: 10, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.98 }}
+            transition={{ duration: 0.4, ease: 'easeOut' }}
+            className="h-full"
+          >
             <PageContent />
-          </PageWrapper>
+          </motion.div>
         </AnimatePresence>
       </main>
 
-      {/* Premium Navigation (Light Glass) */}
-      <nav className="fixed bottom-0 left-0 right-0 nav-glass safe-area-inset-bottom z-50">
-        <div className="flex justify-around items-center h-16 px-4 max-w-lg mx-auto">
+      {/* L1: Glass HUD Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 glass-nav safe-area-inset-bottom-zero z-50 border-t border-black/5">
+        <div className="flex justify-around items-center h-20 px-4 max-w-lg mx-auto">
           <NavButton
             active={currentPage === 'agent'}
             onClick={() => setCurrentPage('agent')}
-            icon={<Cpu />}
-            label="Агент"
+            icon={<LayoutGrid />}
+            label="Главная"
           />
           <NavButton
             active={currentPage === 'products'}
             onClick={() => setCurrentPage('products')}
             icon={<Package />}
-            label="Товары"
+            label="Склад"
           />
+
+          {/* Viktor Center Button */}
+          <div className="relative -top-4">
+            <button
+              onClick={() => {
+                hapticFeedback('heavy');
+                setCurrentPage('agent');
+              }}
+              className="size-14 rounded-full bg-primary flex items-center justify-center shadow-lg shadow-primary/30 border-4 border-white transition-transform active:scale-90"
+            >
+              <Cpu className="text-white size-7" />
+            </button>
+            <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[9px] font-black uppercase text-primary tracking-tighter">
+              Страж
+            </span>
+          </div>
+
           <NavButton
             active={currentPage === 'settings'}
             onClick={() => setCurrentPage('settings')}
             icon={<Settings />}
-            label="Настройки"
+            label="Система"
             dot={user?.hasUnlinkedAccounts}
           />
           <NavButton
@@ -263,34 +285,28 @@ function NavButton({ active, onClick, icon, label, dot }: NavButtonProps) {
         hapticFeedback('light');
         onClick();
       }}
-      aria-current={active ? 'page' : undefined}
-      aria-label={label}
-      className={`relative flex flex-col items-center gap-1.5 transition-all flex-1 py-1 ${active ? 'text-primary' : 'text-zinc-500 hover:text-zinc-300'}`}
+      className={`relative flex flex-col items-center gap-1 transition-all flex-1 py-1 ${
+        active ? 'text-primary' : 'text-black/30'
+      }`}
     >
-      <div
-        className={`p-1.5 rounded-xl transition-all duration-300 relative ${active ? 'bg-primary/10' : ''}`}
-      >
-        {React.cloneElement(icon as React.ReactElement<{ size?: number; strokeWidth?: number }>, {
-          size: 20,
-          strokeWidth: active ? 2.5 : 2,
-        })}
-
+      <div className="p-1 rounded-xl transition-all duration-300">
+        {React.cloneElement(
+          icon as React.ReactElement<{
+            size?: number;
+            strokeWidth?: number;
+            className?: string;
+          }>,
+          {
+            size: 22,
+            strokeWidth: active ? 3 : 2,
+            className: active ? 'fill-current' : '',
+          }
+        )}
         {dot && (
-          <div className="absolute top-0 right-0 w-2 h-2 bg-danger rounded-full border-2 border-background" />
+          <div className="absolute top-1 right-1/4 w-2 h-2 bg-toxic-orange rounded-full border-2 border-white" />
         )}
       </div>
-      <span
-        className={`text-[9px] font-bold uppercase tracking-wider transition-opacity ${active ? 'opacity-100' : 'opacity-60'}`}
-      >
-        {label}
-      </span>
-      {active && (
-        <motion.div
-          layoutId="nav-indicator"
-          className="absolute -top-px w-8 h-[2px] bg-primary rounded-full shadow-[0_0_10px_var(--color-primary)]"
-          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-        />
-      )}
+      <span className="text-[9px] font-black uppercase tracking-tighter">{label}</span>
     </button>
   );
 }

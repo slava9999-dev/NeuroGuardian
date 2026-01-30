@@ -1,11 +1,11 @@
 // ============================================
-// NeuroGUARDIAN — Subscription Page V4.0
-// Premium Professional Upgrades: Pitch Black & Cyber Accents
+// NeuroGUARDIAN — Subscription Page v2.0
+// Aesthetic: Digital Upgrade | Access Tiering
 // ============================================
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, ArrowLeft, Zap, Crown, Package } from 'lucide-react';
+import { Check, ArrowLeft, Zap, Package, Shield, Sparkles } from 'lucide-react';
 import { useAppStore } from '../stores';
 import { paymentApi } from '../lib/api';
 import { hapticFeedback } from '../lib/telegram';
@@ -24,49 +24,49 @@ interface SubscriptionTier {
 const TIERS: SubscriptionTier[] = [
   {
     id: 'free',
-    name: 'BASIC',
+    name: 'Core Basic',
     price: 0,
     currency: 'RUB',
     productLimit: 10,
     shopLimit: 1,
     features: [
-      '10 товаров под защитой',
-      '1 магазин (WB/Ozon)',
-      'Sentinel: Базовая детекция',
-      'Ручной перезапуск',
+      '10 объектов под защитой',
+      '1 торговый канал',
+      'Sentinel: Базовый режим',
+      'Ручной перезапуск потоков',
     ],
   },
   {
     id: 'pro',
-    name: 'PROFESSIONAL',
+    name: 'Professional',
     price: 2999,
     currency: 'RUB',
     productLimit: 500,
     shopLimit: 3,
     isPopular: true,
     features: [
-      '500 товаров под защитой',
-      '3 магазина одновременно',
-      'Sentinel: HARD MODE (24/7)',
-      'Digital Vision: Парсинг цен',
-      'SMM-Ассистент (Unlimited)',
-      'Приоритетный AI-канал',
+      '500 объектов под защитой',
+      '3 активных канала',
+      'Sentinel: Hard Mode (24/7)',
+      'Digital Vision: Сквозные цены',
+      'AI Ассистент (Unlimited)',
+      'Приоритетный Neuro-канал',
     ],
   },
   {
     id: 'business',
-    name: 'ENTERPRISE',
+    name: 'Enterprise',
     price: 9999,
     currency: 'RUB',
     productLimit: 999999,
     shopLimit: 10,
     features: [
-      'Безлимит товаров',
-      '10 магазинов',
-      'Sentinel: Ultra-Low Latency',
-      'Командный доступ',
+      'Безлимитные объекты',
+      '10 торговых каналов',
+      'Sentinel: Ultra-Latency',
+      'Командный доступ (Multi-user)',
       'Персональный архитектор',
-      'API интеграции',
+      'Полный API доступ',
     ],
   },
 ];
@@ -103,135 +103,143 @@ export function SubscriptionPage({ onBack }: SubscriptionPageProps) {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white pb-32 relative overflow-x-hidden bg-cosmic">
-      {/* Dynamic Background Glow */}
-      <div className="nebula-glow opacity-50" />
+    <div className="min-h-full bg-background font-display relative overflow-x-hidden pb-40">
+      <div className="aura-layer" />
 
       {/* Header */}
-      <div className="z-10 p-5 flex items-center justify-between nav-blur sticky top-0">
-        <button onClick={onBack} className="p-2 hover:bg-white/5 rounded-full transition-all">
-          <ArrowLeft className="w-6 h-6 text-zinc-400" />
-        </button>
-        <span className="text-[10px] font-black tracking-[0.3em] text-zinc-500 uppercase">
-          billing system v5
-        </span>
-        <div className="w-10" />
-      </div>
+      <header className="sticky top-0 z-40 glass-nav border-b border-black/5 px-4 py-4">
+        <div className="flex items-center gap-4 max-w-2xl mx-auto">
+          <button
+            onClick={() => {
+              hapticFeedback('light');
+              onBack();
+            }}
+            className="size-10 flex items-center justify-center rounded-xl fused-card border border-black/5 active:scale-90 transition-transform"
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <div className="flex-1">
+            <h1 className="text-base font-black tracking-tight text-text-main">Биллинг</h1>
+            <p className="text-[10px] font-medium text-black/30 tracking-tight">
+              Уровень доступа системы
+            </p>
+          </div>
+        </div>
+      </header>
 
-      <div className="relative z-10 p-6 max-w-xl mx-auto">
-        <header className="text-center mb-10">
-          <h1 className="text-4xl font-black tracking-tight mb-2 italic">UPGRADE</h1>
-          <p className="text-zinc-500 text-sm font-medium">
-            Выберите уровень контроля над вашим бизнесом
+      <div className="px-4 py-8 space-y-8 max-w-2xl mx-auto relative z-10">
+        <div className="text-center space-y-2">
+          <h2 className="text-3xl font-black italic tracking-tighter uppercase">Upgrade</h2>
+          <p className="text-xs font-medium text-black/40 max-w-[240px] mx-auto">
+            Выберите уровень контроля и закройте уязвимости бизнеса
           </p>
-        </header>
+        </div>
 
         {/* Trial Status Card */}
         {user?.subscriptionPlan === 'trial' && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="premium-card bg-violet-500/10 border-violet-500/30 mb-8 flex items-center gap-4"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="fused-card p-5 bg-black text-white flex items-center gap-4 relative overflow-hidden"
           >
-            <div className="w-12 h-12 rounded-full bg-violet-500 flex items-center justify-center shadow-lg shadow-violet-500/40">
-              <Zap className="w-6 h-6 text-white" />
+            <div className="absolute top-0 right-0 p-8 opacity-10">
+              <Sparkles size={80} />
             </div>
-            <div>
-              <h3 className="text-sm font-bold text-white">ТЕСТОВЫЙ ПЕРИОД АКТИВЕН</h3>
-              <p className="text-[11px] text-violet-300 font-mono">
+            <div className="size-12 rounded-2xl bg-white flex items-center justify-center shrink-0 shadow-lg shadow-white/20">
+              <Zap size={22} className="text-black fill-black" />
+            </div>
+            <div className="relative z-10">
+              <h3 className="text-xs font-black uppercase tracking-widest">
+                Тестовый период активен
+              </h3>
+              <p className="text-[10px] font-medium text-white/50 mt-1">
                 Все функции PRO разблокированы до{' '}
-                {user?.subscriptionExpiresAt
-                  ? new Date(user.subscriptionExpiresAt).toLocaleDateString()
-                  : '7 дней'}
+                <span className="text-white">
+                  {user?.subscriptionExpiresAt
+                    ? new Date(user.subscriptionExpiresAt).toLocaleDateString()
+                    : '7 дней'}
+                </span>
               </p>
             </div>
           </motion.div>
         )}
 
-        {/* Current Plan Indicator */}
-        <div className="mb-8 px-2 flex items-center justify-between">
-          <div className="flex flex-col">
-            <span className="text-[10px] text-zinc-500 font-bold uppercase mb-1">
-              ТЕКУЩИЙ СТАТУС
+        {/* Current Info */}
+        <div className="flex items-center justify-between px-1">
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-widest text-black/30 block mb-1">
+              Статус ядра
             </span>
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#10b981]" />
-              <span className="text-lg font-black italic tracking-tighter">
-                {user?.subscriptionPlan?.toUpperCase() || 'FREE'}
+              <div className="size-2 rounded-full bg-peace-green animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+              <span className="text-lg font-black italic uppercase tracking-tighter">
+                {user?.subscriptionPlan || 'Basic Core'}
               </span>
             </div>
           </div>
         </div>
 
-        {/* Tiers List */}
+        {/* TIERS LIST */}
         <div className="space-y-4">
           {TIERS.map(tier => (
             <motion.div
               key={tier.id}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => setSelectedTier(tier.id)}
-              className={`premium-card cursor-pointer relative ${
-                selectedTier === tier.id
-                  ? 'border-violet-500/60 bg-violet-500/5 ring-1 ring-violet-500/20'
-                  : 'border-white/5 opacity-80'
-              }`}
+              onClick={() => {
+                hapticFeedback('light');
+                setSelectedTier(tier.id);
+              }}
+              className={`fused-card p-6 cursor-pointer relative transition-all duration-300 ${selectedTier === tier.id ? 'ring-2 ring-black bg-black/3' : 'opacity-60 border-black/5'}`}
             >
               {tier.isPopular && (
-                <div className="absolute -top-px right-6 bg-emerald-400 text-black text-[9px] font-black px-3 py-1 rounded-b-md shadow-lg shadow-emerald-500/20">
-                  RECOMMENDED
+                <div className="absolute top-0 right-6 bg-black text-white text-[8px] font-black px-3 py-1.5 rounded-b-lg tracking-widest uppercase">
+                  Recommend
                 </div>
               )}
 
               <div className="flex justify-between items-start mb-6">
                 <div>
-                  <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-black/30">
                     {tier.name}
-                  </p>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-black italic">
+                  </span>
+                  <div className="flex items-baseline gap-1 mt-1">
+                    <span className="text-3xl font-black italic tracking-tighter">
                       {tier.price.toLocaleString()}₽
                     </span>
-                    <span className="text-zinc-600 text-[10px] font-bold">/ МЕС</span>
+                    <span className="text-[10px] font-black text-black/20 uppercase">/ мес</span>
                   </div>
                 </div>
-
                 <div
-                  className={`w-6 h-6 rounded-full border flex items-center justify-center transition-all ${
-                    selectedTier === tier.id
-                      ? 'bg-violet-500 border-violet-400'
-                      : 'border-zinc-800 bg-zinc-900'
-                  }`}
+                  className={`size-6 rounded-full border-2 flex items-center justify-center transition-all ${selectedTier === tier.id ? 'bg-black border-black' : 'border-black/5 bg-transparent'}`}
                 >
                   {selectedTier === tier.id && (
-                    <Check className="w-4 h-4 text-white" strokeWidth={4} />
+                    <Check size={14} className="text-white" strokeWidth={4} />
                   )}
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-y-2.5">
-                {tier.features.map((feature, idx) => (
+              <div className="space-y-3">
+                {tier.features.map((f, i) => (
                   <div
-                    key={idx}
-                    className="flex items-center gap-3 text-[12px] font-medium text-zinc-300"
+                    key={i}
+                    className="flex items-center gap-3 text-[11px] font-bold text-black/60"
                   >
-                    <div className="w-1.5 h-1.5 rounded-full bg-violet-500" />
-                    {feature}
+                    <div className="size-1 rounded-full bg-black/20" />
+                    {f}
                   </div>
                 ))}
               </div>
 
-              {/* Limit Footer */}
-              <div className="mt-6 pt-4 border-t border-white/5 flex gap-4">
-                <div className="flex items-center gap-1.5">
-                  <Package className="w-3.5 h-3.5 text-zinc-500" />
-                  <span className="text-[10px] font-mono text-zinc-400">
-                    LIMIT: {tier.productLimit === 999999 ? '∞' : tier.productLimit} SKU
+              <div className="mt-8 pt-5 border-t border-black/5 flex gap-4">
+                <div className="flex items-center gap-2">
+                  <Package size={14} className="text-black/20" />
+                  <span className="text-[10px] font-black text-black/40 uppercase tracking-tighter">
+                    Limit: {tier.productLimit === 999999 ? '∞' : tier.productLimit} SKU
                   </span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <Crown className="w-3.5 h-3.5 text-zinc-500" />
-                  <span className="text-[10px] font-mono text-zinc-400">
-                    SHOPS: {tier.shopLimit}
+                <div className="flex items-center gap-2">
+                  <Shield size={14} className="text-black/20" />
+                  <span className="text-[10px] font-black text-black/40 uppercase tracking-tighter">
+                    Channels: {tier.shopLimit}
                   </span>
                 </div>
               </div>
@@ -240,25 +248,25 @@ export function SubscriptionPage({ onBack }: SubscriptionPageProps) {
         </div>
       </div>
 
-      {/* Floating Action CTA */}
-      <div className="fixed bottom-0 left-0 right-0 p-6 nav-blur border-t border-white/5 safe-area-inset-bottom z-50">
-        <div className="max-w-xl mx-auto">
+      {/* FOOTER CTA */}
+      <div className="fixed bottom-0 left-0 right-0 p-6 glass-nav border-t border-black/5 z-50">
+        <div className="max-w-2xl mx-auto">
           <button
             disabled={loading || selectedTier === 'free' || selectedTier === user?.subscriptionPlan}
             onClick={() => handleSubscribe(selectedTier)}
-            className={`w-full py-5 rounded-xl font-black text-sm uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3 ${
+            className={`w-full h-16 rounded-[24px] font-black text-xs uppercase tracking-[0.3em] transition-all flex items-center justify-center gap-3 shadow-2xl ${
               selectedTier === 'free' || selectedTier === user?.subscriptionPlan
-                ? 'bg-zinc-900 text-zinc-600 border border-white/5 cursor-not-allowed'
-                : 'bg-white text-black hover:bg-emerald-400 shadow-[0_10px_40px_rgba(255,255,255,0.1)] hover:shadow-emerald-500/20'
+                ? 'bg-black/5 text-black/20 cursor-not-allowed shadow-none'
+                : 'bg-black text-white active:scale-95 shadow-black/20'
             }`}
           >
             {loading ? (
-              <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+              <div className="size-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             ) : selectedTier === user?.subscriptionPlan ? (
-              'ПЛАН АКТИВЕН'
+              'Ядро активно'
             ) : (
               <>
-                ПОДКЛЮЧИТЬ ПЛАН <Zap className="w-4 h-4 fill-current" />
+                Подключить апгрейд <Zap size={16} className="fill-current" />
               </>
             )}
           </button>
@@ -268,7 +276,7 @@ export function SubscriptionPage({ onBack }: SubscriptionPageProps) {
               <motion.p
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="text-red-500 text-center text-[10px] mt-4 font-bold tracking-widest"
+                className="text-toxic-orange text-center text-[10px] font-black mt-4 uppercase tracking-widest"
               >
                 {error}
               </motion.p>

@@ -1,25 +1,25 @@
 // ============================================
-// NeuroAgent — Main Agent Page V7.0 (Warm Light)
-// Fixed: Chat not cut off, Voice UI added
+// NeuroGUARDIAN — Agent Viktor UI v2.0
+// Aesthetic: Hybrid Intelligence | Glassmorphism
 // ============================================
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAppStore, useChatStore, type ChatMessage } from '../stores';
+import { useAppStore, useChatStore, useProductsStore, type ChatMessage } from '../stores';
 import { hapticFeedback } from '../lib/telegram';
 import { agentApi, type AgentMessage, type AgentResponse } from '../lib/agentApi';
 
 import {
   Send,
   Mic,
-  MicOff,
-  Paperclip,
+  Plus,
   TrendingUp,
   Calculator,
   Shield,
   Package,
   Trash2,
-  AlertTriangle,
+  Sparkles,
+  Zap,
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { ViktorCore } from '../components/ui/ViktorCore';
@@ -34,17 +34,14 @@ export function AgentPage() {
   const loadFromServer = useChatStore(state => state.loadFromServer);
   const isSynced = useChatStore(state => state.isSynced);
   const isProcessing = useChatStore(state => state.isProcessing);
+  const { products } = useProductsStore();
 
   const [inputValue, setInputValue] = useState('');
   const [isListening, setIsListening] = useState(false);
-  const [voiceSupported] = useState(
-    () => 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window
-  );
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const firstName = user?.firstName || user?.username || 'Командир';
 
@@ -62,45 +59,13 @@ export function AgentPage() {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  // Voice recognition handling
-  const handleVoiceInput = () => {
-    if (!voiceSupported) {
-      alert('Голосовой ввод не поддерживается в этом браузере');
-      return;
-    }
-
-    if (isListening) {
-      setIsListening(false);
-      return;
-    }
-
-    hapticFeedback('medium');
-    setIsListening(true);
-
-    const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'ru-RU';
-    recognition.continuous = false;
-    recognition.interimResults = false;
-
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
-      const transcript = event.results[0][0].transcript;
-      setInputValue(prev => prev + transcript);
-      setIsListening(false);
-      hapticFeedback('success');
-    };
-
-    recognition.onerror = () => {
-      setIsListening(false);
-      hapticFeedback('error');
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-    };
-
-    recognition.start();
-  };
+  // Dynamic Mode for Header
+  const designMode = useMemo(() => {
+    if (!products || products.length === 0) return 'peace';
+    const hasCritical = products.some(p => p.status === 'triggered');
+    if (hasCritical) return 'critical';
+    return 'peace';
+  }, [products]);
 
   const handleSendMessage = async (text: string) => {
     if (!text.trim() || isProcessing) return;
@@ -147,7 +112,7 @@ export function AgentPage() {
       addMessage({
         id: `error-${Date.now()}`,
         role: 'assistant',
-        content: '🚨 Ошибка связи с сервером. Попробуйте еще раз.',
+        content: '🚨 Критический сбой нейронной сети. Проверьте соединение.',
         timestamp: new Date().toISOString(),
       });
       hapticFeedback('error');
@@ -159,317 +124,205 @@ export function AgentPage() {
   const hasMessages = messages.length > 0;
 
   return (
-    <div className="h-full flex flex-col bg-page" role="main">
-      {/* Welcome Screen - No Messages */}
-      <AnimatePresence>
-        {!hasMessages && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="flex-1 overflow-y-auto px-4 pb-40"
-          >
-            {/* Hero Section */}
-            <div className="flex flex-col items-center pt-8 pb-6">
-              <div className="relative mb-6">
-                <motion.div
-                  className="absolute inset-0 bg-linear-to-br from-primary/20 via-violet-400/10 to-transparent blur-[50px] rounded-full scale-150"
-                  animate={{
-                    scale: [1.5, 1.6, 1.5],
-                    opacity: [0.3, 0.5, 0.3],
-                  }}
-                  transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-                />
-                <ViktorCore size="lg" />
-              </div>
-
-              <motion.div
-                className="text-center space-y-2"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-              >
-                <p className="text-[10px] font-bold tracking-[0.2em] text-primary uppercase">
-                  AI-Помощник для маркетплейсов
-                </p>
-                <h1 className="text-2xl font-bold tracking-tight text-text-main">
-                  Привет, {firstName}!
-                </h1>
-                <p className="text-text-secondary text-sm max-w-[260px] mx-auto leading-relaxed">
-                  Чем могу помочь сегодня?
-                </p>
-              </motion.div>
-            </div>
-
-            {/* Action Categories */}
-            <div className="max-w-md mx-auto space-y-5">
-              {/* Category: Protection & Analytics */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-              >
-                <div className="flex items-center gap-2 mb-3 px-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-success" />
-                  <span className="text-[10px] font-bold tracking-widest text-text-muted uppercase">
-                    Защита Плюс 2026
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-2.5">
-                  <ActionCard
-                    icon={<Shield className="w-5 h-5" />}
-                    iconBg="bg-success/10"
-                    iconColor="text-success"
-                    title="Защита всех"
-                    subtitle="Умный Стоп-Лосс"
-                    onClick={() =>
-                      handleSendMessage('Виктор, защити все мои товары по правилам 2026')
-                    }
-                  />
-                  <ActionCard
-                    icon={<TrendingUp className="w-5 h-5" />}
-                    iconBg="bg-primary/10"
-                    iconColor="text-primary"
-                    title="Аналитика"
-                    subtitle="Тренды и прибыль"
-                    onClick={() => handleSendMessage('покажи аналитику продаж и маржинальность')}
-                  />
-                </div>
-              </motion.div>
-
-              {/* Category: Economics */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-              >
-                <div className="flex items-center gap-2 mb-3 px-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-warning" />
-                  <span className="text-[10px] font-bold tracking-widest text-text-muted uppercase">
-                    Экономика и Маржа
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-2.5">
-                  <ActionCard
-                    icon={<Calculator className="w-5 h-5" />}
-                    iconBg="bg-warning/10"
-                    iconColor="text-warning"
-                    title="Аудит 2026"
-                    subtitle="Скрытые платежи"
-                    onClick={() =>
-                      handleSendMessage('проведи аудит юнит-экономики по новым тарифам')
-                    }
-                  />
-                  <ActionCard
-                    icon={<Package className="w-5 h-5" />}
-                    iconBg="bg-info/10"
-                    iconColor="text-info"
-                    title="Конкуренты"
-                    subtitle="Ценовые войны"
-                    onClick={() =>
-                      handleSendMessage('проверь цены конкурентов и предложи демпинг-защиту')
-                    }
-                  />
-                </div>
-              </motion.div>
-
-              {/* Category: System & Risk */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 }}
-              >
-                <div className="flex items-center gap-2 mb-3 px-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-danger" />
-                  <span className="text-[10px] font-bold tracking-widest text-text-muted uppercase">
-                    Разведка и Аудит
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-2.5">
-                  <ActionCard
-                    icon={<TrendingUp className="w-5 h-5" />}
-                    iconBg="bg-danger/10"
-                    iconColor="text-danger"
-                    title="Капитал в риске"
-                    subtitle="Проверка стоков"
-                    onClick={() =>
-                      handleSendMessage('какая сумма капитала сейчас находится под риском?')
-                    }
-                  />
-                  <ActionCard
-                    icon={<Package className="w-5 h-5" />}
-                    iconBg="bg-primary/20"
-                    iconColor="text-primary-hover"
-                    title="Синхронизация"
-                    subtitle="Полный апдейт"
-                    onClick={() => handleSendMessage('синхронизируй каталог и обнови остатки')}
-                  />
-                </div>
-              </motion.div>
-            </div>
-
-            {/* Hint */}
-            <motion.p
-              className="text-center text-[11px] text-text-muted mt-6"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.7 }}
+    <div className="h-full flex flex-col font-display relative overflow-hidden">
+      {/* Header (V2.0 Sticky Glass) */}
+      <header className="sticky top-0 z-40 glass-nav border-b border-black/5 px-4 py-4">
+        <div className="flex items-center justify-between max-w-2xl mx-auto">
+          <div className="flex items-center gap-3">
+            <div
+              className={`p-2 rounded-full shadow-lg ${designMode === 'critical' ? 'bg-toxic-orange/20' : 'bg-primary/10'}`}
             >
-              Или просто напишите свой вопрос ↓
-            </motion.p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Chat Header - Only when messages exist */}
-      {hasMessages && (
-        <header className="sticky top-0 z-40 bg-surface/95 backdrop-blur-lg border-b border-surface-dim px-4 py-3">
-          <div className="flex items-center justify-between max-w-2xl mx-auto">
-            <div className="flex items-center gap-3">
               <ViktorCore size="sm" />
-              <div>
-                <span className="text-sm font-bold text-text-main">Виктор</span>
-                <div className="flex items-center gap-1.5">
-                  <div
-                    className={`w-2 h-2 rounded-full ${
-                      isProcessing ? 'bg-primary animate-pulse' : 'bg-success'
-                    }`}
-                  />
-                  <span className="text-xs text-text-muted">
-                    {isProcessing ? 'Думает...' : 'Онлайн'}
-                  </span>
-                </div>
+            </div>
+            <div>
+              <h2 className="text-base font-black tracking-tight text-text-main">Виктор</h2>
+              <div className="flex items-center gap-1.5">
+                <span
+                  className={`size-1.5 rounded-full ${isProcessing ? 'bg-primary animate-pulse' : 'bg-peace-green pulse-status'}`}
+                ></span>
+                <span className="text-[9px] uppercase tracking-widest font-black text-black/40">
+                  {isProcessing ? 'Синтез данных...' : 'Neuro-Flash v2.4'}
+                </span>
               </div>
             </div>
+          </div>
+
+          <div className="flex items-center gap-2">
             <button
               onClick={() => {
                 hapticFeedback('medium');
-                if (confirm('Очистить историю чата?')) {
-                  clearMessages();
-                }
+                if (confirm('Очистить нейронную память (чат)?')) clearMessages();
               }}
-              className="p-2 rounded-lg text-text-muted hover:text-danger hover:bg-danger-soft transition-colors"
-              aria-label="Очистить чат"
+              className="p-2 rounded-xl bg-black/5 text-black/40 hover:text-hot-neon transition-colors"
             >
-              <Trash2 className="w-5 h-5" />
+              <Trash2 size={18} />
             </button>
           </div>
-        </header>
-      )}
+        </div>
+      </header>
 
-      {/* Messages Area - FIXED: proper scrolling container */}
-      {hasMessages && (
-        <div
-          ref={messagesContainerRef}
-          className="flex-1 overflow-y-auto px-4 py-4 scroll-smooth"
-          style={{
-            paddingBottom: '320px', // Extra space for Chips + Input + Nav
-          }}
-        >
-          <div className="max-w-2xl mx-auto space-y-4">
+      {/* Main Content */}
+      <div
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto px-4 pt-6 pb-40 no-scrollbar scroll-smooth"
+      >
+        <div className="max-w-2xl mx-auto space-y-8">
+          <AnimatePresence>
+            {!hasMessages && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-12 py-8"
+              >
+                <div className="text-center space-y-3">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest mb-4">
+                    <Sparkles size={12} /> Intelligence through Transparency
+                  </div>
+                  <h1 className="text-4xl font-black text-text-main tracking-tighter leading-none">
+                    Привет, <span className="text-primary">{firstName}</span>.
+                  </h1>
+                  <p className="text-sm font-medium text-black/50 max-w-[280px] mx-auto">
+                    Система мониторинга стабильна. Какие стратегии активируем сегодня?
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <StitchActionCard
+                    icon={<Shield className="text-peace-green" />}
+                    title="Защита 2.0"
+                    desc="Умный Стоп-Лосс"
+                    onClick={() => handleSendMessage('Виктор, активируй полную защиту товаров')}
+                  />
+                  <StitchActionCard
+                    icon={<TrendingUp className="text-primary" />}
+                    title="Аналитика"
+                    desc="Индекс прибыльности"
+                    onClick={() => handleSendMessage('Виктор, покажи анализ прибыльности')}
+                  />
+                  <StitchActionCard
+                    icon={<Calculator className="text-toxic-orange" />}
+                    title="Юнит-Экономика"
+                    desc="Аудит тарифов 2026"
+                    onClick={() => handleSendMessage('Виктор, проведи аудит юнит-экономики')}
+                  />
+                  <StitchActionCard
+                    icon={<Package className="text-azure" />}
+                    title="Разведка"
+                    desc="Цены конкурентов"
+                    onClick={() => handleSendMessage('Виктор, проверь цены конкурентов')}
+                  />
+                </div>
+              </motion.div>
+            )}
+
             {messages.map(m => (
               <div
                 key={m.id}
-                className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                className={`flex flex-col gap-1 ${m.role === 'user' ? 'items-end' : 'items-start'}`}
               >
-                {m.isLoading ? <LoadingBubble /> : <MessageBubble message={m} />}
+                {/* Role Label */}
+                <p
+                  className={`text-[10px] font-black uppercase tracking-widest px-2 opacity-30 ${m.role === 'user' ? 'text-right' : 'text-left'}`}
+                >
+                  {m.role === 'user' ? 'Вы' : 'Виктор'}
+                </p>
+
+                {m.isLoading ? (
+                  <div className="fused-card px-5 py-4 flex gap-2">
+                    <div className="size-1.5 rounded-full bg-primary animate-bounce" />
+                    <div className="size-1.5 rounded-full bg-primary animate-bounce [animation-delay:0.2s]" />
+                    <div className="size-1.5 rounded-full bg-primary animate-bounce [animation-delay:0.4s]" />
+                  </div>
+                ) : (
+                  <motion.div
+                    initial={{ scale: 0.95, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className={`max-w-[85%] px-5 py-4 text-sm font-medium leading-relaxed shadow-sm ring-1 ring-black/5 ${
+                      m.role === 'user'
+                        ? 'bg-primary text-white rounded-2xl rounded-tr-none'
+                        : 'fused-card rounded-2xl rounded-tl-none'
+                    }`}
+                  >
+                    <div
+                      dangerouslySetInnerHTML={{
+                        __html: DOMPurify.sanitize(formatMessage(m.content)),
+                      }}
+                    />
+                  </motion.div>
+                )}
+
+                {/* Feedback/Time */}
+                <span className="text-[9px] font-bold text-black/20 px-2 mt-1">
+                  {new Date(m.timestamp).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </span>
               </div>
             ))}
-            <div ref={messagesEndRef} className="h-1" />
-          </div>
+          </AnimatePresence>
+          <div ref={messagesEndRef} className="h-4" />
         </div>
-      )}
+      </div>
 
-      {/* Input Bar & Suggestion Chips */}
-      <div
-        className="fixed left-0 right-0 z-50 bg-linear-to-t from-background via-background to-transparent pt-6"
-        style={{
-          bottom: 'calc(5rem + env(safe-area-inset-bottom))',
-          paddingBottom: '20px',
-        }}
-      >
-        <div className="max-w-2xl mx-auto px-4">
-          {/* Suggestion Chips - Only when chatting */}
+      {/* Input Zone (Fixed Bottom with HUD elements) */}
+      <div className="fixed bottom-24 left-0 right-0 z-50 px-4">
+        <div className="max-w-2xl mx-auto space-y-4">
+          {/* Quick Chips */}
           {hasMessages && (
-            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-3 mb-1 px-1">
+            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 px-1">
               <SuggestionChip
-                icon={<Shield className="w-3 h-3" />}
-                label="Защитить всё"
-                onClick={() => handleSendMessage('Виктор, защити все товары')}
+                icon={<Zap size={14} />}
+                label="Найти демпинг"
+                onClick={() => handleSendMessage('Кто демпингует?')}
               />
               <SuggestionChip
-                icon={<Calculator className="w-3 h-3" />}
-                label="Анализ прибыли"
-                onClick={() => handleSendMessage('Покажи мою чистую прибыль')}
+                icon={<Package size={14} />}
+                label="Мало остатков"
+                onClick={() => handleSendMessage('У каких товаров низкий остаток?')}
               />
               <SuggestionChip
-                icon={<AlertTriangle className="w-3 h-3" />}
-                label="Найти риски"
-                onClick={() => handleSendMessage('Какие товары сейчас в зоне риска?')}
-              />
-              <SuggestionChip
-                icon={<Package className="w-3 h-3" />}
-                label="Синхронизация"
-                onClick={() => handleSendMessage('Синхронизируй каталог')}
+                icon={<Shield size={14} />}
+                label="Стратегия 2026"
+                onClick={() => handleSendMessage('Какие сейчас риски прибыли?')}
               />
             </div>
           )}
 
-          <div className="flex items-end gap-2 bg-surface rounded-2xl border border-surface-dim shadow-lg p-2">
-            {/* Attachment Button */}
-            <button
-              className="p-3 text-text-muted hover:text-primary transition-colors rounded-xl hover:bg-primary-dim"
-              onClick={() => fileInputRef.current?.click()}
-              aria-label="Прикрепить файл"
-            >
-              <Paperclip className="w-5 h-5" />
+          <div className="flex items-center gap-3">
+            <button className="size-12 shrink-0 flex items-center justify-center rounded-full fused-card text-black/40 shadow-sm border border-black/5 active:scale-90 transition-transform">
+              <Plus size={24} />
             </button>
-
-            {/* Text Input */}
-            <textarea
-              ref={inputRef}
-              value={inputValue}
-              onChange={e => setInputValue(e.target.value)}
-              placeholder={isListening ? '🎤 Слушаю...' : 'Напишите сообщение...'}
-              className="flex-1 bg-transparent text-text-main px-2 py-3 text-sm focus:outline-none resize-none max-h-32 min-h-[48px] placeholder:text-text-muted"
-              rows={1}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSendMessage(inputValue);
-                }
-              }}
-              aria-label="Сообщение"
-            />
-
-            {/* Voice Button */}
-            {voiceSupported && (
-              <button
-                onClick={handleVoiceInput}
-                className={`p-3 rounded-xl transition-all ${
-                  isListening
-                    ? 'bg-danger text-white animate-pulse'
-                    : 'text-text-muted hover:text-primary hover:bg-primary-dim'
-                }`}
-                aria-label={isListening ? 'Остановить запись' : 'Голосовой ввод'}
-              >
-                {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-              </button>
-            )}
-
-            {/* Send Button */}
-            {inputValue.trim() ? (
-              <motion.button
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                onClick={() => handleSendMessage(inputValue)}
-                disabled={isProcessing}
-                className="p-3 bg-primary rounded-xl text-white shadow-md hover:bg-primary-hover disabled:opacity-50 transition-all"
-                aria-label="Отправить"
-              >
-                <Send className="w-5 h-5" />
-              </motion.button>
-            ) : null}
+            <div className="flex-1 relative">
+              <div className="flex items-center w-full min-h-[56px] rounded-2xl fused-card px-4 ring-1 ring-inset ring-black/5 shadow-inner">
+                <textarea
+                  value={inputValue}
+                  onChange={e => setInputValue(e.target.value)}
+                  placeholder="Напишите Виктору..."
+                  className="w-full bg-transparent border-none focus:ring-0 text-sm py-3 placeholder:text-black/30 resize-none max-h-32 min-h-[48px]"
+                  rows={1}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendMessage(inputValue);
+                    }
+                  }}
+                />
+                <button
+                  onClick={() => setIsListening(!isListening)}
+                  className={`p-2 transition-colors ${isListening ? 'text-hot-neon animate-pulse' : 'text-black/30'}`}
+                >
+                  <Mic size={20} />
+                </button>
+              </div>
+            </div>
+            <button
+              onClick={() => handleSendMessage(inputValue)}
+              disabled={!inputValue.trim() || isProcessing}
+              className="size-12 shrink-0 flex items-center justify-center rounded-full bg-primary text-white shadow-lg active:scale-95 disabled:opacity-30 transition-all"
+            >
+              <Send size={20} />
+            </button>
           </div>
         </div>
       </div>
@@ -480,92 +333,60 @@ export function AgentPage() {
 }
 
 // ============================================
-// SUB-COMPONENTS
+// HELPER COMPONENTS
 // ============================================
 
-function LoadingBubble() {
-  return (
-    <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-surface border border-surface-dim max-w-[85%]">
-      <div className="flex gap-1">
-        {[0, 1, 2].map(i => (
-          <motion.div
-            key={i}
-            className="w-2 h-2 rounded-full bg-primary"
-            animate={{ y: [0, -6, 0] }}
-            transition={{
-              duration: 0.6,
-              repeat: Infinity,
-              delay: i * 0.15,
-              ease: 'easeInOut',
-            }}
-          />
-        ))}
-      </div>
-      <span className="text-xs text-text-muted">Виктор думает...</span>
-    </div>
-  );
-}
-
-function MessageBubble({ message }: { message: ChatMessage }) {
-  const isUser = message.role === 'user';
-
-  return (
-    <motion.div
-      className={`flex flex-col gap-1.5 max-w-[85%] ${isUser ? 'items-end' : 'items-start'}`}
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2 }}
-    >
-      <div
-        className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${
-          isUser
-            ? 'bg-primary text-white rounded-br-md'
-            : 'bg-surface border border-surface-dim text-text-main rounded-bl-md'
-        }`}
-      >
-        <div
-          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(formatMessage(message.content)) }}
-        />
-      </div>
-      <span className="text-[10px] text-text-muted px-1">
-        {new Date(message.timestamp).toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-        })}
-      </span>
-    </motion.div>
-  );
-}
-
-interface ActionCardProps {
+function StitchActionCard({
+  icon,
+  title,
+  desc,
+  onClick,
+}: {
   icon: React.ReactNode;
-  iconBg: string;
-  iconColor: string;
   title: string;
-  subtitle: string;
+  desc: string;
   onClick: () => void;
-}
-
-function ActionCard({ icon, iconBg, iconColor, title, subtitle, onClick }: ActionCardProps) {
+}) {
   return (
     <motion.button
+      whileHover={{ y: -4, scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
       onClick={() => {
         hapticFeedback('light');
         onClick();
       }}
-      className="flex items-center gap-3 p-3.5 rounded-2xl bg-surface border border-surface-dim hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all duration-200 text-left group"
-      whileTap={{ scale: 0.97 }}
-      whileHover={{ y: -2 }}
+      className="fused-card p-4 text-left flex flex-col gap-3 group"
     >
-      <div
-        className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center shrink-0 ${iconColor} group-hover:scale-110 transition-transform`}
-      >
+      <div className="size-10 rounded-xl bg-black/3 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
         {icon}
       </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-text-main truncate">{title}</p>
-        <p className="text-[11px] text-text-muted truncate">{subtitle}</p>
+      <div>
+        <h4 className="text-xs font-black uppercase tracking-tight text-text-main">{title}</h4>
+        <p className="text-[10px] font-medium text-black/40">{desc}</p>
       </div>
+    </motion.button>
+  );
+}
+
+function SuggestionChip({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <motion.button
+      whileTap={{ scale: 0.95 }}
+      onClick={() => {
+        hapticFeedback('light');
+        onClick();
+      }}
+      className="flex items-center gap-2 px-4 py-2 rounded-full fused-card border border-black/5 text-xs font-black uppercase tracking-tight text-black/60 whitespace-nowrap"
+    >
+      {icon} {label}
     </motion.button>
   );
 }
@@ -575,33 +396,4 @@ function formatMessage(content: string): string {
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\n\n/g, '<br/><br/>')
     .replace(/\n/g, '<br/>');
-}
-
-interface SuggestionChipProps {
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-}
-
-function SuggestionChip({ icon, label, onClick }: SuggestionChipProps) {
-  return (
-    <motion.button
-      whileTap={{ scale: 0.95 }}
-      onClick={() => {
-        hapticFeedback('light');
-        onClick();
-      }}
-      className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-surface/80 backdrop-blur-md border border-surface-dim hover:border-primary/50 text-text-main text-xs font-semibold whitespace-nowrap transition-all shadow-sm"
-    >
-      <span className="text-primary">{icon}</span>
-      {label}
-    </motion.button>
-  );
-}
-
-// Type declarations for Web Speech API
-declare global {
-  interface Window {
-    webkitSpeechRecognition: typeof SpeechRecognition;
-  }
 }

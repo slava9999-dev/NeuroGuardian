@@ -1,6 +1,6 @@
 // ============================================
-// NeuroGUARDIAN — Product Card V7.0 (Warm Light)
-// Clear, tactile, accessible design
+// NeuroGUARDIAN — Product Card v2.0
+// Aesthetic: Tactical Unit | Inventory Matrix
 // ============================================
 
 import { useState } from 'react';
@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   Check,
   Loader2,
+  Lock,
 } from 'lucide-react';
 import { productsApi } from '../../lib/api';
 import { hapticFeedback, openExternalLink } from '../../lib/telegram';
@@ -57,6 +58,7 @@ export function ProductCard({ product, onUpdate, onOpenCalculator }: ProductCard
   };
 
   const isProtected = product.status === 'protected' || (product.minPrice && product.minPrice > 0);
+  const isTriggered = product.status === 'triggered';
   const profit = product.currentPrice - (product.costPrice || 0);
   const isProfitable = profit > 0;
   const profitPercent = product.costPrice ? Math.round((profit / product.costPrice) * 100) : 0;
@@ -64,26 +66,23 @@ export function ProductCard({ product, onUpdate, onOpenCalculator }: ProductCard
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="card overflow-hidden"
+      className={`fused-card overflow-hidden group transition-all duration-300 ${isTriggered ? 'ring-2 ring-toxic-orange ring-offset-2' : ''}`}
     >
-      {/* Top Section: Image + Quick Info */}
+      {/* Visual Identification Layer */}
       <div className="flex gap-4 p-4">
-        {/* Product Image */}
-        <div className="relative w-24 h-24 sm:w-28 sm:h-28 shrink-0 rounded-xl overflow-hidden bg-surface-warm">
+        {/* Media Block */}
+        <div className="relative size-24 shrink-0 rounded-2xl overflow-hidden bg-black/5 border border-black/5 shadow-inner">
           {!imageError && product.imageUrl ? (
             <img
               src={product.imageUrl}
               alt={product.title}
               onError={() => setImageError(true)}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover grayscale-[0.2] transition-all group-hover:grayscale-0 group-hover:scale-110"
               loading="lazy"
             />
           ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center text-text-muted">
-              <ImageIcon className="w-8 h-8 opacity-40" />
-              <span className="text-[9px] mt-1 uppercase font-medium">Нет фото</span>
+            <div className="w-full h-full flex flex-col items-center justify-center text-black/10">
+              <ImageIcon size={24} />
             </div>
           )}
 
@@ -93,183 +92,162 @@ export function ProductCard({ product, onUpdate, onOpenCalculator }: ProductCard
               e.stopPropagation();
               openExternalLink(product.url || '#');
             }}
-            className="absolute top-1.5 right-1.5 p-1.5 bg-white/90 backdrop-blur-sm rounded-lg shadow-sm hover:bg-white transition-colors"
-            aria-label="Открыть на маркетплейсе"
+            className="absolute bottom-1.5 right-1.5 size-7 flex items-center justify-center bg-white/80 backdrop-blur-md rounded-lg shadow-sm border border-black/5 text-black/40 hover:text-primary active:scale-90 transition-all"
           >
-            <ExternalLink className="w-3.5 h-3.5 text-text-secondary" />
+            <ExternalLink size={12} />
           </button>
         </div>
 
-        {/* Product Info */}
-        <div className="flex-1 min-w-0">
-          {/* Status Badge */}
-          <div className="flex items-center gap-2 mb-2 flex-wrap">
-            <span className={`badge ${product.marketplace === 'WB' ? 'badge-wb' : 'badge-ozon'}`}>
-              {product.marketplace}
-            </span>
-            <span className={`badge ${isProtected ? 'badge-success' : 'badge-warning'}`}>
+        {/* Data Block */}
+        <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
+          <div className="space-y-1.5">
+            {/* Tag Stack */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span
+                className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md ${product.marketplace === 'WB' ? 'bg-[#7000FF] text-white' : 'bg-[#005BFF] text-white'}`}
+              >
+                {product.marketplace}
+              </span>
+
               {isProtected ? (
-                <>
-                  <Shield className="w-3 h-3" />
-                  Защищён
-                </>
+                <span
+                  className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md flex items-center gap-1 ${isTriggered ? 'bg-toxic-orange text-black animate-pulse' : 'bg-peace-green/20 text-peace-green'}`}
+                >
+                  {isTriggered ? <Lock size={8} /> : <Shield size={8} />}
+                  {isTriggered ? 'Attacked' : 'Protected'}
+                </span>
               ) : (
-                <>
-                  <AlertTriangle className="w-3 h-3" />
-                  Настроить
-                </>
+                <span className="text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md bg-black/5 text-black/30">
+                  No Guard
+                </span>
               )}
-            </span>
-            <span className="text-[10px] font-mono text-text-muted bg-surface-hl px-2 py-0.5 rounded">
-              {product.nmId || product.offerId || product.id}
-            </span>
+
+              <span className="text-[7px] font-black font-mono text-black/20 uppercase">
+                {product.vendorCode}
+              </span>
+            </div>
+
+            {/* Title */}
+            <h3 className="text-[11px] font-black text-black/80 leading-tight line-clamp-2 tracking-tight">
+              {product.title}
+            </h3>
           </div>
 
-          {/* Title */}
-          <h3
-            className="text-sm font-semibold text-text-main leading-snug line-clamp-2 mb-2"
-            title={product.title}
-          >
-            {product.title}
-          </h3>
-
-          {/* Price Display */}
-          <div className="flex items-baseline gap-3">
-            <span className="text-xl font-bold text-text-main">
-              {product.currentPrice?.toLocaleString('ru-RU')} ₽
-            </span>
-            <span
-              className={`flex items-center gap-1 text-sm font-semibold ${
-                isProfitable ? 'text-success' : 'text-danger'
-              }`}
+          {/* Price Engine */}
+          <div className="flex items-end justify-between">
+            <div className="flex flex-col">
+              <span className="text-[15px] font-black text-black tracking-tighter">
+                {product.currentPrice?.toLocaleString('ru-RU')} ₽
+              </span>
+            </div>
+            <div
+              className={`flex items-center gap-0.5 text-[9px] font-black px-1.5 py-0.5 rounded-lg ${isProfitable ? 'bg-peace-green/10 text-peace-green' : 'bg-toxic-orange/10 text-toxic-orange'}`}
             >
-              {isProfitable ? (
-                <TrendingUp className="w-4 h-4" />
-              ) : (
-                <TrendingDown className="w-4 h-4" />
-              )}
+              {isProfitable ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
               {isProfitable ? '+' : ''}
               {profitPercent}%
-            </span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Economics Section */}
-      <div className="px-4 pb-3">
-        <div className="grid grid-cols-2 gap-3 p-3 bg-surface-warm rounded-xl">
-          {/* Cost Price Input */}
-          <div>
-            <label className="text-[10px] font-semibold text-text-muted uppercase tracking-wide block mb-1">
-              Себестоимость
+      {/* Control Surface */}
+      <div className="px-4 pb-4 mt-2 space-y-3">
+        <div className="grid grid-cols-2 gap-2">
+          {/* Input Unit: Cost */}
+          <div className="space-y-1">
+            <label className="text-[7px] font-black uppercase tracking-[0.1em] text-black/30 px-1">
+              Cost Unit
             </label>
-            <div className="relative">
+            <div className="relative h-10">
               <input
                 type="number"
-                inputMode="numeric"
                 value={localCost || ''}
                 onChange={e => {
                   setLocalCost(Number(e.target.value));
                   setIsEditing(true);
                 }}
-                className="w-full py-2 px-3 bg-surface border border-surface-dim rounded-lg text-sm font-semibold text-text-main focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none transition-all"
+                className="w-full h-full bg-black/3 border border-black/5 rounded-xl px-3 text-[11px] font-black text-black focus:bg-white focus:ring-4 focus:ring-primary/5 outline-none transition-all placeholder:text-black/10"
                 placeholder="0"
               />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted text-sm">
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-black text-black/20">
                 ₽
               </span>
             </div>
           </div>
 
-          {/* Min Price Input */}
-          <div>
-            <label className="text-[10px] font-semibold text-text-muted uppercase tracking-wide block mb-1">
-              Стоп-лосс
+          {/* Input Unit: Stop-Loss */}
+          <div className="space-y-1">
+            <label className="text-[7px] font-black uppercase tracking-[0.1em] text-black/30 px-1">
+              Stop Loss
             </label>
-            <div className="relative">
+            <div className="relative h-10">
               <input
                 type="number"
-                inputMode="numeric"
                 value={localMin || ''}
                 onChange={e => {
                   setLocalMin(Number(e.target.value));
                   setIsEditing(true);
                 }}
-                className="w-full py-2 px-3 bg-surface border border-surface-dim rounded-lg text-sm font-semibold text-text-main focus:border-danger focus:ring-2 focus:ring-danger/10 outline-none transition-all"
+                className="w-full h-full bg-black/3 border border-black/5 rounded-xl px-3 text-[11px] font-black text-black focus:bg-white focus:ring-4 focus:ring-primary/5 outline-none transition-all placeholder:text-black/10"
                 placeholder="0"
               />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted text-sm">
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-black text-black/20">
                 ₽
               </span>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Action Buttons */}
-      <div className="px-4 pb-4">
+        {/* Action Hub */}
         <AnimatePresence mode="wait">
           {isEditing ? (
             <motion.button
               key="save"
-              initial={{ opacity: 0, y: 5 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -5 }}
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
               onClick={handleSave}
               disabled={isSaving}
-              className="w-full btn btn-primary py-3"
+              className="w-full h-11 bg-black text-white rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-xl shadow-black/10 active:scale-95 transition-all"
             >
-              {isSaving ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Сохранение...
-                </>
-              ) : (
-                <>
-                  <Check className="w-4 h-4" />
-                  Сохранить изменения
-                </>
-              )}
+              {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+              {isSaving ? 'Synching...' : 'Commit Changes'}
             </motion.button>
           ) : (
             <motion.div
               key="actions"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
               className="flex gap-2"
             >
-              {/* Calculator Button */}
               <button
                 onClick={() => {
                   hapticFeedback('light');
                   onOpenCalculator?.(product);
                 }}
-                className="flex-1 btn btn-secondary py-3"
-                aria-label="Калькулятор юнит-экономики"
+                className="flex-1 h-11 bg-white border border-black/5 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-black/40 hover:text-black transition-colors"
               >
-                <Calculator className="w-4 h-4" />
-                Калькулятор
+                <Calculator size={14} /> Unit Economic
               </button>
             </motion.div>
           )}
         </AnimatePresence>
-
-        {/* Success Message */}
-        <AnimatePresence>
-          {saveSuccess && (
-            <motion.div
-              initial={{ opacity: 0, y: 5 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              className="mt-3 flex items-center justify-center gap-2 text-success text-sm font-medium"
-            >
-              <Check className="w-4 h-4" />
-              Сохранено!
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
+
+      {/* Success Pulse */}
+      <AnimatePresence>
+        {saveSuccess && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="bg-peace-green text-white text-[8px] font-black uppercase tracking-widest text-center py-1.5"
+          >
+            System Updated Successfully
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

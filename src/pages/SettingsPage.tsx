@@ -1,13 +1,12 @@
 // ============================================
-// NeuroGUARDIAN — Settings Page V7.0 (Warm Light)
-// Clear UX: Easy API key input, sync feedback
+// NeuroGUARDIAN — Settings Page v2.0
+// Aesthetic: System Core | Security Hub
 // ============================================
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft,
-  Plus,
   Trash2,
   Edit3,
   Shield,
@@ -20,9 +19,10 @@ import {
   VolumeX,
   X,
   Key,
-  AlertCircle,
   Package,
-  HelpCircle,
+  Cpu,
+  Fingerprint,
+  Zap,
 } from 'lucide-react';
 import { useAppStore } from '../stores';
 import { hapticFeedback } from '../lib/telegram';
@@ -92,7 +92,6 @@ export function SettingsPage({
       }
     } catch {
       hapticFeedback('error');
-      alert('Ошибка сохранения. Проверьте данные.');
     } finally {
       setIsSaving(false);
     }
@@ -136,310 +135,254 @@ export function SettingsPage({
   };
 
   return (
-    <div className="min-h-full bg-page px-5 py-6 pb-32" role="main">
-      {/* Header */}
-      <header className="flex items-center gap-4 mb-8">
-        <button
-          onClick={onBack}
-          className="p-2 rounded-xl bg-surface border border-surface-dim hover:border-primary transition-colors"
-          aria-label="Назад"
-        >
-          <ArrowLeft className="w-5 h-5 text-text-secondary" />
-        </button>
-        <h1 className="text-xl font-bold text-text-main">Настройки</h1>
-      </header>
+    <div className="min-h-full bg-background font-display relative overflow-x-hidden pb-32">
+      <div className="aura-layer" />
 
-      {/* ============================================
-          SECTION 1: API KEYS (MAIN FOCUS)
-          ============================================ */}
-      <section className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="section-title">🔑 Ключи маркетплейсов</h2>
+      {/* Header */}
+      <header className="sticky top-0 z-40 glass-nav border-b border-black/5 px-4 py-4">
+        <div className="flex items-center gap-4 max-w-2xl mx-auto">
           <button
             onClick={() => {
-              setEditingAccount({
-                marketplace: 'wb',
-                name: 'Wildberries',
-                is_active: true,
-                wb_token: '',
-                ozon_client_id: '',
-                ozon_api_key: '',
-              });
-              setShowAccountModal(true);
+              hapticFeedback('light');
+              onBack();
             }}
-            className="btn btn-ghost text-xs"
+            className="size-10 flex items-center justify-center rounded-xl fused-card border border-black/5 active:scale-90 transition-transform"
           >
-            <Plus className="w-4 h-4" />
-            Добавить
+            <ArrowLeft size={18} />
           </button>
+          <h1 className="text-base font-black tracking-tight text-text-main">Настройки</h1>
         </div>
+      </header>
 
-        {/* Loading State */}
-        {isLoading && (
-          <div className="space-y-3">
-            <AccountCardSkeleton />
-            <AccountCardSkeleton />
+      <div className="px-4 py-6 space-y-8 max-w-2xl mx-auto relative z-10">
+        {/* API Connections Section */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center gap-2">
+              <div className="size-6 rounded-lg bg-black/5 flex items-center justify-center text-black/40">
+                <Key size={14} />
+              </div>
+              <h2 className="text-[10px] font-black uppercase tracking-widest text-black/40">
+                Магистрали данных
+              </h2>
+            </div>
+            <button
+              onClick={() => {
+                setEditingAccount({
+                  marketplace: 'wb',
+                  name: 'Wildberries',
+                  is_active: true,
+                  wb_token: '',
+                  ozon_client_id: '',
+                  ozon_api_key: '',
+                });
+                setShowAccountModal(true);
+              }}
+              className="text-[10px] font-black uppercase tracking-widest text-primary hover:opacity-70 transition-opacity"
+            >
+              + Подключить
+            </button>
           </div>
-        )}
 
-        {/* Empty State */}
-        {!isLoading && accounts.length === 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="card p-6 text-center"
-          >
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-warning-soft flex items-center justify-center">
-              <Key className="w-8 h-8 text-warning" />
+          {isLoading ? (
+            <div className="space-y-3">
+              <AccountCardSkeleton />
+              <AccountCardSkeleton />
             </div>
-            <h3 className="font-semibold text-text-main mb-2">Подключите маркетплейс</h3>
-            <p className="text-sm text-text-secondary mb-6 max-w-xs mx-auto">
-              Добавьте API-ключи Wildberries или Ozon, чтобы синхронизировать товары и включить
-              защиту цен
-            </p>
-            <div className="flex gap-3 justify-center">
-              <button
-                onClick={() => {
-                  setEditingAccount({
-                    marketplace: 'wb',
-                    name: 'Wildberries',
-                    is_active: true,
-                    wb_token: '',
-                    ozon_client_id: '',
-                    ozon_api_key: '',
-                  });
-                  setShowAccountModal(true);
-                }}
-                className="btn btn-primary"
-              >
-                <Store className="w-4 h-4" />
-                Wildberries
-              </button>
-              <button
-                onClick={() => {
-                  setEditingAccount({
-                    marketplace: 'ozon',
-                    name: 'Ozon',
-                    is_active: true,
-                    wb_token: '',
-                    ozon_client_id: '',
-                    ozon_api_key: '',
-                  });
-                  setShowAccountModal(true);
-                }}
-                className="btn btn-secondary"
-              >
-                <Store className="w-4 h-4" />
-                Ozon
-              </button>
+          ) : accounts.length === 0 ? (
+            <div className="fused-card p-10 text-center flex flex-col items-center">
+              <div className="size-16 rounded-3xl bg-black/3 flex items-center justify-center mb-4 text-black/10">
+                <Cpu size={32} />
+              </div>
+              <h3 className="text-sm font-black text-black/80">Пустые каналы</h3>
+              <p className="text-[10px] font-medium text-black/40 mt-2 max-w-[200px]">
+                Подключите API ключи для начала работы Sentinel.
+              </p>
             </div>
-          </motion.div>
-        )}
-
-        {/* Account Cards */}
-        <div className="space-y-3">
-          {accounts.map(acc => (
-            <motion.div key={acc.id} layout className="card p-4 flex items-center justify-between">
-              <div className="flex items-center gap-4">
+          ) : (
+            <div className="space-y-3">
+              {accounts.map(acc => (
                 <div
-                  className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                    acc.marketplace === 'wb'
-                      ? 'bg-purple-100 text-purple-600'
-                      : 'bg-blue-100 text-blue-600'
-                  }`}
+                  key={acc.id}
+                  className="fused-card p-4 flex items-center justify-between group"
                 >
-                  <Store className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-text-main">{acc.name}</h4>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className={`badge ${acc.is_active ? 'badge-success' : 'badge-neutral'}`}>
-                      {acc.is_active ? 'Активен' : 'Отключен'}
-                    </span>
-                    <span className="text-xs text-text-muted uppercase">
-                      {acc.marketplace === 'wb' ? 'Wildberries' : 'Ozon'}
-                    </span>
+                  <div className="flex items-center gap-4">
+                    <div
+                      className={`size-12 rounded-2xl flex items-center justify-center shadow-inner ${acc.marketplace === 'wb' ? 'bg-[#7000FF]/10 text-[#7000FF]' : 'bg-[#005BFF]/10 text-[#005BFF]'}`}
+                    >
+                      <Store size={20} />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black text-black/80">{acc.name}</h4>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span
+                          className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${acc.is_active ? 'bg-peace-green/10 text-peace-green' : 'bg-black/5 text-black/30'}`}
+                        >
+                          {acc.is_active ? 'Online' : 'Offline'}
+                        </span>
+                        <span className="text-[8px] font-black text-black/20 uppercase tracking-tighter">
+                          {acc.marketplace}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => {
+                        setEditingAccount({
+                          ...acc,
+                          wb_token: acc.wb_token === '***' ? '' : acc.wb_token,
+                          ozon_api_key: acc.ozon_api_key === '***' ? '' : acc.ozon_api_key,
+                          ozon_client_id: acc.ozon_client_id === '***' ? '' : acc.ozon_client_id,
+                        });
+                        setShowAccountModal(true);
+                      }}
+                      className="size-9 flex items-center justify-center rounded-xl hover:bg-black/5 text-black/20 hover:text-black transition-colors"
+                    >
+                      <Edit3 size={16} />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteAccount(acc.id)}
+                      className="size-9 flex items-center justify-center rounded-xl hover:bg-toxic-orange/10 text-black/20 hover:text-toxic-orange transition-colors"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </div>
                 </div>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    setEditingAccount({
-                      ...acc,
-                      wb_token: acc.wb_token === '***' ? '' : acc.wb_token,
-                      ozon_api_key: acc.ozon_api_key === '***' ? '' : acc.ozon_api_key,
-                      ozon_client_id: acc.ozon_client_id === '***' ? '' : acc.ozon_client_id,
-                    });
-                    setShowAccountModal(true);
-                  }}
-                  className="p-2 rounded-lg hover:bg-surface-hl text-text-muted hover:text-primary transition-colors"
-                  aria-label="Редактировать"
-                >
-                  <Edit3 className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => handleDeleteAccount(acc.id)}
-                  className="p-2 rounded-lg hover:bg-danger-soft text-text-muted hover:text-danger transition-colors"
-                  aria-label="Удалить"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </motion.div>
-          ))}
-        </div>
+              ))}
+            </div>
+          )}
 
-        {/* Sync Button */}
-        {accounts.length > 0 && (
-          <motion.div layout className="mt-4">
+          {accounts.length > 0 && (
             <button
               disabled={isSyncing}
               onClick={handleSync}
-              className="w-full btn btn-primary py-4 text-sm"
+              className="w-full h-12 rounded-2xl bg-black text-white flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-xl shadow-black/10 active:scale-95 transition-all"
             >
-              <RefreshCcw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-              {isSyncing ? 'Синхронизация...' : 'Синхронизировать товары'}
+              <RefreshCcw size={14} className={isSyncing ? 'animate-spin' : ''} />
+              {isSyncing ? 'Синхронизация потоков...' : 'Синхронизировать данные'}
+            </button>
+          )}
+
+          <AnimatePresence>
+            {syncResult && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className={`p-3 rounded-2xl flex items-center gap-3 border ${syncResult.success ? 'bg-peace-green/5 border-peace-green/10 text-peace-green' : 'bg-toxic-orange/5 border-toxic-orange/10 text-toxic-orange'}`}
+              >
+                <CheckCircle2 size={16} />
+                <span className="text-[10px] font-black uppercase tracking-tight">
+                  {syncResult.success
+                    ? `Успех: ${syncResult.count} объектов обработано`
+                    : 'Ошибка в магистрали данных'}
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </section>
+
+        {/* Sentinel Mode Section */}
+        <section className="space-y-4">
+          <div className="flex items-center gap-2 px-1">
+            <div className="size-6 rounded-lg bg-black/5 flex items-center justify-center text-black/40">
+              <Shield size={14} />
+            </div>
+            <h2 className="text-[10px] font-black uppercase tracking-widest text-black/40">
+              Режим Sentinel
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => handleDefenseModeChange('price_correction')}
+              className={`p-4 rounded-[24px] border transition-all text-left relative overflow-hidden fused-card ${defenseMode === 'price_correction' ? 'ring-2 ring-primary border-transparent' : 'border-black/5'}`}
+            >
+              {defenseMode === 'price_correction' && (
+                <div className="absolute top-2 right-2 size-2 rounded-full bg-primary animate-ping" />
+              )}
+              <RefreshCcw
+                size={20}
+                className={`mb-3 ${defenseMode === 'price_correction' ? 'text-primary' : 'text-black/20'}`}
+              />
+              <h4 className="text-[11px] font-black text-black/80 uppercase">Коррекция</h4>
+              <p className="text-[9px] font-medium text-black/40 mt-1 leading-tight">
+                Сброс цены до минимума при атаке
+              </p>
             </button>
 
-            {/* Sync Result */}
-            <AnimatePresence>
-              {syncResult && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  className={`mt-3 p-4 rounded-xl flex items-center gap-3 ${
-                    syncResult.success
-                      ? 'bg-success-soft border border-success/20'
-                      : 'bg-danger-soft border border-danger/20'
-                  }`}
-                >
-                  {syncResult.success ? (
-                    <>
-                      <CheckCircle2 className="w-5 h-5 text-success shrink-0" />
-                      <div>
-                        <span className="font-semibold text-success">
-                          Синхронизировано успешно!
-                        </span>
-                        <p className="text-sm text-text-secondary mt-0.5">
-                          Загружено товаров: <strong>{syncResult.count}</strong>
-                        </p>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <AlertCircle className="w-5 h-5 text-danger shrink-0" />
-                      <span className="font-semibold text-danger">
-                        Ошибка синхронизации. Проверьте ключи.
-                      </span>
-                    </>
-                  )}
-                </motion.div>
+            <button
+              onClick={() => handleDefenseModeChange('zero_stock')}
+              className={`p-4 rounded-[24px] border transition-all text-left relative overflow-hidden fused-card ${defenseMode === 'zero_stock' ? 'ring-2 ring-toxic-orange border-transparent' : 'border-black/5'}`}
+            >
+              {defenseMode === 'zero_stock' && (
+                <div className="absolute top-2 right-2 size-2 rounded-full bg-toxic-orange animate-ping" />
               )}
-            </AnimatePresence>
-          </motion.div>
-        )}
-      </section>
-
-      {/* ============================================
-          SECTION 2: DEFENSE SETTINGS
-          ============================================ */}
-      <section className="mb-8">
-        <h2 className="section-title">🛡️ Защита Sentinel</h2>
-
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <button
-            onClick={() => handleDefenseModeChange('price_correction')}
-            className={`p-4 rounded-xl border-2 transition-all text-left ${
-              defenseMode === 'price_correction'
-                ? 'border-primary bg-primary-dim shadow-md'
-                : 'border-surface-dim bg-surface hover:border-primary/30'
-            }`}
-          >
-            <RefreshCcw
-              className={`w-6 h-6 mb-2 ${
-                defenseMode === 'price_correction' ? 'text-primary' : 'text-text-muted'
-              }`}
-            />
-            <h4 className="font-semibold text-text-main text-sm">Коррекция цены</h4>
-            <p className="text-xs text-text-muted mt-1">Возврат к минимуму при демпинге</p>
-          </button>
-
-          <button
-            onClick={() => handleDefenseModeChange('zero_stock')}
-            className={`p-4 rounded-xl border-2 transition-all text-left ${
-              defenseMode === 'zero_stock'
-                ? 'border-danger bg-danger-soft shadow-md'
-                : 'border-surface-dim bg-surface hover:border-danger/30'
-            }`}
-          >
-            <Package
-              className={`w-6 h-6 mb-2 ${
-                defenseMode === 'zero_stock' ? 'text-danger' : 'text-text-muted'
-              }`}
-            />
-            <h4 className="font-semibold text-text-main text-sm">Заморозка</h4>
-            <p className="text-xs text-text-muted mt-1">Обнуление остатков при угрозе</p>
-          </button>
-        </div>
-
-        {/* Price Buffer Slider */}
-        <div className="card p-4">
-          <div className="flex justify-between items-center mb-3">
-            <div>
-              <span className="font-semibold text-text-main text-sm">Буфер цены</span>
-              <p className="text-xs text-text-muted">Допуск для СПП и акций</p>
-            </div>
-            <span className="text-2xl font-bold text-primary">
-              {user?.priceBufferPercent ?? 5}%
-            </span>
+              <Package
+                size={20}
+                className={`mb-3 ${defenseMode === 'zero_stock' ? 'text-toxic-orange' : 'text-black/20'}`}
+              />
+              <h4 className="text-[11px] font-black text-black/80 uppercase">Заморозка</h4>
+              <p className="text-[9px] font-medium text-black/40 mt-1 leading-tight">
+                Обнуление остатков при демпинге
+              </p>
+            </button>
           </div>
-          <input
-            type="range"
-            min="0"
-            max="30"
-            step="1"
-            value={user?.priceBufferPercent ?? 5}
-            onChange={e => {
-              hapticFeedback('light');
-              setUser({ ...user!, priceBufferPercent: Number(e.target.value) });
-            }}
-            onMouseUp={() =>
-              settingsApi.updateSettings({ priceBufferPercent: user?.priceBufferPercent })
-            }
-            onTouchEnd={() =>
-              settingsApi.updateSettings({ priceBufferPercent: user?.priceBufferPercent })
-            }
-            className="w-full h-2 bg-surface-hl rounded-lg appearance-none cursor-pointer accent-primary"
-          />
-        </div>
-      </section>
 
-      {/* ============================================
-          SECTION 3: VOICE SETTINGS
-          ============================================ */}
-      <section className="mb-8">
-        <h2 className="section-title">🎙️ Голос Виктора</h2>
-        <div className="card p-4">
-          <div className="flex items-center justify-between">
+          <div className="fused-card p-4 space-y-4">
+            <div className="flex justify-between items-end">
+              <div>
+                <h4 className="text-xs font-black text-black/80 uppercase tracking-tighter">
+                  Буфер безопасности
+                </h4>
+                <p className="text-[10px] font-medium text-black/40">Допуск для акций и СПП</p>
+              </div>
+              <span className="text-xl font-black text-primary">
+                {user?.priceBufferPercent ?? 5}%
+              </span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="30"
+              step="1"
+              value={user?.priceBufferPercent ?? 5}
+              onChange={e => {
+                hapticFeedback('light');
+                setUser({ ...user!, priceBufferPercent: Number(e.target.value) });
+              }}
+              onMouseUp={() =>
+                settingsApi.updateSettings({ priceBufferPercent: user?.priceBufferPercent })
+              }
+              className="w-full h-1.5 bg-black/5 rounded-full appearance-none cursor-pointer accent-black"
+            />
+          </div>
+        </section>
+
+        {/* System Interface Section */}
+        <section className="space-y-4">
+          <div className="flex items-center gap-2 px-1">
+            <div className="size-6 rounded-lg bg-black/5 flex items-center justify-center text-black/40">
+              <Fingerprint size={14} />
+            </div>
+            <h2 className="text-[10px] font-black uppercase tracking-widest text-black/40">
+              Интерфейс системы
+            </h2>
+          </div>
+
+          <div className="fused-card p-4 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div
-                className={`p-3 rounded-xl ${
-                  user?.voiceEnabled
-                    ? 'bg-success-soft text-success'
-                    : 'bg-surface-hl text-text-muted'
-                }`}
+                className={`size-10 rounded-xl flex items-center justify-center ${user?.voiceEnabled ? 'bg-peace-green/10 text-peace-green' : 'bg-black/5 text-black/20'}`}
               >
-                {user?.voiceEnabled ? (
-                  <Volume2 className="w-5 h-5" />
-                ) : (
-                  <VolumeX className="w-5 h-5" />
-                )}
+                {user?.voiceEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
               </div>
               <div>
-                <h4 className="font-semibold text-text-main">Голосовые ответы</h4>
-                <p className="text-xs text-text-muted">Виктор будет отвечать аудио в Telegram</p>
+                <h4 className="text-xs font-black text-black/80 uppercase tracking-tighter">
+                  Нейро-голос
+                </h4>
+                <p className="text-[10px] font-medium text-black/40">Голосовые ответы Виктора</p>
               </div>
             </div>
             <button
@@ -448,263 +391,192 @@ export function SettingsPage({
                 hapticFeedback(newValue ? 'success' : 'light');
                 setVoiceEnabled(newValue);
               }}
-              className={`w-12 h-7 rounded-full transition-all relative ${
-                user?.voiceEnabled ? 'bg-success' : 'bg-surface-dim'
-              }`}
-              role="switch"
-              aria-checked={user?.voiceEnabled}
+              className={`w-12 h-6 rounded-full transition-all relative ${user?.voiceEnabled ? 'bg-black' : 'bg-black/5'}`}
             >
               <div
-                className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow-md transition-all ${
-                  user?.voiceEnabled ? 'left-6' : 'left-1'
-                }`}
+                className={`absolute top-1 size-4 rounded-full bg-white shadow-sm transition-all ${user?.voiceEnabled ? 'left-7' : 'left-1'}`}
               />
             </button>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ============================================
-          SECTION 4: SUBSCRIPTION
-          ============================================ */}
-      <section className="mb-8">
-        <h2 className="section-title">👑 Подписка</h2>
-        <div className="card p-4 bg-linear-to-br from-primary-dim to-surface">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-primary text-white">
-                <Crown className="w-5 h-5" />
-              </div>
-              <div>
-                <span className="text-xs text-text-muted">Ваш тариф</span>
-                <h4 className="font-bold text-text-main uppercase">
-                  {user?.subscriptionPlan || 'FREE'}
-                </h4>
-              </div>
+        {/* Subscription Block */}
+        <section className="space-y-4">
+          <div className="flex items-center gap-2 px-1">
+            <div className="size-6 rounded-lg bg-black/5 flex items-center justify-center text-black/40">
+              <Zap size={14} />
             </div>
-            <span className="badge badge-success">Активен</span>
+            <h2 className="text-[10px] font-black uppercase tracking-widest text-black/40">
+              Уровень доступа
+            </h2>
           </div>
-          <button onClick={() => onNavigate?.('subscription')} className="w-full btn btn-secondary">
-            <CreditCard className="w-4 h-4" />
-            Управление подпиской
-          </button>
-        </div>
-      </section>
 
-      {/* ============================================
-          MODAL: ADD/EDIT ACCOUNT
-          ============================================ */}
+          <div className="fused-card p-5 bg-black text-white relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-8 opacity-10">
+              <Crown size={120} />
+            </div>
+            <div className="relative z-10">
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">
+                    Текущий тариф
+                  </span>
+                  <h4 className="text-2xl font-black italic tracking-tighter mt-1">
+                    {user?.subscriptionPlan?.toUpperCase() || 'CORE'} PLATFORM
+                  </h4>
+                </div>
+                <span className="text-[9px] font-black uppercase px-2 py-1 rounded bg-peace-green text-black">
+                  Active
+                </span>
+              </div>
+              <button
+                onClick={() => onNavigate?.('subscription')}
+                className="w-full h-11 rounded-xl bg-white text-black text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2"
+              >
+                <CreditCard size={14} /> Управление подпиской
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      {/* Account Modal (Tactical) */}
       <AnimatePresence>
         {showAccountModal && (
-          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-md p-4">
             <motion.div
-              initial={{ y: '100%', opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: '100%', opacity: 0 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="w-full max-w-md bg-surface rounded-2xl shadow-2xl overflow-hidden"
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              className="w-full max-w-md bg-white rounded-[32px] shadow-2xl overflow-hidden"
             >
-              {/* Modal Header */}
-              <div className="flex items-center justify-between p-5 border-b border-surface-dim">
-                <h3 className="text-lg font-bold text-text-main">
-                  {editingAccount.id ? 'Редактировать аккаунт' : 'Добавить маркетплейс'}
+              <div className="flex items-center justify-between p-6 border-b border-black/5">
+                <h3 className="text-base font-black text-black uppercase tracking-tight">
+                  {editingAccount.id ? 'Апгрейд канала' : 'Новый канал'}
                 </h3>
                 <button
                   onClick={() => {
                     setShowAccountModal(false);
                     setEditingAccount({});
                   }}
-                  className="p-2 rounded-lg hover:bg-surface-hl transition-colors"
-                  aria-label="Закрыть"
+                  className="size-10 flex items-center justify-center rounded-xl bg-black/5 text-black/40"
                 >
-                  <X className="w-5 h-5 text-text-muted" />
+                  <X size={20} />
                 </button>
               </div>
 
-              {/* Modal Body */}
-              <div className="p-5 space-y-5">
-                {/* Marketplace Selection */}
+              <div className="p-6 space-y-6">
                 <div>
-                  <label className="input-label text-text-muted">Тип площадки</label>
-                  <div className="grid grid-cols-2 gap-3 mt-1">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-black/30 mb-2 block">
+                    Тип площадки
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
                     {(['wb', 'ozon'] as const).map(m => (
                       <button
                         key={m}
-                        type="button"
-                        onClick={() => {
-                          const currentName = editingAccount.name;
-                          const isDefaultName =
-                            currentName === 'Wildberries' || currentName === 'Ozon';
+                        onClick={() =>
                           setEditingAccount({
                             ...editingAccount,
                             marketplace: m,
-                            name: isDefaultName
-                              ? m === 'wb'
-                                ? 'Wildberries'
-                                : 'Ozon'
-                              : currentName,
-                            // Clear fields of other marketplace if BRAND NEW
-                            ...(editingAccount.id
-                              ? {}
-                              : {
-                                  wb_token: m === 'wb' ? editingAccount.wb_token : '',
-                                  ozon_client_id: m === 'ozon' ? editingAccount.ozon_client_id : '',
-                                  ozon_api_key: m === 'ozon' ? editingAccount.ozon_api_key : '',
-                                }),
-                          });
-                        }}
-                        className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-2 ${
-                          editingAccount.marketplace === m
-                            ? 'border-primary bg-primary-dim ring-2 ring-primary/20'
-                            : 'border-surface-dim bg-surface-warm grayscale hover:grayscale-0 hover:border-primary/30'
-                        }`}
+                            name: m === 'wb' ? 'Wildberries' : 'Ozon',
+                          })
+                        }
+                        className={`h-24 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all ${editingAccount.marketplace === m ? 'border-black bg-black text-white' : 'border-black/5 text-black/40 hover:border-black/20'}`}
                       >
-                        <Store
-                          className={`w-6 h-6 ${
-                            editingAccount.marketplace === m ? 'text-primary' : 'text-text-muted'
-                          }`}
-                        />
-                        <span className="text-xs font-bold uppercase tracking-wider">
-                          {m === 'wb' ? 'Wildberries' : 'Ozon'}
-                        </span>
+                        <Store size={24} />
+                        <span className="text-[9px] font-black uppercase tracking-widest">{m}</span>
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {/* Profile Name */}
-                <div>
-                  <label className="input-label">Название профиля</label>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-black/30 block">
+                    ID Имя
+                  </label>
                   <input
                     type="text"
                     value={editingAccount.name || ''}
                     onChange={e => setEditingAccount({ ...editingAccount, name: e.target.value })}
-                    className="input"
-                    placeholder="Например: Основной склад"
+                    className="w-full h-12 bg-black/3 border border-black/5 rounded-2xl px-4 text-xs font-black focus:bg-white focus:ring-4 focus:ring-primary/5 outline-none transition-all"
+                    placeholder="Название аккаунта..."
                   />
-                  <p className="input-hint">Для удобства идентификации</p>
                 </div>
 
-                {/* Ozon Specific Fields */}
-                {editingAccount.marketplace === 'ozon' && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    className="space-y-4 pt-2 border-t border-surface-dim/50"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <label className="input-label mb-0">Client ID</label>
-                        <button
-                          type="button"
-                          onClick={() => setShowHelp('ozon')}
-                          className="flex items-center gap-1 text-[10px] uppercase font-bold text-primary hover:opacity-80 transition-opacity"
-                        >
-                          <HelpCircle className="w-3 h-3" />
-                          Где взять?
-                        </button>
-                      </div>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          value={editingAccount.ozon_client_id || ''}
-                          onChange={e =>
-                            setEditingAccount({ ...editingAccount, ozon_client_id: e.target.value })
-                          }
-                          className="input pl-10"
-                          placeholder="Введите Client ID..."
-                        />
-                        <Package className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-                      </div>
+                {editingAccount.marketplace === 'wb' && (
+                  <div className="space-y-4 pt-4 border-t border-black/5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-black/30">
+                        WB API Token
+                      </label>
+                      <button
+                        onClick={() => setShowHelp('wb')}
+                        className="text-[9px] font-black uppercase text-primary"
+                      >
+                        Помощь
+                      </button>
                     </div>
-
-                    <div>
-                      <label className="input-label mb-1.5">Ozon API Key</label>
-                      <div className="relative">
-                        <input
-                          type="password"
-                          value={editingAccount.ozon_api_key || ''}
-                          onChange={e =>
-                            setEditingAccount({ ...editingAccount, ozon_api_key: e.target.value })
-                          }
-                          className="input pl-10 pr-10"
-                          placeholder={editingAccount.id ? '********' : 'Вставьте API Key...'}
-                        />
-                        <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-                        <Shield className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-success/50" />
-                      </div>
-                    </div>
-                  </motion.div>
+                    <textarea
+                      rows={4}
+                      value={editingAccount.wb_token || ''}
+                      onChange={e =>
+                        setEditingAccount({ ...editingAccount, wb_token: e.target.value })
+                      }
+                      className="w-full bg-black/3 border border-black/5 rounded-2xl p-4 text-[10px] font-mono focus:bg-white outline-none transition-all resize-none"
+                      placeholder={editingAccount.id ? '••••••••••••••••' : 'Вставьте токен WB...'}
+                    />
+                  </div>
                 )}
 
-                {/* Wildberries Specific Fields */}
-                {editingAccount.marketplace === 'wb' && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    className="space-y-4 pt-2 border-t border-surface-dim/50"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <label className="input-label mb-0">WB API Token</label>
-                        <button
-                          type="button"
-                          onClick={() => setShowHelp('wb')}
-                          className="flex items-center gap-1 text-[10px] uppercase font-bold text-primary hover:opacity-80 transition-opacity"
-                        >
-                          <HelpCircle className="w-3 h-3" />
-                          Где взять?
-                        </button>
-                      </div>
-                      <div className="relative">
-                        <textarea
-                          rows={3}
-                          value={editingAccount.wb_token || ''}
-                          onChange={e =>
-                            setEditingAccount({ ...editingAccount, wb_token: e.target.value })
-                          }
-                          className="input min-h-[80px] py-3 pr-10 text-xs font-mono"
-                          placeholder={
-                            editingAccount.id ? '********' : 'Вставьте длинный токен WB...'
-                          }
-                        />
-                        <Shield className="absolute right-3 top-4 w-4 h-4 text-success/50" />
-                      </div>
-                      <p className="text-[10px] text-text-muted mt-2 flex items-center gap-1.5">
-                        <Shield className="w-3 h-3 text-success" />
-                        Токен шифруется по стандарту AES-256-GCM
-                      </p>
+                {editingAccount.marketplace === 'ozon' && (
+                  <div className="space-y-4 pt-4 border-t border-black/5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-black/30">
+                        Ozon Credentials
+                      </label>
+                      <button
+                        onClick={() => setShowHelp('ozon')}
+                        className="text-[9px] font-black uppercase text-primary"
+                      >
+                        Помощь
+                      </button>
                     </div>
-                  </motion.div>
+                    <div className="space-y-3">
+                      <input
+                        type="text"
+                        value={editingAccount.ozon_client_id || ''}
+                        onChange={e =>
+                          setEditingAccount({ ...editingAccount, ozon_client_id: e.target.value })
+                        }
+                        className="w-full h-12 bg-black/3 border border-black/5 rounded-2xl px-4 text-xs font-black focus:bg-white outline-none transition-all"
+                        placeholder="Client ID..."
+                      />
+                      <input
+                        type="password"
+                        value={editingAccount.ozon_api_key || ''}
+                        onChange={e =>
+                          setEditingAccount({ ...editingAccount, ozon_api_key: e.target.value })
+                        }
+                        className="w-full h-12 bg-black/3 border border-black/5 rounded-2xl px-4 text-xs font-black focus:bg-white outline-none transition-all"
+                        placeholder={editingAccount.id ? '••••••••' : 'API Key...'}
+                      />
+                    </div>
+                  </div>
                 )}
               </div>
 
-              {/* Modal Footer */}
-              <div className="p-5 border-t border-surface-dim bg-surface-warm">
+              <div className="p-6 bg-black/3">
                 <button
                   onClick={handleSaveAccount}
-                  disabled={
-                    isSaving ||
-                    !editingAccount.name ||
-                    (editingAccount.marketplace === 'wb' &&
-                      !editingAccount.wb_token &&
-                      !editingAccount.id) ||
-                    (editingAccount.marketplace === 'ozon' &&
-                      (!editingAccount.ozon_api_key || !editingAccount.ozon_client_id) &&
-                      !editingAccount.id)
-                  }
-                  className="w-full btn btn-primary py-4 shadow-lg shadow-primary/20"
+                  disabled={isSaving}
+                  className="w-full h-14 rounded-[20px] bg-black text-white flex items-center justify-center gap-2 text-xs font-black uppercase tracking-[0.2em] shadow-xl shadow-black/20"
                 >
                   {isSaving ? (
-                    <RefreshCcw className="w-5 h-5 animate-spin" />
+                    <RefreshCcw size={16} className="animate-spin" />
                   ) : (
-                    <>
-                      <CheckCircle2 className="w-5 h-5" />
-                      <span>
-                        {editingAccount.id ? 'Сохранить изменения' : 'Подключить аккаунт'}
-                      </span>
-                    </>
+                    <CheckCircle2 size={16} />
                   )}
+                  {editingAccount.id ? 'Commit Update' : 'Initialize Channel'}
                 </button>
               </div>
             </motion.div>
@@ -712,39 +584,57 @@ export function SettingsPage({
         )}
       </AnimatePresence>
 
-      {/* Help Modal */}
+      {/* Help Overlay */}
       <AnimatePresence>
         {showHelp && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 backdrop-blur-sm p-6">
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-surface rounded-2xl p-6 max-w-sm w-full shadow-2xl"
+              className="bg-white rounded-[32px] p-8 max-w-sm w-full shadow-2xl relative overflow-hidden"
             >
-              <h3 className="font-bold text-lg text-text-main mb-3">
-                Где взять {showHelp === 'wb' ? 'API Token' : 'ключи Ozon'}?
+              <div className="absolute -top-10 -right-10 size-32 bg-primary/5 rounded-full" />
+              <h3 className="text-lg font-black text-black uppercase tracking-tight mb-4 relative z-10">
+                Протокол подключения
               </h3>
-              {showHelp === 'wb' ? (
-                <div className="text-sm text-text-secondary space-y-2">
-                  <p>1. Зайдите в личный кабинет Wildberries</p>
-                  <p>
-                    2. Перейдите в <strong>Настройки → Доступ к API</strong>
-                  </p>
-                  <p>3. Нажмите "Создать токен" с доступом к ценам</p>
-                  <p>4. Скопируйте и вставьте сюда</p>
-                </div>
-              ) : (
-                <div className="text-sm text-text-secondary space-y-2">
-                  <p>1. Зайдите в seller.ozon.ru</p>
-                  <p>
-                    2. Перейдите в <strong>Настройки → API-ключи</strong>
-                  </p>
-                  <p>3. Создайте ключ с правами на товары и цены</p>
-                  <p>4. Client ID и API Key вставьте в соответствующие поля</p>
-                </div>
-              )}
-              <button onClick={() => setShowHelp(null)} className="w-full btn btn-secondary mt-5">
+              <div className="space-y-4 text-[11px] font-medium text-black/50 relative z-10">
+                {showHelp === 'wb' ? (
+                  <>
+                    <p>
+                      <span className="font-black text-black">01.</span> ЛК WB → Настройки → Доступ
+                      к API
+                    </p>
+                    <p>
+                      <span className="font-black text-black">02.</span> Создать токен (Категории:
+                      Цены и Скидки)
+                    </p>
+                    <p>
+                      <span className="font-black text-black">03.</span> Скопировать хеш и вставить
+                      в Sentinel
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p>
+                      <span className="font-black text-black">01.</span> Seller Ozon → Настройки →
+                      API ключи
+                    </p>
+                    <p>
+                      <span className="font-black text-black">02.</span> Создать "Admin" токен для
+                      системы
+                    </p>
+                    <p>
+                      <span className="font-black text-black">03.</span> Взять Client ID и Key со
+                      страницы
+                    </p>
+                  </>
+                )}
+              </div>
+              <button
+                onClick={() => setShowHelp(null)}
+                className="w-full h-12 rounded-2xl bg-black text-white text-[10px] font-black uppercase tracking-widest mt-8"
+              >
                 Понятно
               </button>
             </motion.div>

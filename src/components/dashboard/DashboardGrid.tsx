@@ -2,8 +2,9 @@ import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useProductsStore, selectFilteredProducts } from '../../stores';
 import { ProductCard } from './ProductCard';
-import { Search, Sparkles } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
+import { ViktorCore } from '../ui/ViktorCore';
 import type { Product } from '../../types';
 
 interface DashboardGridProps {
@@ -20,8 +21,7 @@ export function DashboardGrid({ onOpenCalculator }: DashboardGridProps) {
   const [prevProducts, setPrevProducts] = useState(products);
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
-  // Reset visible count when filters change (new products list)
-  // implementing derived state pattern to avoid useEffect state update
+  // Reset visible count when filters change
   if (products !== prevProducts) {
     setPrevProducts(products);
     setVisibleCount(12);
@@ -45,47 +45,38 @@ export function DashboardGrid({ onOpenCalculator }: DashboardGridProps) {
     return () => observer.disconnect();
   }, [visibleCount, products.length]);
 
-  // Alive Loading State
+  // Premium Loading State
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-6">
-        <div className="relative">
-          <motion.div
-            className="w-16 h-16 rounded-full bg-violet-100 blur-xl"
-            animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.8, 0.5] }}
-            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-          />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Sparkles className="w-8 h-8 text-violet-600 animate-pulse" />
-          </div>
-        </div>
+      <div className="flex flex-col items-center justify-center py-32 gap-6 bg-white/40 rounded-[32px] border border-black/5 animate-pulse">
+        <ViktorCore size="lg" animate />
         <div className="text-center space-y-1">
-          <h3 className="text-lg font-bold text-slate-700">Синхронизация с нейросетью...</h3>
-          <p className="text-sm text-slate-400">Это займет всего пару секунд</p>
+          <h3 className="text-sm font-black text-black/80 uppercase tracking-tighter">
+            Синхронизация потоков...
+          </h3>
+          <p className="text-[10px] font-medium text-black/30">Загрузка данных из облака Neuro</p>
         </div>
       </div>
     );
   }
 
   if (products.length === 0) {
-    // If entire catalog is empty, return null (ProductsPage will show broad empty state)
     if (totalInCatalog === 0) return null;
 
-    // Otherwise, this is a "nothing found by filters" state
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
-        <div className="w-20 h-20 rounded-3xl bg-slate-50 border border-slate-100 flex items-center justify-center mx-auto mb-6 shadow-xs">
-          <Search className="w-10 h-10 text-slate-300" />
+        <div className="size-20 rounded-3xl bg-black/5 flex items-center justify-center mx-auto mb-6">
+          <Search size={32} className="text-black/10" />
         </div>
-        <h3 className="text-lg font-bold text-slate-800">Товары не найдены</h3>
-        <p className="text-slate-500 mt-2 max-w-xs mx-auto">
-          Попробуйте изменить параметры поиска или сбросить фильтры
+        <h3 className="text-base font-black text-black/80 tracking-tight">Ничего не найдено</h3>
+        <p className="text-[10px] font-medium text-black/40 mt-1 max-w-[180px] mx-auto">
+          Попробуйте изменить запрос или сбросьте активные фильтры
         </p>
         <button
           onClick={() => useProductsStore.getState().setSearchQuery('')}
-          className="mt-6 text-violet-600 font-semibold text-sm hover:underline"
+          className="mt-6 text-[10px] font-black uppercase tracking-widest text-primary border-b border-primary/20 pb-0.5"
         >
-          Сбросить фильтры
+          Сбросить все
         </button>
       </div>
     );
@@ -94,17 +85,17 @@ export function DashboardGrid({ onOpenCalculator }: DashboardGridProps) {
   const visibleProducts = products.slice(0, visibleCount);
 
   return (
-    <div className="pb-24">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="pb-32">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         <AnimatePresence mode="popLayout">
           {visibleProducts.map(product => (
             <motion.div
               key={product.id}
               layout
-              initial={{ opacity: 0, scale: 0.95 }}
+              initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.3, ease: 'easeOut' }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.3 }}
             >
               <ProductCard
                 product={product}
@@ -116,14 +107,14 @@ export function DashboardGrid({ onOpenCalculator }: DashboardGridProps) {
         </AnimatePresence>
       </div>
 
-      {/* Scroll Guardian (Sentinel) */}
+      {/* Scroll Sentinel */}
       {visibleCount < products.length && (
         <div
           ref={loadMoreRef}
-          className="py-12 flex flex-col items-center justify-center opacity-60"
+          className="py-12 flex flex-col items-center justify-center opacity-40"
         >
-          <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin mb-2" />
-          <span className="text-xs font-medium text-slate-400">Загрузка товаров...</span>
+          <div className="size-8 border-2 border-primary border-t-transparent rounded-full animate-spin mb-2" />
+          <span className="text-[10px] font-black uppercase tracking-widest">Прогрузка...</span>
         </div>
       )}
     </div>

@@ -1,5 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+  RefreshCw,
+  Users,
+  Shield,
+  Zap,
+  Cpu,
+  Settings,
+  X,
+  Terminal,
+  LayoutGrid,
+} from 'lucide-react';
+import { hapticFeedback } from '../lib/telegram';
 
 // ============================================
 // TYPES
@@ -36,7 +48,7 @@ interface MoEHealth {
 }
 
 interface OpsEvent {
-  id: number; // Changed to number to match DB
+  id: number;
   event_type: string;
   payload: Record<string, unknown>;
   created_at: string;
@@ -123,7 +135,6 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
   const fetchAudit = useCallback(async () => {
     setLoading(true);
     try {
-      // Re-using ops-events for now, or ops-audit endpoint
       const data = await apiFetch('/api?action=ops-events&type=recent&limit=50');
       if (data.success) setEvents(data.events);
     } catch (e) {
@@ -157,12 +168,10 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
     if (activeTab === 'audit') fetchAudit();
     if (activeTab === 'moe') fetchMoEHealth();
 
-    // Auto-refresh for overview every 30s
     if (activeTab === 'overview') {
       const interval = setInterval(fetchOverview, 30000);
       return () => clearInterval(interval);
     }
-    // Auto-refresh for MoE every 15s
     if (activeTab === 'moe') {
       const interval = setInterval(fetchMoEHealth, 15000);
       return () => clearInterval(interval);
@@ -183,6 +192,7 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    hapticFeedback('medium');
     localStorage.setItem('admin_key', adminKey);
     setIsAuthenticated(true);
   };
@@ -190,6 +200,7 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
   const handleAction = async (action: string, userId: number) => {
     if (!confirm(`Вы уверены, что хотите запустить ${action} для пользователя #${userId}?`)) return;
 
+    hapticFeedback('light');
     setActionLoading(userId);
     try {
       const res = await fetch('/api?action=ops-action', {
@@ -199,10 +210,8 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
       });
       const data = await res.json();
       if (data.success) {
-        // Ideally use a toast here
-        console.log(`Success: ${data.message}`);
+        hapticFeedback('success');
       } else {
-        console.error(`Error: ${data.error}`);
         alert(`Ошибка: ${data.error}`);
       }
     } catch {
@@ -218,39 +227,54 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-stone-950 text-stone-200 p-6 flex flex-col items-center justify-center font-sans">
+      <div className="min-h-full bg-background p-6 flex flex-col items-center justify-center font-display relative">
+        <div className="aura-layer" />
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-sm"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="w-full max-w-sm fused-card p-8 space-y-8"
         >
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold bg-linear-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent mb-2">
-              Админ Панель
+          <div className="text-center space-y-2">
+            <div className="size-16 rounded-2xl bg-black text-white flex items-center justify-center mx-auto shadow-2xl">
+              <Terminal size={32} />
+            </div>
+            <h1 className="text-2xl font-black italic tracking-tighter uppercase mt-4">
+              Ops Console
             </h1>
-            <p className="text-stone-500 text-sm">Вход только для авторизованных операторов</p>
+            <p className="text-[10px] font-black text-black/30 uppercase tracking-widest">
+              Authorized Access Only
+            </p>
           </div>
 
-          <form onSubmit={handleLogin} className="flex flex-col gap-4">
-            <input
-              type="password"
-              placeholder="Admin Security Key"
-              value={adminKey}
-              onChange={e => setAdminKey(e.target.value)}
-              className="p-3 rounded-xl bg-stone-900 border border-stone-800 focus:border-violet-500 outline-none transition-colors"
-            />
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase tracking-widest text-black/40 px-1">
+                Security Token
+              </label>
+              <input
+                type="password"
+                placeholder="••••••••••••"
+                value={adminKey}
+                onChange={e => setAdminKey(e.target.value)}
+                className="w-full h-14 px-4 rounded-2xl bg-black/5 border border-black/5 focus:border-primary/30 outline-none font-mono text-sm transition-all"
+              />
+            </div>
             <button
               type="submit"
-              className="bg-violet-600 p-3 rounded-xl font-bold hover:bg-violet-500 transition-colors shadow-lg shadow-violet-900/20"
+              className="w-full h-14 bg-black text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-2xl active:scale-95 transition-all"
             >
-              Войти в консоль
+              Access System
             </button>
           </form>
+
           <button
-            onClick={onBack}
-            className="mt-6 w-full text-stone-600 hover:text-stone-400 text-sm"
+            onClick={() => {
+              hapticFeedback('light');
+              onBack();
+            }}
+            className="w-full text-center text-[10px] font-black text-black/30 uppercase tracking-widest hover:text-black transition-colors"
           >
-            ← Вернуться в приложение
+            ← Exit Terminal
           </button>
         </motion.div>
       </div>
@@ -262,72 +286,84 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
   // ============================================
 
   return (
-    <div className="min-h-screen bg-stone-950 text-stone-200 pb-24 font-sans">
+    <div className="min-h-full bg-background font-display pb-32 relative">
+      <div className="aura-layer" />
+
       {/* HEADER */}
-      <header className="sticky top-0 bg-stone-950/80 backdrop-blur-md border-b border-stone-800 p-4 z-20 flex justify-between items-center">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-linear-to-br from-violet-600 to-indigo-600 flex items-center justify-center font-bold text-white">
-            N
+      <header className="sticky top-0 z-40 glass-nav border-b border-black/5 px-4 py-4">
+        <div className="flex items-center justify-between max-w-7xl mx-auto">
+          <div className="flex items-center gap-3">
+            <div className="size-10 rounded-xl bg-black text-white flex items-center justify-center shadow-lg font-black italic">
+              N
+            </div>
+            <div>
+              <h1 className="text-sm font-black tracking-tight text-text-main">Ops Panel</h1>
+              <div className="flex items-center gap-1.5 leading-none">
+                <div className="size-1.5 rounded-full bg-peace-green animate-pulse" />
+                <span className="text-[9px] font-black uppercase tracking-widest text-black/30">
+                  System Online
+                </span>
+              </div>
+            </div>
           </div>
-          <h1 className="text-lg font-bold text-stone-200">Админ Панель</h1>
-          <span className="px-2 py-0.5 rounded-full bg-emerald-900/30 text-emerald-400 text-xs border border-emerald-800">
-            • Онлайн
-          </span>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() =>
-              activeTab === 'overview'
-                ? fetchOverview()
-                : activeTab === 'clients'
-                  ? fetchClients()
-                  : fetchAudit()
-            }
-            className="p-2 hover:bg-stone-800 rounded-lg transition-colors text-stone-400"
-          >
-            <RefreshIcon className={loading ? 'animate-spin' : ''} />
-          </button>
-          <button
-            onClick={onBack}
-            className="p-2 hover:bg-stone-800 rounded-lg transition-colors text-stone-400"
-          >
-            ✕
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                hapticFeedback('light');
+                if (activeTab === 'overview') fetchOverview();
+                else if (activeTab === 'clients') fetchClients();
+                else if (activeTab === 'moe') fetchMoEHealth();
+                else fetchAudit();
+              }}
+              className="size-10 flex items-center justify-center rounded-xl bg-black/5 hover:bg-black/10 transition-colors"
+            >
+              <RefreshCw size={18} className={`${loading ? 'animate-spin' : ''} text-black/40`} />
+            </button>
+            <button
+              onClick={() => {
+                hapticFeedback('light');
+                onBack();
+              }}
+              className="size-10 flex items-center justify-center rounded-xl bg-black text-white shadow-lg active:scale-90 transition-transform"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
       </header>
 
       {/* TABS */}
-      <div className="p-4 border-b border-stone-800 overflow-x-auto no-scrollbar">
-        <div className="flex gap-2">
+      <div className="sticky top-[73px] z-30 glass-nav border-b border-black/5 px-4 py-2 overflow-x-auto no-scrollbar">
+        <div className="flex gap-2 max-w-7xl mx-auto">
           <TabButton
             active={activeTab === 'overview'}
             onClick={() => setActiveTab('overview')}
-            icon="📊"
-            label="Обзор"
+            icon={<LayoutGrid size={14} />}
+            label="Overview"
           />
           <TabButton
             active={activeTab === 'clients'}
             onClick={() => setActiveTab('clients')}
-            icon="👥"
-            label="Клиенты"
+            icon={<Users size={14} />}
+            label="Clients"
           />
           <TabButton
             active={activeTab === 'audit'}
             onClick={() => setActiveTab('audit')}
-            icon="🛡️"
-            label="Аудит"
+            icon={<Shield size={14} />}
+            label="Security"
           />
           <TabButton
             active={activeTab === 'n8n'}
             onClick={() => setActiveTab('n8n')}
-            icon="⚡"
-            label="n8n"
+            icon={<Zap size={14} />}
+            label="Automata"
           />
           <TabButton
             active={activeTab === 'moe'}
             onClick={() => setActiveTab('moe')}
-            icon="🧠"
-            label="MoE"
+            icon={<Cpu size={14} />}
+            label="Mixture"
           />
         </div>
       </div>
@@ -344,136 +380,143 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
               exit={{ opacity: 0, y: -10 }}
               className="space-y-6"
             >
-              {/* Top Stats Grid */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard
-                  label="Всего клиентов"
+                  label="Total Nodes"
                   value={overview.clients.total}
                   trend={`+${overview.clients.newToday}`}
                   trendUp={true}
                 />
                 <StatCard
-                  label="Активных"
+                  label="Active Flux"
                   value={overview.clients.active}
-                  subvalue={`${Math.round((overview.clients.active / overview.clients.total) * 100)}% активны`}
-                  color="purple"
+                  subvalue={`${Math.round((overview.clients.active / overview.clients.total) * 100)}% coverage`}
+                  color="primary"
                 />
                 <StatusCard
-                  label="Интеграции"
+                  label="Bridge: WB"
                   status={overview.integrations.wb.status === 'ok' ? 'healthy' : 'warning'}
-                  detail={`WB ${overview.integrations.wb.latency}ms`}
+                  detail={`${overview.integrations.wb.latency}ms ping`}
                 />
                 <StatusCard
-                  label="Движок n8n"
+                  label="Engine: n8n"
                   status={overview.integrations.n8n.status === 'active' ? 'healthy' : 'error'}
-                  detail={`${overview.integrations.n8n.workflows_active} сценариев`}
+                  detail={`${overview.integrations.n8n.workflows_active} chains active`}
                 />
               </div>
 
-              {/* Recent Activity Feed */}
-              <div className="bg-stone-900/50 rounded-2xl border border-stone-800 overflow-hidden">
-                <div className="p-4 border-b border-stone-800 flex justify-between items-center">
-                  <h3 className="font-bold text-stone-300">Лента операций</h3>
-                  <span className="text-xs text-stone-500">Последние 5</span>
+              <div className="fused-card overflow-hidden">
+                <div className="p-4 border-b border-black/5 flex justify-between items-center bg-black/3">
+                  <h3 className="text-[10px] font-black uppercase tracking-widest text-black/40">
+                    Recent Pulse Events
+                  </h3>
                 </div>
-                <div className="divide-y divide-stone-800">
+                <div className="divide-y divide-black/5 bg-white/40">
                   {overview.recent_events.map(evt => (
                     <EventRow key={evt.id} event={evt} compact />
                   ))}
                   {overview.recent_events.length === 0 && (
-                    <div className="p-8 text-center text-stone-600 text-sm">Нет событий</div>
+                    <div className="p-12 text-center text-[10px] font-black uppercase tracking-widest text-black/20">
+                      Zero events detected
+                    </div>
                   )}
                 </div>
               </div>
             </motion.div>
           )}
 
-          {/* CLIENTS TAB (Ops Console) */}
+          {/* CLIENTS TAB */}
           {activeTab === 'clients' && (
             <motion.div
               key="clients"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
+              className="fused-card overflow-hidden"
             >
-              <div className="bg-stone-900/50 rounded-2xl border border-stone-800 overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-stone-900 text-stone-500 text-xs uppercase tracking-wider">
-                        <th className="p-4 font-medium">Магазин / Клиент</th>
-                        <th className="p-4 font-medium">Статус</th>
-                        <th className="p-4 font-medium">Платформы</th>
-                        <th className="p-4 font-medium">Подписка</th>
-                        <th className="p-4 font-medium">Товары</th>
-                        <th className="p-4 font-medium">Действия</th>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-black/3 text-[9px] font-black uppercase tracking-widest text-black/40">
+                      <th className="p-4">Entity</th>
+                      <th className="p-4 text-center">Protocol</th>
+                      <th className="p-4">Platforms</th>
+                      <th className="p-4">Tier</th>
+                      <th className="p-4">Objects</th>
+                      <th className="p-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-black/5 text-xs font-bold bg-white/40">
+                    {clients.map(client => (
+                      <tr key={client.id} className="hover:bg-black/3 transition-colors">
+                        <td className="p-4">
+                          <div className="font-black text-text-main truncate max-w-[140px]">
+                            {client.first_name || 'Anonymous Node'}
+                          </div>
+                          <div className="text-[9px] font-medium text-black/30">
+                            ID: {client.id}
+                          </div>
+                        </td>
+                        <td className="p-4 text-center">
+                          <StatusBadge active={client.is_active} />
+                        </td>
+                        <td className="p-4">
+                          <div className="flex gap-1">
+                            {client.platforms.includes('wb') && <PlatformTag name="WB" />}
+                            {client.platforms.includes('ozon') && <PlatformTag name="OZ" />}
+                          </div>
+                        </td>
+                        <td className="p-4 uppercase tracking-tighter">
+                          {client.subscription_plan}
+                        </td>
+                        <td className="p-4">{client.total_products}</td>
+                        <td className="p-4 text-right">
+                          <div className="flex gap-2 justify-end">
+                            <button
+                              onClick={() => handleAction('sync_products', client.id)}
+                              className="size-8 flex items-center justify-center rounded-lg bg-black text-white shadow-lg active:scale-95 transition-all disabled:opacity-30"
+                              disabled={actionLoading === client.id}
+                            >
+                              <RefreshCw
+                                size={12}
+                                className={actionLoading === client.id ? 'animate-spin' : ''}
+                              />
+                            </button>
+                            <button
+                              onClick={() => handleAction('retry_onboarding', client.id)}
+                              className="size-8 flex items-center justify-center rounded-lg bg-black/5 hover:bg-black/10 transition-colors"
+                            >
+                              <Settings size={12} className="text-black/40" />
+                            </button>
+                          </div>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-stone-800 text-sm">
-                      {clients.map(client => (
-                        <tr key={client.id} className="hover:bg-stone-800/50 transition-colors">
-                          <td className="p-4">
-                            <div className="font-bold text-white max-w-[150px] truncate">
-                              {client.first_name || 'User'}
-                            </div>
-                            <div className="text-stone-500 text-xs">@{client.username}</div>
-                          </td>
-                          <td className="p-4">
-                            <Badge status={client.is_active ? 'active' : 'inactive'} />
-                          </td>
-                          <td className="p-4">
-                            <div className="flex gap-1">
-                              {client.platforms.includes('wb') && <PlatformIcon name="WB" />}
-                              {client.platforms.includes('ozon') && <PlatformIcon name="OZ" />}
-                            </div>
-                          </td>
-                          <td className="p-4 text-stone-300">{client.subscription_plan}</td>
-                          <td className="p-4 text-stone-300">{client.total_products}</td>
-                          <td className="p-4">
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleAction('sync_products', client.id)}
-                                disabled={actionLoading === client.id}
-                                className="px-3 py-1 bg-violet-600/20 text-violet-300 hover:bg-violet-600/30 rounded text-xs font-medium transition-colors disabled:opacity-50"
-                              >
-                                {actionLoading === client.id ? '...' : 'Синк'}
-                              </button>
-                              <button
-                                onClick={() => handleAction('retry_onboarding', client.id)}
-                                disabled={actionLoading === client.id}
-                                className="px-3 py-1 bg-stone-800 text-stone-400 hover:bg-stone-700 rounded text-xs font-medium transition-colors"
-                              >
-                                Повтор
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {/* Pagination (Simple) */}
-                <div className="p-4 border-t border-stone-800 flex justify-center gap-2">
-                  <button
-                    onClick={() => setClientsPage(p => Math.max(1, p - 1))}
-                    disabled={clientsPage === 1}
-                    className="px-3 py-1 bg-stone-800 rounded disabled:opacity-50"
-                  >
-                    ←
-                  </button>
-                  <span className="sc-stone-500 text-sm py-1">Стр. {clientsPage}</span>
-                  <button
-                    onClick={() => setClientsPage(p => p + 1)}
-                    className="px-3 py-1 bg-stone-800 rounded"
-                  >
-                    →
-                  </button>
-                </div>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="p-4 border-t border-black/5 flex items-center justify-between bg-black/3">
+                <button
+                  onClick={() => setClientsPage(p => Math.max(1, p - 1))}
+                  className="size-8 flex items-center justify-center rounded-lg bg-white shadow border border-black/5"
+                  disabled={clientsPage === 1}
+                >
+                  ←
+                </button>
+                <span className="text-[10px] font-black text-black/30 uppercase">
+                  Page {clientsPage}
+                </span>
+                <button
+                  onClick={() => setClientsPage(p => p + 1)}
+                  className="size-8 flex items-center justify-center rounded-lg bg-white shadow border border-black/5"
+                >
+                  →
+                </button>
               </div>
             </motion.div>
           )}
 
-          {/* AUDIT (Deep Dive) */}
+          {/* AUDIT TAB */}
           {activeTab === 'audit' && (
             <motion.div
               key="audit"
@@ -482,14 +525,42 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
               exit={{ opacity: 0 }}
               className="space-y-4"
             >
-              <div className="flex justify-between items-center mb-2">
-                <h2 className="text-xl font-bold">Журнал Аудита</h2>
-                <span className="text-xs text-stone-500">Неизменяемая запись</span>
+              <div className="flex justify-between items-end px-1">
+                <div>
+                  <h2 className="text-2xl font-black italic uppercase tracking-tighter text-text-main">
+                    Security Log
+                  </h2>
+                  <p className="text-[10px] font-black text-black/30 uppercase tracking-widest">
+                    Immutable Ledger Trace
+                  </p>
+                </div>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {events.map(event => (
-                  <EventRow key={event.id} event={event} />
+                  <div key={event.id} className="fused-card p-4 flex gap-4 items-start bg-white/60">
+                    <div className="size-8 rounded-lg bg-black/5 flex items-center justify-center shrink-0">
+                      <Terminal size={14} className="text-black/30" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-primary">
+                          {event.event_type}
+                        </span>
+                        <span className="text-[9px] font-medium text-black/30">
+                          {new Date(event.created_at).toLocaleString()}
+                        </span>
+                      </div>
+                      <pre className="text-[10px] font-mono text-black/60 bg-black/3 p-2 rounded-lg overflow-x-auto">
+                        {JSON.stringify(event.payload, null, 2)}
+                      </pre>
+                    </div>
+                  </div>
                 ))}
+                {events.length === 0 && (
+                  <div className="p-12 text-center text-[10px] font-black uppercase tracking-widest text-black/20">
+                    Zero security events recorded
+                  </div>
+                )}
               </div>
             </motion.div>
           )}
@@ -500,24 +571,38 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
               key="n8n"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="flex flex-col items-center justify-center p-12 text-center"
+              className="fused-card p-12 flex flex-col items-center justify-center text-center space-y-4"
             >
-              <div className="text-6xl mb-4">⚡</div>
-              <h2 className="text-2xl font-bold text-white mb-2">Оркестратор n8n</h2>
-              <div className="bg-stone-900 p-6 rounded-xl border border-stone-800 max-w-md w-full">
-                <div className="flex justify-between mb-2">
-                  <span className="text-stone-400">Статус</span>
-                  <span className="text-emerald-400 font-bold">Активен</span>
+              <div className="size-20 rounded-3xl bg-black text-white flex items-center justify-center shadow-2xl">
+                <Zap size={40} className="fill-current" />
+              </div>
+              <h2 className="text-2xl font-black italic tracking-tighter uppercase text-text-main">
+                Chain Orchestrator
+              </h2>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 justify-center">
+                  <div className="size-2 rounded-full bg-peace-green animate-pulse" />
+                  <span className="text-xs font-black text-text-main">Automata Status: Active</span>
                 </div>
-                <div className="flex justify-between mb-2">
-                  <span className="text-stone-400">Вебхук</span>
-                  <span className="text-stone-200 font-mono text-xs max-w-[200px] truncate">
-                    {overview?.integrations.n8n.status}
+                <p className="text-[10px] font-medium text-black/30 uppercase tracking-widest">
+                  Listening for Webhooks & State Changes
+                </p>
+              </div>
+              <div className="w-full max-w-sm bg-black/3 rounded-2xl p-4 mt-6 border border-black/5">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-[9px] font-black uppercase text-black/30">
+                    Active Chains
+                  </span>
+                  <span className="text-xs font-black">
+                    {overview?.integrations.n8n.workflows_active || 0}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-stone-400">Активные сценарии</span>
-                  <span className="text-stone-200">3</span>
+                <div className="h-1 bg-black/5 rounded-full overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: '65%' }}
+                    className="h-full bg-primary"
+                  />
                 </div>
               </div>
             </motion.div>
@@ -529,161 +614,80 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
               key="moe"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="space-y-6"
+              className="space-y-8"
             >
-              <div className="flex justify-between items-center">
+              <header className="flex justify-between items-start">
                 <div>
-                  <h2 className="text-2xl font-bold text-white">🧠 Hybrid MoE Router</h2>
-                  <p className="text-stone-500 text-sm mt-1">
-                    Mixture of Experts: Local LLM → Cloud → Rules
+                  <h2 className="text-2xl font-black italic uppercase tracking-tighter text-text-main">
+                    Mixture of Experts
+                  </h2>
+                  <p className="text-[10px] font-black text-black/30 uppercase tracking-widest">
+                    Hybrid Neural Engine Routing
                   </p>
                 </div>
                 <div
-                  className={`px-4 py-2 rounded-xl font-bold ${
-                    moeHealth?.healthy
-                      ? 'bg-emerald-900/30 text-emerald-400 border border-emerald-800'
-                      : 'bg-amber-900/30 text-amber-400 border border-amber-800'
-                  }`}
+                  className={`px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest border transition-colors ${moeHealth?.healthy ? 'bg-peace-green/5 text-peace-green border-peace-green/20' : 'bg-toxic-orange/5 text-toxic-orange border-toxic-orange/20'}`}
                 >
-                  {moeHealth?.healthy ? '● Все системы работают' : '⚠ Проблемы с инфраструктурой'}
+                  {moeHealth?.healthy
+                    ? '● All Neural Components Functional'
+                    : '⚠ Engine Fragmentation Detected'}
                 </div>
-              </div>
+              </header>
 
-              {/* MoE Config */}
-              <div className="bg-stone-900/50 rounded-2xl border border-stone-800 p-6">
-                <h3 className="text-lg font-bold text-stone-200 mb-4">Конфигурация</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex justify-between">
-                    <span className="text-stone-400">MoE Routing</span>
-                    <span
-                      className={
-                        moeHealth?.config?.moeEnabled ? 'text-emerald-400' : 'text-stone-500'
-                      }
-                    >
-                      {moeHealth?.config?.moeEnabled ? 'Включено' : 'Выключено'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-stone-400">Force Local</span>
-                    <span
-                      className={
-                        moeHealth?.config?.forceLocal ? 'text-violet-400' : 'text-stone-500'
-                      }
-                    >
-                      {moeHealth?.config?.forceLocal ? 'Да' : 'Нет'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Components Health */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Local LLM */}
-                <div className="p-5 bg-stone-900/50 rounded-2xl border border-stone-800">
-                  <div className="text-stone-500 text-xs font-bold uppercase tracking-wider mb-2">
-                    Локальный LLM
-                  </div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <div
-                      className={`w-2.5 h-2.5 rounded-full ${
-                        moeHealth?.components?.localLLM?.healthy
-                          ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]'
-                          : 'bg-red-500'
-                      }`}
-                    />
-                    <div
-                      className={`text-lg font-bold ${
-                        moeHealth?.components?.localLLM?.healthy
-                          ? 'text-emerald-400'
-                          : 'text-red-400'
-                      }`}
-                    >
-                      {moeHealth?.components?.localLLM?.healthy ? 'Онлайн' : 'Недоступен'}
-                    </div>
-                  </div>
-                  <div className="text-stone-600 text-xs font-mono">
-                    {moeHealth?.components?.localLLM?.latencyMs || 0}ms
-                  </div>
-                </div>
+                <HealthBlock
+                  label="Local LLM"
+                  status={moeHealth?.components?.localLLM?.healthy}
+                  detail={`${moeHealth?.components?.localLLM?.latencyMs || 0}ms Response`}
+                />
+                <HealthBlock
+                  label="Chroma DB"
+                  status={moeHealth?.components?.chromaDB?.healthy}
+                  detail="Vector Repository"
+                />
+                <HealthBlock
+                  label="Vercel KV"
+                  status={moeHealth?.components?.vercelKV?.healthy}
+                  detail="Synaptic Cache"
+                />
+                <HealthBlock
+                  label="Embeddings"
+                  status={moeHealth?.components?.embeddings?.available}
+                  detail="Logic Mapping"
+                />
+              </div>
 
-                {/* ChromaDB */}
-                <div className="p-5 bg-stone-900/50 rounded-2xl border border-stone-800">
-                  <div className="text-stone-500 text-xs font-bold uppercase tracking-wider mb-2">
-                    ChromaDB
-                  </div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <div
-                      className={`w-2.5 h-2.5 rounded-full ${
-                        moeHealth?.components?.chromaDB?.healthy ? 'bg-emerald-500' : 'bg-amber-500'
-                      }`}
-                    />
-                    <div
-                      className={`text-lg font-bold ${
-                        moeHealth?.components?.chromaDB?.healthy
-                          ? 'text-emerald-400'
-                          : 'text-amber-400'
-                      }`}
-                    >
-                      {moeHealth?.components?.chromaDB?.healthy ? 'Норма' : 'Оффлайн'}
+              <div className="fused-card p-6 bg-black text-white relative overflow-hidden group">
+                <div className="absolute top-0 right-0 size-64 bg-primary/20 blur-3xl -mr-32 -mt-32 animate-pulse" />
+                <div className="relative z-10">
+                  <h3 className="text-[10px] font-black uppercase tracking-[0.3em] mb-6 text-white/40">
+                    Core Neural Config
+                  </h3>
+                  <div className="grid grid-cols-2 gap-8">
+                    <div className="space-y-1">
+                      <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">
+                        Routing Logic
+                      </span>
+                      <div className="text-xl font-black italic">
+                        {moeHealth?.config?.moeEnabled ? 'DYN-ENABLED' : 'MANUAL-ONLY'}
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[9px] font-black text-white/40 uppercase tracking-widest text-toxic-orange/60">
+                        Force Priority
+                      </span>
+                      <div className="text-xl font-black italic text-toxic-orange">
+                        {moeHealth?.config?.forceLocal ? 'LOCAL-CORE' : 'HYBRID-MESH'}
+                      </div>
                     </div>
                   </div>
-                  <div className="text-stone-600 text-xs">Vector Store</div>
-                </div>
-
-                {/* Vercel KV */}
-                <div className="p-5 bg-stone-900/50 rounded-2xl border border-stone-800">
-                  <div className="text-stone-500 text-xs font-bold uppercase tracking-wider mb-2">
-                    Vercel KV
-                  </div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <div
-                      className={`w-2.5 h-2.5 rounded-full ${
-                        moeHealth?.components?.vercelKV?.healthy ? 'bg-emerald-500' : 'bg-amber-500'
-                      }`}
-                    />
-                    <div
-                      className={`text-lg font-bold ${
-                        moeHealth?.components?.vercelKV?.healthy
-                          ? 'text-emerald-400'
-                          : 'text-amber-400'
-                      }`}
-                    >
-                      {moeHealth?.components?.vercelKV?.healthy ? 'Норма' : 'Оффлайн'}
-                    </div>
-                  </div>
-                  <div className="text-stone-600 text-xs">Session Memory</div>
-                </div>
-
-                {/* Embeddings */}
-                <div className="p-5 bg-stone-900/50 rounded-2xl border border-stone-800">
-                  <div className="text-stone-500 text-xs font-bold uppercase tracking-wider mb-2">
-                    Embeddings
-                  </div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <div
-                      className={`w-2.5 h-2.5 rounded-full ${
-                        moeHealth?.components?.embeddings?.available
-                          ? 'bg-emerald-500'
-                          : 'bg-stone-600'
-                      }`}
-                    />
-                    <div
-                      className={`text-lg font-bold ${
-                        moeHealth?.components?.embeddings?.available
-                          ? 'text-emerald-400'
-                          : 'text-stone-500'
-                      }`}
-                    >
-                      {moeHealth?.components?.embeddings?.available ? 'Готово' : 'Нет'}
-                    </div>
-                  </div>
-                  <div className="text-stone-600 text-xs">OpenAI text-embedding</div>
                 </div>
               </div>
 
-              {/* Latency */}
-              <div className="text-center text-stone-600 text-sm">
-                Health check: {moeHealth?.latencyMs || 0}ms
+              <div className="text-center">
+                <p className="text-[9px] font-mono text-black/20 uppercase tracking-tighter">
+                  System Pulse: {moeHealth?.latencyMs || 0}ms latency
+                </p>
               </div>
             </motion.div>
           )}
@@ -694,62 +698,69 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
 }
 
 // ============================================
-// HELPER COMPONENTS
+// HELPERS
 // ============================================
 
 interface TabButtonProps {
   active: boolean;
   onClick: () => void;
-  icon: string;
+  icon: React.ReactNode;
   label: string;
 }
 
 function TabButton({ active, onClick, icon, label }: TabButtonProps) {
   return (
     <button
-      onClick={onClick}
-      className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
+      onClick={() => {
+        hapticFeedback('light');
+        onClick();
+      }}
+      className={`px-4 h-10 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all whitespace-nowrap ${
         active
-          ? 'bg-violet-600 text-white shadow-lg shadow-violet-900/20'
-          : 'bg-stone-900 text-stone-400 hover:bg-stone-800 hover:text-stone-200'
+          ? 'bg-black text-white shadow-xl shadow-black/20'
+          : 'bg-black/5 text-black/30 hover:bg-black/10'
       }`}
     >
-      <span>{icon}</span>
-      {label}
+      {icon}
+      <span>{label}</span>
     </button>
   );
 }
 
 interface StatCardProps {
   label: string;
-  value: number;
+  value: number | string;
   trend?: string;
   subvalue?: string;
   trendUp?: boolean;
   color?: string;
 }
 
-function StatCard({ label, value, trend, subvalue, trendUp, color = 'blue' }: StatCardProps) {
+function StatCard({ label, value, trend, subvalue, trendUp, color = 'primary' }: StatCardProps) {
   return (
-    <div className="p-5 bg-stone-900/50 rounded-2xl border border-stone-800 hover:border-stone-700 transition-colors relative overflow-hidden group">
+    <div className="fused-card p-5 relative overflow-hidden group">
       <div
-        className={`absolute top-0 right-0 w-24 h-24 bg-${color}-500/5 rounded-full blur-2xl group-hover:bg-${color}-500/10 transition-colors -mr-4 -mt-4`}
+        className={`absolute top-0 right-0 size-20 bg-${color}/5 blur-2xl group-hover:bg-${color}/10 transition-colors -mr-10 -mt-10`}
       />
       <div className="relative z-10">
-        <div className="text-stone-500 text-xs font-bold uppercase tracking-wider mb-2">
+        <span className="text-[9px] font-black uppercase tracking-widest text-black/30 block mb-3">
           {label}
-        </div>
+        </span>
         <div className="flex items-baseline gap-2">
-          <div className="text-3xl font-bold text-white">{value}</div>
+          <span className="text-3xl font-black italic tracking-tighter">{value}</span>
           {trend && (
-            <div
-              className={`text-xs font-bold px-1.5 py-0.5 rounded ${trendUp ? 'bg-emerald-900/30 text-emerald-400' : 'bg-red-900/30 text-red-400'}`}
+            <span
+              className={`text-[9px] font-black px-1.5 py-0.5 rounded-lg ${trendUp ? 'bg-peace-green/10 text-peace-green' : 'bg-toxic-orange/10 text-toxic-orange'}`}
             >
               {trend}
-            </div>
+            </span>
           )}
         </div>
-        {subvalue && <div className="text-stone-500 text-xs mt-1">{subvalue}</div>}
+        {subvalue && (
+          <p className="text-[9px] font-medium text-black/20 mt-1 uppercase tracking-tight">
+            {subvalue}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -757,89 +768,103 @@ function StatCard({ label, value, trend, subvalue, trendUp, color = 'blue' }: St
 
 interface StatusCardProps {
   label: string;
-  status: string;
+  status: 'healthy' | 'warning' | 'error';
   detail: string;
 }
 
 function StatusCard({ label, status, detail }: StatusCardProps) {
   const isHealthy = status === 'healthy';
+  const isWarning = status === 'warning';
+
   return (
-    <div className="p-5 bg-stone-900/50 rounded-2xl border border-stone-800 hover:border-stone-700 transition-colors">
-      <div className="text-stone-500 text-xs font-bold uppercase tracking-wider mb-2">{label}</div>
+    <div className="fused-card p-5">
+      <span className="text-[9px] font-black uppercase tracking-widest text-black/30 block mb-3">
+        {label}
+      </span>
       <div className="flex items-center gap-2 mb-1">
         <div
-          className={`w-2.5 h-2.5 rounded-full ${isHealthy ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-amber-500'}`}
+          className={`size-2 rounded-full ${isHealthy ? 'bg-peace-green shadow-[0_0_8px_rgba(16,185,129,0.5)]' : isWarning ? 'bg-toxic-orange/50 shadow-[0_0_8px_rgba(255,109,0,0.3)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]'}`}
         />
-        <div className={`text-lg font-bold ${isHealthy ? 'text-emerald-400' : 'text-amber-400'}`}>
-          {isHealthy ? 'Норма' : 'Проблемы'}
-        </div>
+        <span
+          className={`text-lg font-black italic uppercase tracking-tighter ${isHealthy ? 'text-text-main' : 'text-toxic-orange'}`}
+        >
+          {isHealthy ? 'Nominal' : 'Alert'}
+        </span>
       </div>
-      <div className="text-stone-600 text-xs font-mono">{detail}</div>
+      <p className="text-[9px] font-mono text-black/30 uppercase">{detail}</p>
     </div>
   );
 }
 
-function Badge({ status }: { status: string }) {
-  const styles: Record<string, string> = {
-    active: 'bg-emerald-900/30 text-emerald-400 border-emerald-800',
-    inactive: 'bg-stone-800 text-stone-500 border-stone-700',
-    error: 'bg-red-900/30 text-red-400 border-red-800',
-  };
+function HealthBlock({
+  label,
+  status,
+  detail,
+}: {
+  label: string;
+  status: boolean | undefined;
+  detail: string;
+}) {
+  return (
+    <div className="fused-card p-4">
+      <span className="text-[9px] font-black uppercase tracking-widest text-black/30 block mb-2">
+        {label}
+      </span>
+      <div className="flex items-center gap-2 mb-1">
+        <div className={`size-1.5 rounded-full ${status ? 'bg-peace-green' : 'bg-toxic-orange'}`} />
+        <span className="text-xs font-black italic uppercase">
+          {status ? 'Core-Up' : 'Disabled'}
+        </span>
+      </div>
+      <p className="text-[9px] font-medium text-black/20 uppercase transition-colors">{detail}</p>
+    </div>
+  );
+}
+
+function StatusBadge({ active }: { active: boolean }) {
   return (
     <span
-      className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold border ${styles[status] || styles.inactive}`}
+      className={`px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-widest border ${active ? 'bg-peace-green/5 text-peace-green border-peace-green/20' : 'bg-black/5 text-black/20 border-black/5'}`}
     >
-      {status}
+      {active ? 'Active' : 'Offline'}
     </span>
   );
 }
 
-function PlatformIcon({ name }: { name: string }) {
-  const colors: Record<string, string> = {
-    WB: 'bg-fuchsia-900/40 text-fuchsia-300 border-fuchsia-800',
-    OZ: 'bg-blue-900/40 text-blue-300 border-blue-800',
-  };
+function PlatformTag({ name }: { name: string }) {
+  const isWB = name === 'WB';
   return (
     <span
-      className={`w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold border ${colors[name]}`}
+      className={`px-1.5 py-0.5 rounded text-[8px] font-black ${isWB ? 'bg-[#CB11AB] text-white' : 'bg-[#005BFF] text-white'}`}
     >
       {name}
     </span>
   );
 }
 
-function EventRow({ event, compact }: { event: OpsEvent; compact?: boolean }) {
+function EventRow({ event, compact = false }: { event: OpsEvent; compact?: boolean }) {
   return (
-    <div className={`p-4 ${compact ? 'py-3' : ''} hover:bg-stone-800/30 transition-colors`}>
-      <div className="flex justify-between items-start mb-1">
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-xs text-violet-400 bg-violet-900/20 px-1.5 py-0.5 rounded border border-violet-900/50">
+    <div
+      className={`p-4 flex items-start gap-4 hover:bg-black/2 transition-colors ${compact ? 'py-3' : ''}`}
+    >
+      <div className="size-6 rounded-lg bg-black text-white flex items-center justify-center shrink-0 shadow-lg text-[10px] font-black italic">
+        {event.event_type.charAt(0).toUpperCase()}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex justify-between items-center mb-0.5">
+          <span className="text-[10px] font-black uppercase tracking-tight text-text-main truncate pr-2">
             {event.event_type}
           </span>
-          {event.user_id && <span className="text-xs text-stone-500">User #{event.user_id}</span>}
+          <span className="text-[8px] font-medium text-black/20 shrink-0">
+            {new Date(event.created_at).toLocaleTimeString()}
+          </span>
         </div>
-        <span className="text-xs text-stone-600 font-mono">
-          {new Date(event.created_at).toLocaleTimeString()}
-        </span>
+        {!compact && (
+          <pre className="text-[9px] font-mono text-black/40 bg-black/3 p-2 rounded mt-2 overflow-x-auto">
+            {JSON.stringify(event.payload, null, 2)}
+          </pre>
+        )}
       </div>
-      {!compact && (
-        <pre className="text-[10px] text-stone-500 mt-2 bg-black/20 p-2 rounded overflow-x-auto font-mono">
-          {JSON.stringify(event.payload, null, 2)}
-        </pre>
-      )}
     </div>
-  );
-}
-
-function RefreshIcon({ className }: { className?: string }) {
-  return (
-    <svg className={`w-5 h-5 ${className}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-      />
-    </svg>
   );
 }
