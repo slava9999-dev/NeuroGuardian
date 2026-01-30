@@ -69,6 +69,7 @@
     "@upstash/qstash": "^2.8.4",
     "@vercel/kv": "^3.0.0",
     "@vercel/postgres": "^0.10.0",
+    "@vercel/speed-insights": "^1.3.1",
     "ai": "^5.0.113",
     "axios": "^1.13.2",
     "bullmq": "^5.66.5",
@@ -95,12 +96,12 @@
     "reactflow": "^11.11.4",
     "recharts": "^3.6.0",
     "replicate": "^1.4.0",
+    "sharp": "^0.34.5",
     "tailwind-merge": "^3.4.0",
+    "tsx": "^4.21.0",
     "uuid": "^13.0.0",
     "zod": "^4.1.13",
-    "zustand": "^5.0.9",
-    "sharp": "^0.34.5",
-    "tsx": "^4.21.0"
+    "zustand": "^5.0.9"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

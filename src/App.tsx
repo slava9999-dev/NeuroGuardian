@@ -5,6 +5,7 @@
 
 import React, { useEffect, useState, useRef, lazy } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { useAppStore, useProductsStore } from './stores';
 import { initTelegramWebApp, isTelegramWebApp, getInitData, hapticFeedback } from './lib/telegram';
 import { authApi, productsApi } from './lib/api';
@@ -244,6 +245,9 @@ function App() {
           />
         </div>
       </nav>
+
+      {/* Vercel Speed Insights */}
+      <SpeedInsights />
     </div>
   );
 }
