@@ -47,10 +47,7 @@ export class SentinelOrchestrator {
    */
   async getActiveUserIds(): Promise<number[]> {
     const activeUsers = await db.query.users.findMany({
-      where: and(
-        eq(users.isActive, true),
-        drizzleSql`(${users.protectionEnabled} = true OR ${users.subscriptionActive} = true)`
-      ),
+      where: and(eq(users.isActive, true), eq(users.protectionEnabled, true)),
       columns: { id: true },
     });
     return activeUsers.map(u => Number(u.id));
@@ -94,7 +91,7 @@ export class SentinelOrchestrator {
       const activeUsers = await db.query.users.findMany({
         where: and(
           eq(users.isActive, true),
-          drizzleSql`(${users.protectionEnabled} = true OR ${users.subscriptionActive} = true)`
+          eq(users.protectionEnabled, true) // STRICT: Only users with enabled protection
         ),
       });
 
@@ -593,13 +590,14 @@ export class SentinelOrchestrator {
                     : product.product_id;
 
                 // DEDUPLICATION: Check if we already alerted about this specific threat for this product in last 24h
-                // We check sentinel_logs because that's where logSentinelAction writes to.
+                // Deduplication: Check if we already alerted about ANY threat for this product in the last 24h
+                // This prevents spam if prices fluctuate and trigger different threat types
                 const ackCheck = await db.execute(drizzleSql`
                   SELECT id FROM sentinel_logs 
                   WHERE user_id = ${user.id} 
                     AND product_id = ${externalId}
                     AND (
-                      threat_type = ${threat.type} 
+                      threat_type IS NOT NULL 
                       OR defense_action = 'ALERT_ACKNOWLEDGED'
                     )
                     AND created_at > NOW() - INTERVAL '24 hours'

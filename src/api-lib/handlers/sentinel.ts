@@ -353,10 +353,7 @@ export async function handleSentinelPriceReport(
   try {
     // 1. Get active users
     const activeUsers = await db.query.users.findMany({
-      where: and(
-        eq(users.isActive, true),
-        drizzleSql`(${users.protectionEnabled} = true OR ${users.subscriptionActive} = true)`
-      ),
+      where: and(eq(users.isActive, true), eq(users.protectionEnabled, true)),
     });
 
     let reportsSent = 0;

@@ -146,7 +146,11 @@ export class PriceParserService {
       });
       if (socialResponse.ok) {
         const html = await socialResponse.text();
-        const priceMatch = html.match(/"price":"(\d+)"/) || html.match(/"price":(\d+)/);
+        // Stricter price extraction from Ozon HTML metadata
+        const priceMatch =
+          html.match(/"price":\s*"(\d+)"/) ||
+          html.match(/"finalPrice":\s*(\d+)/) ||
+          html.match(/"price":\s*(\d+)/);
         if (priceMatch) {
           const price = parseInt(priceMatch[1]);
           return {

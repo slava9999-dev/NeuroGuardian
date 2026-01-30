@@ -211,7 +211,7 @@ function getAlertButtons(alert: Alert): Record<string, unknown> | undefined {
     const productUrl =
       mpLower === 'wb'
         ? `https://www.wildberries.ru/catalog/${cleanId}/detail.aspx`
-        : `https://www.ozon.ru/product/${cleanId}`;
+        : `https://www.ozon.ru/product/${cleanId}/`;
 
     buttons.push([
       { text: '🔗 Открыть товар', url: productUrl },
@@ -232,7 +232,7 @@ function getAlertButtons(alert: Alert): Record<string, unknown> | undefined {
     const productUrl =
       mp === 'wb'
         ? `https://www.wildberries.ru/catalog/${cleanId}/detail.aspx`
-        : `https://www.ozon.ru/product/${cleanId}`;
+        : `https://www.ozon.ru/product/${cleanId}/`;
 
     // First row: Open product
     buttons.push([
@@ -262,7 +262,7 @@ function getAlertButtons(alert: Alert): Record<string, unknown> | undefined {
     const productUrl =
       mp === 'wb'
         ? `https://www.wildberries.ru/catalog/${cleanId}/detail.aspx`
-        : `https://www.ozon.ru/product/${cleanId}`;
+        : `https://www.ozon.ru/product/${cleanId}/`;
 
     buttons.push([
       { text: '🔗 Открыть товар', url: productUrl },
@@ -322,7 +322,7 @@ function getAlertButtons(alert: Alert): Record<string, unknown> | undefined {
     const productUrl =
       mpLower === 'wb'
         ? `https://www.wildberries.ru/catalog/${cleanId}/detail.aspx`
-        : `https://www.ozon.ru/product/${cleanId}`;
+        : `https://www.ozon.ru/product/${cleanId}/`;
 
     // Первый ряд: ссылки на товар
     buttons.push([

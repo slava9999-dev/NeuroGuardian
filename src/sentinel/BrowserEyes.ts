@@ -371,36 +371,64 @@ export class BrowserEyes {
           };
 
         const priceSelectors = [
-          '[data-widget="webPrice"] span', // Main Ozon price widget
-          '.price span',
-          '[class*="Price"] span',
+          '[data-widget="webPrice"]', // Main Ozon price container
+          '[data-widget="pdpPrice"]', // Alternate price widget
+          '.price-block',
+          '[class*="Price"]',
         ];
 
         let buyerPrice: number | null = null;
         let originalPrice: number | null = null;
 
+        // Strategy A: Direct selector matching
         for (const selector of priceSelectors) {
-          const elems = document.querySelectorAll(selector);
-          elems.forEach(elem => {
-            if (!elem) return; // Safety check
-            const text = elem.textContent || '';
-            // Handle both Space and NBSP (\xa0)
-            const normalizedText = text.replace(/\xa0/g, ' ').trim();
-            const match =
-              normalizedText.match(/([\d\s]+)\s*(?:₽|P|р|руб)/i) ||
-              normalizedText.match(/([\d\s]+)/);
+          const widget = document.querySelector(selector);
+          if (!widget) continue;
+
+          // Inside the widget, we look for spans with prices
+          const spans = Array.from(widget.querySelectorAll('span'));
+          for (const span of spans) {
+            const text = (span.textContent || '').replace(/\xa0/g, ' ').trim();
+            // Match pattern like "1 234 ₽" or "1234"
+            const match = text.match(/([\d\s]+)\s*(?:₽|P|р|руб)/i) || text.match(/^([\d\s]+)$/);
+
             if (match) {
               const price = parseInt(match[1].replace(/\s/g, ''));
-              if (price > 0) {
+              if (price > 10) {
+                // Ignore trivial amounts
+                // If it's the first price found, it's usually the buyer price
                 if (!buyerPrice) {
                   buyerPrice = price;
+                } else if (!originalPrice && price > buyerPrice) {
+                  // If we found a second, higher price - that's the original one
+                  originalPrice = price;
                 } else if (price < buyerPrice) {
+                  // If we found a second, LOWER price - that's the new actual buyer price (e.g. Ozon Card)
                   originalPrice = buyerPrice;
                   buyerPrice = price;
                 }
               }
             }
-          });
+          }
+          if (buyerPrice) break; // Found something in the prioritized widget
+        }
+
+        // Strategy B: Text-based deep search (only if Strategy A failed)
+        if (!buyerPrice) {
+          const allSpans = Array.from(document.querySelectorAll('span'));
+          for (const span of allSpans) {
+            const text = (span.textContent || '').trim();
+            if (text.includes('₽') && text.length < 15) {
+              const priceMatch = text.match(/([\d\s]+)/);
+              if (priceMatch) {
+                const price = parseInt(priceMatch[1].replace(/\s/g, ''));
+                if (price > 100) {
+                  buyerPrice = price;
+                  break;
+                }
+              }
+            }
+          }
         }
 
         // Check stock status

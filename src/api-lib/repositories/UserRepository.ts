@@ -84,7 +84,7 @@ export class UserRepository {
     const result = await sql`
       SELECT * FROM users 
       WHERE is_active = true 
-        AND (protection_enabled = true OR subscription_active = true)
+        AND protection_enabled = true
     `;
     return (result.rows as TelegramUser[]).map(u => this.decryptUser(u));
   }
