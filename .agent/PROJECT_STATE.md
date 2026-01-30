@@ -1,6 +1,33 @@
 # 📊 Project State — NeuroGUARDIAN
 
-Last Updated: 2026-01-30 (Session 114) — 17:15 MSK
+Last Updated: 2026-01-30 (Session 115) — 21:45 MSK
+
+### Session 2026-01-30 (Session 115 - Database Schema Audit & Infrastructure Hardening) 🛡️🏗️
+
+**Objective: Audit the database schema, resolve service-level logging errors, and fix infrastructure mismatches.**
+
+> ✅ **THREAT LOGGING RECOVERY:** Resolved recurring `[ThreatHistoryService] Failed to log threat` errors by creating the missing `threat_history` table with a full analytical schema.
+> ✅ **VALIDATION LOGGING:** Created the `validation_logs` table to enable persistent auditing of LLM response quality and issue tracking.
+> ✅ **IDENTITY STANDARDIZATION:** Fixed a critical system-wide type mismatch where `initializeDatabase` used `BIGINT` for user IDs while the production `users` table uses `VARCHAR(255)` (Telegram IDs are strings). Standardized all 15+ referencing tables.
+> ✅ **OPS TELEMETRY REPAIR:** Fixed the `ops_audit` and `ops_events` tables, adding missing `resource_type`, `resource_id`, and `actor_type` columns required for the tactical Ops Panel.
+> ✅ **IDEMPOTENT INITIALIZATION:** Hardened `src/api-lib/services/database.ts` to ensure all schema creation scripts are idempotent and type-consistent, preventing future synchronization failures on Neon/Vercel.
+
+**Completed Actions:**
+
+- [x] **Database Audit**: Audited `users`, `products`, `threat_history`, `validation_logs`, `ops_audit`, and `ops_events`.
+- [x] **Schema Repair**: `src/api-lib/services/database.ts` (Updated to use `VARCHAR(255)` for all IDs and added missing schema).
+- [x] **Diagnostics**: Created a suite of verification scripts (`verify-audit-fix.ts`, `diagnose-ops-tables.ts`) to confirm table existence and column types.
+- [x] **Verification**: Confirmed successful table creation and column type sync via atomic repair scripts.
+
+**New Issues Discovered:**
+
+- **Neon Connection Stability**: During batch initialization, the DB often drops connections (`ECONNRESET`). Improved retry logic in `database.ts` partially mitigates this, but atomic scripts are safer for major schema changes.
+
+**Next Steps:**
+
+- [ ] Finalize the Sentinel 30-minute CRON setup now that logging infra is stable.
+- [ ] Test the tactical Ops Panel with real events from `ops_events` table.
+- [ ] Verify the persistent validation metrics dashboard using the new `validation_logs` table.
 
 ### Session 2026-01-30 (Session 114 - Database Schema Synchronization & System Recovery) 🛡️🛠️
 

@@ -230,7 +230,7 @@ export async function initializeDatabase(): Promise<void> {
   // 1. Users table
   await sql`
     CREATE TABLE IF NOT EXISTS users (
-      id BIGINT PRIMARY KEY,
+      id VARCHAR(255) PRIMARY KEY,
       username VARCHAR(255),
       first_name VARCHAR(255) NOT NULL,
       last_name VARCHAR(255),
@@ -262,7 +262,7 @@ export async function initializeDatabase(): Promise<void> {
   await sql`
     CREATE TABLE IF NOT EXISTS marketplace_accounts (
       id SERIAL PRIMARY KEY,
-      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       name VARCHAR(255) NOT NULL,
       marketplace VARCHAR(10) NOT NULL,
       is_active BOOLEAN DEFAULT true,
@@ -279,7 +279,7 @@ export async function initializeDatabase(): Promise<void> {
   await sql`
     CREATE TABLE IF NOT EXISTS products (
       id SERIAL PRIMARY KEY,
-      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       product_id VARCHAR(255) NOT NULL,
       nm_id BIGINT,
       official_sku VARCHAR(255),
@@ -336,7 +336,7 @@ export async function initializeDatabase(): Promise<void> {
   await sql`
     CREATE TABLE IF NOT EXISTS subscriptions (
       id SERIAL PRIMARY KEY,
-      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       plan_id VARCHAR(50) NOT NULL REFERENCES subscription_plans(id),
       status VARCHAR(50) NOT NULL DEFAULT 'active',
       current_period_start TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -352,7 +352,7 @@ export async function initializeDatabase(): Promise<void> {
   await sql`
     CREATE TABLE IF NOT EXISTS usage_logs (
       id SERIAL PRIMARY KEY,
-      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       service_type VARCHAR(50) NOT NULL,
       amount INTEGER NOT NULL DEFAULT 1,
       metadata JSONB DEFAULT '{}',
@@ -363,7 +363,7 @@ export async function initializeDatabase(): Promise<void> {
   await sql`
     CREATE TABLE IF NOT EXISTS transactions (
       id VARCHAR(255) PRIMARY KEY,
-      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       yookassa_payment_id VARCHAR(255) UNIQUE,
       amount DECIMAL(12, 2) NOT NULL,
       currency VARCHAR(10) NOT NULL,
@@ -386,7 +386,7 @@ export async function initializeDatabase(): Promise<void> {
 
   // Helper function for subscription check
   await sql`
-    CREATE OR REPLACE FUNCTION is_subscription_active(target_user_id BIGINT) 
+    CREATE OR REPLACE FUNCTION is_subscription_active(target_user_id VARCHAR(255)) 
     RETURNS BOOLEAN AS $$
     BEGIN
       RETURN EXISTS (
@@ -403,7 +403,7 @@ export async function initializeDatabase(): Promise<void> {
   await sql`
     CREATE TABLE IF NOT EXISTS sentinel_logs (
       id SERIAL PRIMARY KEY,
-      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       product_id VARCHAR(255),
       product_title VARCHAR(255),
       detected_price INTEGER NOT NULL,
@@ -427,7 +427,7 @@ export async function initializeDatabase(): Promise<void> {
   await sql`
     CREATE TABLE IF NOT EXISTS chat_history (
       id SERIAL PRIMARY KEY,
-      user_id BIGINT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+      user_id VARCHAR(255) NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
       messages JSONB NOT NULL DEFAULT '[]',
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
@@ -455,7 +455,7 @@ export async function initializeDatabase(): Promise<void> {
   await sql`
     CREATE TABLE IF NOT EXISTS validation_logs (
       id SERIAL PRIMARY KEY,
-      user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+      user_id VARCHAR(255) REFERENCES users(id) ON DELETE SET NULL,
       score INTEGER NOT NULL,
       passed BOOLEAN NOT NULL,
       issue_types TEXT,
@@ -472,7 +472,7 @@ export async function initializeDatabase(): Promise<void> {
   await sql`
     CREATE TABLE IF NOT EXISTS threat_history (
       id SERIAL PRIMARY KEY,
-      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       product_id VARCHAR(255) NOT NULL,
       nm_id VARCHAR(255),
       marketplace VARCHAR(50) NOT NULL,
@@ -492,7 +492,7 @@ export async function initializeDatabase(): Promise<void> {
   await sql`
     CREATE TABLE IF NOT EXISTS marketplace_orders (
       id SERIAL PRIMARY KEY,
-      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       account_id INTEGER REFERENCES marketplace_accounts(id) ON DELETE SET NULL,
       marketplace VARCHAR(20) NOT NULL,
       order_id VARCHAR(255) NOT NULL,
@@ -529,7 +529,7 @@ export async function initializeDatabase(): Promise<void> {
   // 9. User State (Agent V5)
   await sql`
     CREATE TABLE IF NOT EXISTS user_state (
-      user_id BIGINT PRIMARY KEY,
+      user_id VARCHAR(255) PRIMARY KEY,
       state_data JSONB NOT NULL DEFAULT '{}',
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
@@ -541,7 +541,7 @@ export async function initializeDatabase(): Promise<void> {
       id SERIAL PRIMARY KEY,
       event_type VARCHAR(50) NOT NULL,
       event_source VARCHAR(50) NOT NULL,
-      user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+      user_id VARCHAR(255) REFERENCES users(id) ON DELETE SET NULL,
       product_id BIGINT,
       payload JSONB DEFAULT '{}',
       old_price INTEGER,
