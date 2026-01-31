@@ -17,7 +17,7 @@ export class QuotaService {
    * Check if user has enough quota for an operation
    */
   async checkQuota(
-    userId: number,
+    userId: string | number,
     _serviceType: string
   ): Promise<{ allowed: boolean; remaining: number }> {
     // 1. Get user's plan and base limit
@@ -58,7 +58,7 @@ export class QuotaService {
    * Log service usage
    */
   async logUsage(
-    userId: number,
+    userId: string | number,
     serviceType: string,
     amount: number = 1,
     metadata: Record<string, unknown> = {}

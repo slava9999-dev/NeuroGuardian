@@ -16,7 +16,7 @@ import { sql } from '../services/database.js';
 // ============================================
 
 export interface AuthContext {
-  userId: number;
+  userId: string | number;
   authMethod: 'telegram' | 'admin' | 'cron';
   user?: TelegramUser; // Full user record including plan
 }
@@ -79,7 +79,7 @@ export async function extractAdminAuthAsync(req: VercelRequest): Promise<AuthRes
     return {
       success: true,
       context: {
-        userId: adminUserId ? parseInt(adminUserId) : 0, // 0 = System Admin
+        userId: adminUserId ? (adminUserId as string | number) : 0, // 0 = System Admin
         authMethod: 'admin',
       },
     };
@@ -107,7 +107,7 @@ export function extractAdminAuth(req: VercelRequest): AuthResult {
     return {
       success: true,
       context: {
-        userId: adminUserId ? parseInt(adminUserId) : 0, // 0 = System Admin
+        userId: adminUserId ? (adminUserId as string | number) : 0, // 0 = System Admin
         authMethod: 'admin',
       },
     };
@@ -147,7 +147,7 @@ export async function extractCronAuthAsync(req: VercelRequest): Promise<AuthResu
     return {
       success: true,
       context: {
-        userId: parseInt(tgIdStr),
+        userId: tgIdStr,
         authMethod: 'cron',
       },
     };
@@ -174,7 +174,7 @@ export function extractCronAuth(req: VercelRequest): AuthResult {
     return {
       success: true,
       context: {
-        userId: parseInt(telegramId),
+        userId: String(telegramId),
         authMethod: 'cron',
       },
     };
@@ -192,7 +192,7 @@ export function extractCronAuth(req: VercelRequest): AuthResult {
  */
 
 export async function extractAnyAuthAsync(req: VercelRequest): Promise<AuthResult> {
-  let userId: number | undefined;
+  let userId: string | number | undefined;
   let authMethod: 'telegram' | 'admin' | 'cron' = 'telegram';
 
   // Try Telegram
@@ -221,7 +221,7 @@ export async function extractAnyAuthAsync(req: VercelRequest): Promise<AuthResul
   }
 
   // SYSTEM ADMIN BYPASS: userId 0 is reserved for global system control
-  if (userId === 0) {
+  if (userId === 0 || userId === '0') {
     return {
       success: true,
       context: {
@@ -234,7 +234,10 @@ export async function extractAnyAuthAsync(req: VercelRequest): Promise<AuthResul
           is_active: true,
           subscription_active: true,
           subscription_plan: 'premium',
-        } as any,
+          protection_enabled: true,
+          defense_mode: 'price_correction',
+          total_products: 0,
+        } as TelegramUser,
       },
     };
   }

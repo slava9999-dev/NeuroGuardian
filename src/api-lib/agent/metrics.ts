@@ -11,7 +11,7 @@ import { createClient } from '@vercel/kv';
  */
 export interface AgentMetrics {
   // Identification
-  userId: number;
+  userId: string | number;
   sessionId: string;
   timestamp: Date;
 
@@ -226,7 +226,7 @@ async function updateDailySummary(
     totalTokens: number;
     totalCost: number;
     totalResponseTime: number;
-    uniqueUsers: Set<number> | number[];
+    uniqueUsers: Set<string | number> | (string | number)[];
     toolUsage: Record<string, number>;
     errors: number;
     actions: number;
@@ -341,7 +341,7 @@ export async function getDailyAnalytics(date?: string): Promise<AgentAnalytics |
  * Create metrics object from agent response
  */
 export function createAgentMetrics(params: {
-  userId: number;
+  userId: string | number;
   userMessage: string;
   model: string;
   tokensUsed: number;

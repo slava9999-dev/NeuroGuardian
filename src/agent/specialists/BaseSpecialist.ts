@@ -25,7 +25,7 @@ export interface SpecialistResult {
 }
 
 export interface SpecialistContext {
-  userId: number;
+  userId: string | number;
   userState: {
     marketplace: 'WB' | 'Ozon' | 'both' | null;
     hasApiKeys: boolean;

@@ -11,7 +11,7 @@ export const inngest = new Inngest({
 export type NeuroEvents = {
   'ai/query.received': {
     data: {
-      userId: number;
+      userId: string | number;
       query: string;
       sessionId: string;
       marketplace?: 'WB' | 'Ozon' | 'all';
@@ -22,14 +22,14 @@ export type NeuroEvents = {
   };
   'marketplace/price.check': {
     data: {
-      userId: number;
+      userId: string | number;
       accountId?: number;
       items?: string[];
     };
   };
   'sentinel/threat.detected': {
     data: {
-      userId: number;
+      userId: string | number;
       productId: string;
       threatType: string;
       severity: 'warning' | 'critical';

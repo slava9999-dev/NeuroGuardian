@@ -83,7 +83,7 @@ import {
   getMarketplaceInfoTool,
   searchWebTool,
   getCompetitorPriceTool,
-  getReviewsTool,
+  //  getReviewsTool,
   getLowMarginProductsTool,
   updatePricesTool,
   updateStocksTool,
@@ -95,44 +95,54 @@ import {
 } from '../../agent/execution/index.js';
 
 // Tool Executors (Wrappers for V4 compatibility)
-export const executeGetProducts = (userId: number, args: GetProductsArgs) =>
+export const executeGetProducts = (userId: string | number, args: GetProductsArgs) =>
   getProductsTool.execute(userId, args);
-export const executeGetSalesStats = (userId: number, args: GetSalesStatsArgs) =>
+export const executeGetSalesStats = (userId: string | number, args: GetSalesStatsArgs) =>
   getSalesStatsTool.execute(userId, args);
-export const executeGetOrders = (userId: number, args: GetOrdersArgs) =>
+export const executeGetOrders = (userId: string | number, args: GetOrdersArgs) =>
   getOrdersTool.execute(userId, args);
-export const executeGetWarehouseStocks = (userId: number, args: GetWarehouseStocksArgs) =>
+export const executeGetWarehouseStocks = (userId: string | number, args: GetWarehouseStocksArgs) =>
   getWarehouseStocksTool.execute(userId, args);
-export const executeCalculateUnitEconomics = (userId: number, args: CalculateUnitEconomicsArgs) =>
-  calculateUnitEconomicsTool.execute(userId, args);
-export const executeGetAbcAnalysis = (userId: number, args: GetAbcAnalysisArgs) =>
+export const executeCalculateUnitEconomics = (
+  userId: string | number,
+  args: CalculateUnitEconomicsArgs
+) => calculateUnitEconomicsTool.execute(userId, args);
+export const executeGetAbcAnalysis = (userId: string | number, args: GetAbcAnalysisArgs) =>
   getAbcAnalysisTool.execute(userId, args);
-export const executeGetStockForecast = (userId: number, args: GetStockForecastArgs) =>
+export const executeGetStockForecast = (userId: string | number, args: GetStockForecastArgs) =>
   getStockForecastTool.execute(userId, args);
 export const executeGetMarketplaceInfo = (args: GetMarketplaceInfoArgs) =>
   getMarketplaceInfoTool.execute(0, args); // userId 0 for info tools
-export const executeSearchWeb = (userId: number, args: SearchWebArgs) =>
+export const executeSearchWeb = (userId: string | number, args: SearchWebArgs) =>
   searchWebTool.execute(userId, args);
-export const executeGetCompetitorPrice = (userId: number, args: GetCompetitorPriceArgs) =>
+export const executeGetCompetitorPrice = (userId: string | number, args: GetCompetitorPriceArgs) =>
   getCompetitorPriceTool.execute(userId, args);
-export const executeGetReviews = (userId: number, args: GetReviewsArgs) =>
-  getReviewsTool.execute(userId, args);
-export const executeGetLowMarginProducts = (userId: number, args: GetLowMarginProductsArgs) =>
-  getLowMarginProductsTool.execute(userId, args);
-export const executeUpdatePrices = (userId: number, args: UpdatePricesArgs) =>
+// export const executeGetReviews = (userId: string | number, args: GetReviewsArgs) =>
+//   getReviewsTool.execute(userId, args);
+export const executeGetLowMarginProducts = (
+  userId: string | number,
+  args: GetLowMarginProductsArgs
+) => getLowMarginProductsTool.execute(userId, args);
+export const executeUpdatePrices = (userId: string | number, args: UpdatePricesArgs) =>
   updatePricesTool.execute(userId, args);
-export const executeUpdateStocks = (userId: number, args: UpdateStocksArgs) =>
+export const executeUpdateStocks = (userId: string | number, args: UpdateStocksArgs) =>
   updateStocksTool.execute(userId, args);
-export const executeUpdateProductSettings = (userId: number, args: UpdateProductSettingsArgs) =>
-  updateProductSettingsTool.execute(userId, args);
-export const executeSetStopLoss = (userId: number, args: SetStopLossArgs) =>
+export const executeUpdateProductSettings = (
+  userId: string | number,
+  args: UpdateProductSettingsArgs
+) => updateProductSettingsTool.execute(userId, args);
+export const executeSetStopLoss = (userId: string | number, args: SetStopLossArgs) =>
   setStopLossTool.execute(userId, args);
-export const executeBulkProtectProducts = (userId: number, args: BulkProtectProductsArgs) =>
-  bulkProtectProductsTool.execute(userId, args);
-export const executeGetSystemLogs = (userId: number, args: GetSystemLogsArgs) =>
+export const executeBulkProtectProducts = (
+  userId: string | number,
+  args: BulkProtectProductsArgs
+) => bulkProtectProductsTool.execute(userId, args);
+export const executeGetSystemLogs = (userId: string | number, args: GetSystemLogsArgs) =>
   getSystemLogsTool.execute(userId, args);
-export const executeGetMarketplaceAccounts = (userId: number, args: GetMarketplaceAccountsArgs) =>
-  getMarketplaceAccountsTool.execute(userId, args);
+export const executeGetMarketplaceAccounts = (
+  userId: string | number,
+  args: GetMarketplaceAccountsArgs
+) => getMarketplaceAccountsTool.execute(userId, args);
 
 // Validators (Zod schemas for tool arguments)
 export {

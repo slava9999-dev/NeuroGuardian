@@ -58,6 +58,10 @@ const envSchema = z.object({
     .transform(v => String(v).replace(/\r/g, '').trim())
     .optional(),
 
+  // Payments
+  YOOKASSA_SHOP_ID: z.string().optional(),
+  YOOKASSA_SECRET_KEY: z.string().optional(),
+
   // LLM / AI
   GEMINI_API_KEY: z.string().optional(),
   OPENROUTER_API_KEY: z.string().optional(),
@@ -72,6 +76,10 @@ const envSchema = z.object({
   WB_API_KEY: z.string().optional(),
   OZON_API_KEY: z.string().optional(),
   OZON_CLIENT_ID: z.string().optional(),
+
+  // Browser / Network (Industrial)
+  BROWSERLESS_URL: z.string().optional(),
+  PROXY_URLS: z.string().optional(),
 
   // Mode
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),

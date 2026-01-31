@@ -9,12 +9,12 @@ import { logger } from '../lib/logger.js';
 export async function withSubscription(
   req: VercelRequest,
   res: VercelResponse,
-  handler: (req: VercelRequest, res: VercelResponse, userId: number) => Promise<unknown>,
-  userId: number
+  handler: (req: VercelRequest, res: VercelResponse, userId: string | number) => Promise<unknown>,
+  userId: string | number
 ) {
   try {
     // SYSTEM ADMIN BYPASS
-    if (userId === 0) {
+    if (userId === 0 || userId === '0') {
       return handler(req, res, userId);
     }
 

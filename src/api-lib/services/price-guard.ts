@@ -10,7 +10,7 @@ import { sql } from './database.js';
 export interface PriceSecurityCheck {
   productId: string;
   nmId?: number;
-  userId: number;
+  userId: string | number;
   currentPrice: number;
   proposedPrice: number;
   minPrice?: number;
@@ -64,7 +64,7 @@ const LIMITS = {
  * Check if kill switch is active for user/marketplace/product
  */
 export async function checkKillSwitch(
-  userId: number,
+  userId: string | number,
   _marketplace?: string,
   productId?: string
 ): Promise<KillSwitchStatus> {
@@ -121,7 +121,7 @@ export async function checkKillSwitch(
  * Check daily change limits for a product
  */
 export async function checkDailyLimits(
-  userId: number,
+  userId: string | number,
   productId: string
 ): Promise<{
   allowed: boolean;
@@ -180,7 +180,7 @@ export async function checkDailyLimits(
 /**
  * Check if user should use dry-run mode (first-time protection)
  */
-export async function shouldUseDryRun(userId: number): Promise<boolean> {
+export async function shouldUseDryRun(userId: string | number): Promise<boolean> {
   try {
     // Check if user has completed at least 2 monitoring cycles
     const result = await sql`

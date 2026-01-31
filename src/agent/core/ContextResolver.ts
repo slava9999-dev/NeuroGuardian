@@ -49,7 +49,7 @@ export class ContextResolver {
   /**
    * Resolve context for the given message
    */
-  async resolve(userId: number, message: string): Promise<ResolvedContext> {
+  async resolve(userId: string | number, message: string): Promise<ResolvedContext> {
     const state = await stateManager.getState(userId);
 
     // Clean up expired state

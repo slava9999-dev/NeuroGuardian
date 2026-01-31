@@ -108,7 +108,7 @@ export class PricingSpecialist extends BaseSpecialist {
   /**
    * Calculate Net Profit for a product (API for internal use/visualization)
    */
-  async calculateNetProfit(productId: string | number, userId: number) {
+  async calculateNetProfit(productId: string | number, userId: string | number) {
     const { economicsCalculator } = await import('../../api-lib/services/EconomicsCalculator.js');
     return economicsCalculator.calculateNetProfit(productId, userId);
   }

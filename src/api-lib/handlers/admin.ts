@@ -401,7 +401,7 @@ export async function handleAdminCheckUser(
     return res.status(400).json({ error: 'userId required' });
   }
 
-  const user = await getUserById(Number(userId));
+  const user = await getUserById(userId as string | number);
   if (!user) {
     return res.status(404).json({ error: 'User not found' });
   }
@@ -476,7 +476,7 @@ export async function handleAdminListProducts(
   const result = await sql`
     SELECT product_id, title, current_price, min_price, current_stock, marketplace
     FROM products
-    WHERE user_id = ${Number(userId)}
+    WHERE user_id = ${userId}
     ORDER BY created_at DESC
     LIMIT 100
   `;
@@ -493,7 +493,7 @@ export async function handleAdminListProducts(
 export async function handleSentinelLogs(
   req: VercelRequest,
   res: VercelResponse,
-  userId: number
+  userId: string | number
 ): Promise<VercelResponse> {
   const days = parseInt((req.query.days as string) || '7', 10);
   const limit = Math.min(parseInt((req.query.limit as string) || '50', 10), 100);
@@ -605,7 +605,7 @@ export async function handleHealth(
         status: kernelHealth?.status || (dbOk ? 'ok' : 'degraded'),
         timestamp: new Date().toISOString(),
         database: dbOk ? 'connected' : 'error',
-        version: '3.0.0',
+        version: '3.1.0',
         kernel: {
           initialized: manifest.kernel.initialized,
           modulesCount: manifest.modules.length,
@@ -619,7 +619,7 @@ export async function handleHealth(
         status: dbOk ? 'ok' : 'degraded',
         timestamp: new Date().toISOString(),
         database: dbOk ? 'connected' : 'error',
-        version: '3.0.0',
+        version: '3.1.0',
         kernel: { initialized: false },
       });
     }
@@ -651,13 +651,13 @@ export async function handleAdminSetProtection(
     return res.status(400).json({ error: 'userId required' });
   }
 
-  await sql`UPDATE users SET protection_enabled = ${enabled}, updated_at = CURRENT_TIMESTAMP WHERE id = ${Number(userId)}`;
+  await sql`UPDATE users SET protection_enabled = ${enabled}, updated_at = CURRENT_TIMESTAMP WHERE id = ${userId}`;
 
-  const result = await sql`SELECT protection_enabled FROM users WHERE id = ${Number(userId)}`;
+  const result = await sql`SELECT protection_enabled FROM users WHERE id = ${userId}`;
 
   return res.json({
     success: true,
-    userId: Number(userId),
+    userId: userId,
     protection_enabled: result.rows[0]?.protection_enabled,
   });
 }
@@ -678,7 +678,7 @@ export async function handleAdminResetStatuses(
     return res.status(400).json({ error: 'userId required' });
   }
 
-  await sql`UPDATE products SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE user_id = ${Number(userId)}`;
+  await sql`UPDATE products SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE user_id = ${userId}`;
 
   return res.json({ success: true, message: 'All products reset to ACTIVE status' });
 }
@@ -701,13 +701,13 @@ export async function handleAdminSetDefenseMode(
     return res.status(400).json({ error: 'userId and mode required' });
   }
 
-  await sql`UPDATE users SET defense_mode = ${mode as string}, updated_at = CURRENT_TIMESTAMP WHERE id = ${Number(userId)}`;
+  await sql`UPDATE users SET defense_mode = ${mode as string}, updated_at = CURRENT_TIMESTAMP WHERE id = ${userId}`;
 
-  const result = await sql`SELECT defense_mode FROM users WHERE id = ${Number(userId)}`;
+  const result = await sql`SELECT defense_mode FROM users WHERE id = ${userId}`;
 
   return res.json({
     success: true,
-    userId: Number(userId),
+    userId: userId,
     defense_mode: result.rows[0]?.defense_mode,
   });
 }

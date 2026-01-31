@@ -2,12 +2,12 @@ import { sql } from '../services/database.js';
 import type { DBProduct, PendingPriceUpdate } from '../lib/types.js';
 
 export class ProductRepository {
-  async getByUserId(userId: number, accountId?: number): Promise<DBProduct[]> {
+  async getByUserId(userId: string | number, accountId?: number): Promise<DBProduct[]> {
     return this.getFiltered(userId, { accountId });
   }
 
   async getFiltered(
-    userId: number,
+    userId: string | number,
     filters: {
       search?: string;
       marketplace?: string;
@@ -89,7 +89,7 @@ export class ProductRepository {
     return result.rows as DBProduct[];
   }
 
-  async saveBatch(userId: number, products: Partial<DBProduct>[]): Promise<void> {
+  async saveBatch(userId: string | number, products: Partial<DBProduct>[]): Promise<void> {
     for (const p of products) {
       await sql`
         INSERT INTO products (
@@ -139,25 +139,41 @@ export class ProductRepository {
     }
   }
 
-  async updatePrice(userId: number, productId: string, price: number): Promise<void> {
+  async updatePrice(
+    userId: string | number,
+    productId: string | number,
+    price: number
+  ): Promise<void> {
     await sql`UPDATE products SET current_price = ${price}, updated_at = NOW() WHERE user_id = ${userId} AND product_id = ${productId}`;
   }
 
-  async updateMinPrice(userId: number, productId: string, minPrice: number): Promise<void> {
+  async updateMinPrice(
+    userId: string | number,
+    productId: string | number,
+    minPrice: number
+  ): Promise<void> {
     await sql`UPDATE products SET min_price = ${minPrice}, updated_at = NOW() WHERE user_id = ${userId} AND product_id = ${productId}`;
   }
 
-  async updateCostPrice(userId: number, productId: string, costPrice: number): Promise<void> {
+  async updateCostPrice(
+    userId: string | number,
+    productId: string | number,
+    costPrice: number
+  ): Promise<void> {
     await sql`UPDATE products SET cost_price = ${costPrice}, updated_at = NOW() WHERE user_id = ${userId} AND product_id = ${productId}`;
   }
 
-  async updateGroupId(userId: number, productId: string, groupId: string | null): Promise<void> {
+  async updateGroupId(
+    userId: string | number,
+    productId: string | number,
+    groupId: string | null
+  ): Promise<void> {
     await sql`UPDATE products SET group_id = ${groupId}, updated_at = NOW() WHERE user_id = ${userId} AND product_id = ${productId}`;
   }
 
   async batchUpdateCostPrices(
-    userId: number,
-    updates: Array<{ productId: string; costPrice: number }>
+    userId: string | number,
+    updates: Array<{ productId: string | number; costPrice: number }>
   ): Promise<void> {
     for (const update of updates) {
       await this.updateCostPrice(userId, update.productId, update.costPrice);
@@ -165,8 +181,8 @@ export class ProductRepository {
   }
 
   async updateMonitoring(
-    userId: number,
-    productId: string,
+    userId: string | number,
+    productId: string | number,
     isMonitored: boolean,
     minPrice?: number
   ): Promise<void> {
@@ -187,8 +203,8 @@ export class ProductRepository {
 
   // Pending Price methods
   async setPendingPrice(
-    userId: number,
-    productId: string,
+    userId: string | number,
+    productId: string | number,
     price: number,
     taskId?: string
   ): Promise<void> {
@@ -200,7 +216,7 @@ export class ProductRepository {
   }
 
   async batchSetPendingPrices(
-    userId: number,
+    userId: string | number,
     updates: PendingPriceUpdate[],
     taskId?: string
   ): Promise<void> {
@@ -209,13 +225,13 @@ export class ProductRepository {
     }
   }
 
-  async getWithPendingPrices(userId: number): Promise<DBProduct[]> {
+  async getWithPendingPrices(userId: string | number): Promise<DBProduct[]> {
     const result =
       await sql`SELECT * FROM products WHERE user_id = ${userId} AND pending_price IS NOT NULL`;
     return result.rows as DBProduct[];
   }
 
-  async confirmPendingByTaskId(userId: number, taskId: string): Promise<void> {
+  async confirmPendingByTaskId(userId: string | number, taskId: string): Promise<void> {
     await sql`
       UPDATE products 
       SET current_price = pending_price, 
@@ -224,7 +240,7 @@ export class ProductRepository {
     `;
   }
   async bulkUpdateMinPrice(
-    userId: number,
+    userId: string | number,
     percentage: number,
     filters: { marketplace?: string; onlyUnprotected?: boolean }
   ): Promise<number> {

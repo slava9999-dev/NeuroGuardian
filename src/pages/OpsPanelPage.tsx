@@ -52,11 +52,11 @@ interface OpsEvent {
   event_type: string;
   payload: Record<string, unknown>;
   created_at: string;
-  user_id?: number;
+  user_id?: string | number;
 }
 
 interface ClientUser {
-  id: number;
+  id: string | number;
   first_name: string;
   username: string;
   is_active: boolean;
@@ -88,7 +88,7 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
 
   // Pagination for clients
   const [clientsPage, setClientsPage] = useState(1);
-  const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | number | null>(null);
 
   // ============================================
   // API CALLS
@@ -197,7 +197,7 @@ export function OpsPanelPage({ onBack }: { onBack: () => void }) {
     setIsAuthenticated(true);
   };
 
-  const handleAction = async (action: string, userId: number) => {
+  const handleAction = async (action: string, userId: string | number) => {
     if (!confirm(`Вы уверены, что хотите запустить ${action} для пользователя #${userId}?`)) return;
 
     hapticFeedback('light');

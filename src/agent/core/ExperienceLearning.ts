@@ -194,7 +194,7 @@ export class ExperienceLearningManager {
    * Analyze a conversation turn for learning opportunities
    */
   async analyzeInteraction(
-    userId: number,
+    userId: string | number,
     userMessage: string,
     agentResponse: string,
     previousAgentMessage?: string,

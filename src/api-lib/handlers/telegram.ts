@@ -39,7 +39,7 @@ interface TelegramMessage {
 }
 
 interface TelegramUser {
-  id: number;
+  id: string | number;
   is_bot: boolean;
   first_name: string;
   last_name?: string;
@@ -48,7 +48,7 @@ interface TelegramUser {
 }
 
 interface TelegramChat {
-  id: number;
+  id: string | number;
   type: 'private' | 'group' | 'supergroup' | 'channel';
   title?: string;
   username?: string;
@@ -88,7 +88,7 @@ function getBotToken(): string {
 }
 
 async function sendTelegramMessage(
-  chatId: number,
+  chatId: string | number,
   text: string,
   options?: {
     parseMode?: 'Markdown' | 'HTML';
@@ -122,7 +122,7 @@ async function sendTelegramMessage(
 }
 
 async function sendTelegramVoice(
-  chatId: number,
+  chatId: string | number,
   audioBuffer: Buffer,
   caption?: string
 ): Promise<boolean> {
@@ -158,7 +158,7 @@ async function sendTelegramVoice(
   }
 }
 
-async function sendTypingAction(chatId: number): Promise<void> {
+async function sendTypingAction(chatId: string | number): Promise<void> {
   try {
     const token = getBotToken();
     await fetch(`${TELEGRAM_API}${token}/sendChatAction`, {
@@ -191,7 +191,7 @@ async function answerCallbackQuery(callbackQueryId: string, text?: string): Prom
 }
 
 async function editTelegramMessageReplyMarkup(
-  chatId: number,
+  chatId: string | number,
   messageId: number,
   replyMarkup: object
 ): Promise<boolean> {
@@ -224,7 +224,7 @@ async function editTelegramMessageReplyMarkup(
 // USER MANAGEMENT
 // ============================================
 
-async function ensureUserExists(telegramUser: TelegramUser): Promise<number> {
+async function ensureUserExists(telegramUser: TelegramUser): Promise<string | number> {
   try {
     // Check if user exists
     const existing = await sql`
@@ -349,7 +349,7 @@ async function ensureUserExists(telegramUser: TelegramUser): Promise<number> {
 // ============================================
 
 async function sendTelegramPhoto(
-  chatId: number,
+  chatId: string | number,
   photoUrl: string,
   caption?: string,
   options?: { parseMode?: 'Markdown' | 'HTML'; replyMarkup?: object }
@@ -381,7 +381,7 @@ async function sendTelegramPhoto(
   }
 }
 
-async function handleStartCommand(chatId: number, user: TelegramUser): Promise<void> {
+async function handleStartCommand(chatId: string | number, user: TelegramUser): Promise<void> {
   await ensureUserExists(user);
 
   const webAppUrl = process.env.WEBAPP_URL || 'https://neuro-guardian.vercel.app';
@@ -431,7 +431,7 @@ async function handleStartCommand(chatId: number, user: TelegramUser): Promise<v
   });
 }
 
-async function handleHelpCommand(chatId: number): Promise<void> {
+async function handleHelpCommand(chatId: string | number): Promise<void> {
   const helpMessage = `
 ❓ <b>Помощь по Viktor AI</b>
 
@@ -454,7 +454,7 @@ async function handleHelpCommand(chatId: number): Promise<void> {
   await sendTelegramMessage(chatId, helpMessage, { parseMode: 'HTML' });
 }
 
-async function handleSettingsCommand(chatId: number): Promise<void> {
+async function handleSettingsCommand(chatId: string | number): Promise<void> {
   const webAppUrl = process.env.WEBAPP_URL || 'https://neuro-guardian.vercel.app';
 
   await sendTelegramMessage(chatId, '⚙️ Для настройки API ключей откройте приложение:', {
@@ -472,7 +472,10 @@ async function handleSettingsCommand(chatId: number): Promise<void> {
   });
 }
 
-async function handleStatusCommand(chatId: number, userId: number): Promise<void> {
+async function handleStatusCommand(
+  chatId: string | number,
+  userId: string | number
+): Promise<void> {
   try {
     const result = await sql`
       SELECT 
@@ -593,8 +596,8 @@ async function handleSentinelDashboard(chatId: string | number) {
 // ============================================
 
 async function handleUserMessage(
-  chatId: number,
-  userId: number,
+  chatId: string | number,
+  userId: string | number,
   text: string,
   userName?: string
 ): Promise<void> {

@@ -4,7 +4,7 @@
 // ============================================
 
 export interface TelegramUser {
-  id: number;
+  id: string | number;
   first_name: string;
   last_name?: string;
   username?: string;
@@ -81,7 +81,7 @@ export interface UserContext {
  * Primary key is `id` (Telegram user ID stored as BIGINT)
  */
 export interface DBUser {
-  id: number; // BIGINT PRIMARY KEY (Telegram user ID)
+  id: string | number; // VARCHAR(255) PRIMARY KEY (Telegram user ID)
   username: string | null; // VARCHAR(255)
   first_name: string; // VARCHAR(255) NOT NULL
   last_name: string | null; // VARCHAR(255)
@@ -111,7 +111,7 @@ export interface DBUser {
 
 export interface Product {
   id: number;
-  user_id: string; // Changed to string
+  user_id: string | number; // Changed to string | number
   sku: string;
   name: string;
   current_price: number;
@@ -134,7 +134,7 @@ export type PendingPriceStatus = 'pending' | 'processing' | 'completed' | 'faile
 export interface ProductMediaAsset {
   id: number;
   productId: string;
-  userId: string;
+  userId: string | number;
   type: string;
   status: string;
   originalUrl: string;
@@ -154,7 +154,7 @@ export interface ProductMediaAsset {
 export interface DBProduct {
   media_assets?: ProductMediaAsset[];
   id: number; // SERIAL PRIMARY KEY
-  user_id: string; // VARCHAR(50) NOT NULL REFERENCES users(id)
+  user_id: string | number; // VARCHAR(50) NOT NULL REFERENCES users(id)
   product_id: string; // VARCHAR(255) NOT NULL
   group_id: string | null; // VARCHAR(255) (Cross-marketplace group ID)
   nm_id: string | null; // VARCHAR(50) (WB nmId)
@@ -203,7 +203,7 @@ export interface DBProduct {
 
 export interface PendingPriceUpdate {
   productId: string;
-  nmId?: number;
+  nmId?: string | number;
   pendingPrice: number;
   taskId: number;
   marketplace: 'WB' | 'Ozon';
@@ -214,7 +214,7 @@ export interface PendingPriceUpdate {
  */
 export interface DBPriceRule {
   id: number;
-  user_id: number;
+  user_id: string | number;
   product_id: string;
   min_price: number | string; // Postgres numeric often comes as string
   max_price: number | string;
@@ -238,7 +238,7 @@ export interface DBPriceRule {
  */
 export interface SentinelLog {
   id: number;
-  user_id: string;
+  user_id: string | number;
   product_id: string;
   product_title: string;
   detected_price: number;

@@ -187,7 +187,7 @@ export const backgroundPriceCheck = inngest.createFunction(
     step,
   }): Promise<{
     success: boolean;
-    userId: number;
+    userId: string | number;
     threatsDetected: number;
     actionsTaken: number;
     errors: string[];
@@ -255,22 +255,27 @@ export const scheduledSentinelCycle = inngest.createFunction(
   async ({ step }) => {
     logger.info('[Sentinel-FanOut] Starting global cycle orchestration');
 
-    const usersToProcess = await step.run('gather-active-users', async (): Promise<number[]> => {
-      // Logic to get only active users with protection enabled
-      // In production, we'd chunk this if > 10,000 users
-      const result = await sentinelService.getActiveUserIds();
-      return result;
-    });
+    const usersToProcess = await step.run(
+      'gather-active-users',
+      async (): Promise<Array<string | number>> => {
+        // Logic to get only active users with protection enabled
+        // In production, we'd chunk this if > 10,000 users
+        const result = await sentinelService.getActiveUserIds();
+        return result;
+      }
+    );
 
     const now = new Date();
     const utcHour = now.getUTCHours();
     const isReportTime = [6, 11, 17].includes(utcHour);
 
     // FAN-OUT: Trigger individual user tasks
-    const events = ((usersToProcess as unknown as number[]) || []).map((userId: number) => ({
-      name: 'sentinel/user.process',
-      data: { userId, isReportTime },
-    }));
+    const events = ((usersToProcess as unknown as Array<string | number>) || []).map(
+      (userId: string | number) => ({
+        name: 'sentinel/user.process',
+        data: { userId, isReportTime },
+      })
+    );
 
     await step.sendEvent('trigger-user-tasks', events);
 
@@ -314,7 +319,7 @@ export const processSentinelUserTask = inngest.createFunction(
 // ============================================
 
 async function handleStatsQuery(params: {
-  userId: number;
+  userId: string | number;
   query: string;
   marketplace?: 'WB' | 'Ozon' | 'all';
   wbApiKey?: string;
@@ -352,7 +357,7 @@ async function handleStatsQuery(params: {
 }
 
 async function handleChatQuery(params: {
-  userId: number;
+  userId: string | number;
   query: string;
   history: Array<{ role: string; content: string }>;
 }): Promise<{ success: boolean; message: string }> {
@@ -398,7 +403,7 @@ async function handleChatQuery(params: {
 }
 
 async function handleComplexQuery(params: {
-  userId: number;
+  userId: string | number;
   query: string;
   marketplace?: 'WB' | 'Ozon' | 'all';
   wbApiKey?: string;
@@ -451,7 +456,7 @@ async function handleComplexQuery(params: {
 // ============================================
 
 export async function triggerMoEQuery(params: {
-  userId: number;
+  userId: string | number;
   query: string;
   sessionId: string;
   marketplace?: 'WB' | 'Ozon' | 'all';
@@ -468,7 +473,7 @@ export async function triggerMoEQuery(params: {
 }
 
 export async function triggerPriceCheck(params: {
-  userId: number;
+  userId: string | number;
   accountId?: number;
   items?: string[];
 }): Promise<{ eventId: string }> {

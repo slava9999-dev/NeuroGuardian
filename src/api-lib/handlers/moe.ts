@@ -17,7 +17,7 @@ import { memoryService } from '../services/memory-service.js';
 export async function handleMoEClassify(
   req: VercelRequest,
   res: VercelResponse,
-  userId: number
+  userId: string | number
 ): Promise<VercelResponse> {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -67,7 +67,7 @@ export async function handleMoEClassify(
 export async function handleMoEQuery(
   req: VercelRequest,
   res: VercelResponse,
-  userId: number
+  userId: string | number
 ): Promise<VercelResponse> {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -201,7 +201,7 @@ export async function handleMoEHealth(
 export async function handleMoEPriceCheck(
   req: VercelRequest,
   res: VercelResponse,
-  userId: number
+  userId: string | number
 ): Promise<VercelResponse> {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });

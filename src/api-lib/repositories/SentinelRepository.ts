@@ -2,8 +2,8 @@ import { sql } from '../../api-lib/services/database.js';
 
 export class SentinelRepository {
   async logAction(log: {
-    user_id: number;
-    product_id: string;
+    user_id: string | number;
+    product_id: string | number;
     product_title: string;
     detected_price: number;
     min_price: number;

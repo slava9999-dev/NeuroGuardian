@@ -45,12 +45,12 @@ export class SentinelOrchestrator {
   /**
    * Returns list of active users for task orchestration
    */
-  async getActiveUserIds(): Promise<number[]> {
+  async getActiveUserIds(): Promise<Array<string | number>> {
     const activeUsers = await db.query.users.findMany({
       where: and(eq(users.isActive, true), eq(users.protectionEnabled, true)),
       columns: { id: true },
     });
-    return activeUsers.map(u => Number(u.id));
+    return activeUsers.map(u => u.id as string | number);
   }
 
   /**
@@ -107,8 +107,8 @@ export class SentinelOrchestrator {
 
       for (const user of legacyUsers) {
         const userResult: UserCycleResult = {
-          userId: Number(user.id),
-          telegramId: Number(user.id),
+          userId: user.id as string | number,
+          telegramId: user.id as string | number,
           firstName: user.first_name || undefined,
           productsScanned: { wb: 0, ozon: 0 },
           threatsDetected: 0,
@@ -133,13 +133,13 @@ export class SentinelOrchestrator {
 
             let lastCount = -1;
             try {
-              const rows = lastReport as unknown as any[];
+              const rows = lastReport.rows as Array<{ details: unknown }>;
               if (rows.length > 0 && rows[0].details) {
                 const details =
                   typeof rows[0].details === 'string'
                     ? JSON.parse(rows[0].details)
-                    : rows[0].details; // Drizzle might return object
-                lastCount = details?.threatsDetected ?? -1;
+                    : (rows[0].details as Record<string, unknown>); // Drizzle might return object
+                lastCount = (details as { threatsDetected?: number })?.threatsDetected ?? -1;
               }
             } catch (e) {
               logger.warn('Failed to parse last report stats, following safe path', { error: e });
@@ -223,7 +223,7 @@ export class SentinelOrchestrator {
                 name: 'System Security',
                 marketplace: 'ALL',
                 externalId: 'security-update',
-                userId: Number(user.id),
+                userId: user.id,
               },
             });
           }
@@ -345,7 +345,7 @@ export class SentinelOrchestrator {
     if (allProducts.length === 0) return;
 
     const prices = await this.priceMonitor.fetchAll(user, allProducts);
-    const contextErrors = prices.errors.map(err => `[User ${user.id}] ${err}`);
+    const contextErrors = prices.errors.map(err => `[User ${String(user.id)}] ${err}`);
     summary.errors.push(...contextErrors);
     if (userResult) userResult.errors.push(...prices.errors);
 
@@ -371,7 +371,7 @@ export class SentinelOrchestrator {
     // 3. Hunter Mode (Aggressive Repricing)
     // Run this BEFORE standard checks to ensure we are competitive first
     // Use the mapped products but we need to ensure we access new fields via 'any' casting for now
-    await this.processCompetitorsHunter(Number(user.id), allProducts, Date.now());
+    await this.processCompetitorsHunter(user.id, allProducts, Date.now());
 
     for (let i = 0; i < allProducts.length; i += PRODUCT_BATCH_SIZE) {
       const productBatch = allProducts.slice(i, i + PRODUCT_BATCH_SIZE);
@@ -448,7 +448,8 @@ export class SentinelOrchestrator {
                           : await priceParserService.getOzonRealPrice(sku);
 
                       buyerPrice = realPriceInfo.buyerPrice;
-                      originalPrice = (realPriceInfo as any).originalPrice || 0;
+                      originalPrice =
+                        (realPriceInfo as { originalPrice?: number }).originalPrice || 0;
 
                       if (buyerPrice > 0) {
                         logger.info(`[Sentinel] API Fallback Success for ${sku}: ${buyerPrice}₽`);
@@ -605,7 +606,7 @@ export class SentinelOrchestrator {
                   LIMIT 1
                 `);
 
-                if ((ackCheck as unknown as any[]).length > 0) {
+                if (ackCheck.rows.length > 0) {
                   logger.debug(
                     `[Sentinel] Skipping alert for ${externalId} (${threat.type}) - already logged in last 24h`
                   );
@@ -633,9 +634,9 @@ export class SentinelOrchestrator {
                   success: true,
                   details: {
                     threatType: threat.type,
-                    buyerPrice: (threat.data as any)?.buyerPrice,
-                    profit: (threat.data as any)?.profit,
-                    margin: (threat.data as any)?.margin,
+                    buyerPrice: (threat.data as Record<string, unknown>)?.buyerPrice as number,
+                    profit: (threat.data as Record<string, unknown>)?.profit as number,
+                    margin: (threat.data as Record<string, unknown>)?.margin as number,
                   },
                 }).catch(err => logger.error('Failed to log sentinel action:', err));
               }
@@ -711,12 +712,12 @@ export class SentinelOrchestrator {
       if (userResult) userResult.threatsDetected += parityThreats.length;
 
       // Log and Alert for parity group issues
-      await this.threatDetector.logThreatsToHistory(String(user.id), parityThreats, 'WB'); // Default to WB for parity as it triggers the risk
+      await this.threatDetector.logThreatsToHistory(user.id, parityThreats, 'WB'); // Default to WB for parity as it triggers the risk
 
       for (const threat of parityThreats) {
         // Send alert for the group (using first item title for context)
         const sampleProduct =
-          allProducts.find(p => (p as any).group_id === (threat.data as any).groupId) ||
+          allProducts.find(p => p.group_id === (threat.data as Record<string, unknown>).groupId) ||
           allProducts[0];
 
         await this.alertSender
@@ -728,7 +729,7 @@ export class SentinelOrchestrator {
           user_id: user.id,
           product_id: threat.productId,
           product_title: sampleProduct.title,
-          detected_price: (threat.data as any).wbPrice,
+          detected_price: (threat.data as Record<string, unknown>).wbPrice as number,
           min_price: 0,
           defense_action: 'PARITY_ALERT',
           saved_amount: 0,
@@ -741,7 +742,7 @@ export class SentinelOrchestrator {
     }
 
     // 6. Logistics Optimization (VGH/Volume Analysis)
-    await this.analyzeLogisticsOptimization(Number(user.id), allProducts);
+    await this.analyzeLogisticsOptimization(user.id, allProducts);
 
     // === SENTINEL PRICE REPORT ===
     if (options.sendPriceReport) {
@@ -783,14 +784,14 @@ export class SentinelOrchestrator {
               [
                 {
                   text: `🚨 Исправить цены (${breaches.length} шт)`,
-                  callback_data: `sentinel_fix_prices:${user.id}`,
+                  callback_data: `sentinel_fix_prices:${String(user.id)}`,
                 },
               ],
             ],
           };
         }
 
-        await notificationService.sendRawMessage(Number(user.id), report, replyMarkup);
+        await notificationService.sendRawMessage(user.id as string | number, report, replyMarkup);
       } catch (e) {
         logger.error('Failed to send periodic price report', e);
       }
@@ -801,7 +802,7 @@ export class SentinelOrchestrator {
    * Hunter Mode: Analyze competitors and adjust prices dynamically
    */
   private async processCompetitorsHunter(
-    userId: number,
+    userId: string | number,
     productsList: DBProduct[],
     startTime: number
   ) {
@@ -826,7 +827,7 @@ export class SentinelOrchestrator {
     }
   }
 
-  private async huntOneProduct(userId: number, product: DBProduct) {
+  private async huntOneProduct(userId: string | number, product: DBProduct) {
     if (!product.competitor_url) return;
 
     try {
@@ -937,7 +938,7 @@ export class SentinelOrchestrator {
    * Logistics Optimization Analysis (VGH/Volume)
    * Formula 2025: L = 38 + (V - 1) * 9.5
    */
-  private async analyzeLogisticsOptimization(userId: number, productsList: DBProduct[]) {
+  private async analyzeLogisticsOptimization(userId: string | number, productsList: DBProduct[]) {
     for (const p of productsList) {
       if (p.marketplace !== 'WB') continue; // WB has the most aggressive volume-based pricing
       if (!p.width_cm || !p.height_cm || !p.depth_cm) continue;

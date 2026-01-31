@@ -98,7 +98,7 @@ export function validateTelegramInitData(initData: string): InitDataValidationRe
     const user = JSON.parse(userJson) as TelegramUser;
 
     // Validate user ID
-    if (!user.id || typeof user.id !== 'number' || user.id <= 0) {
+    if (!user.id || (typeof user.id !== 'number' && typeof user.id !== 'string')) {
       return { valid: false, user: null, error: 'Invalid user ID' };
     }
 

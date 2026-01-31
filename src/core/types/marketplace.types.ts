@@ -7,7 +7,7 @@ export type PendingPriceStatus = 'pending' | 'processing' | 'completed' | 'faile
  */
 export interface DBProduct {
   id: number; // SERIAL PRIMARY KEY
-  user_id: number; // BIGINT NOT NULL REFERENCES users(id)
+  user_id: string | number; // BIGINT NOT NULL REFERENCES users(id)
   product_id: string; // VARCHAR(255) NOT NULL
   nm_id: number | null; // BIGINT (WB nmId)
   offer_id: string | null; // VARCHAR(255) (Ozon offer_id)
@@ -48,7 +48,7 @@ export interface PendingPriceUpdate {
  */
 export interface DBPriceRule {
   id: number;
-  user_id: number;
+  user_id: string | number;
   product_id: string;
   min_price: number | string;
   max_price: number | string;

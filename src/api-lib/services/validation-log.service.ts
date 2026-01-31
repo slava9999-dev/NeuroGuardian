@@ -15,7 +15,7 @@ import type { Threat } from '../../sentinel/ThreatDetector.js';
 // ============================================
 
 interface ValidationLogEntry {
-  userId?: string;
+  userId?: string | number;
   score: number;
   passed: boolean;
   issues: ValidationIssue[];
@@ -25,7 +25,7 @@ interface ValidationLogEntry {
 }
 
 interface ThreatLogEntry {
-  userId: string;
+  userId: string | number;
   productId: string;
   nmId?: string | null;
   marketplace: 'WB' | 'Ozon';
@@ -83,7 +83,7 @@ class ValidationLogService {
       const hasCritical = entry.issues.some(i => i.severity === 'critical');
 
       await db.insert(validationLogs).values({
-        userId: entry.userId || null,
+        userId: entry.userId ? String(entry.userId) : null,
         score: entry.score,
         passed: entry.passed,
         issueTypes: JSON.stringify(issueTypes),
@@ -112,11 +112,11 @@ class ValidationLogService {
   /**
    * Get validation statistics for analytics
    */
-  async getStats(userId?: string, hours: number = 24): Promise<ValidationStats> {
+  async getStats(userId?: string | number, hours: number = 24): Promise<ValidationStats> {
     const since = new Date(Date.now() - hours * 60 * 60 * 1000);
 
     const whereClause = userId
-      ? and(eq(validationLogs.userId, userId), gte(validationLogs.createdAt, since))
+      ? and(eq(validationLogs.userId, String(userId)), gte(validationLogs.createdAt, since))
       : gte(validationLogs.createdAt, since);
 
     // Get aggregated stats
@@ -191,7 +191,7 @@ class ValidationLogService {
    */
   async getCombinedMetrics(
     inMemoryMetrics: ValidationMetrics,
-    userId?: string
+    userId?: string | number
   ): Promise<ValidationStats & { inMemory: ValidationMetrics }> {
     const dbStats = await this.getStats(userId, 24);
     return {
@@ -214,7 +214,7 @@ class ThreatHistoryService {
       const result = await db
         .insert(threatHistory)
         .values({
-          userId: entry.userId,
+          userId: String(entry.userId),
           productId: entry.productId,
           nmId: entry.nmId || null,
           marketplace: entry.marketplace,
@@ -264,11 +264,11 @@ class ThreatHistoryService {
   /**
    * Get threat statistics for analytics
    */
-  async getStats(userId?: string, hours: number = 168): Promise<ThreatStats> {
+  async getStats(userId?: string | number, hours: number = 168): Promise<ThreatStats> {
     const since = new Date(Date.now() - hours * 60 * 60 * 1000);
 
     const whereClause = userId
-      ? and(eq(threatHistory.userId, userId), gte(threatHistory.createdAt, since))
+      ? and(eq(threatHistory.userId, String(userId)), gte(threatHistory.createdAt, since))
       : gte(threatHistory.createdAt, since);
 
     // Get aggregated stats

@@ -109,7 +109,7 @@ export class PriceShieldService {
   /**
    * Fetch Active Rules for a User
    */
-  public async getRulesForUser(userId: number): Promise<PriceRule[]> {
+  public async getRulesForUser(userId: string | number): Promise<PriceRule[]> {
     try {
       const { rows } = await sql`
         SELECT * FROM price_rules 

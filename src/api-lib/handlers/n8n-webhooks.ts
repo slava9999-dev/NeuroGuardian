@@ -66,7 +66,12 @@ export async function handleN8nPriceCheck(req: VercelRequest, res: VercelRespons
       totalUpdated: 0,
       totalAlerts: 0,
       totalErrors: 0,
-      details: [] as Array<{ userId: number; analyzed: number; updated: number; alerts: number }>,
+      details: [] as Array<{
+        userId: string | number;
+        analyzed: number;
+        updated: number;
+        alerts: number;
+      }>,
     };
 
     for (const user of users) {

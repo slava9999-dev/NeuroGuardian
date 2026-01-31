@@ -26,7 +26,7 @@ export interface MarketplacePriceUpdate {
 }
 
 // Key Management
-export const getMarketplaceKeys = (userId: number, accountId?: number) =>
+export const getMarketplaceKeys = (userId: string | number, accountId?: number) =>
   marketplaceAccountRepository.getKeys(userId, accountId);
 
 // WB Functions
@@ -119,5 +119,5 @@ export const getOzonFbsWarehouses = (clientId: string, apiKey: string) =>
 export { OZON_DISCOUNT_CONFIG, WB_DISCOUNT_CONFIG, calculateOzonBuyerPrice, calculateWbBuyerPrice };
 
 // Sync
-export const syncSalesHistory = (userId: number, daysBack = 30, accountId?: number) =>
+export const syncSalesHistory = (userId: string | number, daysBack = 30, accountId?: number) =>
   marketplaceService.syncSalesHistory(userId, daysBack, accountId);

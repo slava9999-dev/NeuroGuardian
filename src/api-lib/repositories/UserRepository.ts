@@ -3,7 +3,7 @@ import type { TelegramUser } from '../../api-lib/services/database.js';
 import { encryptApiKey, decryptApiKey } from '../../api-lib/lib/index.js';
 
 export class UserRepository {
-  async getById(id: number): Promise<TelegramUser | null> {
+  async getById(id: string | number): Promise<TelegramUser | null> {
     const result = await sql`SELECT * FROM users WHERE id = ${id}`;
     const user = result.rows[0] as TelegramUser;
     return user ? this.decryptUser(user) : null;
@@ -67,11 +67,14 @@ export class UserRepository {
     return this.decryptUser(dbUser);
   }
 
-  async setProtectionEnabled(id: number, enabled: boolean): Promise<void> {
+  async setProtectionEnabled(id: string | number, enabled: boolean): Promise<void> {
     await sql`UPDATE users SET protection_enabled = ${enabled}, updated_at = NOW() WHERE id = ${id}`;
   }
 
-  async setDefenseMode(id: number, mode: 'zero_stock' | 'price_correction'): Promise<void> {
+  async setDefenseMode(
+    id: string | number,
+    mode: 'zero_stock' | 'price_correction'
+  ): Promise<void> {
     await sql`UPDATE users SET defense_mode = ${mode}, updated_at = NOW() WHERE id = ${id}`;
   }
 

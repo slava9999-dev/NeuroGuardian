@@ -46,7 +46,7 @@ import { toolRegistry } from '../../agent/execution/ToolRegistry.js';
 
 // Interfaces
 interface DBUserRecord {
-  id: number;
+  id: string | number;
   username?: string;
   first_name: string;
   last_name?: string;
@@ -91,7 +91,7 @@ export async function handleAgentV5(
   }
 
   // 1. Authentication
-  let userId: number;
+  let userId: string | number;
   const isAdmin = await verifyAdminAccessAsync(req);
   const bypassTelegramId = req.body?.telegramId || req.query?.telegramId;
 
@@ -256,7 +256,7 @@ export async function handleAgentV5Confirm(
   }
 
   // 1. Authentication
-  let userId: number;
+  let userId: string | number;
   const isAdmin = await verifyAdminAccessAsync(req);
   const bypassTelegramId = req.body?.telegramId || req.query?.telegramId;
 

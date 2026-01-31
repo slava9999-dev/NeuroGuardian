@@ -47,7 +47,7 @@ export class SentinelPriceMonitor implements PriceMonitor {
           });
 
           const result = await marketplaceService.fetchCurrentPrices(
-            Number(user.id),
+            user.id,
             'WB',
             nmIds,
             accountId
@@ -86,7 +86,7 @@ export class SentinelPriceMonitor implements PriceMonitor {
           });
 
           const result = await marketplaceService.fetchCurrentPrices(
-            Number(user.id),
+            user.id,
             'Ozon',
             ozonIds,
             accountId

@@ -16,7 +16,7 @@ import type { z } from 'zod';
  */
 export interface UserState {
   // === STATIC (rarely changes) ===
-  userId: number;
+  userId: string | number;
   marketplace: 'WB' | 'Ozon' | 'both' | null;
   hasWbKey: boolean;
   hasOzonKey: boolean;
@@ -122,7 +122,7 @@ export interface ToolDefinition<TArgs = unknown> {
   examples?: string[];
 
   /** Execute the tool */
-  execute: (userId: number, args: TArgs) => Promise<ToolResult>;
+  execute: (userId: string | number, args: TArgs) => Promise<ToolResult>;
 }
 
 /**
@@ -151,7 +151,7 @@ export interface AgentPlan {
  * Context passed to the orchestrator
  */
 export interface OrchestratorContext {
-  userId: number;
+  userId: string | number;
   userName?: string;
   isFirstContact?: boolean;
   onboardingMode?: boolean;
@@ -239,7 +239,7 @@ export interface LLMCompletionResult {
  */
 export interface MemoryFact {
   id: string;
-  userId: number;
+  userId: string | number;
   type: 'user_preference' | 'product_info' | 'business_rule' | 'resolved_issue';
   content: string;
   createdAt: Date;

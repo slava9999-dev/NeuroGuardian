@@ -251,7 +251,7 @@ export async function callLLMWithFallback(
 // ============================================
 
 export interface UserContext {
-  userId: number;
+  userId: string | number;
   userName?: string; // Имя пользователя из Telegram
   marketplace?: 'WB' | 'Ozon' | 'all';
   wbApiKey?: string;
@@ -630,7 +630,7 @@ async function callPlanner(
 async function executeTool(
   toolName: ToolName,
   args: Record<string, unknown>,
-  userId: number
+  userId: string | number
 ): Promise<{ success: boolean; data?: unknown; error?: string }> {
   try {
     return await toolRegistry.execute(toolName, userId, args);

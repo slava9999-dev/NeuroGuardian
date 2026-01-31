@@ -15,7 +15,7 @@ export type FactType =
 
 export interface MemoryFact {
   id: string;
-  userId: number;
+  userId: string | number;
   type: FactType;
   content: string;
   createdAt: Date;
@@ -24,7 +24,7 @@ export interface MemoryFact {
 }
 
 export interface MemorySummary {
-  userId: number;
+  userId: string | number;
   totalFacts: number;
   lastSummaryAt: Date;
   summary: string;
@@ -32,7 +32,7 @@ export interface MemorySummary {
 
 interface DBMemoryMessage {
   id: number;
-  user_id: number;
+  user_id: string | number;
   role: string;
   content: string;
   timestamp: string;
@@ -41,7 +41,7 @@ interface DBMemoryMessage {
 
 interface DBMemoryFact {
   id: string;
-  user_id: number;
+  user_id: string | number;
   type: FactType;
   content: string;
   created_at: string;
@@ -67,7 +67,7 @@ export class MemoryManager {
       await sql`
         CREATE TABLE IF NOT EXISTS agent_messages (
           id SERIAL PRIMARY KEY,
-          user_id INTEGER NOT NULL,
+          user_id VARCHAR(255) NOT NULL,
           role TEXT NOT NULL,
           content TEXT NOT NULL,
           timestamp TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
@@ -79,7 +79,7 @@ export class MemoryManager {
       await sql`
         CREATE TABLE IF NOT EXISTS memory_facts (
           id TEXT PRIMARY KEY,
-          user_id INTEGER NOT NULL,
+          user_id VARCHAR(255) NOT NULL,
           type TEXT NOT NULL,
           content TEXT NOT NULL,
           created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
@@ -91,7 +91,7 @@ export class MemoryManager {
       // Summaries table
       await sql`
         CREATE TABLE IF NOT EXISTS memory_summaries (
-          user_id INTEGER PRIMARY KEY,
+          user_id VARCHAR(255) PRIMARY KEY,
           total_facts INTEGER NOT NULL DEFAULT 0,
           last_summary_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
           summary TEXT NOT NULL,
@@ -108,7 +108,11 @@ export class MemoryManager {
   /**
    * Save message to short-term memory
    */
-  async saveMessage(userId: number, role: 'user' | 'assistant', content: string): Promise<void> {
+  async saveMessage(
+    userId: number | string,
+    role: 'user' | 'assistant',
+    content: string
+  ): Promise<void> {
     await this.lazyEnsureTablesExist();
     try {
       await sql`
@@ -123,7 +127,7 @@ export class MemoryManager {
   /**
    * Get recent conversation history
    */
-  async getRecentHistory(userId: number, limit: number = 5): Promise<AgentMessage[]> {
+  async getRecentHistory(userId: number | string, limit: number = 5): Promise<AgentMessage[]> {
     await this.lazyEnsureTablesExist();
     try {
       const result = await sql`
@@ -149,7 +153,7 @@ export class MemoryManager {
    * Save important fact to long-term memory
    */
   async saveImportantFact(
-    userId: number,
+    userId: number | string,
     fact: string,
     type: FactType,
     overwriteExisting: boolean = false
@@ -182,7 +186,7 @@ export class MemoryManager {
   /**
    * Search for relevant facts using simple keyword matching
    */
-  async searchRelevantFacts(userId: number, query: string): Promise<string[]> {
+  async searchRelevantFacts(userId: number | string, query: string): Promise<string[]> {
     await this.lazyEnsureTablesExist();
     try {
       const keywords = this.extractKeywords(query);
@@ -206,7 +210,7 @@ export class MemoryManager {
   /**
    * Get user preferences from memory
    */
-  async getUserPreferences(userId: number): Promise<Record<string, string>> {
+  async getUserPreferences(userId: number | string): Promise<Record<string, string>> {
     await this.lazyEnsureTablesExist();
     try {
       const result = await sql`
@@ -253,7 +257,7 @@ export class MemoryManager {
   /**
    * Summarize and archive old memories
    */
-  async summarizeAndArchive(userId: number): Promise<void> {
+  async summarizeAndArchive(userId: number | string): Promise<void> {
     await this.lazyEnsureTablesExist();
     try {
       // Get all facts for user
@@ -300,7 +304,7 @@ export class MemoryManager {
   /**
    * Clear user memory (for testing or user request)
    */
-  async clearMemory(userId: number): Promise<void> {
+  async clearMemory(userId: number | string): Promise<void> {
     await this.lazyEnsureTablesExist();
     try {
       await sql`DELETE FROM agent_messages WHERE user_id = ${userId}`;
@@ -314,7 +318,7 @@ export class MemoryManager {
   /**
    * Get memory statistics
    */
-  async getMemoryStats(userId: number): Promise<{
+  async getMemoryStats(userId: number | string): Promise<{
     messageCount: number;
     factCount: number;
     lastSummaryAt?: Date;
@@ -343,7 +347,7 @@ export class MemoryManager {
   /**
    * Generate unique fact ID
    */
-  private generateFactId(userId: number, type: FactType, content: string): string {
+  private generateFactId(userId: number | string, type: FactType, content: string): string {
     const hash = this.simpleHash(content);
     return `${userId}_${type}_${hash}`;
   }

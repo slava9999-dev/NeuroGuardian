@@ -7,7 +7,7 @@ export interface MarketplaceAccountKeys {
 }
 
 export class MarketplaceAccountRepository {
-  async getKeys(userId: number, accountId?: number): Promise<MarketplaceAccountKeys> {
+  async getKeys(userId: string | number, accountId?: number): Promise<MarketplaceAccountKeys> {
     const keys: MarketplaceAccountKeys = {};
 
     if (accountId) {
@@ -22,10 +22,23 @@ export class MarketplaceAccountRepository {
 
       const mkt = account.marketplace?.toLowerCase();
       if (mkt === 'wb' && account.wb_token) {
-        keys.wb = encryptionService.decrypt(account.wb_token);
+        const decrypted = encryptionService.decrypt(account.wb_token);
+        // CRITICAL FIX: If decryption fails (returns empty) but we had a token,
+        // throw validation error to trigger Sentinel's "Soft Reset" flow.
+        if (!decrypted && account.wb_token) {
+          throw new Error('Critical: Decryption failed (Unsupported state). Key reset required.');
+        }
+        keys.wb = decrypted;
       } else if (mkt === 'ozon' && account.ozon_client_id && account.ozon_api_key) {
         const clientId = encryptionService.decrypt(account.ozon_client_id);
         const apiKey = encryptionService.decrypt(account.ozon_api_key);
+
+        if ((!clientId && account.ozon_client_id) || (!apiKey && account.ozon_api_key)) {
+          throw new Error(
+            'Critical: Decryption failed (Unsupported state) for Ozon. Key reset required.'
+          );
+        }
+
         if (clientId && apiKey) {
           keys.ozon = { clientId, apiKey };
         }
@@ -43,17 +56,34 @@ export class MarketplaceAccountRepository {
     if (!user) return keys;
 
     if (user.api_key_wb) {
-      keys.wb = encryptionService.decrypt(user.api_key_wb);
+      const decrypted = encryptionService.decrypt(user.api_key_wb);
+      if (!decrypted) {
+        throw new Error(
+          'Critical: Decryption failed (Unsupported state) for WB Legacy. Key reset required.'
+        );
+      }
+      keys.wb = decrypted;
     }
 
     if (user.api_key_ozon) {
       const ozonKey = encryptionService.decrypt(user.api_key_ozon);
+      if (!ozonKey) {
+        throw new Error(
+          'Critical: Decryption failed (Unsupported state) for Ozon Legacy. Key reset required.'
+        );
+      }
+
       if (ozonKey) {
         if (ozonKey.includes(':')) {
           const [clientId, apiKey] = ozonKey.split(':');
           if (clientId && apiKey) keys.ozon = { clientId, apiKey };
         } else if (user.ozon_client_id) {
           const clientId = encryptionService.decrypt(user.ozon_client_id);
+          if (!clientId) {
+            throw new Error(
+              'Critical: Decryption failed (Unsupported state) for Ozon Client ID. Key reset required.'
+            );
+          }
           if (clientId) keys.ozon = { clientId, apiKey: ozonKey };
         }
       }

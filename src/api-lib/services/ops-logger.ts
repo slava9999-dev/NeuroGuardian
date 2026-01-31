@@ -64,8 +64,8 @@ export type ResourceType =
 export interface OpsEvent {
   eventType: EventType;
   eventSource: EventSource;
-  userId?: number;
-  productId?: number;
+  userId?: string | number;
+  productId?: string | number;
   payload?: Record<string, unknown>;
   oldPrice?: number;
   newPrice?: number;
@@ -199,7 +199,7 @@ export async function getPendingEvents(
  * Get events for a user (for dashboard)
  */
 export async function getUserEvents(
-  userId: number,
+  userId: string | number,
   hours = 24,
   limit = 50
 ): Promise<Array<Record<string, unknown>>> {
@@ -228,7 +228,10 @@ export async function getUserEvents(
 /**
  * Get event statistics for dashboard
  */
-export async function getEventStats(userId?: number, hours = 24): Promise<Record<string, number>> {
+export async function getEventStats(
+  userId?: string | number,
+  hours = 24
+): Promise<Record<string, number>> {
   try {
     const uid = userId || null;
 
@@ -236,7 +239,7 @@ export async function getEventStats(userId?: number, hours = 24): Promise<Record
       SELECT event_type, COUNT(*) as count
       FROM ops_events 
       WHERE created_at > NOW() - (${hours} || ' hours')::interval
-        AND (${uid}::int IS NULL OR user_id = ${uid})
+        AND (${uid}::text IS NULL OR user_id = ${uid})
       GROUP BY event_type
     `;
 
@@ -258,7 +261,7 @@ export async function getEventStats(userId?: number, hours = 24): Promise<Record
  */
 export async function getSystemEvents(
   limit = 100,
-  filters?: { eventType?: string; source?: string; userId?: number }
+  filters?: { eventType?: string; source?: string; userId?: string | number }
 ): Promise<Array<Record<string, unknown>>> {
   try {
     const fType = filters?.eventType || null;
@@ -270,7 +273,7 @@ export async function getSystemEvents(
       FROM ops_events 
       WHERE (${fType}::text IS NULL OR event_type = ${fType})
         AND (${fSource}::text IS NULL OR event_source = ${fSource})
-        AND (${fUser}::int IS NULL OR user_id = ${fUser})
+        AND (${fUser}::text IS NULL OR user_id = ${fUser})
       ORDER BY created_at DESC
       LIMIT ${limit}
     `;

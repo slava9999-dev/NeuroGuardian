@@ -19,7 +19,7 @@ export type LogType = 'price_drop' | 'defense_triggered' | 'sync' | 'error' | 'i
 // User Model
 // ============================================
 export interface User {
-  telegramId: number;
+  telegramId: string | number;
   username: string | null;
   firstName: string;
   lastName: string | null;
@@ -65,7 +65,7 @@ export interface User {
 // ============================================
 export interface Product {
   id: string;
-  userId: number;
+  userId: string | number;
 
   // Identifiers
   productId: string; // Universal ID
@@ -167,7 +167,7 @@ export interface WarehouseStock {
 // ============================================
 export interface LogEntry {
   id: string;
-  userId: number;
+  userId: string | number;
 
   type: LogType;
   productId?: string;

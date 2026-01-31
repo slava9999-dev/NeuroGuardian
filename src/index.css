@@ -49,6 +49,36 @@
   --radius-lg: 1rem;
   --radius-xl: 1.5rem;
   --radius-full: 9999px;
+  
+  /* Glass Systems */
+  --glass-nav-bg: rgba(255, 255, 255, 0.75);
+}
+
+/* ============================================
+   🌑 DARK AURORA (System Dark Mode Support)
+   Deep Obsidian Glass Aesthetics
+   ============================================ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Base Layers */
+    --color-background: #050507; /* Deepest Void */
+    --color-surface: rgba(18, 18, 20, 0.75); /* Obsidian Glass */
+    
+    /* Text Inversion */
+    --color-text-main: #FFFFFF;
+    --color-text-secondary: rgba(255, 255, 255, 0.7);
+    --color-text-muted: rgba(255, 255, 255, 0.4);
+
+    /* Accents Re-calibration for Dark */
+    --color-primary: #9F6BFF; /* Lighter vivid purple for contrast */
+    --color-primary-glow: rgba(159, 107, 255, 0.25);
+    
+    /* Glass Systems Dark */
+    --glass-nav-bg: rgba(10, 10, 12, 0.8);
+    
+    /* Shadows are subtle glows in dark mode */
+    --shadow-fused: 0 8px 32px -4px rgba(0, 0, 0, 0.5);
+  }
 }
 
 /* ============================================
@@ -61,14 +91,14 @@
   inset: 0;
   z-index: -1;
   background: 
-    radial-gradient(circle at 20% 30%, rgba(66, 133, 244, 0.08) 0%, #FAFAFA 100%),
+    radial-gradient(circle at 20% 30%, rgba(66, 133, 244, 0.08) 0%, var(--color-background) 100%),
     radial-gradient(circle at 80% 70%, rgba(135, 67, 244, 0.05) 0%, transparent 50%);
   transition: background 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .mode-hunt .aura-layer {
   background: 
-    radial-gradient(circle at 20% 30%, rgba(40, 53, 147, 0.08) 0%, #FAFAFA 100%),
+    radial-gradient(circle at 20% 30%, rgba(40, 53, 147, 0.08) 0%, var(--color-background) 100%),
     radial-gradient(circle at 80% 70%, rgba(135, 67, 244, 0.05) 0%, transparent 50%);
 }
 
@@ -100,7 +130,7 @@
 }
 
 @utility glass-nav {
-  background: rgba(255, 255, 255, 0.75);
+  background: var(--glass-nav-bg);
   backdrop-filter: blur(20px) saturate(160%);
   -webkit-backdrop-filter: blur(20px) saturate(160%);
 }

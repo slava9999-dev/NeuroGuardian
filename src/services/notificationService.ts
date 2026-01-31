@@ -4,7 +4,7 @@ import { logger } from '@/api-lib/lib/logger';
 interface TelegramConfig {
   botToken: string;
   adminChatId: string;
-  userChatIds: Map<number, string>;
+  userChatIds: Map<string | number, string>;
 }
 
 interface Alert {
@@ -40,8 +40,9 @@ export class NotificationService {
     await this.logNotification(alert);
 
     // If associated with user product, send to user
-    if (alert.product?.userId && typeof alert.product.userId === 'number') {
-      const userChatId = await this.getUserChatId(alert.product.userId);
+    if (alert.product?.userId) {
+      const uId = alert.product.userId as string | number;
+      const userChatId = await this.getUserChatId(uId);
       if (userChatId) {
         await this.sendMessage(userChatId, message);
       }
@@ -100,7 +101,7 @@ export class NotificationService {
     }
   }
 
-  private async getUserChatId(userId: number): Promise<string | null> {
+  private async getUserChatId(userId: string | number): Promise<string | null> {
     if (this.config.userChatIds.has(userId)) {
       return this.config.userChatIds.get(userId)!;
     }

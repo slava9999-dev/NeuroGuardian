@@ -69,7 +69,7 @@ export class ThreatDetector {
    * Log threats to history database (non-blocking)
    */
   async logThreatsToHistory(
-    userId: string,
+    userId: string | number,
     threats: Threat[],
     marketplace: 'WB' | 'Ozon'
   ): Promise<void> {

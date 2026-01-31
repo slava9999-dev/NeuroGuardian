@@ -3,7 +3,7 @@ import type { DBUser } from '../lib/types.js';
 
 export interface MarketplaceAccount {
   id: number;
-  user_id: number;
+  user_id: string | number;
   name: string;
   marketplace: 'wb' | 'ozon';
   is_active: boolean;
@@ -14,7 +14,9 @@ export interface MarketplaceAccount {
   last_sync_at?: string;
 }
 
-export async function getMarketplaceAccounts(telegramId: number): Promise<MarketplaceAccount[]> {
+export async function getMarketplaceAccounts(
+  telegramId: string | number
+): Promise<MarketplaceAccount[]> {
   const { rows } =
     await sql`SELECT * FROM marketplace_accounts WHERE user_id = ${telegramId} ORDER BY created_at DESC`;
   return rows as MarketplaceAccount[];
@@ -38,7 +40,7 @@ export async function addMarketplaceAccount(
 
 export async function updateMarketplaceAccount(
   accountId: number,
-  userId: number,
+  userId: string | number,
   updates: Partial<Omit<MarketplaceAccount, 'id' | 'user_id' | 'created_at'>>
 ): Promise<MarketplaceAccount | null> {
   // Construct dynamic update query
@@ -46,7 +48,7 @@ export async function updateMarketplaceAccount(
   // For simplicity, we'll update fields if they are provided
 
   const existing = await getAccountById(accountId);
-  if (!existing || Number(existing.user_id) !== userId) return null;
+  if (!existing || String(existing.user_id) !== String(userId)) return null;
 
   const result = await sql`
     UPDATE marketplace_accounts SET
@@ -64,7 +66,7 @@ export async function updateMarketplaceAccount(
 
 export async function deleteMarketplaceAccount(
   accountId: number,
-  userId: number
+  userId: string | number
 ): Promise<boolean> {
   const result = await sql`
     DELETE FROM marketplace_accounts 
@@ -73,9 +75,11 @@ export async function deleteMarketplaceAccount(
   return (result.rowCount ?? 0) > 0;
 }
 
-export async function getAllUsers(): Promise<Array<{ id: number; telegram_id: number }>> {
+export async function getAllUsers(): Promise<
+  Array<{ id: string | number; telegram_id: string | number }>
+> {
   const { rows } = await sql`SELECT id, id as telegram_id FROM users WHERE is_active = true`;
-  return rows as Array<{ id: number; telegram_id: number }>;
+  return rows as Array<{ id: string | number; telegram_id: string | number }>;
 }
 
 export async function getUsersStats() {
@@ -92,7 +96,7 @@ export async function getUsersStats() {
 }
 
 export interface UserSummary {
-  id: number;
+  id: string | number;
   first_name: string;
   last_name?: string;
   username?: string;
@@ -135,7 +139,7 @@ export async function getUsersPaginated(
   const { rows } = await query;
 
   return (rows as DBUser[]).map(row => ({
-    id: Number(row.id), // Ensure number
+    id: row.id, // String or number based on DB
     first_name: row.first_name,
     last_name: row.last_name || undefined,
     username: row.username || undefined,

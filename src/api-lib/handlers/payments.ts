@@ -17,7 +17,7 @@ import { logger } from '../lib/logger.js';
 export async function handleCreatePayment(
   req: VercelRequest,
   res: VercelResponse,
-  userId: number
+  userId: string | number
 ): Promise<VercelResponse> {
   try {
     const { tier, billing_period = 'monthly', return_url } = req.body || {};
@@ -204,7 +204,7 @@ export async function handlePaymentWebhook(
   // Use VERIFIED payment data
   const payment = verifiedPayment;
   const metadata = payment.metadata || {};
-  const userId = parseInt(metadata.user_id, 10);
+  const userId = metadata.user_id;
   const tier = metadata.tier;
   const billingPeriod = metadata.billing_period || 'monthly';
 
@@ -248,7 +248,7 @@ export async function handlePaymentWebhook(
         const amount = parseFloat(payment.amount.value);
         try {
           await sendTelegramNotification(
-            parseInt(adminTelegramId),
+            adminTelegramId,
             `💰 <b>КАССА:</b> Поступило <b>${amount}₽</b> от user_${userId}\n` +
               `📦 Тариф: ${tier} (${billingPeriod})\n` +
               `🆔 Payment: ${paymentId}`

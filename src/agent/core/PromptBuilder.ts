@@ -21,7 +21,7 @@ interface PromptContext {
   recentHistory: ChatMessage[];
   relevantKnowledge?: string[];
   isFirstContact?: boolean;
-  userId?: number; // For memory retrieval
+  userId?: string | number; // For memory retrieval
 }
 
 /**
@@ -63,7 +63,7 @@ ${context}
   /**
    * Build a brief summary of top products for LLM context grounding
    */
-  private async buildCatalogSummary(userId?: number): Promise<string> {
+  private async buildCatalogSummary(userId?: string | number): Promise<string> {
     if (!userId) return '';
     try {
       const products = await productRepository.getFiltered(userId, { limit: 10 });
@@ -84,7 +84,7 @@ ${context}
    * Build memory context from long-term memory
    * This retrieves stored facts about the user and their business
    */
-  private async buildMemoryContext(userId: number, query: string): Promise<string> {
+  private async buildMemoryContext(userId: string | number, query: string): Promise<string> {
     try {
       const lines: string[] = [];
 
@@ -128,7 +128,7 @@ ${context}
    * This is used by the orchestrator
    */
   async build(
-    _userId: number,
+    _userId: string | number,
     state: UserState,
     _availableTools: ToolDefinition[],
     query: string

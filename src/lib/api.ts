@@ -109,7 +109,7 @@ export const authApi = {
       return {
         success: true,
         user: {
-          telegramId: 123456,
+          telegramId: '123456',
           username: 'demo_user',
           firstName: 'Demo User',
           lastName: null,
@@ -237,7 +237,7 @@ export const marketplaceAccountsApi = {
 
 export interface ProductData {
   id: string;
-  userId: number;
+  userId: string | number;
   productId: string;
   nmId?: number;
   offerId?: string;

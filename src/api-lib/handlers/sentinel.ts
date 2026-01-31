@@ -92,7 +92,7 @@ export async function handleCheckPrices(
 export async function handleSentinelStats(
   _req: VercelRequest,
   res: VercelResponse,
-  userId: number
+  userId: string | number
 ): Promise<VercelResponse> {
   try {
     const logs = await sql`
@@ -131,7 +131,7 @@ export async function handleSentinelStats(
 export async function handleSentinelDashboard(
   req: VercelRequest,
   res: VercelResponse,
-  userId: number
+  userId: string | number
 ): Promise<VercelResponse> {
   const { ThreatDetector } = await import('../../sentinel/ThreatDetector.js');
   const threatDetector = new ThreatDetector();
@@ -469,7 +469,7 @@ export async function handleSentinelFixPrices(
 
     // 3. Notify user
     await notificationService.sendRawMessage(
-      Number(userId),
+      userId,
       `✅ *Успешно исправлено ${fixedProducts.length} цен!*\n\nЦены установлены на уровень Stop Loss. Синхронизация с маркетплейсом запущена.`
     );
 

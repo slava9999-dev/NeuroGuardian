@@ -67,7 +67,7 @@ const syncProductsSchema = z.object({
 export async function handleProducts(
   req: VercelRequest,
   res: VercelResponse,
-  userId: number
+  userId: string | number
 ): Promise<VercelResponse> {
   console.log(`🔍 [handleProducts] userId=${userId}, method=${req.method}`);
   if (req.method === 'GET') {
@@ -150,7 +150,7 @@ import { smartDefaultsService } from '../core-services/SmartDefaultsService.js';
 export async function handleSyncProducts(
   req: VercelRequest,
   res: VercelResponse,
-  userId: number
+  userId: string | number
 ): Promise<VercelResponse> {
   // Validate with Zod schema
   const validated = await validateBody(req, res, syncProductsSchema);
@@ -175,7 +175,7 @@ export async function handleSyncProducts(
 
   // Import locally to avoid circular dependency issues if any
   const { getMarketplaceAccounts } = await import('../services/users.js');
-  const accounts = await getMarketplaceAccounts(userId);
+  const accounts = await getMarketplaceAccounts(userId as string | number);
 
   // Filter active accounts for the requested marketplace
   const activeAccounts = accounts.filter(
@@ -259,7 +259,7 @@ export async function handleSyncProducts(
                 .map(p =>
                   mediaQueue
                     .enqueue('ingest_marketplace_image', p.image_url!, {
-                      userId,
+                      userId: userId as string | number,
                       productId: p.product_id,
                       metadata: { userId, productId: p.product_id },
                     })
@@ -278,7 +278,7 @@ export async function handleSyncProducts(
             // TRIGGER ONBOARDING ANALYSIS (Sales Hook)
             await mediaQueue
               .enqueue('onboarding_analysis', account.marketplace, {
-                userId,
+                userId: userId as string | number,
                 metadata: { userId },
               })
               .catch(e => console.error('Failed to trigger onboarding analysis', e));
@@ -350,7 +350,7 @@ export async function handleSyncProducts(
               .map(p =>
                 mediaQueue
                   .enqueue('ingest_marketplace_image', p.image_url!, {
-                    userId,
+                    userId: userId as string | number,
                     productId: p.product_id,
                     metadata: { userId, productId: p.product_id },
                   })
@@ -370,7 +370,7 @@ export async function handleSyncProducts(
           // TRIGGER ONBOARDING ANALYSIS (Sales Hook)
           await mediaQueue
             .enqueue('onboarding_analysis', mp, {
-              userId,
+              userId: userId as string | number,
               metadata: { userId },
             })
             .catch(e => console.error('Failed to trigger onboarding analysis (legacy)', e));
@@ -417,7 +417,7 @@ export async function handleSyncProducts(
 export async function handleBatchSetStopLoss(
   req: VercelRequest,
   res: VercelResponse,
-  userId: number
+  userId: string | number
 ): Promise<VercelResponse> {
   // Validate with Zod schema
   const validated = await validateBody(req, res, batchStopLossSchema);
@@ -505,7 +505,7 @@ export async function handleBatchSetStopLoss(
 export async function handleApplyMinPrices(
   _req: VercelRequest,
   res: VercelResponse,
-  userId: number
+  userId: string | number
 ): Promise<VercelResponse> {
   console.log(`🔧 Apply min_prices to marketplace for user ${userId}`);
 
@@ -607,7 +607,7 @@ export async function handleApplyMinPrices(
 export async function handleBatchUpdateCosts(
   req: VercelRequest,
   res: VercelResponse,
-  userId: number
+  userId: string | number
 ): Promise<VercelResponse> {
   // Validate with Zod schema
   const validated = await validateBody(req, res, batchUpdateCostsSchema);
@@ -710,7 +710,7 @@ export async function handleBatchUpdateCosts(
 export async function handleLossProducts(
   req: VercelRequest,
   res: VercelResponse,
-  userId: number
+  userId: string | number
 ): Promise<VercelResponse> {
   try {
     const { threshold = 0 } = req.query;

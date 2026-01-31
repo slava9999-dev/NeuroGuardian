@@ -69,7 +69,7 @@ const N8N_URL = process.env.N8N_WEBHOOK_URL || process.env.N8N_WEBHOOK_BASE;
 
 export interface N8nActionPayload {
   action: string;
-  userId: number;
+  userId: string | number;
   [key: string]: unknown;
 }
 
@@ -153,7 +153,7 @@ export async function triggerN8nWorkflow(
 /**
  * Runbook Action: Sync Products
  */
-export async function triggerSyncProducts(userId: number): Promise<boolean> {
+export async function triggerSyncProducts(userId: string | number): Promise<boolean> {
   // Use existing dedicated webhook or generic action endpoint
   // For simplicity using generic action endpoint if available, but assuming dedicated webhooks for now
   // Based on n8n-webhooks.ts, we actually RECEIVE these.
@@ -166,6 +166,6 @@ export async function triggerSyncProducts(userId: number): Promise<boolean> {
 /**
  * Runbook Action: Retry Onboarding
  */
-export async function triggerRetryOnboarding(userId: number): Promise<boolean> {
+export async function triggerRetryOnboarding(userId: string | number): Promise<boolean> {
   return triggerN8nWorkflow('retry-onboarding', { action: 'retry_onboarding', userId });
 }

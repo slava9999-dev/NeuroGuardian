@@ -22,7 +22,7 @@ export const getSalesStatsTool = defineTool<GetSalesStatsArgs>({
   requiresConfirmation: false,
   examples: ['sales stats for last week', 'how much revenue today', 'sales on ozon last month'],
 
-  async execute(userId: number, args: GetSalesStatsArgs) {
+  async execute(userId: string | number, args: GetSalesStatsArgs) {
     try {
       const { sql } = await import('../../../api-lib/services/database.js');
       const { from, to } = calculateDateRange(args.period || 'week');

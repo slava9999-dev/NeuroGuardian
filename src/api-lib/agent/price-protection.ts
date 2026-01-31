@@ -23,7 +23,7 @@ import { logOpsEvent, logPriceChange } from '../services/ops-logger.js';
 export interface PriceRule {
   id: number;
   productId: string;
-  userId: number;
+  userId: string | number;
   minPrice: number;
   maxPrice: number;
   costPrice: number | null;
@@ -72,7 +72,7 @@ export interface ProtectionResult {
 /**
  * Load price rules from database
  */
-export async function loadPriceRules(userId?: number): Promise<Map<string, PriceRule>> {
+export async function loadPriceRules(userId?: string | number): Promise<Map<string, PriceRule>> {
   const rules = new Map<string, PriceRule>();
 
   try {
@@ -112,7 +112,7 @@ export async function loadPriceRules(userId?: number): Promise<Map<string, Price
  */
 export async function upsertPriceRule(
   productId: string,
-  userId: number,
+  userId: string | number,
   rule: Partial<PriceRule>
 ): Promise<boolean> {
   try {
@@ -237,7 +237,7 @@ function analyzeProduct(product: MarketplaceProduct, rule: PriceRule | null): Pr
  * Main price protection function
  * Analyzes all products and takes protective actions
  */
-export async function runPriceProtection(userId: number): Promise<ProtectionResult> {
+export async function runPriceProtection(userId: string | number): Promise<ProtectionResult> {
   const startTime = Date.now();
   const result: ProtectionResult = {
     analyzed: 0,
@@ -409,7 +409,7 @@ export async function runPriceProtection(userId: number): Promise<ProtectionResu
  * Quick check for a single product against its rule
  */
 export async function checkProductPrice(
-  userId: number,
+  userId: string | number,
   productId: string
 ): Promise<PriceAnalysis | null> {
   const rules = await loadPriceRules(userId);

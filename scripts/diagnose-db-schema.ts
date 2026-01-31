@@ -61,7 +61,7 @@ async function diagnose() {
         ['1634470382']
       );
       console.log('✅ JOIN Query Success. Results:', joinTest.rowCount);
-    } catch (e) {
+    } catch (e: any) {
       console.error('❌ JOIN Query Failed:', e.message);
     }
   } catch (err) {

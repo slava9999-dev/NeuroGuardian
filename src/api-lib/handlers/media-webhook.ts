@@ -111,7 +111,7 @@ export default async function handleMediaWebhook(req: VercelRequest, res: Vercel
 
 interface IngestionMetadata {
   productId?: string;
-  userId?: number;
+  userId?: string | number;
   assetId?: string;
   [key: string]: unknown;
 }
@@ -188,7 +188,7 @@ async function processIngestion(imageUrl: string, metadata: IngestionMetadata) {
   logger.info(`[MediaWebhook] Ingested asset ${assetId} for product ${productId}`);
 }
 
-async function processOnboardingAnalysis(userId: number) {
+async function processOnboardingAnalysis(userId: string | number) {
   if (!userId) return;
 
   // 1. Get stats

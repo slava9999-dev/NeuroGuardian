@@ -24,8 +24,8 @@ function getPool(): pkg.Pool {
   const isLocal =
     connectionString.includes('localhost') ||
     connectionString.includes('127.0.0.1') ||
-    connectionString.includes('postgres') ||
-    connectionString.includes('db');
+    connectionString.includes('//db') ||
+    connectionString.includes('//postgres:'); // Common local docker/default patterns
 
   // Use SSL only if explicitly requested in URL OR if production and NOT local
   const useSsl =
@@ -147,7 +147,7 @@ export const sql = Object.assign(
 import type { DBProduct, PendingPriceUpdate } from '../lib/types.js';
 
 export interface TelegramUser {
-  id: number;
+  id: string | number;
   username?: string;
   first_name: string;
   last_name?: string;
@@ -178,7 +178,7 @@ export interface TelegramUser {
 
 export interface MarketplaceOrder {
   order_id: string;
-  user_id: number;
+  user_id: string | number;
   account_id?: number | null;
   marketplace: 'WB' | 'Ozon' | 'wb' | 'ozon';
   product_id?: string | null;
@@ -196,7 +196,7 @@ export interface MarketplaceOrder {
 
 export interface TransactionData {
   id: string;
-  user_id: number;
+  user_id: string | number;
   yookassa_payment_id?: string | null;
   amount: number;
   currency: string;
@@ -253,6 +253,8 @@ export async function initializeDatabase(): Promise<void> {
       last_reminder_sent TIMESTAMP,
       price_buffer_percent INTEGER DEFAULT 5,
       warning_threshold_percent INTEGER DEFAULT 10,
+      tax_rate DECIMAL(5, 2) DEFAULT 7.0,
+      voice_enabled BOOLEAN DEFAULT true,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
@@ -530,8 +532,22 @@ export async function initializeDatabase(): Promise<void> {
   await sql`
     CREATE TABLE IF NOT EXISTS user_state (
       user_id VARCHAR(255) PRIMARY KEY,
-      state_data JSONB NOT NULL DEFAULT '{}',
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      marketplace TEXT,
+      has_api_keys BOOLEAN NOT NULL DEFAULT false,
+      products_count INTEGER NOT NULL DEFAULT 0,
+      subscription_tier TEXT NOT NULL DEFAULT 'free',
+      gender TEXT,
+      user_name TEXT,
+      current_intent TEXT,
+      pending_action JSONB,
+      awaiting_input JSONB,
+      last_mentioned_products JSONB NOT NULL DEFAULT '[]'::jsonb,
+      last_query TEXT,
+      last_active_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+      session_started_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+      total_queries INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
     )
   `;
 
@@ -595,7 +611,7 @@ import { productRepository } from '../repositories/ProductRepository.js';
 /**
  * Get user by ID
  */
-export async function getUserById(id: number): Promise<TelegramUser | null> {
+export async function getUserById(id: string | number): Promise<TelegramUser | null> {
   return userRepository.getById(id);
 }
 
@@ -606,12 +622,12 @@ export async function createOrUpdateUser(user: Partial<TelegramUser>): Promise<T
   return userRepository.createOrUpdate(user);
 }
 
-export async function setProtectionEnabled(id: number, enabled: boolean): Promise<void> {
+export async function setProtectionEnabled(id: string | number, enabled: boolean): Promise<void> {
   return userRepository.setProtectionEnabled(id, enabled);
 }
 
 export async function setDefenseMode(
-  id: number,
+  id: string | number,
   mode: 'zero_stock' | 'price_correction'
 ): Promise<void> {
   return userRepository.setDefenseMode(id, mode);
@@ -620,12 +636,12 @@ export async function setDefenseMode(
 /**
  * Get user's products
  */
-export async function getProductsByUserId(userId: number, accountId?: number) {
+export async function getProductsByUserId(userId: string | number, accountId?: number) {
   return productRepository.getByUserId(userId, accountId);
 }
 
 export async function getFilteredProducts(
-  userId: number,
+  userId: string | number,
   filters: {
     search?: string;
     marketplace?: string;
@@ -640,7 +656,7 @@ export async function getFilteredProducts(
 }
 
 export async function updateProductMinPrice(
-  userId: number,
+  userId: string | number,
   productId: string,
   minPrice: number
 ): Promise<void> {
@@ -648,7 +664,7 @@ export async function updateProductMinPrice(
 }
 
 export async function updateProductCostPrice(
-  userId: number,
+  userId: string | number,
   productId: string,
   costPrice: number
 ): Promise<void> {
@@ -656,14 +672,14 @@ export async function updateProductCostPrice(
 }
 
 export async function batchUpdateCostPrices(
-  userId: number,
-  updates: Array<{ productId: string; costPrice: number }>
+  userId: string | number,
+  updates: Array<{ productId: string | number; costPrice: number }>
 ): Promise<void> {
   return productRepository.batchUpdateCostPrices(userId, updates);
 }
 
 export async function updateProductCategory(
-  userId: number,
+  userId: string | number,
   productId: string,
   category: string
 ): Promise<void> {
@@ -675,7 +691,7 @@ export async function updateProductCategory(
 }
 
 export async function updateProductPrice(
-  userId: number,
+  userId: string | number,
   productId: string,
   price: number
 ): Promise<void> {
@@ -683,23 +699,29 @@ export async function updateProductPrice(
 }
 
 export async function bulkUpdateMinPrice(
-  userId: number,
+  userId: string | number,
   percentage: number,
   filters: { marketplace?: string; onlyUnprotected?: boolean }
 ) {
   return productRepository.bulkUpdateMinPrice(userId, percentage, filters);
 }
 
-export async function batchUpdateWbPrices(_userId: number, _updates: unknown[]): Promise<void> {
+export async function batchUpdateWbPrices(
+  _userId: string | number,
+  _updates: unknown[]
+): Promise<void> {
   // Placeholder - logic in marketplace service usually
 }
 
-export async function batchUpdateOzonPrices(_userId: number, _updates: unknown[]): Promise<void> {
+export async function batchUpdateOzonPrices(
+  _userId: string | number,
+  _updates: unknown[]
+): Promise<void> {
   // Placeholder
 }
 
 export async function activateSubscription(
-  userId: number,
+  userId: string | number,
   plan: string,
   durationDays: number
 ): Promise<void> {
@@ -727,7 +749,7 @@ export async function updateTransactionStatus(
   }
 }
 
-export async function isFirstPayment(userId: number): Promise<boolean> {
+export async function isFirstPayment(userId: string | number): Promise<boolean> {
   const result =
     await sql`SELECT COUNT(*) as count FROM transactions WHERE user_id = ${userId} AND status = 'succeeded'`;
   return parseInt((result.rows[0] as { count: string }).count) === 0;
@@ -748,18 +770,21 @@ export async function getUsersWithExpiringSubscriptions(days: number): Promise<T
   return result.rows as TelegramUser[];
 }
 
-export async function markReminderSent(userId: number): Promise<void> {
+export async function markReminderSent(userId: string | number): Promise<void> {
   await sql`UPDATE users SET last_reminder_sent = NOW() WHERE id = ${userId}`;
 }
 
-export async function applyReferralBonus(userId: number, bonusAmount: number): Promise<void> {
+export async function applyReferralBonus(
+  userId: string | number,
+  bonusAmount: number
+): Promise<void> {
   await sql`UPDATE users SET saved_amount = saved_amount + ${bonusAmount} WHERE id = ${userId}`;
 }
 
 // === PENDING PRICE TRACKING ===
 
 export async function setPendingPrice(
-  userId: number,
+  userId: string | number,
   productId: string,
   price: number,
   taskId?: string
@@ -771,7 +796,7 @@ export async function setPendingPrice(
   `;
 }
 
-export async function clearPendingPrice(userId: number, productId: string): Promise<void> {
+export async function clearPendingPrice(userId: string | number, productId: string): Promise<void> {
   await sql`
     UPDATE products 
     SET pending_price = NULL, pending_task_id = NULL, pending_status = NULL, pending_since = NULL
@@ -779,7 +804,10 @@ export async function clearPendingPrice(userId: number, productId: string): Prom
   `;
 }
 
-export async function confirmPendingPrice(userId: number, productId: string): Promise<void> {
+export async function confirmPendingPrice(
+  userId: string | number,
+  productId: string
+): Promise<void> {
   await sql`
     UPDATE products 
     SET current_price = COALESCE(pending_price, current_price), 
@@ -789,7 +817,7 @@ export async function confirmPendingPrice(userId: number, productId: string): Pr
 }
 
 export async function batchSetPendingPrices(
-  userId: number,
+  userId: string | number,
   updates: PendingPriceUpdate[],
   taskId?: string
 ): Promise<void> {
@@ -798,13 +826,16 @@ export async function batchSetPendingPrices(
   }
 }
 
-export async function getProductsWithPendingPrices(userId: number) {
+export async function getProductsWithPendingPrices(userId: string | number) {
   const result =
     await sql`SELECT * FROM products WHERE user_id = ${userId} AND pending_price IS NOT NULL`;
   return result.rows;
 }
 
-export async function batchConfirmPendingByTaskId(userId: number, taskId: string): Promise<void> {
+export async function batchConfirmPendingByTaskId(
+  userId: string | number,
+  taskId: string
+): Promise<void> {
   await sql`
     UPDATE products 
     SET current_price = pending_price, 
@@ -856,14 +887,17 @@ export async function migrateAddPendingColumns(): Promise<void> {
   await sql`ALTER TABLE price_rules ADD COLUMN IF NOT EXISTS undercut_type TEXT DEFAULT 'percent'`;
 }
 
-export async function clearChatHistory(userId: number): Promise<void> {
+export async function clearChatHistory(userId: string | number): Promise<void> {
   await sql`UPDATE chat_history SET messages = '[]', updated_at = NOW() WHERE user_id = ${userId}`;
 }
 
 /**
  * Save products (bulk upsert)
  */
-export async function saveProducts(userId: number, products: Partial<DBProduct>[]): Promise<void> {
+export async function saveProducts(
+  userId: string | number,
+  products: Partial<DBProduct>[]
+): Promise<void> {
   return productRepository.saveBatch(userId, products);
 }
 
@@ -871,7 +905,7 @@ export async function saveProducts(userId: number, products: Partial<DBProduct>[
  * Update product monitoring
  */
 export async function updateProductMonitoring(
-  userId: number,
+  userId: string | number,
   productId: string,
   isMonitored: boolean,
   minPrice?: number
@@ -895,8 +929,8 @@ export async function updateProductMonitoring(
  * Log sentinel action
  */
 export async function logSentinelAction(log: {
-  user_id: number;
-  product_id: string;
+  user_id: string | number;
+  product_id: string | number;
   product_title: string;
   detected_price: number;
   min_price: number;
@@ -944,7 +978,10 @@ export async function getAllUsers(): Promise<TelegramUser[]> {
 /**
  * Manage chat history
  */
-export async function saveChatHistory(userId: number, messages: ChatMessage[]): Promise<void> {
+export async function saveChatHistory(
+  userId: string | number,
+  messages: ChatMessage[]
+): Promise<void> {
   await sql`
     INSERT INTO chat_history (user_id, messages, updated_at)
     VALUES (${userId}, ${JSON.stringify(messages)}, NOW())
@@ -954,7 +991,7 @@ export async function saveChatHistory(userId: number, messages: ChatMessage[]): 
   `;
 }
 
-export async function getChatHistory(userId: number): Promise<ChatMessage[]> {
+export async function getChatHistory(userId: string | number): Promise<ChatMessage[]> {
   const result = await sql`SELECT messages FROM chat_history WHERE user_id = ${userId}`;
   return result.rows[0]?.messages || [];
 }
@@ -962,7 +999,7 @@ export async function getChatHistory(userId: number): Promise<ChatMessage[]> {
 /**
  * Upsert marketplace orders
  */
-export async function upsertMarketplaceOrders(userId: number, orders: MarketplaceOrder[]) {
+export async function upsertMarketplaceOrders(userId: string | number, orders: MarketplaceOrder[]) {
   let inserted = 0;
   let updated = 0;
 
@@ -1010,7 +1047,7 @@ export async function upsertMarketplaceOrders(userId: number, orders: Marketplac
  * Get sales history for analytics
  */
 export async function getSalesHistory(
-  userId: number,
+  userId: string | number,
   dateFrom: Date,
   dateTo: Date,
   accountId?: number

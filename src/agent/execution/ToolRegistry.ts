@@ -96,7 +96,7 @@ export class ToolRegistry {
    */
   async execute(
     toolName: string,
-    userId: number,
+    userId: string | number,
     args: Record<string, unknown>
   ): Promise<ToolResult> {
     const tool = this.tools.get(toolName);
@@ -229,7 +229,7 @@ export const toolRegistry = new ToolRegistry();
  */
 export function defineTool<TArgs>(
   definition: Omit<ToolDefinition<TArgs>, 'execute'> & {
-    execute: (userId: number, args: TArgs) => Promise<ToolResult>;
+    execute: (userId: string | number, args: TArgs) => Promise<ToolResult>;
   }
 ): ToolDefinition<TArgs> {
   return definition as ToolDefinition<TArgs>;

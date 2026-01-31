@@ -42,7 +42,7 @@ export interface Alert {
     name: string;
     marketplace: string;
     externalId: string;
-    userId?: number;
+    userId?: string | number;
   };
   analysis?: {
     currentPrice: number;
@@ -136,10 +136,10 @@ async function sendTelegramMessage(
  *
  * We only need to verify the user EXISTS in the database once, then cache it.
  */
-const chatIdCache = new Map<number, string>();
-const nonExistentUsers = new Set<number>(); // Track users we've already checked don't exist
+const chatIdCache = new Map<string | number, string>();
+const nonExistentUsers = new Set<string | number>(); // Track users we've already checked don't exist
 
-async function getUserChatId(userId: number): Promise<string | null> {
+async function getUserChatId(userId: string | number): Promise<string | null> {
   // Fast path: already cached
   const cached = chatIdCache.get(userId);
   if (cached) return cached;
@@ -971,7 +971,7 @@ export async function sendAlertToAdmin(alert: Alert): Promise<boolean> {
 /**
  * Send alert to user
  */
-export async function sendAlertToUser(userId: number, alert: Alert): Promise<boolean> {
+export async function sendAlertToUser(userId: string | number, alert: Alert): Promise<boolean> {
   const chatId = await getUserChatId(userId);
   if (!chatId) {
     console.warn(`No Telegram chat ID found for user ${userId}`);
@@ -1112,7 +1112,10 @@ export async function sendDailyReport(stats: {
 /**
  * Send welcome message to new user
  */
-export async function sendWelcomeMessage(userId: number, userName: string): Promise<boolean> {
+export async function sendWelcomeMessage(
+  userId: string | number,
+  userName: string
+): Promise<boolean> {
   const chatId = await getUserChatId(userId);
   if (!chatId) return false;
 
@@ -1149,7 +1152,7 @@ export const notificationService = {
  * Used for complex reports and interactive tools
  */
 export async function sendRawMessage(
-  userId: number,
+  userId: string | number,
   markdownText: string,
   replyMarkup?: Record<string, unknown>
 ): Promise<boolean> {
@@ -1165,7 +1168,10 @@ export async function sendRawMessage(
 /**
  * Legacy compatibility wrapper (simple text message)
  */
-export async function sendTelegramNotification(userId: number, message: string): Promise<boolean> {
+export async function sendTelegramNotification(
+  userId: string | number,
+  message: string
+): Promise<boolean> {
   const chatId = await getUserChatId(userId);
   if (!chatId) return false;
   return sendTelegramMessage(chatId, message, { parseMode: 'HTML' });

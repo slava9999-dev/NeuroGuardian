@@ -19,7 +19,7 @@ export class SubscriptionService {
   /**
    * Get user's subscription
    */
-  static async getSubscription(userId: number): Promise<Subscription | null> {
+  static async getSubscription(userId: string | number): Promise<Subscription | null> {
     try {
       const result = await sql`
         SELECT * FROM subscriptions
@@ -41,7 +41,7 @@ export class SubscriptionService {
   /**
    * Check if user has active subscription (trial or paid)
    */
-  static async isActive(userId: number): Promise<boolean> {
+  static async isActive(userId: string | number): Promise<boolean> {
     try {
       const result = await sql`
         SELECT is_subscription_active(${userId}) as is_active
@@ -57,7 +57,7 @@ export class SubscriptionService {
   /**
    * Get detailed subscription check with limits
    */
-  static async checkSubscription(userId: number): Promise<SubscriptionCheckResult> {
+  static async checkSubscription(userId: string | number): Promise<SubscriptionCheckResult> {
     try {
       const subscription = await this.getSubscription(userId);
 
@@ -129,7 +129,7 @@ export class SubscriptionService {
    * Get current usage (products and accounts count)
    */
   private static async getCurrentUsage(
-    userId: number
+    userId: string | number
   ): Promise<{ products: number; accounts: number }> {
     try {
       const result = await sql`
@@ -152,7 +152,7 @@ export class SubscriptionService {
    * Create or update subscription
    */
   static async createOrUpdate(
-    userId: number,
+    userId: string | number,
     tier: SubscriptionTier,
     status: SubscriptionStatus = 'trial'
   ): Promise<Subscription> {
@@ -207,7 +207,7 @@ export class SubscriptionService {
    * Upgrade subscription to paid tier
    */
   static async upgrade(
-    userId: number,
+    userId: string | number,
     newTier: SubscriptionTier,
     billingPeriod: 'monthly' | 'yearly' = 'monthly'
   ): Promise<Subscription> {
@@ -267,7 +267,7 @@ export class SubscriptionService {
    * Cancel subscription
    */
   static async cancel(
-    userId: number,
+    userId: string | number,
     reason?: string,
     immediately: boolean = false
   ): Promise<Subscription> {
@@ -356,7 +356,7 @@ export class SubscriptionService {
    * Record successful payment
    */
   static async recordPayment(
-    userId: number,
+    userId: string | number,
     paymentId: string,
     amount: number,
     provider: string

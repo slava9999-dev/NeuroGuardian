@@ -15,7 +15,7 @@ import type {
 export async function handleGetSubscription(
   _req: VercelRequest,
   res: VercelResponse,
-  userId: number
+  userId: string | number
 ): Promise<void> {
   try {
     const check = await SubscriptionService.checkSubscription(userId);
@@ -42,7 +42,7 @@ export async function handleGetSubscription(
 export async function handleUpgradeSubscription(
   req: VercelRequest,
   res: VercelResponse,
-  userId: number
+  userId: string | number
 ): Promise<void> {
   try {
     const { new_tier, billing_period = 'monthly' } = req.body as UpgradeSubscriptionRequest;
@@ -104,7 +104,7 @@ export async function handleUpgradeSubscription(
 export async function handleCancelSubscription(
   req: VercelRequest,
   res: VercelResponse,
-  userId: number
+  userId: string | number
 ): Promise<void> {
   try {
     const { reason, cancel_immediately = false } = req.body as CancelSubscriptionRequest;
@@ -155,7 +155,7 @@ export async function handleGetTiers(_req: VercelRequest, res: VercelResponse): 
 export async function handleCheckLimits(
   req: VercelRequest,
   res: VercelResponse,
-  userId: number
+  userId: string | number
 ): Promise<void> {
   try {
     const { resource_type } = req.body as { resource_type: 'product' | 'account' };

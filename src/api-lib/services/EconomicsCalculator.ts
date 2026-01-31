@@ -14,7 +14,7 @@ export class EconomicsCalculator {
    */
   async calculateNetProfit(
     productId: string | number,
-    userId: number
+    userId: string | number
   ): Promise<UnitEconomicsResult> {
     // 1. Fetch product data from DB
     const res = await sql`

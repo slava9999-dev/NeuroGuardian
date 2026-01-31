@@ -11,7 +11,7 @@ import { SubscriptionService } from '../services/subscription-service.js';
 export async function requireActiveSubscription(
   _req: VercelRequest,
   res: VercelResponse,
-  userId: number
+  userId: string | number
 ): Promise<boolean> {
   try {
     const isActive = await SubscriptionService.isActive(userId);
@@ -47,7 +47,7 @@ export async function requireActiveSubscription(
 export async function checkSubscriptionLimits(
   _req: VercelRequest,
   res: VercelResponse,
-  userId: number,
+  userId: string | number,
   resourceType: 'product' | 'account'
 ): Promise<boolean> {
   try {
@@ -100,7 +100,9 @@ export async function checkSubscriptionLimits(
 /**
  * Get subscription info for response headers
  */
-export async function getSubscriptionHeaders(userId: number): Promise<Record<string, string>> {
+export async function getSubscriptionHeaders(
+  userId: string | number
+): Promise<Record<string, string>> {
   try {
     const check = await SubscriptionService.checkSubscription(userId);
 
@@ -122,7 +124,7 @@ export async function getSubscriptionHeaders(userId: number): Promise<Record<str
  * Helper to add subscription info to API responses
  */
 export async function enrichResponseWithSubscription(
-  userId: number,
+  userId: string | number,
   data: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
   try {

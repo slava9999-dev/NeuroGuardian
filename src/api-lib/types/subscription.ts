@@ -11,7 +11,7 @@ export type PaymentProvider = 'yookassa' | 'tinkoff' | 'stripe';
 
 export interface Subscription {
   id: number;
-  user_id: number;
+  user_id: string | number;
   status: SubscriptionStatus;
   tier: SubscriptionTier;
   plan_id?: string;
@@ -43,7 +43,7 @@ export interface Subscription {
 
 export interface Payment {
   id: number;
-  user_id: number;
+  user_id: string | number;
   subscription_id?: number;
 
   payment_id: string; // External ID

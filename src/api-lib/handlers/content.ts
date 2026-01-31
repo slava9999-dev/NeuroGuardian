@@ -11,7 +11,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 export async function handleGenerateContent(
   _req: VercelRequest,
   res: VercelResponse,
-  _userId: number
+  _userId: string | number
 ): Promise<VercelResponse> {
   return res.status(410).json({
     success: false,
@@ -26,7 +26,7 @@ export async function handleGenerateContent(
 export async function handleContentQuota(
   _req: VercelRequest,
   res: VercelResponse,
-  _userId: number
+  _userId: string | number
 ): Promise<VercelResponse> {
   return res.json({
     success: true,

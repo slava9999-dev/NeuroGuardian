@@ -24,7 +24,7 @@ export class StateManager {
     try {
       await sql`
         CREATE TABLE IF NOT EXISTS user_state (
-          user_id BIGINT PRIMARY KEY,
+          user_id VARCHAR(255) PRIMARY KEY,
           marketplace TEXT,
           has_api_keys BOOLEAN NOT NULL DEFAULT false,
           products_count INTEGER NOT NULL DEFAULT 0,
@@ -53,7 +53,7 @@ export class StateManager {
   /**
    * Get user state from database
    */
-  async getState(userId: number): Promise<UserState> {
+  async getState(userId: string | number): Promise<UserState> {
     await this.lazyEnsureTableExists();
 
     try {
@@ -66,7 +66,7 @@ export class StateManager {
       if (result.rows.length > 0) {
         const row = result.rows[0];
         state = {
-          userId: Number(userId),
+          userId: userId,
           marketplace: (row.marketplace as 'WB' | 'Ozon' | 'both' | null) || null,
           hasApiKeys: row.has_api_keys || false,
           hasWbKey: false,
@@ -131,7 +131,7 @@ export class StateManager {
   /**
    * Update user state partially
    */
-  async updateState(userId: number, partial: Partial<UserState>): Promise<void> {
+  async updateState(userId: string | number, partial: Partial<UserState>): Promise<void> {
     await this.lazyEnsureTableExists();
 
     try {
@@ -178,7 +178,7 @@ export class StateManager {
   /**
    * Clear pending action
    */
-  async clearPendingAction(userId: number): Promise<void> {
+  async clearPendingAction(userId: string | number): Promise<void> {
     await this.updateState(userId, { pendingAction: undefined });
   }
 
@@ -186,7 +186,7 @@ export class StateManager {
    * Set awaiting input state
    */
   async setAwaitingInput(
-    userId: number,
+    userId: string | number,
     type: string,
     question: string,
     forProductId?: string
@@ -207,33 +207,33 @@ export class StateManager {
   /**
    * Clear awaiting input state
    */
-  async clearAwaitingInput(userId: number): Promise<void> {
+  async clearAwaitingInput(userId: string | number): Promise<void> {
     await this.updateState(userId, { awaitingInput: undefined });
   }
 
   /**
    * Set current intent
    */
-  async setCurrentIntent(userId: number, intent: string): Promise<void> {
+  async setCurrentIntent(userId: string | number, intent: string): Promise<void> {
     await this.updateState(userId, { currentIntent: intent });
   }
 
   /**
    * Clear current intent
    */
-  async clearCurrentIntent(userId: number): Promise<void> {
+  async clearCurrentIntent(userId: string | number): Promise<void> {
     await this.updateState(userId, { currentIntent: undefined });
   }
 
   /**
    * Increment query counter
    */
-  async incrementQueryCount(userId: number): Promise<void> {
+  async incrementQueryCount(userId: string | number): Promise<void> {
     const state = await this.getState(userId);
     await this.updateState(userId, { totalQueries: state.totalQueries + 1 });
   }
 
-  async recordQuery(userId: number, query: string): Promise<void> {
+  async recordQuery(userId: string | number, query: string): Promise<void> {
     const state = await this.getState(userId);
     await this.updateState(userId, {
       totalQueries: state.totalQueries + 1,
@@ -244,15 +244,15 @@ export class StateManager {
   /**
    * Update last mentioned products
    */
-  async updateLastMentionedProducts(userId: number, productIds: string[]): Promise<void> {
+  async updateLastMentionedProducts(userId: string | number, productIds: string[]): Promise<void> {
     await this.updateState(userId, { lastMentionedProducts: productIds });
   }
 
-  async trackMentionedProducts(userId: number, productIds: string[]): Promise<void> {
+  async trackMentionedProducts(userId: string | number, productIds: string[]): Promise<void> {
     await this.updateLastMentionedProducts(userId, productIds);
   }
 
-  async cleanupExpiredState(userId: number): Promise<void> {
+  async cleanupExpiredState(userId: string | number): Promise<void> {
     const state = await this.getState(userId);
     const now = new Date();
     // Clean interactive state if older than 30 mins
@@ -266,7 +266,7 @@ export class StateManager {
   /**
    * Get default state
    */
-  private getDefaultState(userId: number): UserState {
+  private getDefaultState(userId: string | number): UserState {
     return {
       userId,
       marketplace: 'both',
@@ -285,7 +285,7 @@ export class StateManager {
   /**
    * Reset user state (for testing)
    */
-  async resetState(userId: number): Promise<void> {
+  async resetState(userId: string | number): Promise<void> {
     await this.lazyEnsureTableExists();
     try {
       await sql`DELETE FROM user_state WHERE user_id = ${userId}`;
@@ -297,7 +297,7 @@ export class StateManager {
   /**
    * Get session duration in minutes
    */
-  async getSessionDuration(userId: number): Promise<number> {
+  async getSessionDuration(userId: string | number): Promise<number> {
     const state = await this.getState(userId);
     const now = new Date();
     return Math.floor((now.getTime() - state.sessionStartedAt.getTime()) / (1000 * 60));
@@ -306,7 +306,7 @@ export class StateManager {
   /**
    * Check if user is in onboarding mode (no API keys)
    */
-  async isOnboardingMode(userId: number): Promise<boolean> {
+  async isOnboardingMode(userId: string | number): Promise<boolean> {
     const state = await this.getState(userId);
     return !state.hasApiKeys;
   }
@@ -314,21 +314,24 @@ export class StateManager {
   /**
    * Update API keys status
    */
-  async updateApiKeysStatus(userId: number, hasKeys: boolean): Promise<void> {
+  async updateApiKeysStatus(userId: string | number, hasKeys: boolean): Promise<void> {
     await this.updateState(userId, { hasApiKeys: hasKeys });
   }
 
   /**
    * Update products count
    */
-  async updateProductsCount(userId: number, count: number): Promise<void> {
+  async updateProductsCount(userId: string | number, count: number): Promise<void> {
     await this.updateState(userId, { productsCount: count });
   }
 
   /**
    * Update subscription tier
    */
-  async updateSubscriptionTier(userId: number, tier: 'free' | 'basic' | 'pro'): Promise<void> {
+  async updateSubscriptionTier(
+    userId: string | number,
+    tier: 'free' | 'basic' | 'pro'
+  ): Promise<void> {
     await this.updateState(userId, { subscriptionTier: tier });
   }
 }

@@ -10,8 +10,8 @@ export interface SentinelRunResult {
 }
 
 export interface UserCycleResult {
-  userId: number;
-  telegramId: number;
+  userId: string | number;
+  telegramId: string | number;
   firstName?: string;
   productsScanned: { wb: number; ozon: number };
   threatsDetected: number;

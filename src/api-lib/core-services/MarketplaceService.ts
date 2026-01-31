@@ -53,7 +53,7 @@ export class MarketplaceService {
    * Fetch products from specific marketplace
    */
   async fetchProducts(
-    userId: number,
+    userId: string | number,
     marketplace: 'WB' | 'Ozon',
     limit = 100,
     accountId?: number
@@ -77,7 +77,7 @@ export class MarketplaceService {
    * Update prices
    */
   async updatePrices(
-    userId: number,
+    userId: string | number,
     marketplace: 'WB' | 'Ozon',
     updates: Array<{ id: string | number; price: number }>,
     accountId?: number
@@ -118,7 +118,7 @@ export class MarketplaceService {
    * Fetch current prices only (lightweight, for monitoring)
    */
   async fetchCurrentPrices(
-    userId: number,
+    userId: string | number,
     marketplace: 'WB' | 'Ozon',
     productIds: (string | number)[],
     accountId?: number
@@ -132,8 +132,13 @@ export class MarketplaceService {
         errors.push('WB API key not configured');
         return { prices, errors };
       }
-      // Cast to numbers for WB
-      const nmIds = productIds.map(id => Number(id)).filter(id => !isNaN(id) && id > 0);
+      // Cast to numbers for WB, stripping prefix if present
+      const nmIds = productIds
+        .map(id => {
+          const str = String(id);
+          return str.startsWith('wb-') ? Number(str.replace('wb-', '')) : Number(str);
+        })
+        .filter(id => !isNaN(id) && id > 0);
       try {
         const result = await withCircuitBreaker('wb-prices', () =>
           wbService.fetchPrices(keys.wb!, nmIds)
@@ -142,7 +147,8 @@ export class MarketplaceService {
         if (result.error) errors.push(`WB Error: ${result.error}`);
         if (result.priceMap) {
           for (const [id, price] of result.priceMap.entries()) {
-            prices.set(id, price);
+            // Re-prefix to match DB format (wb-xxxxx)
+            prices.set(`wb-${id}`, price);
           }
         }
       } catch (error: unknown) {
@@ -173,7 +179,8 @@ export class MarketplaceService {
         );
 
         for (const [id, price] of ozonPrices.entries()) {
-          prices.set(id, price);
+          // Re-prefix to match DB format (ozon-xxxxx)
+          prices.set(`ozon-${id}`, price);
         }
       } catch (error: unknown) {
         errors.push(
@@ -190,7 +197,7 @@ export class MarketplaceService {
    * Set Zero Stock (Defense Action)
    */
   async setZeroStock(
-    userId: number,
+    userId: string | number,
     marketplace: 'WB' | 'Ozon',
     products: Array<{ id: string | number; offerId?: string }>,
     accountId?: number
@@ -220,7 +227,7 @@ export class MarketplaceService {
    * Set Defense Price (Defense Action)
    */
   async setDefensePrice(
-    userId: number,
+    userId: string | number,
     marketplace: 'WB' | 'Ozon',
     products: Array<{ id: string | number; offerId?: string; price: number }>,
     accountId?: number
@@ -255,7 +262,7 @@ export class MarketplaceService {
    * Fetch Sales Statistics
    */
   async fetchSalesStats(
-    userId: number,
+    userId: string | number,
     marketplace: 'WB' | 'Ozon',
     dateFrom: Date,
     dateTo: Date,
@@ -285,7 +292,7 @@ export class MarketplaceService {
    * Sync sales history from marketplaces to local DB
    */
   async syncSalesHistory(
-    userId: number,
+    userId: string | number,
     daysBack: number = 30,
     accountId?: number
   ): Promise<{ success: boolean; imported: number; error?: string }> {
@@ -305,7 +312,7 @@ export class MarketplaceService {
             .filter((o: WbStatisticsSale) => o.nmId && (o.srid || o.saleID))
             .map((o: WbStatisticsSale) => ({
               order_id: o.srid || o.saleID || 'unknown',
-              user_id: userId,
+              user_id: String(userId),
               marketplace_product_id: String(o.nmId),
               title: o.subject || `Товар ${o.nmId}`,
               marketplace: 'WB',
@@ -337,7 +344,7 @@ export class MarketplaceService {
           );
           const mappedOzon: MarketplaceOrder[] = ozonOrders.map((o: OzonOrder) => ({
             order_id: o.posting_number,
-            user_id: userId,
+            user_id: String(userId),
             marketplace_product_id: String(o.products?.[0]?.sku || o.products?.[0]?.offer_id),
             title: o.products?.[0]?.name || 'Ozon Product',
             marketplace: 'Ozon',
@@ -360,7 +367,7 @@ export class MarketplaceService {
 
       // 3. Save to DB
       if (orders.length > 0) {
-        const result = await upsertMarketplaceOrders(userId, orders);
+        const result = await upsertMarketplaceOrders(String(userId), orders);
         totalImported = result.inserted + result.updated;
         console.log(
           `💾 Sync: Saved ${totalImported} orders to history (Date > ${dateFrom.toISOString()})`

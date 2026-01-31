@@ -7,7 +7,7 @@ type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 interface LogContext {
   [key: string]: unknown;
-  userId?: number;
+  userId?: number | string;
   correlationId?: string;
 }
 

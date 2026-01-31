@@ -31,7 +31,7 @@ import { verifyAdminAccessAsync, extractTelegramAuth } from '../middleware/auth.
 
 /** Database user record */
 interface DBUserRecord {
-  id: number;
+  id: string | number;
   username?: string;
   first_name: string;
   last_name?: string;
@@ -73,14 +73,14 @@ export async function handleAgentV4(
 
   logger.debug('Agent V4 starting authentication');
   // 1. Authentication
-  let userId: number;
+  let userId: string | number;
 
   const isAdmin = await verifyAdminAccessAsync(req);
   const bypassTelegramId = req.body?.telegramId || req.query?.telegramId;
 
   if (isAdmin && bypassTelegramId) {
     // Admin bypass for testing
-    userId = parseInt(bypassTelegramId as string);
+    userId = bypassTelegramId as string | number;
     logger.info('Admin API access granted', { userId });
 
     // SECURITY: Verify user exists before proceeding
@@ -382,7 +382,7 @@ export async function handleAgentV4Confirm(
     // Fallback if admin
   }
 
-  const userId = auth.success ? auth.context.userId : parseInt(req.body.telegramId);
+  const userId = auth.success ? auth.context.userId : (req.body.telegramId as string | number);
   const kv = await getKVClient();
 
   if (!kv) {

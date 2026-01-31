@@ -32,7 +32,7 @@ export interface MediaJob {
   id: string;
   type: JobType;
   status: JobStatus;
-  user_id: number;
+  user_id: string | number;
   productId?: string;
 
   sourceImageUrl: string;
@@ -120,7 +120,7 @@ export class MediaQueueService {
     type: JobType,
     sourceImageUrl: string,
     options: {
-      userId: number;
+      userId: string | number;
       productId?: string;
       metadata?: Record<string, unknown>;
       priority?: 'high' | 'normal' | 'low';
@@ -347,7 +347,7 @@ export class MediaQueueService {
       id: row.id as string,
       type: row.type as JobType,
       status: row.status as JobStatus,
-      user_id: parseInt(row.user_id as string),
+      user_id: row.user_id as string | number,
       productId: row.product_id as string | undefined,
 
       sourceImageUrl: row.source_image_url as string,

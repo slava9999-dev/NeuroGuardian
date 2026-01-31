@@ -14,7 +14,7 @@ import { sanitizeInput } from '../lib/index.js';
 export async function handleMarketplaceAccounts(
   req: VercelRequest,
   res: VercelResponse,
-  userId: number
+  userId: string | number
 ): Promise<VercelResponse> {
   const method = req.method;
 

@@ -68,6 +68,7 @@ export const products = pgTable(
     accountId: integer('account_id').references(() => marketplaceAccounts.id),
     marketplace: varchar('marketplace', { length: 50 }).notNull(),
     productId: varchar('product_id', { length: 255 }).notNull(),
+    groupId: varchar('group_id', { length: 255 }), // Cross-marketplace group ID
     nmId: varchar('nm_id', { length: 255 }), // WB Nomenclature ID
     officialSku: text('official_sku'),
     offerId: varchar('offer_id', { length: 255 }),

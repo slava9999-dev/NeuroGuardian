@@ -408,7 +408,7 @@ export class AgentOrchestratorV5 {
    */
   private async executeTools(
     plan: AgentPlan,
-    userId: number
+    userId: string | number
   ): Promise<Array<ToolResult & { tool: string }>> {
     const results: Array<ToolResult & { tool: string }> = [];
 
@@ -514,7 +514,7 @@ ${JSON.stringify(toolResults, null, 2)}
    * Update state after response
    */
   private async updateStateAfterResponse(
-    userId: number,
+    userId: string | number,
     query: string,
     _plan: AgentPlan,
     toolResults: Array<ToolResult & { tool: string }>
@@ -567,7 +567,7 @@ ${JSON.stringify(toolResults, null, 2)}
    * This enables the agent to remember important information across sessions
    */
   private async extractAndSaveFacts(
-    userId: number,
+    userId: string | number,
     userMessage: string,
     _assistantResponse: string,
     toolResults: Array<ToolResult & { tool: string }>

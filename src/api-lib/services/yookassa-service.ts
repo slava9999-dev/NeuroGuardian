@@ -50,7 +50,7 @@ export class YooKassaService {
    * Create payment
    */
   async createPayment(
-    request: CreatePaymentRequest & { userId: number }
+    request: CreatePaymentRequest & { userId: string | number }
   ): Promise<CreatePaymentResponse> {
     try {
       // Get tier price

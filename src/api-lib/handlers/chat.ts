@@ -13,7 +13,7 @@ import { getChatHistory, saveChatHistory, clearChatHistory } from '../services/d
 export async function handleGetChatHistory(
   _req: VercelRequest,
   res: VercelResponse,
-  userId: number
+  userId: string | number
 ): Promise<VercelResponse> {
   try {
     const messages = await getChatHistory(userId);
@@ -34,7 +34,7 @@ export async function handleGetChatHistory(
 export async function handleSaveChatHistory(
   req: VercelRequest,
   res: VercelResponse,
-  userId: number
+  userId: string | number
 ): Promise<VercelResponse> {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -65,7 +65,7 @@ export async function handleSaveChatHistory(
 export async function handleClearChatHistory(
   req: VercelRequest,
   res: VercelResponse,
-  userId: number
+  userId: string | number
 ): Promise<VercelResponse> {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });

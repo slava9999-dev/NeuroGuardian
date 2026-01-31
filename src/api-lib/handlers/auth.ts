@@ -101,7 +101,7 @@ export async function handleAuth(
 export async function handleSettings(
   req: VercelRequest,
   res: VercelResponse,
-  userId: number
+  userId: string | number
 ): Promise<VercelResponse> {
   // Import crypto for API key encryption/decryption
   const { encryptApiKey, decryptApiKey } = await import('../lib/crypto.js');
@@ -221,7 +221,7 @@ export async function handleSettings(
 export async function handlePlans(
   _req: VercelRequest,
   res: VercelResponse,
-  userId: number
+  userId: string | number
 ): Promise<VercelResponse> {
   // Import isFirstPayment from database
   const { isFirstPayment } = await import('../services/database.js');
