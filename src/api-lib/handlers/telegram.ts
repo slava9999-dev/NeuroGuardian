@@ -1056,6 +1056,94 @@ async function handleCallbackQuery(query: TelegramCallbackQuery): Promise<void> 
     return;
   }
 
+  // --- LOWER PRICE (Attack/Competitor) ---
+  if (data.startsWith('lower_price:')) {
+    const parts = data.split(':');
+    const mp = parts[1];
+    const externalId = parts[2];
+
+    await sendTelegramMessage(
+      Number(chatId),
+      `📉 *Атака конкурента*\n\nГотов снизить цену. На сколько опустить?`,
+      {
+        parseMode: 'Markdown',
+        replyMarkup: {
+          inline_keyboard: [
+            [
+              {
+                text: '📉 На -1%',
+                callback_data: `confirm:lower_percent:${mp}:${externalId}:1`,
+              },
+              {
+                text: '📉 На -2%',
+                callback_data: `confirm:lower_percent:${mp}:${externalId}:2`,
+              },
+            ],
+            [
+              {
+                text: '📉 На -5%',
+                callback_data: `confirm:lower_percent:${mp}:${externalId}:5`,
+              },
+            ],
+            [{ text: '❌ Отмена', callback_data: `cancel_action` }],
+          ],
+        },
+      }
+    );
+    return;
+  }
+
+  // --- LOWER PERCENT CONFIRMATION ---
+  if (data.startsWith('confirm:lower_percent:')) {
+    const parts = data.split(':');
+    const mp = parts[2];
+    const eid = parts[3];
+    const pct = parts[4];
+
+    await sendTelegramMessage(
+      Number(chatId),
+      `⚠️ *Подтвердите снижение цены на ${pct}%*\n\nВы вступаете в ценовую войну. Виктор рассчитает новую цену и отправит запрос.`,
+      {
+        parseMode: 'Markdown',
+        replyMarkup: {
+          inline_keyboard: [
+            [
+              { text: '📉 Атаковать', callback_data: `do_lower_percent:${mp}:${eid}:${pct}` },
+              { text: '❌ Отмена', callback_data: `cancel_action` },
+            ],
+          ],
+        },
+      }
+    );
+    return;
+  }
+
+  // --- DO LOWER PERCENT ---
+  if (data.startsWith('do_lower_percent:')) {
+    const parts = data.split(':');
+    const mp = parts[1];
+    const eid = parts[2];
+    const pct = parts[3];
+    const userId = query.from.id;
+
+    await sendTelegramMessage(Number(chatId), `⏳ Снижаю цену на ${pct}%...`);
+    const command = `Снизь цену на товар ${eid} на ${pct}% на ${mp}`;
+
+    try {
+      const result = await orchestrateV5(command, {
+        userId,
+        isFirstContact: false,
+        userName: query.from.first_name,
+      });
+
+      await sendTelegramMessage(Number(chatId), result.message, { parseMode: 'HTML' });
+    } catch (e) {
+      logger.error('Failed to lower price via callback', e);
+      await sendTelegramMessage(Number(chatId), `❌ Ошибка при снижении цены.`);
+    }
+    return;
+  }
+
   // --- USER PROTECTION CONTROL ---
   if (data === 'user_stop_all' || data === 'user_start_all') {
     const enable = data === 'user_start_all';

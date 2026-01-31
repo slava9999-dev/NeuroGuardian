@@ -1,6 +1,32 @@
 # 📊 Project State — NeuroGUARDIAN
 
-Last Updated: 2026-01-30 (Session 116) — 22:45 MSK
+Last Updated: 2026-01-31 (Session 117) — 18:20 MSK
+
+### Session 2026-01-31 (Session 117 - Sentinel Report & Vision Repair) 👁️🛡️
+
+**Objective: Fix broken "Digital Vision" price extraction and repair critical bugs in Sentinel Telegram report buttons.**
+
+> ✅ **PROXY AUTHENTICATION REPAIRED:** Fixed `ERR_SOCKS_CONNECTION_FAILED` in `BrowserEyes.ts` by implementing `proxy-chain`. Playwright now correctly handles SOCKS5 credentials via a local forwarder, bypassing marketplace IP blocks.
+> ✅ **TRUE PRICE VISION:** Updated DOM selectors in `BrowserEyes.ts` to capture the "WB Wallet" (purple) price. The bot now sees the real 2965₽ price instead of the inflated 4300₽ price, ensuring accurate alerts.
+> ✅ **TELEGRAM REPORT FIX:** Fixed a critical bug in `notifications.ts` where the "💰 Атаковать (снизить)" button triggered the _Raise Price_ handler.
+> ✅ **INTERACTIVE ATTACK MODE:** Implemented `lower_price` handlers in `telegram.ts`. Users can now instantly respond to competitor threats with -1%, -2%, or -5% price cuts directly from the Telegram alert.
+
+**Completed Actions:**
+
+- [x] **BrowserEyes Core**: `src/sentinel/BrowserEyes.ts` (Integrated `proxy-chain`, fixed selectors, added stealth headers).
+- [x] **Telegram Handlers**: `src/api-lib/handlers/telegram.ts` (Added `lower_price`, `confirm:lower_percent`, `do_lower_percent`).
+- [x] **Notification Service**: `src/api-lib/services/notifications.ts` (Corrected callback data for competitor alerts).
+- [x] **Verification**: Ran `scripts/test-vision-wb.ts` confirming successful proxy connection and price extraction.
+
+**New Issues Discovered:**
+
+- **None**: Critical path items resolved.
+
+**Next Steps:**
+
+- [ ] Deploy the fix to Vercel/Production.
+- [ ] Monitor the "Attack" button usage in live environment to ensure users understand the -1%/-5% flow.
+- [ ] Consider adding "Match Price" (exact parity) button in future updates.
 
 ### Session 2026-01-30 (Session 116 - Price Parity & Browser Vision Recovery) ⚖️👁️
 

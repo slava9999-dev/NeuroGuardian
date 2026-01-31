@@ -342,7 +342,7 @@ function getAlertButtons(alert: Alert): Record<string, unknown> | undefined {
       ]);
     } else if (alert.type === 'competitor_alert') {
       buttons.push([
-        { text: '💰 Атаковать (снизить)', callback_data: `raise_price:${mpLower}:${externalId}` },
+        { text: '💰 Атаковать (снизить)', callback_data: `lower_price:${mpLower}:${externalId}` },
         { text: '🛡️ Настроить защиту', callback_data: `check_protection:${externalId}` },
       ]);
     } else {

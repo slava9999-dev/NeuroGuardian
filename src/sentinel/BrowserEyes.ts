@@ -10,6 +10,7 @@ import type { Browser, Page, BrowserContext } from 'playwright';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { logger } from '../api-lib/lib/logger.js';
 import { proxyService } from '../api-lib/services/proxy-service.js';
+import { anonymizeProxy, closeAnonymizedProxy } from 'proxy-chain';
 
 interface BrowserEyesResult {
   buyerPrice: number | null;
@@ -74,12 +75,11 @@ export class BrowserEyes {
 
       this.browser = await chromium.launch({
         headless: process.env.HEADLESS !== 'false',
+        ignoreDefaultArgs: ['--enable-automation'],
         args: [
           '--disable-blink-features=AutomationControlled',
           '--disable-dev-shm-usage',
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-web-security',
+          '--window-size=1920,1080',
           '--disable-features=IsolateOrigins,site-per-process',
           '--lang=ru-RU',
         ],
@@ -120,6 +120,7 @@ export class BrowserEyes {
       let proxyConfig: import('../api-lib/services/proxy-service.js').ProxyConfig | null = null;
       let context: BrowserContext | null = null;
       let page: Page | null = null;
+      let anonymizedProxyUrl: string | null = null;
 
       try {
         await this.init();
@@ -146,23 +147,44 @@ export class BrowserEyes {
           locale: 'ru-RU',
           timezoneId: 'Europe/Moscow',
           extraHTTPHeaders: {
-            'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8',
-            Referer: 'https://www.google.com/',
+            Accept:
+              'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Cache-Control': 'max-age=0',
+            Connection: 'keep-alive',
+            // Change referer to look like internal navigation or direct traffic
+            Referer: 'https://www.wildberries.ru/',
+            'Sec-Ch-Ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"Windows"',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'same-origin',
+            'Sec-Fetch-User': '?1',
+            'Upgrade-Insecure-Requests': '1',
           },
         };
 
         if (proxyConfig) {
+          // Construct full URL with credentials for proxy-chain
           const proxyUrl = new URL(proxyConfig.server);
           if (proxyConfig.username && proxyConfig.password) {
             proxyUrl.username = proxyConfig.username;
             proxyUrl.password = proxyConfig.password;
           }
+          const upstreamUrl = proxyUrl.toString();
+
+          // "Chain" the proxy: Create a local HTTP proxy that forwards to the upstream SOCKS5/HTTP
+          // This solves Playwright's inability to handle SOCKS5 auth
+          anonymizedProxyUrl = await anonymizeProxy(upstreamUrl);
 
           logger.info(
-            `[BrowserEyes] Attempt ${attempt}: Using proxy ${proxyUrl.protocol}//${proxyUrl.host}`
+            `[BrowserEyes] Attempt ${attempt}: Chained proxy ${upstreamUrl} -> ${anonymizedProxyUrl}`
           );
+
           contextOptions.proxy = {
-            server: proxyUrl.toString(),
+            server: anonymizedProxyUrl,
+            // parsed properties are not needed here, proxy-chain handles auth
           };
         }
 
@@ -178,16 +200,25 @@ export class BrowserEyes {
         logger.info(`[BrowserEyes] Navigating to ${marketplace}: ${url}`);
 
         // Navigation with timeout and retry-safe wait
-        // WB is heavy, wait for load to ensure JS-rendered prices are ready
         await page.goto(url, {
           waitUntil: marketplace === 'WB' ? 'load' : 'domcontentloaded',
           timeout: 60000,
         });
 
-        // Wait for specific content or handle blocks
-        const content = await page.content();
+        // Check for blocks, but give it a chance to pass (e.g. Cloudflare turnstile)
+        let content = await page.content();
         if (content.includes('Доступ ограничен') || content.includes('challenge')) {
-          throw new Error('Blocked by Marketplace (Antibot)');
+          logger.warn('[BrowserEyes] Detected potential block. Waiting 5s for redirect...');
+          await page.waitForTimeout(5000);
+          content = await page.content();
+
+          if (content.includes('Доступ ограничен') || content.includes('challenge')) {
+            await page.screenshot({ path: 'blocked-page.png', fullPage: true });
+            logger.error(
+              '[BrowserEyes] Still blocked. Screenshot saved to updated blocked-page.png'
+            );
+            throw new Error('Blocked by Marketplace (Antibot)');
+          }
         }
 
         await this.simulateHumanBehavior(page);
@@ -223,6 +254,9 @@ export class BrowserEyes {
       } finally {
         if (page) await page.close();
         if (context) await context.close();
+        if (anonymizedProxyUrl) {
+          await closeAnonymizedProxy(anonymizedProxyUrl, true);
+        }
       }
     }
 
@@ -303,33 +337,57 @@ export class BrowserEyes {
    */
   private async extractWBPriceFromDOM(page: Page): Promise<BrowserEyesResult> {
     const priceData = await page.evaluate(() => {
-      // Strategy: Find price elements by common WB patterns
-      const priceSelectors = [
-        '.price-block__wallet-price', // WB Wallet price specific
-        '.price-block__final-price', // Main final price
-        '[class*="wallet-price"]', // WB Wallet price generic
-        '.price-block__content ins', // Another final price variant
-        '.product-page__price-block ins', // Sale price
-        'ins.price-block__final-price', // Explicit ins tags
+      // Updated selectors based on 2025 WB layout
+      const walletSelectors = [
+        '.price-block__wallet-price',
+        '.price-section__wallet-price',
+        '.price-block__wallet-price-value',
+        '.wallet-price',
+      ];
+
+      const regularSelectors = [
+        '.price-block__final-price',
+        '.price-section__final-price',
+        'ins.price-block__final-price',
+        '.product-page__price-block ins',
       ];
 
       let buyerPrice: number | null = null;
       let originalPrice: number | null = null;
-      const cardPrice: number | null = null;
+      let cardPrice: number | null = null;
 
-      // Try to find wallet/card price (lowest)
-      for (const selector of priceSelectors) {
+      // 1. Try to find WB Wallet Price (Purple price)
+      for (const selector of walletSelectors) {
+        const elem = document.querySelector(selector);
+        if (elem) {
+          const text = elem.textContent || '';
+          const match = text.match(/(\d[\d\s]*)/);
+          if (match) {
+            cardPrice = parseInt(match[1].replace(/\s/g, ''));
+            break; // Found the specific wallet price
+          }
+        }
+      }
+
+      // 2. Try to find Regular Final Price
+      for (const selector of regularSelectors) {
         const elem = document.querySelector(selector);
         if (elem) {
           const text = elem.textContent || '';
           const match = text.match(/(\d[\d\s]*)/);
           if (match) {
             const price = parseInt(match[1].replace(/\s/g, ''));
-            if (!buyerPrice || price < buyerPrice) {
+            // If we haven't found a buyer price yet, or this one is lower/valid
+            if (!buyerPrice) {
               buyerPrice = price;
             }
           }
         }
+      }
+
+      // If we found a card price, that is effectively the "buyer price" (lowest)
+      if (cardPrice) {
+        buyerPrice = cardPrice;
       }
 
       // Find original price (strikethrough)
